@@ -1,0 +1,110 @@
+{
+    "books": [
+        {
+            "id": "book-1",
+            "title": "The Design of Everyday Things",
+            "author": "Don Norman",
+            "category": "nonfiction",
+            "subcategory": "design",
+            "enjoyment": 5,
+            "importance": 5,
+            "dateAdded": "2024-01-15",
+            "favorite": true,
+            "notes": "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+        },
+        {
+            "id": "book-2",
+            "title": "Thinking, Fast and Slow",
+            "author": "Daniel Kahneman",
+            "category": "nonfiction",
+            "subcategory": "science",
+            "enjoyment": 4,
+            "importance": 5,
+            "dateAdded": "2024-02-10",
+            "favorite": true,
+            "notes": null
+        },
+        {
+            "id": "book-3",
+            "title": "The Catcher in the Rye",
+            "author": "J.D. Salinger",
+            "category": "fiction",
+            "subcategory": null,
+            "enjoyment": 4,
+            "importance": 3,
+            "dateAdded": "2024-03-20",
+            "favorite": false,
+            "notes": null
+        },
+        {
+            "id": "essay-1",
+            "title": "Politics and the English Language",
+            "author": "George Orwell",
+            "category": "essays",
+            "subcategory": null,
+            "enjoyment": 5,
+            "importance": 4,
+            "dateAdded": "2024-04-05",
+            "favorite": true,
+            "notes": "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        },
+        {
+            "id": "paper-academic-1",
+            "title": "Attention Is All You Need",
+            "author": "Vaswani et al.",
+            "category": "research",
+            "subcategory": "machine-learning",
+            "enjoyment": 4,
+            "importance": 5,
+            "dateAdded": "2024-05-12",
+            "favorite": true,
+            "notes": "The foundational transformer paper."
+        },
+        {
+            "id": "advice-1",
+            "title": "How to Do Great Work",
+            "author": "Paul Graham",
+            "category": "advice",
+            "subcategory": null,
+            "enjoyment": 5,
+            "importance": 5,
+            "dateAdded": "2024-06-01",
+            "favorite": true,
+            "notes": "Ut enim ad minim veniam, quis nostrud exercitation."
+        }
+    ],
+    "categories": [
+        {
+            "id": "all",
+            "name": "All"
+        },
+        {
+            "id": "favorites",
+            "name": "Favorites"
+        },
+        {
+            "id": "essays",
+            "name": "Essays"
+        },
+        {
+            "id": "research",
+            "name": "Research Papers"
+        },
+        {
+            "id": "science",
+            "name": "Science"
+        },
+        {
+            "id": "advice",
+            "name": "Advice"
+        },
+        {
+            "id": "fiction",
+            "name": "Fiction"
+        },
+        {
+            "id": "nonfiction",
+            "name": "Nonfiction"
+        }
+    ]
+}

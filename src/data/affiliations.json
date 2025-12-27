@@ -1,0 +1,38 @@
+{
+    "name": "Atrey Desai",
+    "title": "Undergraduate Researcher",
+    "school": "[SCHOOL NAME - e.g., University of Maryland]",
+    "program": "[PROGRAM - e.g., Computer Science]",
+    "year": "Third year",
+    "advisors": [],
+    "currentRole": {
+        "organization": "Learn Prompting",
+        "role": "[ROLE - e.g., Research Lead]",
+        "url": "https://learnprompting.org"
+    },
+    "researchInterests": [
+        "[INTEREST 1 - e.g., AI Safety]",
+        "[INTEREST 2 - e.g., Large Language Models]",
+        "[INTEREST 3 - e.g., Reinforcement Learning]"
+    ],
+    "priorExperience": [],
+    "mentors": [],
+    "location": {
+        "hometown": "Saratoga",
+        "current": "Washington, DC area"
+    },
+    "personal": {
+        "description": "Curious and whimsical",
+        "interests": [
+            "[PERSONAL INTEREST 1]",
+            "[PERSONAL INTEREST 2]"
+        ],
+        "blogs": []
+    },
+    "social": {
+        "github": "https://github.com/atreydesai",
+        "twitter": "https://x.com/atreydesai",
+        "scholar": "https://scholar.google.com/citations?user=hTDzj6cAAAAJ&hl=en",
+        "email": "adesai10@umd.edu"
+    }
+}

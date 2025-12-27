@@ -1,5 +1,5 @@
 {
-  "name": "prestonfu.com",
+  "name": "atreydesai.com",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -34,6 +34,7 @@
     "@types/strftime": "^0.9.8",
     "@vercel/analytics": "^1.2.2",
     "@vercel/speed-insights": "^1.1.0",
+    "locomotive-scroll": "^4.1.4",
     "lucide-svelte": "^0.344.0",
     "marked": "^12.0.0",
     "mathlifier": "^1.3.5",

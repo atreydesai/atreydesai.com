@@ -1,247 +1,196 @@
 <script lang="ts">
-  import ArrowUpRight from "lucide-svelte/icons/arrow-up-right";
   import Seo from "$lib/components/Seo.svelte";
+  import ResearchCard from "$lib/components/ResearchCard.svelte";
+  import LegoImage from "$lib/components/LegoImage.svelte";
+  import ArrowRight from "lucide-svelte/icons/arrow-right";
+  import Github from "lucide-svelte/icons/github";
+  import Twitter from "lucide-svelte/icons/twitter";
+  import GraduationCap from "lucide-svelte/icons/graduation-cap";
+  import Mail from "lucide-svelte/icons/mail";
+  import { fly, fade } from "svelte/transition";
+  import papersData from "$lib/../data/papers.json";
+  import affiliationsData from "$lib/../data/affiliations.json";
+  import ScrollReveal from "$lib/components/ScrollReveal.svelte";
 
-  //   const featuredProjects = [
-  //     {
-  //       name: "sshx",
-  //       href: "/projects#sshx",
-  //       desc: "secure web-based, collaborative terminal",
-  //     },
-  //     {
-  //       name: "Bore",
-  //       href: "/projects#bore",
-  //       desc: "bypass your NAT in just 400 lines of code",
-  //       aside: "7500+ stars on GitHub",
-  //     },
-  //     {
-  //       name: "Percival",
-  //       href: "/projects#percival",
-  //       desc: "reactive notebooks for exploratory data analysis",
-  //     },
-  //     {
-  //       name: "Rustpad",
-  //       href: "/projects#rustpad",
-  //       desc: "self-hosted collaborative text editor",
-  //       aside: "2M+ downloads",
-  //     },
-  //     {
-  //       name: "Crepe",
-  //       href: "/projects#crepe",
-  //       desc: "compiled Datalog language in Rust",
-  //       aside: "used by distributed databases & security systems",
-  //     },
-  //     {
-  //       name: "FastSeg",
-  //       href: "/projects#fastseg",
-  //       desc: "real-time semantic segmentation for self-driving cars",
-  //     },
-  //     {
-  //       name: "Set with Friends",
-  //       href: "/projects#setwithfriends",
-  //       desc: "online multiplayer card game",
-  //       aside: "30M+ page views, 900K+ users",
-  //     },
-  //   ];
-  //
+  // Get featured papers for the preview section
+  $: featuredPapers = papersData.papers.filter((p) => p.featured).slice(0, 3);
 
-  import { page } from "$app/stores";
-  import { onMount } from "svelte";
-  import CalendarDays from "lucide-svelte/icons/calendar-days";
-  import Star from "lucide-svelte/icons/star";
+  // Email reveal with animation
+  let emailRevealed = false;
+  const email = "adesai10@umd.edu";
 
-  import Project from "./projects/Project.svelte";
-
-  const projects = import.meta.glob("../projects/*.md", {
-    eager: true,
-  }) as any;
-  // const images = import.meta.glob("../projects/*.{png,jpg,svg,gif}", {
-  //   eager: true,
-  // }) as any;
-
-  function trimName(id: string) {
-    return id.match(/\.\.\/projects\/(.*)\.md$/)?.[1];
+  function revealEmail() {
+    emailRevealed = true;
   }
 
-  $: projectsByDate = Object.keys(projects).sort(
-    (a, b) => projects[b].date - projects[a].date,
-  );
-  $: projectsByTitle = Object.keys(projects).sort((a, b) => {
-    const titleA = projects[a].title.toLowerCase();
-    const titleB = projects[b].title.toLowerCase();
-    return titleA < titleB ? -1 : titleA > titleB ? 1 : 0;
-  });
-
-  onMount(() => {
-    // Hack: Fix the scroll position after the page loads, especially for mobile browsers.
-    const selected = $page.url.hash.slice(1);
-    if (selected) {
-      setTimeout(() => {
-        if ($page.url.hash.slice(1) === selected) {
-          document.getElementById(selected)?.scrollIntoView();
-        }
-      }, 500);
-    }
-  });
-
-  let stars: Record<string, number> | null = null;
-  onMount(async () => {
-    const resp = await fetch(
-      "https://api.github.com/users/ekzhang/repos?per_page=100",
-    );
-    const repos = await resp.json();
-    stars = {};
-    for (const obj of repos) {
-      stars[obj.full_name] = obj.stargazers_count;
-    }
-  });
-
-  $: projectsByStars = [...projectsByTitle].sort((a, b) => {
-    const starsA = stars?.[projects[a].repo] ?? 0;
-    const starsB = stars?.[projects[b].repo] ?? 0;
-    return starsB - starsA;
-  });
-
-  let sortOrder: "date" | "stars" = "date";
+  const socialLinks = [
+    { name: "GitHub", href: "https://github.com/atreydesai", icon: Github },
+    { name: "Twitter", href: "https://x.com/atreydesai", icon: Twitter },
+    {
+      name: "Scholar",
+      href: "https://scholar.google.com/citations?user=hTDzj6cAAAAJ&hl=en",
+      icon: GraduationCap,
+    },
+  ];
 </script>
 
-<Seo title="Preston Fu" description="Undergrad at UC Berkeley" />
+<Seo
+  title="Atrey Desai"
+  description="Third year undergraduate researcher interested in AI and machine learning."
+/>
 
-<!-- <p
-  class="layout-md text-black text-xl leading-tight font-light mb-16"
-  id="preston-is"
->
-  <span class="g">is a</span> software engineer<span class="g">,</span><br />
-  researcher<span class="g">, and</span><br />
-  designer<span class="g">.</span>
-</p> -->
-
-<div class="layout-md text-lg space-y-8">
-  <!-- <div
-    class="flex flex-col md:flex-row md:items-center md:justify-between md:space-x-8"
-  >
-    <div class="flex-1"> -->
-  <p>
-    I'm an undergrad at UC Berkeley advised by
-    <a
-      class="link"
-      href="https://people.eecs.berkeley.edu/~svlevine/"
-      target="_blank"
-    >
-      Sergey Levine</a
-    >
-    and
-    <a class="link" href="https://aviralkumar2907.github.io/" target="_blank">
-      Aviral Kumar</a
-    >. I'm interested in building systems that can efficiently learn 
-    general skills.
-  </p>
-  <!-- </div> -->
-  <!-- <div
-      class="mt-6 md:mt-0 flex-shrink-0 flex justify-center md:justify-start"
-    >
-      <img
-        src="/assets/images/big-game.jpg"
-        alt="Go bears!"
-        class="w-60 md:w-44 md:h-44 md:rounded-full object-cover"
-      />
-    </div> -->
-  <!-- </div> -->
-
-  <div>
-    <h2 class="heading2 text-xl mb-2">News</h2>
-    <ul class="list-disc ml-4">
-      <li>
-        <b>Sep 2025</b>: New
-        <a class="link" href="https://value-scaling.github.io/" target="_blank"
-          >blog post</a
-        > summarizing our
-        <a class="link" href="#model_scaling">two</a>
-        <a class="link" href="#utd_scaling">papers</a>
-        on scaling laws for RL with value functions and discussing open problems.
-      </li>
-      <li>
-        <b>Sep 2025</b>: New
-        <a class="link" href="https://arxiv.org/abs/2508.14881" target="_blank"
-          >paper</a
-        > on compute-optimal scaling for value-based RL is accepted to NeurIPS!
-      </li>
-      <li>
-        <b>May 2025</b>: I'm an
-        <a
-          class="link"
-          href="https://eecs.berkeley.edu/resources/undergrads/accel/"
-          target="_blank">Accel Scholar</a
-        >!
-      </li>
-      <li>
-        <b>May 2025</b>: New
-        <a class="link" href="https://arxiv.org/abs/2502.04327" target="_blank"
-          >paper</a
-        > on scaling laws for value-based RL is accepted to ICML!
-      </li>
-    </ul>
-  </div>
-
-  <div class="space-y-2">
-    <h2 class="heading2 text-xl space-y-5">Research</h2>
-    {#each sortOrder === "date" ? projectsByDate : projectsByStars as id (id)}
-      <section id={trimName(id)}>
-        <!-- <div class="mx-auto max-w-[1152px] px-4 sm:px-6"> -->
-        <Project data={projects[id]} {stars} />
-        <!-- </div> -->
-      </section>
-    {/each}
-  </div>
-</div>
-
-<!-- <div class="leading-snug space-y-4">
-    <p class="pb-2">Notable open-source work:</p>
-
-    {#each featuredProjects as project}
-      <a class="project-pair" href={project.href}>
-        <div class="text-black font-medium">
-          {project.name}
-          <ArrowUpRight size={18} class="inline text-neutral-400" />
+<div class="layout-main py-8 md:py-12">
+  <!-- Hero Section -->
+  <section class="mb-16">
+    <div class="flex flex-col md:flex-row items-start gap-8">
+      <!-- Left Column: Image + Social Links -->
+      <div class="w-full md:w-1/3 flex-shrink-0">
+        <!-- Profile Image with Lego Effect -->
+        <div
+          class="aspect-square w-full max-w-[300px] mx-auto md:mx-0 rounded-lg overflow-hidden mb-6"
+        >
+          <LegoImage
+            src="/images/profile.png"
+            alt="Atrey Desai"
+            blockSize={16}
+          />
         </div>
-        <div>
-          <p>{project.desc}</p>
-          {#if project.aside}
-            <aside>{project.aside}</aside>
+
+        <!-- Social Links (moved from footer) -->
+        <div class="space-y-3 max-w-[300px] mx-auto md:mx-0">
+          {#each socialLinks as link}
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center space-x-3 text-ink-600 dark:text-cream-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 group"
+            >
+              <svelte:component
+                this={link.icon}
+                size={18}
+                class="transition-transform duration-300 group-hover:-translate-y-0.5"
+              />
+              <span class="text-sm">@atreydesai</span>
+            </a>
+          {/each}
+
+          <!-- Email with animated click to reveal -->
+          <div class="flex items-center space-x-3">
+            <span
+              class="text-ink-600 dark:text-cream-400 transition-transform duration-300"
+              class:translate-y-0={!emailRevealed}
+              class:-translate-y-0.5={emailRevealed}
+            >
+              <Mail size={18} />
+            </span>
+            {#if emailRevealed}
+              <a
+                href="mailto:{email}"
+                class="text-sm text-accent dark:text-accent-light hover:text-accent-dark transition-all duration-300"
+                in:fly={{ x: -10, duration: 300 }}
+              >
+                {email}
+              </a>
+            {:else}
+              <button
+                type="button"
+                on:click={revealEmail}
+                class="text-sm text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 cursor-pointer underline underline-offset-2 decoration-dotted"
+              >
+                click to reveal
+              </button>
+            {/if}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Introduction -->
+      <div class="flex-1">
+        <h1
+          class="heading-display text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
+        >
+          hey, i'm atrey desai.
+        </h1>
+
+        <div class="space-y-4 text-ink-700 dark:text-cream-300">
+          <p class="text-lg">i'm currently:</p>
+          <ul class="space-y-2 text-base">
+            <li>
+              @ <span class="text-ink-900 dark:text-cream-100"
+                >{affiliationsData.school}</span
+              >
+              — {affiliationsData.year} undergraduate
+              {#if affiliationsData.advisors.length > 0}
+                advised by
+                {#each affiliationsData.advisors as advisor, i}
+                  {#if advisor.url}
+                    <a
+                      href={advisor.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="link">{advisor.name}</a
+                    >
+                  {:else}
+                    <span>{advisor.name}</span>
+                  {/if}
+                  {#if i < affiliationsData.advisors.length - 1}{", "}{/if}
+                {/each}
+              {/if}
+            </li>
+            {#if affiliationsData.currentRole}
+              <li>
+                @ <a
+                  href={affiliationsData.currentRole.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link">{affiliationsData.currentRole.organization}</a
+                >
+                — {affiliationsData.currentRole.role}
+              </li>
+            {/if}
+          </ul>
+
+          <p class="text-base">
+            <span class="text-ink-500 dark:text-ink-400"
+              >research interests:</span
+            >
+            {affiliationsData.researchInterests.join(", ")}
+          </p>
+
+          {#if affiliationsData.priorExperience.length > 0}
+            <p class="text-sm text-ink-500 dark:text-ink-400">
+              prior: {affiliationsData.priorExperience
+                .map((e) => e.name)
+                .join(", ")}
+            </p>
           {/if}
         </div>
-      </a>
-    {/each}
-  </div> -->
+      </div>
+    </div>
+  </section>
 
-<!-- <div class="space-y-5">
-    <img
-      alt="Self-portrait photograph of Preston Fu at his desk"
-      src="/assets/images/profile4.jpg"
-    />
-  </div> -->
+  <!-- Divider -->
+  <hr class="border-dotted border-ink-200 dark:border-ink-700 my-8" />
 
-<style lang="postcss">
-  .g {
-    @apply text-neutral-400;
-  }
+  <!-- Research Preview Section -->
+  <ScrollReveal animation="fade-up" delay={100}>
+    <section class="mb-12">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="section-heading mb-0">research</h2>
+        <a
+          href="/research"
+          class="link-subtle inline-flex items-center gap-1 text-sm"
+        >
+          see all
+          <ArrowRight size={14} />
+        </a>
+      </div>
 
-  em {
-    @apply font-serif text-[110%] leading-[100%];
-  }
-
-  .project-pair {
-    @apply grid sm:grid-cols-[1fr,2fr] gap-y-1 -mx-3 px-3 py-2 hover:bg-neutral-100 transition-colors;
-  }
-
-  aside {
-    @apply mt-0.5 text-base text-neutral-500;
-  }
-
-  /* Correction for vertical navigation links on mobile. */
-  @media (max-width: 420px) {
-    #preston-is {
-      @apply -mt-10;
-    }
-  }
-</style>
+      <div class="space-y-2">
+        {#each featuredPapers as paper (paper.id)}
+          <ResearchCard {paper} />
+        {/each}
+      </div>
+    </section>
+  </ScrollReveal>
+</div>

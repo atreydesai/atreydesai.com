@@ -1,42 +1,98 @@
-<footer class="layout-md text-lg mt-20 flex flex-col">
-  <div class="row">
-    <span>GitHub</span>
-    <hr />
-    <a class="link" href="https://github.com/prestonfu" target="_blank"
-      >@prestonfu</a
+<script lang="ts">
+  import { onMount } from "svelte";
+  import { fly, fade } from "svelte/transition";
+  import Music from "lucide-svelte/icons/music";
+  import Volume2 from "lucide-svelte/icons/volume-2";
+  import VolumeX from "lucide-svelte/icons/volume-x";
+
+  // DC Time with seconds
+  let dcTime = "";
+
+  onMount(() => {
+    const updateTime = () => {
+      const now = new Date();
+      dcTime = now.toLocaleTimeString("en-US", {
+        timeZone: "America/New_York",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  });
+
+  // Music player
+  let isPlaying = false;
+  let audioElement: HTMLAudioElement | null = null;
+
+  const musicSamples = [
+    "/audio/sample1.mp3",
+    "/audio/sample2.mp3",
+    "/audio/sample3.mp3",
+  ];
+
+  function toggleMusic() {
+    if (!audioElement) {
+      const randomSample =
+        musicSamples[Math.floor(Math.random() * musicSamples.length)];
+      audioElement = new Audio(randomSample);
+      audioElement.volume = 0.3;
+      audioElement.loop = true;
+    }
+
+    if (isPlaying) {
+      audioElement.pause();
+    } else {
+      audioElement.play().catch(() => {
+        console.log("Audio playback requires user interaction first");
+      });
+    }
+    isPlaying = !isPlaying;
+  }
+</script>
+
+<footer class="mt-20 pb-8 px-6 md:px-12">
+  <div class="border-t border-ink-200 dark:border-ink-700 pt-6">
+    <!-- Footer - full width, left/right justified -->
+    <div
+      class="flex flex-col sm:flex-row items-center sm:items-end justify-between text-sm space-y-4 sm:space-y-0"
     >
-  </div>
-  <div class="row">
-    <span>Linkedin</span>
-    <hr />
-    <a class="link whitespace-nowrap" href="https://www.linkedin.com/in/preston-fu/" target="_blank"
-      >@preston-fu</a
-    >
-  </div>
-  <div class="row">
-    <span>Scholar</span>
-    <hr />
-    <a class="link whitespace-nowrap" href="https://scholar.google.com/citations?view_op=list_works&hl=en&hl=en&user=VjtRFvEAAAAJ" target="_blank"
-      >click</a
-    >
-  </div>
-  <div class="row">
-    <span>Email</span>
-    <hr />
-    <p>prestonfu&nbsp;[at]&nbsp;berkeley&nbsp;[dot]&nbsp;edu</p>
+      <!-- Left side - DC Time -->
+      <div class="text-ink-500 dark:text-ink-400 text-center sm:text-left">
+        <div class="font-mono text-lg tabular-nums">{dcTime}</div>
+        <div class="text-xs uppercase tracking-wider opacity-75">
+          Washington, DC
+        </div>
+      </div>
+
+      <!-- Right side - Music player -->
+      <button
+        type="button"
+        on:click={toggleMusic}
+        class="flex items-center space-x-2 text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-cream-300 transition-all duration-300 group"
+      >
+        <span
+          class="transition-transform duration-300 group-hover:scale-110"
+          class:animate-pulse={isPlaying}
+        >
+          <Music size={16} />
+        </span>
+        <span class="text-xs uppercase tracking-wider">let's get groovy</span>
+        <span class="transition-all duration-300">
+          {#if isPlaying}
+            <span in:fade={{ duration: 200 }}>
+              <Volume2 size={16} />
+            </span>
+          {:else}
+            <span in:fade={{ duration: 200 }}>
+              <VolumeX size={16} />
+            </span>
+          {/if}
+        </span>
+      </button>
+    </div>
   </div>
 </footer>
-
-<style lang="postcss">
-  .row {
-    @apply flex items-center space-x-4;
-  }
-
-  .row span {
-    @apply text-neutral-500;
-  }
-
-  .row hr {
-    @apply w-full mt-0.5 border-neutral-300 border-dotted;
-  }
-</style>

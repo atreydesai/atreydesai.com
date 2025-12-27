@@ -5,7 +5,9 @@ import preprocess from "svelte-preprocess";
 const config = {
   preprocess: [preprocess({ postcss: true })],
   kit: {
-    adapter: adapter(),
+    adapter: adapter({
+      runtime: 'nodejs20.x'
+    }),
   },
 };
 export default config;

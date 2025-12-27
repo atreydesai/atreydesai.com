@@ -2,81 +2,258 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: "IBM Plex Sans";
-  src: url("/fonts/ibm_plex_sans/IBMPlexSans-Regular.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Newsreader Italics";
-  src: url("/fonts/newsreader/Newsreader_14pt-Italic.ttf") format("truetype");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+/* ============================================
+   Design System - Atrey Desai's Personal Site
+   ============================================ */
 
 @layer base {
+  html {
+    @apply motion-safe:scroll-smooth;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream-100 text-ink-700;
+    font-family: "neue-haas-grotesk-text", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Dark mode base styles */
+  .dark body,
+  body.dark {
+    @apply bg-ink-900 text-cream-200;
+  }
+
   hr {
-    @apply border-neutral-200;
+    @apply border-ink-200;
+  }
+
+  .dark hr {
+    @apply border-ink-700;
+  }
+
+  ::selection {
+    @apply bg-blush-200;
+  }
+
+  .dark ::selection {
+    @apply bg-ink-600;
   }
 }
 
 @layer components {
-  .link {
-    @apply underline underline-offset-[3px] decoration-neutral-400 dark:decoration-neutral-500;
-    @apply hover:text-black hover:decoration-black transition-colors;
-    @apply dark:hover:text-white dark:hover:decoration-white;
-  }
-  .link-no-underline {
-    @apply decoration-neutral-400 dark:decoration-neutral-500;
-    @apply hover:text-black hover:decoration-black transition-colors hover:underline hover:underline-offset-[3px];
-    @apply dark:hover:text-white dark:hover:decoration-white;
+
+  /* Typography */
+  .heading-display {
+    font-family: "neue-haas-grotesk-display", sans-serif;
+    @apply font-bold tracking-tight;
   }
 
-  .layout-md {
+  .text-serif {
+    font-family: "Source Serif 4", serif;
+  }
+
+  /* Layout - 1:3:1 ratio system */
+  .layout-container {
+    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .layout-main {
     @apply max-w-[700px] mx-auto px-4 sm:px-6;
   }
 
-  .heading2 {
-    @apply text-black text-xl font-semibold mb-4;
+  /* Links - Adobe-ish accent color */
+  .link {
+    @apply text-accent decoration-accent/50 underline underline-offset-[3px];
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .link:hover {
+    @apply text-accent-dark decoration-accent-dark;
+    transform: translateY(-1px);
+  }
+
+  .dark .link {
+    @apply text-accent-light decoration-accent-light/50;
+  }
+
+  .dark .link:hover {
+    @apply text-accent-light decoration-accent-light;
+  }
+
+  .link-subtle {
+    @apply text-ink-500 transition-all duration-300 ease-out;
+  }
+
+  .link-subtle:hover {
+    @apply text-accent;
+    transform: translateY(-1px);
+  }
+
+  .dark .link-subtle {
+    @apply text-ink-400;
+  }
+
+  .dark .link-subtle:hover {
+    @apply text-accent-light;
+  }
+
+  /* Section headings */
+  .section-heading {
+    font-family: "neue-haas-grotesk-display", sans-serif;
+    @apply text-xl font-semibold text-ink-900 mb-4;
+  }
+
+  .dark .section-heading {
+    @apply text-cream-100;
+  }
+
+  /* Cards and containers */
+  .card {
+    @apply bg-cream-50 rounded-lg p-4 transition-all duration-200;
+    @apply hover:bg-cream-200;
+  }
+
+  .dark .card {
+    @apply bg-ink-800 hover:bg-ink-700;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg;
+    @apply font-medium transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply btn bg-ink-900 text-cream-100;
+    @apply hover:bg-ink-700;
+  }
+
+  .dark .btn-primary {
+    @apply bg-cream-100 text-ink-900 hover:bg-cream-200;
+  }
+
+  /* Tags/Pills */
+  .pill {
+    @apply inline-flex items-center text-sm font-medium;
+    @apply px-2 py-0.5 bg-cream-200 text-ink-600 rounded-full;
+  }
+
+  .dark .pill {
+    @apply bg-ink-700 text-cream-300;
   }
 }
 
-html {
-  @apply motion-safe:scroll-smooth;
-}
+@layer utilities {
 
-body {
-  @apply /* antialiased */
-  py-12 sm:py-24 md:py-32 text-neutral-700;
-  font-family: "IBM Plex Sans", sans-serif;
-}
+  /* Custom cursor */
+  .cursor-custom {
+    cursor: none;
+  }
 
-.font-serif {
-  font-family: "Newsreader Italics", serif;
-}
+  /* Smooth image loading */
+  .img-loading {
+    @apply blur-sm transition-all duration-300;
+  }
 
-::selection {
-  @apply bg-emerald-100 dark:bg-emerald-600;
-}
+  .img-loaded {
+    @apply blur-0;
+  }
 
-.dark {
-  color-scheme: dark;
-}
+  /* Prevent layout shift */
+  .aspect-photo {
+    aspect-ratio: 3/2;
+  }
 
-@media screen and (min-width: 960px) {
-  html {
-    margin-left: calc(100vw - 100%);
-    margin-right: 0;
+  .aspect-portrait {
+    aspect-ratio: 2/3;
+  }
+
+  /* Text balance for headings */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Hide scrollbar but keep scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
+/* Custom Cursor Styles */
+.custom-cursor {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transition: transform 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out;
+  mix-blend-mode: difference;
+  background: transparent;
+}
+
+.custom-cursor.cursor-hover {
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Disable custom cursor on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .custom-cursor {
+    display: none;
+  }
+
+  .cursor-custom {
+    cursor: auto;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  body {
+    @apply bg-white text-black;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Image styles */
 img {
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
+}
+
+/* Fix horizontal scrollbar on wide screens */
+@media screen and (min-width: 960px) {
+  html {
+    margin-left: calc(100vw - 100%);
+    margin-right: 0;
+  }
 }
