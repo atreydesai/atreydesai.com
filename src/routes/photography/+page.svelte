@@ -1,9 +1,7 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
-    import X from "lucide-svelte/icons/x";
-    import ChevronLeft from "lucide-svelte/icons/chevron-left";
-    import ChevronRight from "lucide-svelte/icons/chevron-right";
-    import Instagram from "lucide-svelte/icons/instagram";
+    import { X, ChevronLeft, ChevronRight } from "@jis3r/icons";
+    import { Instagram } from "lucide-svelte";
     import { onMount } from "svelte";
 
     // Placeholder photos - replace with actual photos
@@ -166,7 +164,7 @@
     </p>
 
     <!-- Masonry Grid (2 columns like Jessy Lin's) -->
-    <div class="columns-1 sm:columns-2 gap-4 space-y-4">
+    <div class="columns-1 sm:columns-2 gap-4 space-y-4 stagger-children">
         {#each photos as photo, index}
             <button
                 type="button"

@@ -1,9 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { fly, fade } from "svelte/transition";
-  import Music from "lucide-svelte/icons/music";
-  import Volume2 from "lucide-svelte/icons/volume-2";
-  import VolumeX from "lucide-svelte/icons/volume-x";
+  import { Disc3, VolumeOff } from "@jis3r/icons";
+  import { Volume2 } from "lucide-svelte";
 
   // DC Time with seconds
   let dcTime = "";
@@ -78,17 +77,17 @@
           class="transition-transform duration-300 group-hover:scale-110"
           class:animate-pulse={isPlaying}
         >
-          <Music size={16} />
+          <Disc3 size={16} class="translate-y-[1px]" />
         </span>
         <span class="text-xs uppercase tracking-wider">let's get groovy</span>
         <span class="transition-all duration-300">
           {#if isPlaying}
             <span in:fade={{ duration: 200 }}>
-              <Volume2 size={16} />
+              <Volume2 size={16} class="translate-y-[1px]" />
             </span>
           {:else}
             <span in:fade={{ duration: 200 }}>
-              <VolumeX size={16} />
+              <VolumeOff size={16} class="translate-y-[1px]" />
             </span>
           {/if}
         </span>

@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
-    import Sun from "lucide-svelte/icons/sun";
-    import Moon from "lucide-svelte/icons/moon";
+    import { Sun, CloudMoon } from "@jis3r/icons";
 
     let isDark = false;
 
@@ -54,6 +53,6 @@
     {#if isDark}
         <Sun size={18} />
     {:else}
-        <Moon size={18} />
+        <CloudMoon size={18} />
     {/if}
 </button>

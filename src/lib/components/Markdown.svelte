@@ -5,7 +5,7 @@
 
   marked.use({
     renderer: {
-      link(href: string, title: string | null, text: string) {
+      link(href: string, title: string | null | undefined, text: string) {
         let out = `<a rel="external" href="${encodeURI(href)}" class="link" target="_blank"`;
         if (title) {
           out += ' title="' + title + '"';
@@ -16,10 +16,7 @@
     },
   });
 
-  $: html = marked.parse(source, {
-    smartLists: true,
-    smartypants: true,
-  });
+  $: html = marked.parse(source);
 </script>
 
 <div class="md-output">

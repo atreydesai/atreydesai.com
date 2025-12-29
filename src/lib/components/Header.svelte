@@ -2,8 +2,8 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import DarkModeToggle from "./DarkModeToggle.svelte";
-  import Menu from "lucide-svelte/icons/menu";
-  import X from "lucide-svelte/icons/x";
+  import { Menu } from "lucide-svelte";
+  import { X } from "@jis3r/icons";
 
   const links = [
     { name: "About", href: "/about" },
@@ -145,7 +145,7 @@
 </header>
 
 <!-- Spacer to prevent content from going under fixed header -->
-<div class="h-16" />
+<div class="h-16"></div>
 
 <style>
   .nav-link {

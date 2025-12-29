@@ -1,9 +1,7 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
-    import booksData from "$lib/../data/books.json";
-    import Star from "lucide-svelte/icons/star";
-    import BookOpen from "lucide-svelte/icons/book-open";
-    import ChevronDown from "lucide-svelte/icons/chevron-down";
+    import { booksData } from "$lib/content";
+    import { Star, BookOpenText, ChevronDown } from "@jis3r/icons";
     import { slide } from "svelte/transition";
 
     // Filter state
@@ -83,7 +81,7 @@
     </div>
 
     <!-- Books list -->
-    <div class="space-y-2">
+    <div class="space-y-2 stagger-children">
         {#each sortedBooks as book (book.id)}
             <div class="border-b border-ink-100 dark:border-ink-800">
                 <!-- Clickable header -->
@@ -192,7 +190,7 @@
     <!-- Empty state -->
     {#if sortedBooks.length === 0}
         <div class="text-center py-12 text-ink-500 dark:text-ink-400">
-            <BookOpen size={48} class="mx-auto mb-4 opacity-50" />
+            <BookOpenText size={48} class="mx-auto mb-4 opacity-50" />
             <p>No books in this category yet.</p>
         </div>
     {/if}

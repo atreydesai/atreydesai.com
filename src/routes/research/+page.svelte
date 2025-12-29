@@ -2,8 +2,8 @@
     import Seo from "$lib/components/Seo.svelte";
     import ResearchCard from "$lib/components/ResearchCard.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
-    import papersData from "$lib/../data/papers.json";
-    import Filter from "lucide-svelte/icons/filter";
+    import { papersData } from "$lib/content";
+    import { Blend } from "@jis3r/icons";
 
     // State for filtering
     let selectedYear: string = "all";
@@ -73,7 +73,7 @@
         <div
             class="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400"
         >
-            <Filter size={16} />
+            <Blend size={16} />
             <span>Filter:</span>
         </div>
 
@@ -112,9 +112,11 @@
                         >
                             {year}
                         </h3>
-                        {#each papersByYear[year].filter((p) => !p.preprint) as paper (paper.id)}
-                            <ResearchCard {paper} />
-                        {/each}
+                        <div class="stagger-children">
+                            {#each papersByYear[year].filter((p) => !p.preprint) as paper (paper.id)}
+                                <ResearchCard {paper} />
+                            {/each}
+                        </div>
                     </div>
                 {/if}
             {/each}
@@ -125,9 +127,11 @@
     {#if showPreprints && preprints.length > 0}
         <section class="mb-12">
             <h2 class="section-heading">preprints</h2>
-            {#each preprints as paper (paper.id)}
-                <ResearchCard {paper} />
-            {/each}
+            <div class="stagger-children">
+                {#each preprints as paper (paper.id)}
+                    <ResearchCard {paper} />
+                {/each}
+            </div>
         </section>
     {/if}
 

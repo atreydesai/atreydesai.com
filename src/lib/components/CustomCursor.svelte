@@ -73,5 +73,5 @@
         class="custom-cursor"
         class:cursor-hover={isHovering}
         aria-hidden="true"
-    />
+    ></div>
 {/if}

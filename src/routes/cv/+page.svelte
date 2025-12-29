@@ -1,7 +1,7 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
-    import Download from "lucide-svelte/icons/download";
-    import FileText from "lucide-svelte/icons/file-text";
+    import { Download } from "@jis3r/icons";
+    import { FileText } from "lucide-svelte";
 </script>
 
 <Seo

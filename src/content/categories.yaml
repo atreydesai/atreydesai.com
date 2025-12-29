@@ -1,0 +1,23 @@
+- id: all
+  name: All
+
+- id: favorites
+  name: Favorites
+
+- id: essays
+  name: Essays
+
+- id: research
+  name: Research Papers
+
+- id: science
+  name: Science
+
+- id: advice
+  name: Advice
+
+- id: fiction
+  name: Fiction
+
+- id: nonfiction
+  name: Nonfiction

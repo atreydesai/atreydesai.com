@@ -2,14 +2,10 @@
   import Seo from "$lib/components/Seo.svelte";
   import ResearchCard from "$lib/components/ResearchCard.svelte";
   import LegoImage from "$lib/components/LegoImage.svelte";
-  import ArrowRight from "lucide-svelte/icons/arrow-right";
-  import Github from "lucide-svelte/icons/github";
-  import Twitter from "lucide-svelte/icons/twitter";
-  import GraduationCap from "lucide-svelte/icons/graduation-cap";
-  import Mail from "lucide-svelte/icons/mail";
+  import { ArrowRight } from "@jis3r/icons";
+  import { Github, Twitter, GraduationCap, Mail } from "lucide-svelte";
   import { fly, fade } from "svelte/transition";
-  import papersData from "$lib/../data/papers.json";
-  import affiliationsData from "$lib/../data/affiliations.json";
+  import { papersData, affiliations as affiliationsData } from "$lib/content";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
 
   // Get featured papers for the preview section
@@ -50,7 +46,7 @@
           class="aspect-square w-full max-w-[300px] mx-auto md:mx-0 rounded-lg overflow-hidden mb-6"
         >
           <LegoImage
-            src="/images/profile.png"
+            src="/images/profile.JPG"
             alt="Atrey Desai"
             blockSize={16}
           />
@@ -186,7 +182,7 @@
         </a>
       </div>
 
-      <div class="space-y-2">
+      <div class="space-y-2 stagger-children">
         {#each featuredPapers as paper (paper.id)}
           <ResearchCard {paper} />
         {/each}

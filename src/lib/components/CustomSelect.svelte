@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
-    import ChevronDown from "lucide-svelte/icons/chevron-down";
+    import { ChevronDown } from "@jis3r/icons";
 
     export let options: Array<{ value: string; label: string }>;
     export let value: string = options[0]?.value || "";

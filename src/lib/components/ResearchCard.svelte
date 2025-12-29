@@ -1,12 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
-    import ExternalLink from "lucide-svelte/icons/external-link";
-    import FileText from "lucide-svelte/icons/file-text";
-    import Code from "lucide-svelte/icons/code";
-    import Award from "lucide-svelte/icons/award";
-    import Twitter from "lucide-svelte/icons/twitter";
-    import PenLine from "lucide-svelte/icons/pen-line";
-    import X from "lucide-svelte/icons/x";
+    import { ExternalLink, FileText, Twitter, Pause } from "lucide-svelte";
+    import { Binary, Award, PenLine, X, Play } from "@jis3r/icons";
 
     export let paper: {
         id: string;
@@ -26,17 +21,23 @@
         preprint: boolean;
         featured: boolean;
         image: string | null;
+        imageAnimated: string | null;
         imageDescription: string | null;
     };
 
     export let compact = false;
 
+    // Image hover state
+    let isHovered = false;
+
     // Image lightbox
     let lightboxOpen = false;
+    let showAnimated = false; // Toggle between static and animated in lightbox
 
     function openLightbox() {
         if (paper.image) {
             lightboxOpen = true;
+            showAnimated = false; // Start with static image
             if (typeof document !== "undefined") {
                 document.body.style.overflow = "hidden";
             }
@@ -45,10 +46,20 @@
 
     function closeLightbox() {
         lightboxOpen = false;
+        showAnimated = false;
         if (typeof document !== "undefined") {
             document.body.style.overflow = "";
         }
     }
+
+    function toggleAnimated() {
+        showAnimated = !showAnimated;
+    }
+
+    // Check if animated version is a video
+    $: isVideo =
+        paper.imageAnimated?.endsWith(".mp4") ||
+        paper.imageAnimated?.endsWith(".webm");
 
     // Highlight the author's name
     function formatAuthors(authors: string[]): string {
@@ -169,7 +180,7 @@
                         rel="noopener noreferrer"
                         class="link-subtle inline-flex items-center gap-1"
                     >
-                        <Code size={14} />
+                        <Binary size={14} />
                         Code
                     </a>
                 {/if}
@@ -209,21 +220,59 @@
             </div>
         </div>
 
-        <!-- Image with clickable lightbox (if available) -->
+        <!-- Image with hover animation effect -->
         {#if !compact}
             <div class="w-full md:w-40 flex-shrink-0">
                 {#if paper.image}
                     <button
                         type="button"
                         on:click={openLightbox}
-                        class="w-full h-32 md:h-full rounded-lg overflow-hidden cursor-pointer group/img transition-transform duration-300 hover:scale-[1.02]"
+                        on:mouseenter={() => (isHovered = true)}
+                        on:mouseleave={() => (isHovered = false)}
+                        class="w-full h-32 md:h-full rounded-lg overflow-hidden cursor-pointer group/img transition-transform duration-300 hover:scale-[1.02] relative"
                     >
+                        <!-- Static image (shown by default) -->
                         <img
                             src={paper.image}
                             alt="{paper.title} preview"
-                            class="w-full h-full object-cover"
+                            class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
+                            class:opacity-0={isHovered && paper.imageAnimated}
                             loading="lazy"
                         />
+
+                        <!-- Animated version (shown on hover) -->
+                        {#if paper.imageAnimated}
+                            {#if isVideo}
+                                <!-- svelte-ignore a11y-media-has-caption -->
+                                <video
+                                    src={paper.imageAnimated}
+                                    class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
+                                    class:opacity-0={!isHovered}
+                                    autoplay
+                                    loop
+                                    muted
+                                    playsinline
+                                ></video>
+                            {:else}
+                                <img
+                                    src={paper.imageAnimated}
+                                    alt="{paper.title} animated preview"
+                                    class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
+                                    class:opacity-0={!isHovered}
+                                    loading="lazy"
+                                />
+                            {/if}
+                        {/if}
+
+                        <!-- Play indicator if animated version exists -->
+                        {#if paper.imageAnimated}
+                            <div
+                                class="absolute bottom-2 right-2 bg-ink-900/70 rounded-full p-1 transition-opacity duration-300"
+                                class:opacity-0={isHovered}
+                            >
+                                <Play size={12} class="text-cream-100" />
+                            </div>
+                        {/if}
                     </button>
                 {:else}
                     <!-- Placeholder for image -->
@@ -264,12 +313,52 @@
         <div
             class="max-w-3xl max-h-[80vh] flex flex-col items-center"
             on:click|stopPropagation={() => {}}
+            on:keydown|stopPropagation={() => {}}
         >
-            <img
-                src={paper.image}
-                alt="{paper.title} diagram"
-                class="max-w-full max-h-[70vh] object-contain rounded-lg"
-            />
+            <!-- Image/Video display -->
+            {#if showAnimated && paper.imageAnimated}
+                {#if isVideo}
+                    <!-- svelte-ignore a11y-media-has-caption -->
+                    <video
+                        src={paper.imageAnimated}
+                        class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                        autoplay
+                        loop
+                        muted
+                        playsinline
+                        controls
+                    ></video>
+                {:else}
+                    <img
+                        src={paper.imageAnimated}
+                        alt="{paper.title} animated diagram"
+                        class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                    />
+                {/if}
+            {:else}
+                <img
+                    src={paper.image}
+                    alt="{paper.title} diagram"
+                    class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                />
+            {/if}
+
+            <!-- Toggle button for static/animated -->
+            {#if paper.imageAnimated}
+                <button
+                    type="button"
+                    class="mt-4 px-4 py-2 bg-ink-700 hover:bg-ink-600 text-cream-100 rounded-full text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                    on:click|stopPropagation={toggleAnimated}
+                >
+                    {#if showAnimated}
+                        <Pause size={16} />
+                        Show Static
+                    {:else}
+                        <Play size={16} />
+                        Show Animated
+                    {/if}
+                </button>
+            {/if}
 
             <!-- Description -->
             <div class="mt-4 text-cream-300 text-sm text-center max-w-xl">

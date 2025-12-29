@@ -1,0 +1,15 @@
+- id: talk-1
+  title: "Guest Lecture: Introduction to Generative AI"
+  venue: "University of Maryland CS Department"
+  date: "2024-03-15"
+  type: lecture
+  slides: null
+  video: null
+
+- id: talk-2
+  title: "Poster: Lorem Ipsum Research"
+  venue: "NeurIPS 2024"
+  date: "2024-12-10"
+  type: poster
+  slides: null
+  video: null

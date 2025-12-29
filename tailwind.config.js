@@ -51,6 +51,14 @@ export default {
           dark: "#C94B3D",
           muted: "#D4847A",
         },
+        // Purple-gray for code blocks & secondary surfaces (future use)
+        mist: {
+          50: "#F5F5F7",
+          100: "#EDEDF0",
+          200: "#E7E7EB",  // Main - Murasakisuishiyou (Purple Water)
+          300: "#DCDCE2",
+          400: "#C5C5CD",
+        },
       },
       fontFamily: {
         display: ['"neue-haas-grotesk-display"', ...defaultTheme.fontFamily.sans],

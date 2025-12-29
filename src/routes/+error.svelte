@@ -1,8 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import Seo from "$lib/components/Seo.svelte";
-  import Home from "lucide-svelte/icons/home";
-  import ArrowLeft from "lucide-svelte/icons/arrow-left";
+  import { House, ArrowLeft } from "@jis3r/icons";
 </script>
 
 <Seo
@@ -31,7 +30,7 @@
       class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
     >
       <a href="/" class="btn-primary inline-flex items-center gap-2">
-        <Home size={16} />
+        <House size={16} />
         Back to Home
       </a>
 

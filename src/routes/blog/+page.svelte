@@ -1,7 +1,7 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
-    import ExternalLink from "lucide-svelte/icons/external-link";
-    import Calendar from "lucide-svelte/icons/calendar";
+    import { ExternalLink } from "lucide-svelte";
+    import { CalendarDays } from "@jis3r/icons";
 
     // Placeholder blog posts - will be replaced with actual content
     // All marked as external since internal routes don't exist yet
@@ -73,7 +73,7 @@
     </div>
 
     <!-- Blog posts -->
-    <div class="space-y-6">
+    <div class="space-y-6 stagger-children">
         {#each posts as post (post.id)}
             <article
                 class="py-4 border-b border-ink-100 dark:border-ink-800 group"
@@ -111,7 +111,10 @@
                             <span
                                 class="flex items-center gap-1 text-ink-500 dark:text-ink-400"
                             >
-                                <Calendar size={14} />
+                                <CalendarDays
+                                    size={14}
+                                    class="translate-y-[0.5px]"
+                                />
                                 {new Date(post.date).toLocaleDateString(
                                     "en-US",
                                     {

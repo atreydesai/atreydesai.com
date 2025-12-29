@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
     import Seo from "$lib/components/Seo.svelte";
-    import affiliationsData from "$lib/../data/affiliations.json";
+    import { affiliations as affiliationsData } from "$lib/content";
 
     // Footnotes data - can be edited to add your own footnotes
     const footnotes = [

@@ -139,7 +139,8 @@
     role="img"
     aria-label={alt}
 >
-    <canvas bind:this={canvas} class="lego-canvas" class:loaded={imageLoaded} />
+    <canvas bind:this={canvas} class="lego-canvas" class:loaded={imageLoaded}
+    ></canvas>
     {#if !imageLoaded}
         <div class="loading-placeholder">
             <span class="loading-text">Loading...</span>
