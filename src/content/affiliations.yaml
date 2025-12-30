@@ -1,19 +1,23 @@
 name: Atrey Desai
 title: Undergraduate Researcher
-school: "[SCHOOL NAME - e.g., University of Maryland]"
-program: "[PROGRAM - e.g., Computer Science]"
+school: University of Maryland
+program: Computer Science and Linguistics with a minor Korean Studies
 year: Third year
-advisors: []
+advisors:
+  - name: Professor Rachel Rudinger
+    url: https://rudinger.github.io/
+  - name: Professor Jordan Boyd-Graber
+    url: http://www.umiacs.umd.edu/~jbg
 
 currentRole:
   organization: Learn Prompting
-  role: "[ROLE - e.g., Research Lead]"
+  role: Technical Staff
   url: https://learnprompting.org
 
 researchInterests:
-  - "[INTEREST 1 - e.g., AI Safety]"
-  - "[INTEREST 2 - e.g., Large Language Models]"
-  - "[INTEREST 3 - e.g., Reinforcement Learning]"
+  - natural language processing
+  - rigorously evaluate models
+  - create robust evaluation methods (black-box and white-box)
 
 priorExperience: []
 mentors: []

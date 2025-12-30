@@ -83,11 +83,11 @@
         <span class="transition-all duration-300">
           {#if isPlaying}
             <span in:fade={{ duration: 200 }}>
-              <Volume2 size={16} class="translate-y-[1px]" />
+              <Volume2 size={16} class="translate-y-[0px]" />
             </span>
           {:else}
             <span in:fade={{ duration: 200 }}>
-              <VolumeOff size={16} class="translate-y-[1px]" />
+              <VolumeOff size={16} class="translate-y-[2px]" />
             </span>
           {/if}
         </span>

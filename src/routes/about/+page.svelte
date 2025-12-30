@@ -9,17 +9,17 @@
         {
             id: 1,
             content:
-                "It's unclear to me what order I should list them in, since I didn't tell the registrar who my primary advisor was when this info was entered into Stanford's system. This is entirely intended.",
+                "HackAPrompt is the world's largest red-teaming hackathon.",
         },
         {
             id: 2,
             content:
-                "Nathan is responsible for helping me formulate who I want to be as a researcher (both directly and indirectly). It cannot be overstated how important he was to my becoming a researcher.",
+                "This work at ACL2 aims to eventually create an end-to-end machine translation pipeline for animal vocalizations. Our research is also graciously supported by the NSF.",
         },
         {
             id: 3,
             content:
-                "I was awarded the Georgetown Tropaia Computer Science Award in 2024. My favourite class at Georgetown was a field linguistics class taught by Michael Obiri-Yeboah where we documented the Dagaare language of West Africa from scratch.",
+                "Our findings were published at the AAAI-22 Workshop on Interactive Machine Learning (IMLW) and the Conference on Reinforcement Learning and Decision Making (RLDM-22). And also my first publications!",
         },
     ];
 
@@ -116,48 +116,131 @@
                 <p>
                     I'm <strong class="text-ink-900 dark:text-cream-100"
                         >Atrey Desai</strong
-                    >, a {affiliationsData.year.toLowerCase()} undergraduate at {affiliationsData.school}.<sup
-                        class="footnote-ref"
-                        data-footnote="1">[1]</sup
+                    >, a third-year undergraduate student double majoring in
+                    Computer Science and Linguistics with a minor in Korean
+                    Studies at the
+                    <a
+                        href="https://umd.edu"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link">University of Maryland</a
+                    >. I am fortunate to be advised by
+                    <a
+                        href="https://rudinger.github.io/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link">Professor Rachel Rudinger</a
                     >
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed
-                    do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                    and
+                    <a
+                        href="http://www.umiacs.umd.edu/~jbg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link">Professor Jordan Boyd-Graber</a
+                    >.
                 </p>
 
                 <p>
-                    <span class="text-ink-500 dark:text-ink-400"
-                        >affiliations:</span
+                    I am a member of the <a
+                        href="https://clip.umd.edu/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link"
+                        >Computational Linguistics and Information Processing
+                        (CLIP) lab</a
                     >
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. [DESCRIBE
-                    YOUR RESEARCH GROUP, LAB, OR ORGANIZATION AFFILIATIONS]<sup
+                    in UMIACS. I am also currently a member of the technical staff
+                    of
+                    <a
+                        href="https://learnprompting.org"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link">Learn Prompting</a
+                    >, where I work on HackAPrompt and research on creating
+                    trustworhy and robust AI safety judges.<sup
+                        class="footnote-ref"
+                        data-footnote="1">[1]</sup
+                    >
+                </p>
+
+                <p>
+                    Currently, I'm also a visiting researcher under <a
+                        href="https://kenzhu2000.github.io/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link">Professor Kenny Zhu</a
+                    >
+                    at the
+                    <a
+                        href="https://uta-acl2.github.io/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link"
+                        >Arlington Computational Linguistics Lab (ACL2)</a
+                    >
+                    at the University of Texas at Arlington. Our work focuses on
+                    identifying structural similarities to human language and contextual
+                    semantics within animal vocalizations to gain insights about
+                    the language of animal species.<sup
                         class="footnote-ref"
                         data-footnote="2">[2]</sup
                     >
                 </p>
 
                 <p>
-                    <span class="text-ink-500 dark:text-ink-400"
-                        >other mentors:</span
+                    Previously, I worked under <a
+                        href="https://littmania.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link">Professor Michael Littman</a
                     >
-                    {#if affiliationsData.mentors.length > 0}
-                        {#each affiliationsData.mentors as mentor, i}
-                            {mentor.name} ({mentor.affiliation}){#if i < affiliationsData.mentors.length - 1},
-                            {/if}
-                        {/each}
-                    {:else}
-                        [LIST OTHER MENTORS HERE]
-                    {/if}
-                </p>
-
-                <p>
-                    I'm an <strong>AI researcher</strong> interested in
-                    {affiliationsData.researchInterests.join(", ")}.<sup
+                    at the
+                    <a
+                        href="http://irl.cs.brown.edu/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="link"
+                        >Reinforcement Learning & Adaptive Behavior (RLAB)</a
+                    >
+                    group at Brown University on applications of reinforcement learning
+                    to 2D non-sequential tasks.<sup
                         class="footnote-ref"
                         data-footnote="3">[3]</sup
                     >
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut enim
-                    ad minim veniam, quis nostrud exercitation ullamco laboris.
                 </p>
+
+                <p>
+                    My research interests lie in <strong
+                        >natural language processing</strong
+                    >, particularly:
+                </p>
+                <ol class="list-decimal list-inside space-y-1 ml-4">
+                    <li>
+                        How can we <strong>verify</strong> validity and
+                        robustness of
+                        <span class="text-ink-900 dark:text-cream-100"
+                            >existing benchmarks</span
+                        >?
+                    </li>
+                    <li>
+                        How can humans and AI <strong>collaborate</strong> in data
+                        creation?
+                    </li>
+                    <li>
+                        How can we <strong>create</strong> new evaluation
+                        methods that probe
+                        <span class="text-ink-900 dark:text-cream-100"
+                            >multimodal</span
+                        >,
+                        <span class="text-ink-900 dark:text-cream-100"
+                            >linguistic</span
+                        >, and
+                        <span class="text-ink-900 dark:text-cream-100"
+                            >spatiotemporal</span
+                        >
+                        understanding?
+                    </li>
+                </ol>
             </div>
         </section>
 

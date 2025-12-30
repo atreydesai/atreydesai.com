@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { createEventDispatcher } from "svelte";
+    import { createEventDispatcher, onMount, onDestroy } from "svelte";
     import { ExternalLink, FileText, Twitter, Pause } from "lucide-svelte";
     import { Binary, Award, PenLine, X, Play } from "@jis3r/icons";
+    import { browser } from "$app/environment";
 
     export let paper: {
         id: string;
@@ -20,6 +21,8 @@
         awards: string[];
         preprint: boolean;
         featured: boolean;
+        highlight: boolean;
+        priority: number;
         image: string | null;
         imageAnimated: string | null;
         imageDescription: string | null;
@@ -33,6 +36,16 @@
     // Image lightbox
     let lightboxOpen = false;
     let showAnimated = false; // Toggle between static and animated in lightbox
+
+    // Portal element for lightbox (to escape transform stacking context)
+    let portalTarget: HTMLElement | null = null;
+    let lightboxEl: HTMLElement;
+
+    onMount(() => {
+        if (browser) {
+            portalTarget = document.body;
+        }
+    });
 
     function openLightbox() {
         if (paper.image) {
@@ -61,6 +74,11 @@
         paper.imageAnimated?.endsWith(".mp4") ||
         paper.imageAnimated?.endsWith(".webm");
 
+    // Highlight class for special emphasis
+    $: highlightClass = paper.highlight
+        ? "relative bg-accent/5 dark:bg-accent/10 rounded-lg px-4 -mx-4 border-l-4 border-accent"
+        : "";
+
     // Highlight the author's name
     function formatAuthors(authors: string[]): string {
         return authors
@@ -71,6 +89,16 @@
             )
             .join(", ");
     }
+
+    // Portal action to move element to document.body
+    function portal(node: HTMLElement) {
+        document.body.appendChild(node);
+        return {
+            destroy() {
+                node.remove();
+            },
+        };
+    }
 </script>
 
 <svelte:window on:keydown={(e) => e.key === "Escape" && closeLightbox()} />
@@ -78,7 +106,7 @@
 <article
     class="group py-4 {compact
         ? ''
-        : 'border-b border-ink-100 dark:border-ink-800'}"
+        : 'border-b border-ink-100 dark:border-ink-800'} {highlightClass}"
     id={paper.id}
 >
     <div class="flex flex-col md:flex-row gap-4">
@@ -132,8 +160,8 @@
                 </div>
             {/if}
 
-            <!-- TL;DR -->
-            {#if paper.tldr && !compact}
+            <!-- TL;DR (only shown for highlighted papers) -->
+            {#if paper.tldr && !compact && paper.highlight}
                 <p class="text-sm text-ink-600 dark:text-ink-300 mb-3">
                     <span class="font-medium">TL;DR:</span>
                     {paper.tldr}
@@ -287,85 +315,87 @@
     </div>
 </article>
 
-<!-- Image Lightbox -->
-{#if lightboxOpen && paper.image}
+<!-- Image Lightbox (portaled to body to escape transform stacking context) -->
+{#if lightboxOpen && paper.image && browser}
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-    <div
-        class="fixed inset-0 z-50 bg-ink-900/95 flex items-center justify-center p-4"
-        on:click={closeLightbox}
-        on:keydown={(e) => e.key === "Escape" && closeLightbox()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Image lightbox"
-        tabindex="-1"
-    >
-        <!-- Close button -->
-        <button
-            type="button"
-            class="absolute top-4 right-4 text-cream-100 hover:text-cream-300 transition-colors z-10"
-            on:click|stopPropagation={closeLightbox}
-            aria-label="Close lightbox"
-        >
-            <X size={32} />
-        </button>
-
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
+    <div class="lightbox-portal" use:portal>
         <div
-            class="max-w-3xl max-h-[80vh] flex flex-col items-center"
-            on:click|stopPropagation={() => {}}
-            on:keydown|stopPropagation={() => {}}
+            class="fixed inset-0 z-[9999] bg-ink-900/95 flex items-center justify-center p-4"
+            on:click={closeLightbox}
+            on:keydown={(e) => e.key === "Escape" && closeLightbox()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Image lightbox"
+            tabindex="-1"
         >
-            <!-- Image/Video display -->
-            {#if showAnimated && paper.imageAnimated}
-                {#if isVideo}
-                    <!-- svelte-ignore a11y-media-has-caption -->
-                    <video
-                        src={paper.imageAnimated}
-                        class="max-w-full max-h-[70vh] object-contain rounded-lg"
-                        autoplay
-                        loop
-                        muted
-                        playsinline
-                        controls
-                    ></video>
+            <!-- Close button -->
+            <button
+                type="button"
+                class="absolute top-4 right-4 text-cream-100 hover:text-cream-300 transition-colors z-10"
+                on:click|stopPropagation={closeLightbox}
+                aria-label="Close lightbox"
+            >
+                <X size={32} />
+            </button>
+
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div
+                class="max-w-3xl max-h-[80vh] flex flex-col items-center"
+                on:click|stopPropagation={() => {}}
+                on:keydown|stopPropagation={() => {}}
+            >
+                <!-- Image/Video display -->
+                {#if showAnimated && paper.imageAnimated}
+                    {#if isVideo}
+                        <!-- svelte-ignore a11y-media-has-caption -->
+                        <video
+                            src={paper.imageAnimated}
+                            class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                            autoplay
+                            loop
+                            muted
+                            playsinline
+                            controls
+                        ></video>
+                    {:else}
+                        <img
+                            src={paper.imageAnimated}
+                            alt="{paper.title} animated diagram"
+                            class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                        />
+                    {/if}
                 {:else}
                     <img
-                        src={paper.imageAnimated}
-                        alt="{paper.title} animated diagram"
+                        src={paper.image}
+                        alt="{paper.title} diagram"
                         class="max-w-full max-h-[70vh] object-contain rounded-lg"
                     />
                 {/if}
-            {:else}
-                <img
-                    src={paper.image}
-                    alt="{paper.title} diagram"
-                    class="max-w-full max-h-[70vh] object-contain rounded-lg"
-                />
-            {/if}
 
-            <!-- Toggle button for static/animated -->
-            {#if paper.imageAnimated}
-                <button
-                    type="button"
-                    class="mt-4 px-4 py-2 bg-ink-700 hover:bg-ink-600 text-cream-100 rounded-full text-sm font-medium inline-flex items-center gap-2 transition-colors"
-                    on:click|stopPropagation={toggleAnimated}
-                >
-                    {#if showAnimated}
-                        <Pause size={16} />
-                        Show Static
-                    {:else}
-                        <Play size={16} />
-                        Show Animated
-                    {/if}
-                </button>
-            {/if}
-
-            <!-- Description -->
-            <div class="mt-4 text-cream-300 text-sm text-center max-w-xl">
-                <p class="font-medium text-cream-100 mb-1">{paper.title}</p>
-                {#if paper.imageDescription}
-                    <p>{paper.imageDescription}</p>
+                <!-- Toggle button for static/animated -->
+                {#if paper.imageAnimated}
+                    <button
+                        type="button"
+                        class="mt-4 px-4 py-2 bg-ink-700 hover:bg-ink-600 text-cream-100 rounded-full text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                        on:click|stopPropagation={toggleAnimated}
+                    >
+                        {#if showAnimated}
+                            <Pause size={16} />
+                            Show Static
+                        {:else}
+                            <Play size={16} />
+                            Show Animated
+                        {/if}
+                    </button>
                 {/if}
+
+                <!-- Description -->
+                <div class="mt-4 text-cream-300 text-sm text-center max-w-xl">
+                    <p class="font-medium text-cream-100 mb-1">{paper.title}</p>
+                    {#if paper.imageDescription}
+                        <p>{paper.imageDescription}</p>
+                    {/if}
+                </div>
             </div>
         </div>
     </div>

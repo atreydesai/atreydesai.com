@@ -7,9 +7,13 @@
   import { fly, fade } from "svelte/transition";
   import { papersData, affiliations as affiliationsData } from "$lib/content";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
+  import HyperText from "$lib/components/HyperText.svelte";
 
-  // Get featured papers for the preview section
-  $: featuredPapers = papersData.papers.filter((p) => p.featured).slice(0, 3);
+  // Get featured papers for the preview section, sorted by priority (lower = first)
+  $: featuredPapers = papersData.papers
+    .filter((p) => p.featured)
+    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+    .slice(0, 3);
 
   // Email reveal with animation
   let emailRevealed = false;
@@ -48,7 +52,7 @@
           <LegoImage
             src="/images/profile.JPG"
             alt="Atrey Desai"
-            blockSize={16}
+            blockSize={48}
           />
         </div>
 
@@ -105,53 +109,79 @@
         <h1
           class="heading-display text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
         >
-          hey, i'm atrey desai.
+          hey, i'm <HyperText text="atrey desai." />
         </h1>
 
         <div class="space-y-4 text-ink-700 dark:text-cream-300">
-          <p class="text-lg">i'm currently:</p>
-          <ul class="space-y-2 text-base">
-            <li>
-              @ <span class="text-ink-900 dark:text-cream-100"
-                >{affiliationsData.school}</span
-              >
-              — {affiliationsData.year} undergraduate
-              {#if affiliationsData.advisors.length > 0}
-                advised by
-                {#each affiliationsData.advisors as advisor, i}
-                  {#if advisor.url}
-                    <a
-                      href={advisor.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="link">{advisor.name}</a
-                    >
-                  {:else}
-                    <span>{advisor.name}</span>
-                  {/if}
-                  {#if i < affiliationsData.advisors.length - 1}{", "}{/if}
-                {/each}
-              {/if}
-            </li>
-            {#if affiliationsData.currentRole}
-              <li>
-                @ <a
-                  href={affiliationsData.currentRole.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="link">{affiliationsData.currentRole.organization}</a
-                >
-                — {affiliationsData.currentRole.role}
-              </li>
-            {/if}
-          </ul>
-
-          <p class="text-base">
-            <span class="text-ink-500 dark:text-ink-400"
-              >research interests:</span
+          <p class="text-base leading-relaxed">
+            I am a third-year undergraduate student double majoring in <span
+              class="text-ink-900 dark:text-cream-100"
+              >Computer Science and Linguistics</span
             >
-            {affiliationsData.researchInterests.join(", ")}
+            with a minor in
+            <span class="text-ink-900 dark:text-cream-100">Korean Studies</span>
+            at the
+            <span class="text-ink-900 dark:text-cream-100"
+              >{affiliationsData.school}</span
+            >.
           </p>
+
+          <p class="text-base leading-relaxed">
+            I am fortunate to be advised by
+            {#if affiliationsData.advisors.length > 0}
+              {#each affiliationsData.advisors as advisor, i}
+                {#if advisor.url}
+                  <a
+                    href={advisor.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="link">{advisor.name}</a
+                  >
+                {:else}
+                  <span class="text-ink-900 dark:text-cream-100"
+                    >{advisor.name}</span
+                  >
+                {/if}
+                {#if i < affiliationsData.advisors.length - 2}{", "}
+                {:else if i === affiliationsData.advisors.length - 2}
+                  {" and "}
+                {/if}
+              {/each}
+            {/if}.
+          </p>
+
+          <p class="text-base leading-relaxed">
+            I am a member of the technical staff of
+            {#if affiliationsData.currentRole}
+              <a
+                href={affiliationsData.currentRole.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link">{affiliationsData.currentRole.organization}</a
+              >.
+            {/if}
+          </p>
+
+          <div class="text-base">
+            <p class="mb-1">
+              <span class="text-ink-500 dark:text-ink-400"
+                >research interests:</span
+              >
+              <strong>natural language processing</strong>, specifically:
+            </p>
+            <ol
+              class="list-decimal list-inside space-y-0.5 ml-4 text-sm text-ink-600 dark:text-cream-400"
+            >
+              <li>
+                <strong>verify</strong> validity and robustness of existing benchmarks
+              </li>
+              <li>human-AI <strong>collaboration</strong> in data creation</li>
+              <li>
+                <strong>create</strong> evaluation methods for multimodal, linguistic,
+                and spatiotemporal understanding
+              </li>
+            </ol>
+          </div>
 
           {#if affiliationsData.priorExperience.length > 0}
             <p class="text-sm text-ink-500 dark:text-ink-400">

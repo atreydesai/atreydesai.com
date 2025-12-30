@@ -1,7 +1,6 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
     import { Download } from "@jis3r/icons";
-    import { FileText } from "lucide-svelte";
 </script>
 
 <Seo
@@ -31,22 +30,13 @@
     </p>
 
     <!-- PDF Embed -->
-    <div class="bg-cream-50 dark:bg-ink-800 rounded-lg p-8 text-center">
-        <FileText
-            size={64}
-            class="mx-auto mb-4 text-ink-300 dark:text-ink-600"
-        />
-        <p class="text-ink-600 dark:text-cream-400 mb-4">
-            [PDF Embed Placeholder]
-        </p>
-        <p class="text-sm text-ink-500 dark:text-ink-400">
-            Place your <code class="bg-cream-200 dark:bg-ink-700 px-1 rounded"
-                >resume.pdf</code
-            >
-            in the
-            <code class="bg-cream-200 dark:bg-ink-700 px-1 rounded"
-                >static/</code
-            > folder.
-        </p>
+    <div
+        class="w-full rounded-lg overflow-hidden shadow-lg border border-cream-200 dark:border-ink-700"
+    >
+        <iframe
+            src="/resume.pdf"
+            class="w-full h-[80vh] min-h-[600px]"
+            title="Atrey Desai Resume"
+        ></iframe>
     </div>
 </div>

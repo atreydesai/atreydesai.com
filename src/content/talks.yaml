@@ -1,15 +1,33 @@
-- id: talk-1
-  title: "Guest Lecture: Introduction to Generative AI"
-  venue: "University of Maryland CS Department"
-  date: "2024-03-15"
-  type: lecture
-  slides: null
-  video: null
-
-- id: talk-2
-  title: "Poster: Lorem Ipsum Research"
-  venue: "NeurIPS 2024"
-  date: "2024-12-10"
+- id: poster-mcq-july
+  title: "Language Models Generate Multiple-Choice Questions with Artifacts"
+  venue: "University of Maryland, College Park"
+  date: "2025-07-01"
   type: poster
   slides: null
   video: null
+
+- id: poster-mcq-april
+  title: "Language Models Generate Multiple-Choice Questions with Artifacts"
+  venue: "University of Maryland, College Park"
+  date: "2025-04-01"
+  type: poster
+  slides: null
+  video: null
+
+- id: talk-umd-cat
+  title: "Adaptor Grammars and Neural Networks for Feline Lexical Discovery (adapted)"
+  venue: "University of Maryland, College Park"
+  date: "2024-11-01"
+  type: research talk
+  slides: null
+  video: null
+  
+- id: talk-uta-cat
+  title: "Adaptor Grammars and Neural Networks for Feline Lexical Discovery"
+  venue: "The University of Texas at Arlington"
+  date: "2024-07-01"
+  type: research talk
+  slides: null
+  video: null
+
+

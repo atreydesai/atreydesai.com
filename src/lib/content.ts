@@ -19,6 +19,8 @@ export interface Paper {
     awards: string[];
     preprint: boolean;
     featured: boolean;
+    highlight: boolean;  // Special emphasis styling
+    priority: number;    // Lower number = higher priority for featured ordering
     image: string | null;
     imageAnimated: string | null;  // For hover effect - gif/mp4 version
     imageDescription: string | null;
