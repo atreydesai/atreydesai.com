@@ -11,3 +11,7 @@ vite.config.ts.timestamp-*
 *:Zone.Identifier
 .vercel/
 src/projects
+
+# Generated files
+static/images/photography/thumbs/
+build_*.txt

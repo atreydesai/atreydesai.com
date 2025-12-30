@@ -2,7 +2,7 @@
   export let title = "Atrey Desai";
   export let description =
     "Third year undergraduate researcher interested in AI and machine learning.";
-  export let image = "/og-image.png";
+  export let image = "/og-image.jpg";
   export let url = "https://atreydesai.com";
   export let type = "website";
 </script>

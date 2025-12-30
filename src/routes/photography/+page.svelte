@@ -125,7 +125,7 @@
                         class="h-full w-full transition-transform duration-300 group-hover:scale-[1.02]"
                     >
                         <OptimizedImage
-                            src={photo.src}
+                            src={photo.thumbSrc}
                             alt={photo.alt}
                             aspectRatio={photo.orientation}
                             class="h-full w-full"

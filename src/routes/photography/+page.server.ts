@@ -1,13 +1,16 @@
 import type { PageServerLoad } from "./$types";
-import { readdir, readFile } from "fs/promises";
-import { join } from "path";
+import { readdir, readFile, access } from "fs/promises";
+import { join, parse } from "path";
 import ExifReader from "exifreader";
 
 interface PhotoData {
-    src: string;
+    src: string;           // Original full-size path for lightbox
+    thumbSrc: string;      // Optimized thumbnail for grid
     alt: string;
     filename: string;
     orientation: "landscape" | "portrait" | "square";
+    width?: number;
+    height?: number;
     exif: {
         camera?: string;
         lens?: string;
@@ -35,6 +38,8 @@ export const load: PageServerLoad = async () => {
 
                 let exif: PhotoData["exif"] = {};
                 let orientation: PhotoData["orientation"] = "landscape";
+                let width: number | undefined;
+                let height: number | undefined;
 
                 try {
                     const tags = ExifReader.load(fileBuffer);
@@ -85,13 +90,15 @@ export const load: PageServerLoad = async () => {
                     }
 
                     // Determine orientation from image dimensions
-                    const width = tags["Image Width"]?.value || tags.ImageWidth?.value || tags.PixelXDimension?.value;
-                    const height = tags["Image Height"]?.value || tags.ImageHeight?.value || tags.PixelYDimension?.value;
+                    const imgWidth = tags["Image Width"]?.value || tags.ImageWidth?.value || tags.PixelXDimension?.value;
+                    const imgHeight = tags["Image Height"]?.value || tags.ImageHeight?.value || tags.PixelYDimension?.value;
 
-                    if (width && height) {
-                        const w = Array.isArray(width) ? width[0] : width;
-                        const h = Array.isArray(height) ? height[0] : height;
+                    if (imgWidth && imgHeight) {
+                        const w = Array.isArray(imgWidth) ? imgWidth[0] : imgWidth;
+                        const h = Array.isArray(imgHeight) ? imgHeight[0] : imgHeight;
                         if (typeof w === "number" && typeof h === "number") {
+                            width = w;
+                            height = h;
                             const ratio = w / h;
                             if (ratio > 1.1) {
                                 orientation = "landscape";
@@ -112,11 +119,26 @@ export const load: PageServerLoad = async () => {
                     .replace(/[-_]/g, " ") // Replace dashes/underscores with spaces
                     .replace(/\b\w/g, (c) => c.toUpperCase()); // Capitalize words
 
+                // Check for optimized thumbnail
+                const { name } = parse(filename);
+                const thumbPath = join(photosDir, "thumbs", `${name}.webp`);
+                let thumbSrc = `/images/photography/${filename}`; // Default to original
+
+                try {
+                    await access(thumbPath);
+                    thumbSrc = `/images/photography/thumbs/${name}.webp`;
+                } catch {
+                    // Thumbnail doesn't exist, use original
+                }
+
                 return {
                     src: `/images/photography/${filename}`,
+                    thumbSrc,
                     alt,
                     filename,
                     orientation,
+                    width,
+                    height,
                     exif,
                 };
             })
