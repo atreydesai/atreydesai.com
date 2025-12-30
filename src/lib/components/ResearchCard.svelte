@@ -76,7 +76,7 @@
 
     // Highlight class for special emphasis
     $: highlightClass = paper.highlight
-        ? "relative bg-accent/5 dark:bg-accent/10 rounded-lg px-4 -mx-4 border-l-4 border-accent"
+        ? "relative bg-accent/5 dark:bg-accent/10 rounded-lg px-4 -mx-4 border-l-4 border-l-accent"
         : "";
 
     // Highlight the author's name
