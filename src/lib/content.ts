@@ -24,6 +24,7 @@ export interface Paper {
     image: string | null;
     imageAnimated: string | null;  // For hover effect - gif/mp4 version
     imageDescription: string | null;
+    classProject?: boolean;  // Distinguishes class projects from regular papers
     content?: string;
 }
 

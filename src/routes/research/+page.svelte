@@ -51,9 +51,10 @@
         .map(Number)
         .sort((a, b) => b - a);
 
-    // Separate preprints
-    $: preprints = filteredPapers.filter((p) => p.preprint);
-    $: published = filteredPapers.filter((p) => !p.preprint);
+    // Separate preprints, published, and class projects
+    $: preprints = filteredPapers.filter((p) => p.preprint && !p.classProject);
+    $: published = filteredPapers.filter((p) => !p.preprint && !p.classProject);
+    $: classProjects = filteredPapers.filter((p) => p.classProject);
 </script>
 
 <Seo
@@ -106,7 +107,7 @@
         <section class="mb-12">
             <h2 class="section-heading">publications</h2>
             {#each sortedYears as year}
-                {#if papersByYear[year]?.some((p) => !p.preprint)}
+                {#if papersByYear[year]?.some((p) => !p.preprint && !p.classProject)}
                     <div class="mb-6">
                         <h3
                             class="text-sm font-medium text-ink-500 dark:text-ink-400 mb-2"
@@ -114,7 +115,7 @@
                             {year}
                         </h3>
                         <div class="stagger-children">
-                            {#each papersByYear[year].filter((p) => !p.preprint) as paper (paper.id)}
+                            {#each papersByYear[year].filter((p) => !p.preprint && !p.classProject) as paper (paper.id)}
                                 <ResearchCard {paper} />
                             {/each}
                         </div>
@@ -136,7 +137,20 @@
         </section>
     {/if}
 
+    <!-- Class Projects -->
+    {#if classProjects.length > 0}
+        <section class="mb-12">
+            <h2 class="section-heading">class projects</h2>
+            <div class="stagger-children">
+                {#each classProjects as paper (paper.id)}
+                    <ResearchCard {paper} />
+                {/each}
+            </div>
+        </section>
+    {/if}
+
     <!-- Talks & Presentations -->
+
     {#if papersData.talks.length > 0}
         <section class="mb-12">
             <h2 class="section-heading">talks & presentations</h2>

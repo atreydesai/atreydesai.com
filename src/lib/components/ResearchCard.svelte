@@ -26,6 +26,7 @@
         image: string | null;
         imageAnimated: string | null;
         imageDescription: string | null;
+        classProject?: boolean;
     };
 
     export let compact = false;
@@ -137,7 +138,8 @@
 
             <!-- Venue and Year -->
             <p class="text-sm text-ink-500 dark:text-ink-400 mb-2">
-                <span class="italic">{paper.venue}</span>, {paper.year}
+                {#if paper.venue}<span class="italic">{paper.venue}</span>,
+                {/if}{paper.year}
                 {#if paper.preprint}
                     <span
                         class="ml-2 text-xs bg-cream-300 dark:bg-ink-700 px-2 py-0.5 rounded"
@@ -160,8 +162,8 @@
                 </div>
             {/if}
 
-            <!-- TL;DR (only shown for highlighted papers) -->
-            {#if paper.tldr && !compact && paper.highlight}
+            <!-- TL;DR (shown for highlighted papers or class projects) -->
+            {#if paper.tldr && !compact && (paper.highlight || paper.classProject)}
                 <p class="text-sm text-ink-600 dark:text-ink-300 mb-3">
                     <span class="font-medium">TL;DR:</span>
                     {paper.tldr}
