@@ -23,6 +23,20 @@
 </script>
 
 <svelte:head>
+  <!-- Google Analytics 4 -->
+  <script
+    async
+    src="https://www.googletagmanager.com/gtag/js?id=G-4NTR1HXBLW"
+  ></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-4NTR1HXBLW");
+  </script>
+
   <!-- Preconnect to external resources for performance -->
   <link rel="preconnect" href="https://use.typekit.net" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
