@@ -4,12 +4,6 @@
 - id: favorites
   name: Favorites
 
-- id: essays
-  name: Essays
-
-- id: research
-  name: Research Papers
-
 - id: science
   name: Science
 

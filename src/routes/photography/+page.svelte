@@ -111,13 +111,13 @@
                         grid-column: span {isLarge ? 2 : 1};
                         grid-row: span {photo.orientation === 'landscape'
                         ? isLarge
-                            ? 18
-                            : 12
+                            ? 24
+                            : 16
                         : photo.orientation === 'square'
                           ? isLarge
-                              ? 18
-                              : 12
-                          : 18};
+                              ? 24
+                              : 16
+                          : 20};
                     "
                     on:click={() => openLightbox(index)}
                 >

@@ -32,7 +32,7 @@ export interface Book {
     title: string;
     author: string;
     category: string;
-    subcategory?: string | null;
+    subcategory?: string[];
     enjoyment?: number | null;  // 1-10 scale, optional
     importance?: number | null; // 1-10 scale, optional
     medium?: string;            // "essay", "book", "video", "article", "paper", "podcast", "short story"
@@ -130,8 +130,17 @@ export const books: Book[] = Object.values(bookModules)
     .map((mod) => {
         const data = mod as unknown as Book;
         // Spread to create a mutable copy, use content as notes if notes not set
+        // Normalize subcategory to array of strings
+        let subcategories: string[] = [];
+        if (Array.isArray(data.subcategory)) {
+            subcategories = data.subcategory;
+        } else if (typeof data.subcategory === "string") {
+            subcategories = [data.subcategory];
+        }
+
         return {
             ...data,
+            subcategory: subcategories,
             notes: data.notes || data.content || undefined
         };
     });

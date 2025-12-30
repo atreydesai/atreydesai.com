@@ -22,9 +22,11 @@
 
     // Colors based on type
     $: strokeColor =
-        type === "enjoyment" ? "stroke-amber-500" : "stroke-blue-500";
+        type === "enjoyment" ? "stroke-violet-500" : "stroke-cyan-500";
     $: textColor =
-        type === "enjoyment" ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400";
+        type === "enjoyment"
+            ? "text-violet-600 dark:text-violet-400"
+            : "text-cyan-600 dark:text-cyan-400";
 
     onMount(() => {
         mounted = true;

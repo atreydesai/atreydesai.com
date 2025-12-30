@@ -22,8 +22,8 @@
     </h2>
 
     <p class="text-ink-600 dark:text-cream-400 max-w-md mx-auto">
-      Lorem ipsum dolor sit amet. The page you're looking for doesn't exist or
-      has been moved. Let's get you back on track.
+      The page you're looking for doesn't exist or has been moved ┻━┻︵ \(°□°)/
+      ︵ ┻━┻
     </p>
 
     <div

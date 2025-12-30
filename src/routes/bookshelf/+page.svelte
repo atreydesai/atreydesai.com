@@ -10,6 +10,8 @@
         Search,
         X,
         Filter,
+        ArrowUp,
+        ArrowDown,
     } from "lucide-svelte";
     import { slide, fade } from "svelte/transition";
 
@@ -18,6 +20,30 @@
     let selectedTag: string | null = null;
     let searchQuery = "";
     let showTagFilter = false;
+
+    // Sort state
+    let sortField:
+        | "title"
+        | "category"
+        | "medium"
+        | "enjoyment"
+        | "importance"
+        | "dateAdded" = "dateAdded";
+    let sortDirection: "asc" | "desc" = "desc";
+
+    function handleSort(field: typeof sortField) {
+        if (sortField === field) {
+            sortDirection = sortDirection === "asc" ? "desc" : "asc";
+        } else {
+            sortField = field;
+            sortDirection =
+                field === "enjoyment" ||
+                field === "importance" ||
+                field === "dateAdded"
+                    ? "desc"
+                    : "asc";
+        }
+    }
 
     // Track which books have notes revealed
     let revealedNotes: Set<string> = new Set();
@@ -31,9 +57,12 @@
         revealedNotes = revealedNotes; // Trigger reactivity
     }
 
-    // Get all unique tags across books
+    // Get all unique tags and subcategories across books
     $: allTags = [
-        ...new Set(booksData.books.flatMap((book) => book.tags || [])),
+        ...new Set([
+            ...booksData.books.flatMap((book) => book.tags || []),
+            ...booksData.books.flatMap((book) => book.subcategory || []),
+        ]),
     ].sort();
 
     // Get all unique mediums
@@ -54,9 +83,14 @@
                 return false;
         }
 
-        // Tag filter
-        if (selectedTag && (!book.tags || !book.tags.includes(selectedTag))) {
-            return false;
+        // Tag filter (checks tags AND subcategories)
+        if (selectedTag) {
+            const hasTag = book.tags && book.tags.includes(selectedTag);
+            const hasSubcategory =
+                book.subcategory && book.subcategory.includes(selectedTag);
+            if (!hasTag && !hasSubcategory) {
+                return false;
+            }
         }
 
         // Search filter (search in notes/content)
@@ -70,11 +104,29 @@
         return true;
     });
 
-    // Sort by date added (newest first)
-    $: sortedBooks = [...filteredBooks].sort(
-        (a, b) =>
-            new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime(),
-    );
+    // Sort books
+    $: sortedBooks = [...filteredBooks].sort((a, b) => {
+        const modifier = sortDirection === "asc" ? 1 : -1;
+
+        if (sortField === "title") {
+            return modifier * a.title.localeCompare(b.title);
+        } else if (sortField === "category") {
+            return modifier * a.category.localeCompare(b.category);
+        } else if (sortField === "medium") {
+            return modifier * (a.medium || "").localeCompare(b.medium || "");
+        } else if (sortField === "enjoyment") {
+            return modifier * ((a.enjoyment || 0) - (b.enjoyment || 0));
+        } else if (sortField === "importance") {
+            return modifier * ((a.importance || 0) - (b.importance || 0));
+        } else {
+            // dateAdded
+            return (
+                modifier *
+                (new Date(a.dateAdded).getTime() -
+                    new Date(b.dateAdded).getTime())
+            );
+        }
+    });
 
     function clearFilters() {
         selectedCategory = "all";
@@ -90,9 +142,6 @@
     // Helper to get category display color
     function getCategoryColor(category: string): string {
         const colors: Record<string, string> = {
-            essays: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-            research:
-                "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
             science:
                 "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
             advice: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
@@ -279,12 +328,81 @@
     <div
         class="hidden md:grid grid-cols-12 gap-4 px-2 py-2 text-xs font-medium text-ink-500 dark:text-ink-400 border-b border-ink-200 dark:border-ink-700 mb-2"
     >
-        <div class="col-span-5">Title</div>
-        <div class="col-span-2">Category</div>
-        <div class="col-span-1">Medium</div>
-        <div class="col-span-1 text-center">Enjoyment</div>
-        <div class="col-span-1 text-center">Importance</div>
-        <div class="col-span-2">Tags</div>
+        <button
+            on:click={() => handleSort("title")}
+            class="col-span-6 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
+        >
+            Title
+            {#if sortField === "title"}
+                <div in:fade={{ duration: 200 }}>
+                    {#if sortDirection === "asc"}
+                        <ArrowUp size={12} />
+                    {:else}
+                        <ArrowDown size={12} />
+                    {/if}
+                </div>
+            {/if}
+        </button>
+        <button
+            on:click={() => handleSort("category")}
+            class="col-span-2 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
+        >
+            Category
+            {#if sortField === "category"}
+                <div in:fade={{ duration: 200 }}>
+                    {#if sortDirection === "asc"}
+                        <ArrowUp size={12} />
+                    {:else}
+                        <ArrowDown size={12} />
+                    {/if}
+                </div>
+            {/if}
+        </button>
+        <button
+            on:click={() => handleSort("medium")}
+            class="col-span-2 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
+        >
+            Medium
+            {#if sortField === "medium"}
+                <div in:fade={{ duration: 200 }}>
+                    {#if sortDirection === "asc"}
+                        <ArrowUp size={12} />
+                    {:else}
+                        <ArrowDown size={12} />
+                    {/if}
+                </div>
+            {/if}
+        </button>
+        <button
+            on:click={() => handleSort("enjoyment")}
+            class="col-span-1 flex items-center justify-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
+        >
+            Enjoyment
+            {#if sortField === "enjoyment"}
+                <div in:fade={{ duration: 200 }}>
+                    {#if sortDirection === "asc"}
+                        <ArrowUp size={12} />
+                    {:else}
+                        <ArrowDown size={12} />
+                    {/if}
+                </div>
+            {/if}
+        </button>
+        <button
+            on:click={() => handleSort("importance")}
+            class="col-span-1 flex items-center justify-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
+        >
+            Importance
+            {#if sortField === "importance"}
+                <div in:fade={{ duration: 200 }}>
+                    {#if sortDirection === "asc"}
+                        <ArrowUp size={12} />
+                    {:else}
+                        <ArrowDown size={12} />
+                    {/if}
+                </div>
+            {/if}
+        </button>
     </div>
 
     <!-- Books list -->
@@ -300,7 +418,7 @@
                     <!-- Desktop: Table row layout -->
                     <div class="hidden md:grid grid-cols-12 gap-4 items-center">
                         <!-- Title -->
-                        <div class="col-span-5 flex items-center gap-2">
+                        <div class="col-span-6 flex items-center gap-2">
                             {#if book.favorite}
                                 <Star
                                     size={14}
@@ -336,7 +454,7 @@
                         </div>
 
                         <!-- Medium -->
-                        <div class="col-span-1">
+                        <div class="col-span-2">
                             {#if book.medium}
                                 <span
                                     class="text-xs text-ink-500 dark:text-ink-400 bg-cream-200 dark:bg-ink-700 px-2 py-0.5 rounded"
@@ -364,26 +482,6 @@
                                 type="importance"
                                 size={28}
                             />
-                        </div>
-
-                        <!-- Tags -->
-                        <div class="col-span-2 flex gap-1 overflow-hidden">
-                            {#if book.tags && book.tags.length > 0}
-                                {#each book.tags.slice(0, 2) as tag}
-                                    <span
-                                        class="text-xs px-1.5 py-0.5 bg-cream-200 dark:bg-ink-700 text-ink-600 dark:text-cream-400 rounded truncate"
-                                    >
-                                        {tag}
-                                    </span>
-                                {/each}
-                                {#if book.tags.length > 2}
-                                    <span class="text-xs text-ink-400"
-                                        >+{book.tags.length - 2}</span
-                                    >
-                                {/if}
-                            {:else}
-                                <span class="text-xs text-ink-400">--</span>
-                            {/if}
                         </div>
                     </div>
 
@@ -529,10 +627,14 @@
                                         View Source
                                     </a>
                                 {/if}
-                                {#if book.subcategory}
-                                    <span class="pill text-xs"
-                                        >{book.subcategory}</span
-                                    >
+                                {#if book.subcategory && book.subcategory.length > 0}
+                                    {#each book.subcategory as sub}
+                                        <span
+                                            class="pill text-xs px-2 py-0.5 bg-cream-200 dark:bg-ink-700 rounded text-ink-600 dark:text-cream-400"
+                                        >
+                                            {sub}
+                                        </span>
+                                    {/each}
                                 {/if}
                                 <span
                                     class="text-xs text-ink-400 dark:text-ink-500"
