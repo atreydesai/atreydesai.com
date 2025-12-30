@@ -5,7 +5,11 @@
   import { ArrowRight } from "@jis3r/icons";
   import { Github, Twitter, GraduationCap, Mail } from "lucide-svelte";
   import { fly, fade } from "svelte/transition";
-  import { papersData, affiliations as affiliationsData } from "$lib/content";
+  import {
+    papersData,
+    affiliations as affiliationsData,
+    aboutData,
+  } from "$lib/content";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
   import HyperText from "$lib/components/HyperText.svelte";
 
@@ -21,6 +25,18 @@
 
   function revealEmail() {
     emailRevealed = true;
+  }
+
+  // Helper to parse markdown-style links in text
+  function parseLinks(text: string): string {
+    // Convert **text** to <strong>text</strong>
+    text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    // Convert *text* to <span class="emphasized">text</span>
+    text = text.replace(
+      /\*([^*]+)\*/g,
+      '<span class="text-ink-900 dark:text-cream-100">$1</span>',
+    );
+    return text;
   }
 
   const socialLinks = [
@@ -167,19 +183,19 @@
               <span class="text-ink-500 dark:text-ink-400"
                 >research interests:</span
               >
-              <strong>natural language processing</strong>, specifically:
+              {@html parseLinks(
+                aboutData.professional.researchInterests.intro.replace(
+                  "My research interests lie in ",
+                  "",
+                ),
+              )}
             </p>
             <ol
               class="list-decimal list-inside space-y-0.5 ml-4 text-sm text-ink-600 dark:text-cream-400"
             >
-              <li>
-                <strong>verify</strong> validity and robustness of existing benchmarks
-              </li>
-              <li>human-AI <strong>collaboration</strong> in data creation</li>
-              <li>
-                <strong>create</strong> evaluation methods for multimodal, linguistic,
-                and spatiotemporal understanding
-              </li>
+              {#each aboutData.professional.researchInterests.items as item}
+                <li>{@html parseLinks(item)}</li>
+              {/each}
             </ol>
           </div>
 

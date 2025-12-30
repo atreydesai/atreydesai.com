@@ -1,0 +1,95 @@
+# About page content - edit this file to update the about page text
+
+# Footnotes shown in the sidebar (desktop) or bottom (mobile)
+footnotes:
+  - id: 1
+    content: "HackAPrompt is the world's largest red-teaming hackathon."
+  - id: 2
+    content: "This work at ACL2 aims to eventually create an end-to-end machine translation pipeline for animal vocalizations. Our research is also graciously supported by the NSF."
+  - id: 3
+    content: "Our findings were published at the AAAI-22 Workshop on Interactive Machine Learning (IMLW) and the Conference on Reinforcement Learning and Decision Making (RLDM-22). And also my first publications!"
+  - id: 4
+    content: "I especially love collecting used and old books. I tend to buy too many from the discount carts outside the Strand in NYC."
+  - id: 5
+    content: "A relic of high school newspaper and my wonderful journalism teacher, Mr. Tyler. I had also been an editor for STYLUS, Maryland's literary arts and photography magazine my freshman year."
+  - id: 6
+    content: "This had started out as a fun thing with my roommate, but we both discovered we were really good at predictions. It became a nightly tradition to come back and talk about the progress of our trades for the day (much to the chagrin of our friends)."
+    
+
+# Professional section - your academic/research bio
+professional:
+  intro: "I'm **Atrey Desai**, a third-year undergraduate student double majoring in Computer Science and Linguistics with a minor in Korean Studies at the [University of Maryland](https://umd.edu). I am fortunate to be advised by [Professor Rachel Rudinger](https://rudinger.github.io/) and [Professor Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg). I am also eternally thankful for [Nishant Balepur](https://nbalepur.github.io/) and [Yoo Yeon Sung](https://yysung.github.io/) for taking a curious undergraduate under their wing."
+  
+  paragraphs:
+    - text: "I am a member of the [Computational Linguistics and Information Processing (CLIP) lab](https://clip.umd.edu/) in UMIACS. I am also currently a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I work on HackAPrompt and research on creating trustworthy and robust AI safety judges."
+      footnote: 1
+      
+    - text: "Currently, I'm also a visiting researcher under [Professor Kenny Zhu](https://kenzhu2000.github.io/) at the [Arlington Computational Linguistics Lab (ACL2)](https://uta-acl2.github.io/) at the University of Texas at Arlington. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights about the language of animal species."
+      footnote: 2
+      
+    - text: "Previously, I worked under [Professor Michael Littman](https://littmania.com/) at the [Reinforcement Learning & Adaptive Behavior (RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
+      footnote: 3
+
+  # Research interests - each item can have emphasized words wrapped in **
+  researchInterests:
+    intro: "My research interests lie in **natural language processing**, particularly:"
+    items:
+      - "How can we **verify** validity and robustness of *existing benchmarks*?"
+      - "How can humans and AI **collaborate** in data creation?"
+      - "How can we **create** new evaluation methods that probe *multimodal*, *linguistic*, and *spatiotemporal* understanding?"
+
+# Personal section
+personal:
+  description: "I would describe myself as **curious and bubbly** with a healthy dose of whimsy! I love exploring new ideas and finding unexpected connections between different fields."
+  interests: "photography, reading[^4], graphic design[^5], learning languages, repeatedly lifting chunky objects, music (especially edm and indie pop), [manifold](https://manifold.markets)[^6], and cultures of the world"
+  blogs: []
+
+# Location section  
+location:
+  text: "I was born and grew up in **Saratoga, California**, attending the lovely [Saratoga High School](https://www.saratogahigh.org/). I currently live in the Washington, DC area, specifically in College Park, MD. I also tend to frequent the New York City and Boston areas for work and visiting friends. If you are ever around and want to talk, feel free to reach out!"
+
+# Website section
+website:
+  inspiration: "This site draws inspiration from many beautiful personal websites that I had been collecting for the better half of 2025."
+  inspirationList:
+    - name: "Aryaman Arora"
+      url: "https://aryaman.io/"
+      description: "For the click to reveal email feature, formatting for the about section, and footnotes."
+    - name: "Henry Wang"
+      url: "https://www.henryweng.com/"
+      description: "For cool effects when hovering over the profile photo."
+    - name: "Preston Fu"
+      url: "https://www.prestonfu.com/"
+      description: "For providing a rough base for the website, formatting content in 1:3:1, and hovering over research images for animated previews."
+    - name: "Jessy Lin"
+      url: "https://jessylin.com/"
+      description: "For inspiring the formatting for the photography section."
+    - name: "Brian Lovin"
+      url: "https://brianlovin.com/sites"
+      description: "For collecting a host of sites to collect tidbits of animations from."
+    - name: "Lingxi Li"
+      url: "https://lingxi.li/"
+      description: "For the current time in the footer."
+    - name: "Maxime Heckel"
+      url: "https://maximeheckel.com/"
+      description: "For general creative inspiration and a better implementation of the lego effect."
+    - name: "Mason Wang"
+      url: "https://masonjwang.com/"
+      description: "For the design and thought process behind the bookshelf section."
+    - name: "Lily Yang"
+      url: "https://lilyyang.me/work"
+      description: "For raise for hover section animation inspiration, and the music in the footer."
+    - name: "Are.na"
+      url: "https://www.are.na/alt3-_/webdesign-insp"
+      description: "For general website inspo."
+    - name: "Shashwat"
+      url: "https://shashwatt.tech/#about"
+      description: "For inspiring a custom cursor."
+  builtWith: "This website was built in [Antigravity](https://antigravity.google), with assistance from Claude Opus 4.5 and Gemini 3 Flash. It uses SvelteKit, Tailwind CSS, and is deployed on Vercel."
+
+# Things you're thinking about
+thoughts:
+  - "what to focus on in my phd"
+  - "things to photograph in my daily life"
+  - "why are sparkling ice drinks so good"
+  - "cheesecake"

@@ -1,4 +1,5 @@
 import { sveltekit } from "@sveltejs/kit/vite";
+import { imagetools } from "vite-imagetools";
 import pluginYaml from "@rollup/plugin-yaml";
 import yaml from "js-yaml";
 import { dataToEsm } from "@rollup/pluginutils";
@@ -31,7 +32,7 @@ function markdown() {
 }
 
 const config: UserConfig = {
-  plugins: [sveltekit(), pluginYaml() as any, markdown()],
+  plugins: [sveltekit(), imagetools(), pluginYaml() as any, markdown()],
 };
 
 export default config;

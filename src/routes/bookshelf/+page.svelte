@@ -1,11 +1,23 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
+    import RatingCircle from "$lib/components/RatingCircle.svelte";
     import { booksData } from "$lib/content";
-    import { Star, BookOpenText, ChevronDown } from "@jis3r/icons";
-    import { slide } from "svelte/transition";
+    import {
+        Star,
+        BookOpenText,
+        ChevronDown,
+        ExternalLink,
+        Search,
+        X,
+        Filter,
+    } from "lucide-svelte";
+    import { slide, fade } from "svelte/transition";
 
     // Filter state
     let selectedCategory = "all";
+    let selectedTag: string | null = null;
+    let searchQuery = "";
+    let showTagFilter = false;
 
     // Track which books have notes revealed
     let revealedNotes: Set<string> = new Set();
@@ -19,11 +31,43 @@
         revealedNotes = revealedNotes; // Trigger reactivity
     }
 
-    // Filter books based on category
+    // Get all unique tags across books
+    $: allTags = [
+        ...new Set(booksData.books.flatMap((book) => book.tags || [])),
+    ].sort();
+
+    // Get all unique mediums
+    $: allMediums = [
+        ...new Set(booksData.books.map((book) => book.medium).filter(Boolean)),
+    ].sort();
+
+    // Filter books based on category, tag, and search
     $: filteredBooks = booksData.books.filter((book) => {
-        if (selectedCategory === "all") return true;
-        if (selectedCategory === "favorites") return book.favorite;
-        return book.category === selectedCategory;
+        // Category filter
+        if (selectedCategory !== "all") {
+            if (selectedCategory === "favorites" && !book.favorite)
+                return false;
+            if (
+                selectedCategory !== "favorites" &&
+                book.category !== selectedCategory
+            )
+                return false;
+        }
+
+        // Tag filter
+        if (selectedTag && (!book.tags || !book.tags.includes(selectedTag))) {
+            return false;
+        }
+
+        // Search filter (search in notes/content)
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const searchableText =
+                `${book.title} ${book.author} ${book.notes || ""} ${book.content || ""}`.toLowerCase();
+            if (!searchableText.includes(query)) return false;
+        }
+
+        return true;
     });
 
     // Sort by date added (newest first)
@@ -32,8 +76,35 @@
             new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime(),
     );
 
-    function renderStars(count: number) {
-        return "★".repeat(count) + "☆".repeat(5 - count);
+    function clearFilters() {
+        selectedCategory = "all";
+        selectedTag = null;
+        searchQuery = "";
+    }
+
+    function selectTag(tag: string) {
+        selectedTag = selectedTag === tag ? null : tag;
+        showTagFilter = false;
+    }
+
+    // Helper to get category display color
+    function getCategoryColor(category: string): string {
+        const colors: Record<string, string> = {
+            essays: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+            research:
+                "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+            science:
+                "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
+            advice: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+            fiction:
+                "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+            nonfiction:
+                "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+        };
+        return (
+            colors[category] ||
+            "bg-cream-200 text-ink-600 dark:bg-ink-700 dark:text-cream-300"
+        );
     }
 </script>
 
@@ -42,7 +113,7 @@
     description="Reading list and book recommendations by Atrey Desai."
 />
 
-<div class="layout-main py-8 md:py-12">
+<div class="layout-main py-8 md:py-12 pb-4">
     <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100 mb-4">
         bookshelf
     </h1>
@@ -52,12 +123,15 @@
     </p>
 
     <!-- Instructions about TL;DR -->
-    <p class="text-sm text-ink-500 dark:text-ink-400 mb-8 italic">
+    <p class="text-sm text-ink-500 dark:text-ink-400 mb-0 italic">
         Click on a book to reveal my notes/TL;DR.
     </p>
+</div>
 
+<!-- Expanded width container for bookshelf content -->
+<div class="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
     <!-- Category filters -->
-    <div class="flex flex-wrap gap-2 mb-8">
+    <div class="flex flex-wrap gap-2 mb-6">
         {#each booksData.categories as category}
             <button
                 type="button"
@@ -80,106 +154,397 @@
         {/each}
     </div>
 
+    <!-- Search and Filter Bar -->
+    <div class="flex flex-col sm:flex-row gap-4 mb-6">
+        <!-- Search Input -->
+        <div class="relative flex-1">
+            <Search
+                size={16}
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+            />
+            <input
+                type="text"
+                placeholder="Search reading notes..."
+                bind:value={searchQuery}
+                class="w-full pl-10 pr-10 py-2 text-sm bg-cream-100 dark:bg-ink-800 border border-cream-300 dark:border-ink-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/50 dark:focus:ring-accent-light/50 text-ink-800 dark:text-cream-200 placeholder:text-ink-400"
+            />
+            {#if searchQuery}
+                <button
+                    type="button"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-cream-300"
+                    on:click={() => (searchQuery = "")}
+                >
+                    <X size={14} />
+                </button>
+            {/if}
+        </div>
+
+        <!-- Tag Filter Dropdown -->
+        <div class="relative">
+            <button
+                type="button"
+                class="flex items-center gap-2 px-4 py-2 text-sm bg-cream-100 dark:bg-ink-800 border border-cream-300 dark:border-ink-700 rounded-lg hover:bg-cream-200 dark:hover:bg-ink-700 transition-colors"
+                on:click={() => (showTagFilter = !showTagFilter)}
+            >
+                <Filter size={14} />
+                <span>{selectedTag || "Filter by tag"}</span>
+                <ChevronDown
+                    size={14}
+                    class={`transition-transform ${showTagFilter ? "rotate-180" : ""}`}
+                />
+            </button>
+
+            {#if showTagFilter}
+                <div
+                    class="absolute right-0 mt-2 w-64 max-h-64 overflow-y-auto bg-cream-50 dark:bg-ink-800 border border-cream-300 dark:border-ink-700 rounded-lg shadow-lg z-50"
+                    transition:slide={{ duration: 200 }}
+                >
+                    {#if selectedTag}
+                        <button
+                            type="button"
+                            class="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-cream-100 dark:hover:bg-ink-700"
+                            on:click={() => selectTag(selectedTag || "")}
+                        >
+                            Clear filter
+                        </button>
+                        <hr class="border-cream-200 dark:border-ink-700" />
+                    {/if}
+                    {#each allTags as tag}
+                        <button
+                            type="button"
+                            class="w-full px-4 py-2 text-left text-sm hover:bg-cream-100 dark:hover:bg-ink-700 transition-colors"
+                            class:bg-accent-subtle={selectedTag === tag}
+                            class:text-accent={selectedTag === tag}
+                            on:click={() => selectTag(tag)}
+                        >
+                            {tag}
+                        </button>
+                    {/each}
+                    {#if allTags.length === 0}
+                        <p class="px-4 py-2 text-sm text-ink-400">
+                            No tags available
+                        </p>
+                    {/if}
+                </div>
+            {/if}
+        </div>
+    </div>
+
+    <!-- Active filters indicator -->
+    {#if selectedTag || searchQuery}
+        <div
+            class="flex items-center gap-2 mb-4"
+            transition:fade={{ duration: 150 }}
+        >
+            <span class="text-sm text-ink-500 dark:text-ink-400">Filters:</span>
+            {#if selectedTag}
+                <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-accent/10 text-accent dark:text-accent-light rounded-full"
+                >
+                    {selectedTag}
+                    <button
+                        type="button"
+                        on:click={() => (selectedTag = null)}
+                        class="hover:text-accent-dark"
+                    >
+                        <X size={12} />
+                    </button>
+                </span>
+            {/if}
+            {#if searchQuery}
+                <span
+                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full"
+                >
+                    "{searchQuery}"
+                    <button
+                        type="button"
+                        on:click={() => (searchQuery = "")}
+                        class="hover:text-blue-800 dark:hover:text-blue-300"
+                    >
+                        <X size={12} />
+                    </button>
+                </span>
+            {/if}
+            <button
+                type="button"
+                class="text-xs text-ink-500 hover:text-ink-700 dark:hover:text-cream-300 underline"
+                on:click={clearFilters}
+            >
+                Clear all
+            </button>
+        </div>
+    {/if}
+
+    <!-- Table Header (desktop only) -->
+    <div
+        class="hidden md:grid grid-cols-12 gap-4 px-2 py-2 text-xs font-medium text-ink-500 dark:text-ink-400 border-b border-ink-200 dark:border-ink-700 mb-2"
+    >
+        <div class="col-span-5">Title</div>
+        <div class="col-span-2">Category</div>
+        <div class="col-span-1">Medium</div>
+        <div class="col-span-1 text-center">Enjoyment</div>
+        <div class="col-span-1 text-center">Importance</div>
+        <div class="col-span-2">Tags</div>
+    </div>
+
     <!-- Books list -->
-    <div class="space-y-2 stagger-children">
+    <div class="space-y-0 stagger-children">
         {#each sortedBooks as book (book.id)}
             <div class="border-b border-ink-100 dark:border-ink-800">
                 <!-- Clickable header -->
                 <button
                     type="button"
-                    class="w-full py-4 text-left group transition-all duration-200 hover:bg-cream-50 dark:hover:bg-ink-800/50 -mx-2 px-2 rounded"
+                    class="w-full py-3 text-left group transition-all duration-200 hover:bg-cream-50 dark:hover:bg-ink-800/50 -mx-2 px-2 rounded"
                     on:click={() => toggleNotes(book.id)}
                 >
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2 mb-1">
-                                {#if book.favorite}
-                                    <Star
-                                        size={14}
-                                        class="text-amber-500 fill-amber-500"
-                                    />
-                                {/if}
-                                <h3
-                                    class="font-medium text-ink-900 dark:text-cream-100 group-hover:text-accent dark:group-hover:text-accent-light transition-colors"
+                    <!-- Desktop: Table row layout -->
+                    <div class="hidden md:grid grid-cols-12 gap-4 items-center">
+                        <!-- Title -->
+                        <div class="col-span-5 flex items-center gap-2">
+                            {#if book.favorite}
+                                <Star
+                                    size={14}
+                                    class="text-amber-500 fill-amber-500 flex-shrink-0"
+                                />
+                            {/if}
+                            <span
+                                class="font-medium text-ink-900 dark:text-cream-100 group-hover:text-accent dark:group-hover:text-accent-light transition-colors truncate"
+                            >
+                                {book.title}
+                            </span>
+                            {#if book.notes || book.content}
+                                <span
+                                    class="text-ink-400 transition-transform duration-300 flex-shrink-0"
+                                    class:rotate-180={revealedNotes.has(
+                                        book.id,
+                                    )}
                                 >
-                                    {book.title}
-                                </h3>
-                                {#if book.notes}
-                                    <span
-                                        class="text-ink-400 transition-transform duration-300"
-                                        class:rotate-180={revealedNotes.has(
-                                            book.id,
-                                        )}
-                                    >
-                                        <ChevronDown size={16} />
-                                    </span>
-                                {/if}
-                            </div>
-                            <p class="text-sm text-ink-500 dark:text-ink-400">
-                                {book.author}
-                            </p>
+                                    <ChevronDown size={14} />
+                                </span>
+                            {/if}
                         </div>
 
-                        <div class="text-right flex-shrink-0">
-                            <!-- Ratings -->
-                            <div
-                                class="text-xs text-ink-400 dark:text-ink-500 space-y-1"
+                        <!-- Category -->
+                        <div class="col-span-2">
+                            <span
+                                class="inline-block px-2 py-0.5 text-xs rounded {getCategoryColor(
+                                    book.category,
+                                )}"
                             >
-                                <div>
-                                    <span class="text-ink-500 dark:text-ink-400"
-                                        >enjoyment:</span
+                                {book.category}
+                            </span>
+                        </div>
+
+                        <!-- Medium -->
+                        <div class="col-span-1">
+                            {#if book.medium}
+                                <span
+                                    class="text-xs text-ink-500 dark:text-ink-400 bg-cream-200 dark:bg-ink-700 px-2 py-0.5 rounded"
+                                >
+                                    {book.medium}
+                                </span>
+                            {:else}
+                                <span class="text-xs text-ink-400">--</span>
+                            {/if}
+                        </div>
+
+                        <!-- Enjoyment -->
+                        <div class="col-span-1 flex justify-center">
+                            <RatingCircle
+                                value={book.enjoyment}
+                                type="enjoyment"
+                                size={28}
+                            />
+                        </div>
+
+                        <!-- Importance -->
+                        <div class="col-span-1 flex justify-center">
+                            <RatingCircle
+                                value={book.importance}
+                                type="importance"
+                                size={28}
+                            />
+                        </div>
+
+                        <!-- Tags -->
+                        <div class="col-span-2 flex gap-1 overflow-hidden">
+                            {#if book.tags && book.tags.length > 0}
+                                {#each book.tags.slice(0, 2) as tag}
+                                    <span
+                                        class="text-xs px-1.5 py-0.5 bg-cream-200 dark:bg-ink-700 text-ink-600 dark:text-cream-400 rounded truncate"
                                     >
-                                    <span class="text-amber-500"
-                                        >{renderStars(book.enjoyment)}</span
+                                        {tag}
+                                    </span>
+                                {/each}
+                                {#if book.tags.length > 2}
+                                    <span class="text-xs text-ink-400"
+                                        >+{book.tags.length - 2}</span
                                     >
+                                {/if}
+                            {:else}
+                                <span class="text-xs text-ink-400">--</span>
+                            {/if}
+                        </div>
+                    </div>
+
+                    <!-- Mobile: Stack layout -->
+                    <div class="md:hidden">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    {#if book.favorite}
+                                        <Star
+                                            size={14}
+                                            class="text-amber-500 fill-amber-500"
+                                        />
+                                    {/if}
+                                    <h3
+                                        class="font-medium text-ink-900 dark:text-cream-100 group-hover:text-accent dark:group-hover:text-accent-light transition-colors"
+                                    >
+                                        {book.title}
+                                    </h3>
+                                    {#if book.notes || book.content}
+                                        <span
+                                            class="text-ink-400 transition-transform duration-300"
+                                            class:rotate-180={revealedNotes.has(
+                                                book.id,
+                                            )}
+                                        >
+                                            <ChevronDown size={14} />
+                                        </span>
+                                    {/if}
                                 </div>
-                                <div>
-                                    <span class="text-ink-500 dark:text-ink-400"
-                                        >importance:</span
+                                <p
+                                    class="text-sm text-ink-500 dark:text-ink-400 mb-2"
+                                >
+                                    {book.author}
+                                </p>
+                                <!-- Pills row -->
+                                <div class="flex flex-wrap gap-2">
+                                    <span
+                                        class="inline-block px-2 py-0.5 text-xs rounded {getCategoryColor(
+                                            book.category,
+                                        )}"
                                     >
-                                    <span class="text-blue-500"
-                                        >{renderStars(book.importance)}</span
-                                    >
+                                        {book.category}
+                                    </span>
+                                    {#if book.medium}
+                                        <span
+                                            class="text-xs text-ink-500 dark:text-ink-400 bg-cream-200 dark:bg-ink-700 px-2 py-0.5 rounded"
+                                        >
+                                            {book.medium}
+                                        </span>
+                                    {/if}
                                 </div>
+                            </div>
+                            <!-- Ratings on right -->
+                            <div class="flex gap-2">
+                                <RatingCircle
+                                    value={book.enjoyment}
+                                    type="enjoyment"
+                                    size={28}
+                                />
+                                <RatingCircle
+                                    value={book.importance}
+                                    type="importance"
+                                    size={28}
+                                />
                             </div>
                         </div>
                     </div>
                 </button>
 
                 <!-- Animated notes reveal -->
-                {#if revealedNotes.has(book.id) && book.notes}
+                {#if revealedNotes.has(book.id) && (book.notes || book.content)}
                     <div
                         class="pb-4 px-2 -mx-2"
                         transition:slide={{ duration: 300 }}
                     >
                         <div
-                            class="pl-6 border-l-2 border-accent/30 dark:border-accent-light/30"
+                            class="pl-6 border-l-2 border-accent/30 dark:border-accent-light/30 space-y-4"
                         >
+                            <!-- Author (desktop) -->
                             <p
-                                class="text-sm text-ink-600 dark:text-cream-400 italic"
+                                class="hidden md:block text-sm text-ink-500 dark:text-ink-400"
                             >
-                                {book.notes}
+                                by {book.author}
                             </p>
-                        </div>
 
-                        <!-- Category pill and date -->
-                        <div class="mt-3 flex items-center gap-3">
-                            <span class="pill text-xs">{book.category}</span>
-                            {#if book.subcategory}
-                                <span class="pill text-xs"
-                                    >{book.subcategory}</span
+                            <!-- Notes -->
+                            <div>
+                                <p
+                                    class="text-sm text-ink-600 dark:text-cream-400"
                                 >
+                                    {book.notes || book.content}
+                                </p>
+                            </div>
+
+                            <!-- Quotes -->
+                            {#if book.quotes && book.quotes.length > 0}
+                                <div class="mt-4">
+                                    <h4
+                                        class="text-xs font-medium text-ink-500 dark:text-ink-400 mb-2 uppercase tracking-wide"
+                                    >
+                                        Quotes
+                                    </h4>
+                                    <div class="space-y-2">
+                                        {#each book.quotes as quote}
+                                            <blockquote
+                                                class="text-sm italic text-ink-600 dark:text-cream-400 pl-4 border-l-2 border-ink-200 dark:border-ink-700"
+                                            >
+                                                "{quote}"
+                                            </blockquote>
+                                        {/each}
+                                    </div>
+                                </div>
                             {/if}
-                            <span
-                                class="text-xs text-ink-400 dark:text-ink-500"
-                            >
-                                Added {new Date(
-                                    book.dateAdded,
-                                ).toLocaleDateString("en-US", {
-                                    month: "short",
-                                    year: "numeric",
-                                })}
-                            </span>
+
+                            <!-- Tags (full list) -->
+                            {#if book.tags && book.tags.length > 0}
+                                <div class="flex flex-wrap gap-2 mt-3">
+                                    {#each book.tags as tag}
+                                        <button
+                                            type="button"
+                                            class="text-xs px-2 py-0.5 bg-cream-200 dark:bg-ink-700 text-ink-600 dark:text-cream-400 rounded hover:bg-cream-300 dark:hover:bg-ink-600 transition-colors"
+                                            on:click|stopPropagation={() =>
+                                                selectTag(tag)}
+                                        >
+                                            {tag}
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
+
+                            <!-- Footer: URL link, subcategory, date -->
+                            <div class="mt-3 flex flex-wrap items-center gap-3">
+                                {#if book.url}
+                                    <a
+                                        href={book.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="inline-flex items-center gap-1 text-sm text-accent dark:text-accent-light hover:underline"
+                                        on:click|stopPropagation
+                                    >
+                                        <ExternalLink size={14} />
+                                        View Source
+                                    </a>
+                                {/if}
+                                {#if book.subcategory}
+                                    <span class="pill text-xs"
+                                        >{book.subcategory}</span
+                                    >
+                                {/if}
+                                <span
+                                    class="text-xs text-ink-400 dark:text-ink-500"
+                                >
+                                    Added {new Date(
+                                        book.dateAdded,
+                                    ).toLocaleDateString("en-US", {
+                                        month: "short",
+                                        year: "numeric",
+                                    })}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 {/if}
@@ -191,7 +556,18 @@
     {#if sortedBooks.length === 0}
         <div class="text-center py-12 text-ink-500 dark:text-ink-400">
             <BookOpenText size={48} class="mx-auto mb-4 opacity-50" />
-            <p>No books in this category yet.</p>
+            {#if searchQuery || selectedTag}
+                <p>No books match your filters.</p>
+                <button
+                    type="button"
+                    class="mt-2 text-accent dark:text-accent-light hover:underline"
+                    on:click={clearFilters}
+                >
+                    Clear filters
+                </button>
+            {:else}
+                <p>No books in this category yet.</p>
+            {/if}
         </div>
     {/if}
 </div>

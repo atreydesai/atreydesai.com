@@ -27,11 +27,14 @@
   let isPlaying = false;
   let audioElement: HTMLAudioElement | null = null;
 
-  const musicSamples = [
-    "/audio/sample1.mp3",
-    "/audio/sample2.mp3",
-    "/audio/sample3.mp3",
-  ];
+  // Dynamically import all mp3 files from /static/audio using Vite's glob
+  const audioModules = import.meta.glob("/static/audio/*.mp3", {
+    eager: true,
+    as: "url",
+  });
+  const musicSamples = Object.values(audioModules).map((url) =>
+    url.replace("/static", ""),
+  );
 
   function toggleMusic() {
     if (!audioElement) {

@@ -33,8 +33,12 @@ export interface Book {
     author: string;
     category: string;
     subcategory?: string | null;
-    enjoyment: number;
-    importance: number;
+    enjoyment?: number | null;  // 1-10 scale, optional
+    importance?: number | null; // 1-10 scale, optional
+    medium?: string;            // "essay", "book", "video", "article", "paper", "podcast", "short story"
+    tags?: string[];            // For tag filtering
+    quotes?: string[];          // Notable quotes from the work
+    url?: string;               // Source link
     dateAdded: string;
     favorite: boolean;
     notes?: string;
@@ -88,6 +92,32 @@ export interface Affiliations {
     };
 }
 
+export interface AboutData {
+    footnotes: Array<{ id: number; content: string }>;
+    professional: {
+        intro: string;
+        paragraphs: Array<{ text: string; footnote?: number }>;
+        researchInterests: {
+            intro: string;
+            items: string[];
+        };
+    };
+    personal: {
+        description: string;
+        interests: string;
+        blogs: Array<{ name: string; url: string }>;
+    };
+    location: {
+        text: string;
+    };
+    website: {
+        inspiration: string;
+        inspirationList: Array<{ name: string; url: string; description: string }>;
+        builtWith: string;
+    };
+    thoughts: string[];
+}
+
 // Import all paper markdown files
 const paperModules = import.meta.glob<Paper>('/src/content/papers/*.md', { eager: true });
 export const papers: Paper[] = Object.values(paperModules)
@@ -110,10 +140,12 @@ export const books: Book[] = Object.values(bookModules)
 import affiliationsYaml from '../content/affiliations.yaml';
 import talksYaml from '../content/talks.yaml';
 import categoriesYaml from '../content/categories.yaml';
+import aboutYaml from '../content/about.yaml';
 
 export const affiliations: Affiliations = affiliationsYaml as Affiliations;
 export const talks: Talk[] = talksYaml as Talk[];
 export const categories: Category[] = categoriesYaml as Category[];
+export const aboutData: AboutData = aboutYaml as AboutData;
 
 // Helper to get papers data in the old format (for compatibility)
 export const papersData = {
