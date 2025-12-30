@@ -68,7 +68,8 @@
 
 <Seo
     title="Photography | Atrey Desai"
-    description="Photography by Atrey Desai - capturing moments and perspectives."
+    description="Photography portfolio by Atrey Desai. Follow @framedbyatrey on Instagram for more."
+    url="https://atreydesai.com/photography"
 />
 
 <div class="layout-main py-8 md:py-12">

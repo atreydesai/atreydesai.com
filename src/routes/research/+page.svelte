@@ -58,7 +58,8 @@
 
 <Seo
     title="Research | Atrey Desai"
-    description="Research papers, preprints, and talks by Atrey Desai."
+    description="Publications and preprints by Atrey Desai on NLP benchmarks, multimodal reasoning, and computational animal linguistics. Research from UMD CLIP Lab, UT Arlington ACL2 Lab, and Brown University."
+    url="https://atreydesai.com/research"
 />
 
 <div class="layout-main py-8 md:py-12">

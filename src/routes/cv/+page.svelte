@@ -5,7 +5,8 @@
 
 <Seo
     title="CV | Atrey Desai"
-    description="Curriculum Vitae of Atrey Desai - comprehensive academic and professional history."
+    description="Curriculum Vitae of Atrey Desai - undergraduate researcher at UMD with experience at Learn Prompting, CLIP Lab, Brown University, and UT Arlington."
+    url="https://atreydesai.com/cv"
 />
 
 <div class="layout-main py-8 md:py-12">

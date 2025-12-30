@@ -5,7 +5,8 @@
 
 <Seo
     title="Resume | Atrey Desai"
-    description="Resume of Atrey Desai - undergraduate researcher and AI enthusiast."
+    description="Resume of Atrey Desai - CS & Linguistics student at University of Maryland, researching NLP and AI safety."
+    url="https://atreydesai.com/resume"
 />
 
 <div class="layout-main py-8 md:py-12">

@@ -72,7 +72,8 @@
 
 <Seo
     title="About | Atrey Desai"
-    description="Learn more about Atrey Desai - undergraduate researcher, AI enthusiast, and curious mind."
+    description="Learn about Atrey Desai - CS & Linguistics student at University of Maryland, researching NLP at CLIP Lab under Prof. Rudinger and Prof. Boyd-Graber."
+    url="https://atreydesai.com/about"
 />
 
 <!-- Centered layout container with footnotes on the side -->

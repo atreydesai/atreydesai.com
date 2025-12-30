@@ -44,6 +44,8 @@
 <Seo
     title="Blog | Atrey Desai"
     description="Blog posts and writings by Atrey Desai on AI, research, and more."
+    url="https://atreydesai.com/blog"
+    noindex={true}
 />
 
 <div class="layout-main py-8 md:py-12">

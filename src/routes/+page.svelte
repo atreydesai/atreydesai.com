@@ -52,7 +52,8 @@
 
 <Seo
   title="Atrey Desai"
-  description="Third year undergraduate researcher interested in AI and machine learning."
+  description="Atrey Desai - undergraduate researcher at University of Maryland studying NLP, AI safety, and computational linguistics. Research on benchmark evaluation, multimodal reasoning, and animal vocalizations."
+  url="https://atreydesai.com"
 />
 
 <div class="layout-main py-8 md:py-12">
