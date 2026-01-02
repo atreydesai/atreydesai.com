@@ -138,8 +138,8 @@
 
             <!-- Venue and Year -->
             <p class="text-sm text-ink-500 dark:text-ink-400 mb-2">
-                {#if paper.venue}<span class="italic">{paper.venue}</span>,
-                {/if}{paper.year}
+                {#if paper.venue}<span class="italic">{paper.venue}</span
+                    >,&nbsp;{/if}{paper.year}
                 {#if paper.preprint}
                     <span
                         class="ml-2 text-xs bg-cream-300 dark:bg-ink-700 px-2 py-0.5 rounded"
