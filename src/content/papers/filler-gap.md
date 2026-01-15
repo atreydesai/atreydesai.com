@@ -1,6 +1,6 @@
 ---
 id: filler-gap
-title: "Emergence of Filler–Gap Mechanisms in Developmentally Constrained Language Models"
+title: "Filling in the Mechanisms: How do LMs Learn Filler-Gap Dependencies under Developmental Constraints?"
 authors:
   - Atrey Desai
   - Sathvik Nair
@@ -21,8 +21,8 @@ preprint: true
 featured: false
 highlight: false
 priority: 99
-image: /images/papers/filler-gap-heatmap.png
+image: /images/papers/dasfigure.png
 imageAnimated: null
-imageDescription: "Heatmaps showing ODDS by layer (y-axis) and position (x-axis) for all four experiments. Position 1 corresponds to the filler slot; position 5 to the verb. Note the clear hotspot at Layer 11, Position 5 for Wh→Topic transfer, and the absence of signal for Topic→Wh."
+imageDescription: "To create a DAS vector, we learn a direction 'a' to align neural representations with the binary variable FILLER_PRESENT. We intervene by projecting the difference between the source and base representations onto 'a' and injecting it into the base sentence."
 ---
 
