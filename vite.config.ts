@@ -5,7 +5,7 @@ import yaml from "js-yaml";
 import { dataToEsm } from "@rollup/pluginutils";
 import type { UserConfig } from "vite";
 
-/** A custom Markdown plugin for Vite, with TOML frontmatter support. */
+/** A custom Markdown plugin for Vite, with YAML frontmatter support. */
 function markdown() {
   return {
     name: "markdown",
@@ -15,12 +15,13 @@ function markdown() {
         let frontmatter = {};
         let content = src;
         if (src.startsWith("---")) {
-          const end = src.indexOf("---", 3);
-          if (end === -1) {
-            throw new Error(`Unclosed TOML frontmatter in ${id}`);
+          // Find --- at the start of a line (after the opening ---)
+          const match = src.slice(3).match(/^([\s\S]*?)\r?\n---\r?\n/);
+          if (!match) {
+            throw new Error(`Unclosed YAML frontmatter in ${id}`);
           }
-          frontmatter = yaml.load(src.substring(3, end).trim()) as any;
-          content = src.substring(end + 3).trim();
+          frontmatter = yaml.load(match[1].trim()) as any;
+          content = src.slice(3 + match[0].length).trim();
         }
         return {
           code: dataToEsm({ ...frontmatter, content }),

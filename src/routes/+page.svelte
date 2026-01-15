@@ -5,11 +5,7 @@
   import { ArrowRight } from "@jis3r/icons";
   import { Github, Twitter, GraduationCap, Mail } from "lucide-svelte";
   import { fly, fade } from "svelte/transition";
-  import {
-    papersData,
-    affiliations as affiliationsData,
-    aboutData,
-  } from "$lib/content";
+  import { papersData, homepageData } from "$lib/content";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
   import HyperText from "$lib/components/HyperText.svelte";
 
@@ -21,7 +17,6 @@
 
   // Email reveal with animation
   let emailRevealed = false;
-  const email = "adesai10@umd.edu";
 
   function revealEmail() {
     emailRevealed = true;
@@ -36,17 +31,18 @@
       /\*([^*]+)\*/g,
       '<span class="text-ink-900 dark:text-cream-100">$1</span>',
     );
+    // Convert [text](url) to <a href="url" class="link">text</a>
+    text = text.replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$1</a>',
+    );
     return text;
   }
 
   const socialLinks = [
-    { name: "GitHub", href: "https://github.com/atreydesai", icon: Github },
-    { name: "Twitter", href: "https://x.com/atreydesai", icon: Twitter },
-    {
-      name: "Scholar",
-      href: "https://scholar.google.com/citations?user=hTDzj6cAAAAJ&hl=en",
-      icon: GraduationCap,
-    },
+    { name: "GitHub", href: homepageData.social.github, icon: Github },
+    { name: "Twitter", href: homepageData.social.twitter, icon: Twitter },
+    { name: "Scholar", href: homepageData.social.scholar, icon: GraduationCap },
   ];
 </script>
 
@@ -102,11 +98,11 @@
             </span>
             {#if emailRevealed}
               <a
-                href="mailto:{email}"
+                href="mailto:{homepageData.social.email}"
                 class="text-sm text-accent dark:text-accent-light hover:text-accent-dark transition-all duration-300"
                 in:fly={{ x: -10, duration: 300 }}
               >
-                {email}
+                {homepageData.social.email}
               </a>
             {:else}
               <button
@@ -130,83 +126,27 @@
         </h1>
 
         <div class="space-y-4 text-ink-700 dark:text-cream-300">
-          <p class="text-base leading-relaxed">
-            I am a third-year undergraduate student double majoring in <span
-              class="text-ink-900 dark:text-cream-100"
-              >Computer Science and Linguistics</span
-            >
-            with a minor in
-            <span class="text-ink-900 dark:text-cream-100">Korean Studies</span>
-            at the
-            <span class="text-ink-900 dark:text-cream-100"
-              >{affiliationsData.school}</span
-            >.
-          </p>
-
-          <p class="text-base leading-relaxed">
-            I am fortunate to be advised by
-            {#if affiliationsData.advisors.length > 0}
-              {#each affiliationsData.advisors as advisor, i}
-                {#if advisor.url}
-                  <a
-                    href={advisor.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="link">{advisor.name}</a
-                  >
-                {:else}
-                  <span class="text-ink-900 dark:text-cream-100"
-                    >{advisor.name}</span
-                  >
-                {/if}
-                {#if i < affiliationsData.advisors.length - 2}{", "}
-                {:else if i === affiliationsData.advisors.length - 2}
-                  {" and "}
-                {/if}
-              {/each}
-            {/if}.
-          </p>
-
-          <p class="text-base leading-relaxed">
-            I am a member of the technical staff of
-            {#if affiliationsData.currentRole}
-              <a
-                href={affiliationsData.currentRole.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="link">{affiliationsData.currentRole.organization}</a
-              >.
-            {/if}
-          </p>
+          {#each homepageData.intro as paragraph}
+            <p class="text-base leading-relaxed">
+              {@html parseLinks(paragraph)}
+            </p>
+          {/each}
 
           <div class="text-base">
             <p class="mb-1">
               <span class="text-ink-500 dark:text-ink-400"
                 >research interests:</span
               >
-              {@html parseLinks(
-                aboutData.professional.researchInterests.intro.replace(
-                  "My research interests lie in ",
-                  "",
-                ),
-              )}
+              {@html parseLinks(homepageData.researchInterests.intro)}
             </p>
             <ol
               class="list-decimal list-inside space-y-0.5 ml-4 text-sm text-ink-600 dark:text-cream-400"
             >
-              {#each aboutData.professional.researchInterests.items as item}
+              {#each homepageData.researchInterests.items as item}
                 <li>{@html parseLinks(item)}</li>
               {/each}
             </ol>
           </div>
-
-          {#if affiliationsData.priorExperience.length > 0}
-            <p class="text-sm text-ink-500 dark:text-ink-400">
-              prior: {affiliationsData.priorExperience
-                .map((e) => e.name)
-                .join(", ")}
-            </p>
-          {/if}
         </div>
       </div>
     </div>

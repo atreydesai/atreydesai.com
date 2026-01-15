@@ -151,18 +151,20 @@
             </div>
         </section>
 
-        <hr class="border-dotted border-ink-200 dark:border-ink-700 my-8" />
-
         <!-- Personal Section -->
         <section class="mb-12">
-            <h2 class="section-heading">personally...</h2>
+            <p class="text-serif text-xl mb-4">
+                <em>personally speaking...</em>
+            </p>
 
             <div
                 class="prose prose-lg text-ink-700 dark:text-cream-300 space-y-4"
             >
-                <p>
-                    {@html parseLinks(aboutData.personal.description)}
-                </p>
+                {#each aboutData.personal.descriptions as description}
+                    <p>
+                        {@html parseLinks(description)}
+                    </p>
+                {/each}
 
                 <p>
                     <span class="text-ink-500 dark:text-ink-400"

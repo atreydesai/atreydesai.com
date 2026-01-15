@@ -92,10 +92,17 @@ export const load: PageServerLoad = async () => {
                     // Determine orientation from image dimensions
                     const imgWidth = tags["Image Width"]?.value || tags.ImageWidth?.value || tags.PixelXDimension?.value;
                     const imgHeight = tags["Image Height"]?.value || tags.ImageHeight?.value || tags.PixelYDimension?.value;
+                    const orientationTag = tags.Orientation?.value;  // EXIF Orientation tag
 
                     if (imgWidth && imgHeight) {
-                        const w = Array.isArray(imgWidth) ? imgWidth[0] : imgWidth;
-                        const h = Array.isArray(imgHeight) ? imgHeight[0] : imgHeight;
+                        let w = Array.isArray(imgWidth) ? imgWidth[0] : imgWidth;
+                        let h = Array.isArray(imgHeight) ? imgHeight[0] : imgHeight;
+
+                        // Swap dimensions for 90° rotations (Orientation 6 = Rotate 90° CW, 8 = Rotate 270° CW)
+                        if (orientationTag === 6 || orientationTag === 8) {
+                            [w, h] = [h, w];
+                        }
+
                         if (typeof w === "number" && typeof h === "number") {
                             width = w;
                             height = h;

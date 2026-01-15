@@ -18,9 +18,11 @@ footnotes:
 
 # Professional section - your academic/research bio
 professional:
-  intro: "I'm **Atrey Desai**, a third-year undergraduate student double majoring in Computer Science and Linguistics with a minor in Korean Studies at the [University of Maryland](https://umd.edu). I am fortunate to be advised by [Professor Rachel Rudinger](https://rudinger.github.io/) and [Professor Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg). I am also eternally thankful for [Nishant Balepur](https://nbalepur.github.io/) and [Yoo Yeon Sung](https://yysung.github.io/) for taking a curious undergraduate under their wing."
+  intro: "I'm **Atrey Desai**, a third-year undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu). I am fortunate to be advised by [Professor Rachel Rudinger](https://rudinger.github.io/) and [Professor Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
   
   paragraphs:
+    - text: "I am also eternally thankful for [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for taking a curious undergraduate under their wing."
+
     - text: "I am a member of the [Computational Linguistics and Information Processing (CLIP) lab](https://clip.umd.edu/) in UMIACS. I am also currently a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I work on HackAPrompt and research on creating trustworthy and robust AI safety judges."
       footnote: 1
       
@@ -40,7 +42,9 @@ professional:
 
 # Personal section
 personal:
-  description: "I would describe myself as **curious and bubbly** with a healthy dose of whimsy! I love exploring new ideas and finding unexpected connections between different fields."
+  descriptions:
+    - "I would describe myself as **curious** and **bubbly** with a healthy dose of whimsy. I love exploring new ideas and live at the boundary between disciplines, especially when they reveal unexpected structure. Naturally, this impulse led me to NLP, a field where computer science meets reading and journalism, my favorite pastimes growing up."
+    - "On the day to day, you'll probably find me at the lab, or at the gym, or at [Moge Tea](https://share.google/uG66fHdt79TEs0HtE), or wandering about aimlessly looking through my camera viewfinder!"
   interests: "photography, reading[^4], graphic design[^5], learning languages, repeatedly lifting chunky objects, music (especially edm and indie pop), [manifold](https://manifold.markets)[^6], and cultures of the world"
   blogs: []
 

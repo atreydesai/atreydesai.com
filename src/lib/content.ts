@@ -61,29 +61,12 @@ export interface Category {
     name: string;
 }
 
-export interface Affiliations {
-    name: string;
-    title: string;
-    school: string;
-    program: string;
-    year: string;
-    advisors: Array<{ name: string; url?: string }>;
-    currentRole?: {
-        organization: string;
-        role: string;
-        url: string;
-    };
-    researchInterests: string[];
-    priorExperience: Array<{ name: string; organization?: string; role?: string }>;
-    mentors: Array<{ name: string; affiliation: string }>;
-    location: {
-        hometown: string;
-        current: string;
-    };
-    personal: {
-        description: string;
-        interests: string[];
-        blogs: Array<{ name: string; url: string }>;
+
+export interface HomepageData {
+    intro: string[];
+    researchInterests: {
+        intro: string;
+        items: string[];
     };
     social: {
         github: string;
@@ -104,7 +87,7 @@ export interface AboutData {
         };
     };
     personal: {
-        description: string;
+        descriptions: string[];
         interests: string;
         blogs: Array<{ name: string; url: string }>;
     };
@@ -123,7 +106,10 @@ export interface AboutData {
 const paperModules = import.meta.glob<Paper>('/src/content/papers/*.md', { eager: true });
 export const papers: Paper[] = Object.values(paperModules)
     .map((mod) => mod as unknown as Paper)
-    .sort((a, b) => b.year - a.year);
+    .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return (a.priority ?? 99) - (b.priority ?? 99);  // Secondary sort by priority (lower = higher priority)
+    });
 
 // Import all book markdown files
 const bookModules = import.meta.glob<Book>('/src/content/books/*.md', { eager: true });
@@ -148,15 +134,15 @@ export const books: Book[] = Object.values(bookModules)
     });
 
 // Import YAML files
-import affiliationsYaml from '../content/affiliations.yaml';
 import talksYaml from '../content/talks.yaml';
 import categoriesYaml from '../content/categories.yaml';
 import aboutYaml from '../content/about.yaml';
+import homepageYaml from '../content/homepage.yaml';
 
-export const affiliations: Affiliations = affiliationsYaml as Affiliations;
 export const talks: Talk[] = talksYaml as Talk[];
 export const categories: Category[] = categoriesYaml as Category[];
 export const aboutData: AboutData = aboutYaml as AboutData;
+export const homepageData: HomepageData = homepageYaml as HomepageData;
 
 // Helper to get papers data in the old format (for compatibility)
 export const papersData = {

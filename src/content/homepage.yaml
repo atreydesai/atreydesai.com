@@ -1,0 +1,21 @@
+# Homepage content - edit this file to update the main page text
+# Each paragraph in 'intro' will be rendered as a separate <p> tag
+# You can use markdown links: [text](url) and emphasis: **bold** *italic*
+
+intro:
+  - "I am a third-year undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu)."
+  - "I am fortunate to be advised by [Professor Rachel Rudinger](https://rudinger.github.io/) and [Professor Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
+  - "I am a member of the technical staff of [Learn Prompting](https://learnprompting.org)."
+
+researchInterests:
+  intro: "**natural language processing**, particularly:"
+  items:
+    - "How can we **verify** validity and robustness of *existing benchmarks*?"
+    - "How can humans and AI **collaborate** in data creation?"
+    - "How can we **create** new evaluation methods that probe *multimodal*, *linguistic*, and *spatiotemporal* understanding?"
+
+social:
+  github: https://github.com/atreydesai
+  twitter: https://x.com/atreydesai
+  scholar: https://scholar.google.com/citations?user=hTDzj6cAAAAJ&hl=en
+  email: adesai10@umd.edu
