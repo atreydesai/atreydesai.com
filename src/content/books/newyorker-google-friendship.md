@@ -3,7 +3,7 @@ id: newyorker-google-friendship
 title: "The Friendship That Made Google Huge"
 author: James Somers
 category: nonfiction
-subcategory: computing history
+subcategory: computing, history
 dateAdded: "2025-12-29"
 favorite: true
 medium: essay

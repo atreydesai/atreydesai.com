@@ -3,7 +3,7 @@ id: v0-friday-night-vibes
 title: "Friday Night Vibes"
 author: v0 (by Vercel)
 category: nonfiction
-subcategory: vibe coding
+subcategory: vibe coding, cool websites
 dateAdded: "2025-12-29"
 favorite: false
 medium: other

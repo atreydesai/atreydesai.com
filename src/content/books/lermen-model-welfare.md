@@ -3,7 +3,7 @@ id: lermen-model-welfare
 title: "Model welfare and open source"
 author: Simon Lermen
 category: science
-subcategory: AI ethics
+subcategory: ai, ethics
 dateAdded: "2025-12-29"
 favorite: false
 medium: essay

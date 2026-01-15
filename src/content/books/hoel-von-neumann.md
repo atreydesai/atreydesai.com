@@ -2,7 +2,7 @@
 id: hoel-von-neumann
 title: "John von Neumann Shot Lightning From His Arse"
 author: Erik Hoel
-category: science
+category: nonfiction
 subcategory: pop-hereditarianism
 dateAdded: "2025-12-29"
 favorite: true

@@ -2,8 +2,8 @@
 id: bau-vibe-coding
 title: "Vibe Coding"
 author: David Bau
-category: science
-subcategory: computing
+category: nonfiction
+subcategory: ai, software engineering
 dateAdded: "2025-12-29"
 favorite: false
 medium: blog post

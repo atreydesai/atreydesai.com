@@ -2,8 +2,8 @@
 id: acx-embryo-selection
 title: "My Responses To Three Concerns From The Embryo Selection Post"
 author: Scott Alexander
-category: science
-subcategory: ethics
+category: nonfiction
+subcategory: ethics, medicine
 dateAdded: "2025-12-29"
 favorite: false
 medium: essay

@@ -3,7 +3,7 @@ id: dattani-data-viz
 title: "Saloni's guide to data visualization"
 author: Saloni Dattani
 category: advice
-subcategory: data science
+subcategory: data science, ui-ux
 dateAdded: "2025-12-29"
 favorite: false
 medium: blog post

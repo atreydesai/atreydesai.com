@@ -3,7 +3,7 @@ id: hf-positional-encoding
 title: "You could have designed state of the art positional encoding"
 author: Christopher Fleetwood
 category: science
-subcategory: machine learning
+subcategory: ai, machine learning
 dateAdded: "2025-12-29"
 favorite: false
 medium: blog post

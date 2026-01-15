@@ -3,7 +3,7 @@ id: titotal-ai-timelines
 title: "A deep critique of AI 2027’s bad timeline models"
 author: titotal
 category: science
-subcategory: AI safety
+subcategory: ai, ai safety
 dateAdded: "2025-12-29"
 favorite: false
 medium: blog post

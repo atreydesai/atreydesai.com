@@ -630,11 +630,14 @@
                                 {/if}
                                 {#if book.subcategory && book.subcategory.length > 0}
                                     {#each book.subcategory as sub}
-                                        <span
-                                            class="pill text-xs px-2 py-0.5 bg-cream-200 dark:bg-ink-700 rounded text-ink-600 dark:text-cream-400"
+                                        <button
+                                            type="button"
+                                            class="pill text-xs px-2 py-0.5 bg-cream-200 dark:bg-ink-700 rounded text-ink-600 dark:text-cream-400 hover:bg-cream-300 dark:hover:bg-ink-600 transition-colors cursor-pointer"
+                                            on:click|stopPropagation={() =>
+                                                selectTag(sub)}
                                         >
                                             {sub}
-                                        </span>
+                                        </button>
                                     {/each}
                                 {/if}
                                 <span

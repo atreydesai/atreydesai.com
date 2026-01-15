@@ -3,7 +3,7 @@ id: cacm-computational-social-science
 title: "Computational Social Science ≠ Computer Science + Social Data"
 author: Hanna Wallach
 category: science
-subcategory: computational social science
+subcategory: ai, computational social science
 dateAdded: "2025-12-29"
 favorite: false
 medium: essay

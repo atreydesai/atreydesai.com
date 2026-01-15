@@ -3,7 +3,7 @@ id: edit-lens
 title: "EditLens: Quantifying the Extent of AI Editing in Text"
 author: Katherine Thai, et al.
 category: science
-subcategory: NLP / AI Detection
+subcategory: nlp, ai
 dateAdded: "2025-12-29"
 favorite: false
 medium: research paper

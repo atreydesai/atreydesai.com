@@ -3,7 +3,7 @@ id: sagrista-jpeg-xl
 title: "Google *unkills* JPEG XL?"
 author: Toni Sagristà
 category: science
-subcategory: web technology
+subcategory: computing, web technology
 dateAdded: "2025-12-29"
 favorite: false
 medium: blog post

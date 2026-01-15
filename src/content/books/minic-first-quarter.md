@@ -3,7 +3,7 @@ id: minic-first-quarter
 title: "First Quarter"
 author: Tijana Minić
 category: nonfiction
-subcategory: PhD life
+subcategory: phd, student life
 dateAdded: "2025-12-29"
 favorite: false
 medium: blog post

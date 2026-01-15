@@ -33,7 +33,7 @@ export interface Book {
     title: string;
     author: string;
     category: string;
-    subcategory?: string[];
+    subcategory?: string | string[];
     enjoyment?: number | null;  // 1-10 scale, optional
     importance?: number | null; // 1-10 scale, optional
     medium?: string;            // "essay", "book", "video", "article", "paper", "podcast", "short story"
@@ -136,7 +136,8 @@ export const books: Book[] = Object.values(bookModules)
         if (Array.isArray(data.subcategory)) {
             subcategories = data.subcategory;
         } else if (typeof data.subcategory === "string") {
-            subcategories = [data.subcategory];
+            // Split by comma and trim whitespace from each subcategory
+            subcategories = data.subcategory.split(',').map(s => s.trim()).filter(s => s.length > 0);
         }
 
         return {

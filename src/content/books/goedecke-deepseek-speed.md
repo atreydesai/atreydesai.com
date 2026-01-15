@@ -3,7 +3,7 @@ id: goedecke-deepseek-speed
 title: "Are DeepSeek's new models really that fast and cheap?"
 author: Sean Goedecke
 category: science
-subcategory: AI economics
+subcategory: ai, economics
 dateAdded: "2025-12-29"
 favorite: false
 medium: blog post

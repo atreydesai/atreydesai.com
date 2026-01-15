@@ -3,7 +3,7 @@ id: bau-curiosity
 title: "In Defense of Curiosity"
 author: David Bau
 category: science
-subcategory: philosophy of AI
+subcategory: ai, philosophy
 dateAdded: "2025-12-29"
 favorite: true
 medium: blog post
