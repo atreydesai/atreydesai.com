@@ -139,10 +139,10 @@ import categoriesYaml from '../content/categories.yaml';
 import aboutYaml from '../content/about.yaml';
 import homepageYaml from '../content/homepage.yaml';
 
-export const talks: Talk[] = talksYaml as Talk[];
-export const categories: Category[] = categoriesYaml as Category[];
-export const aboutData: AboutData = aboutYaml as AboutData;
-export const homepageData: HomepageData = homepageYaml as HomepageData;
+export const talks: Talk[] = talksYaml as unknown as Talk[];
+export const categories: Category[] = categoriesYaml as unknown as Category[];
+export const aboutData: AboutData = aboutYaml as unknown as AboutData;
+export const homepageData: HomepageData = homepageYaml as unknown as HomepageData;
 
 // Helper to get papers data in the old format (for compatibility)
 export const papersData = {
