@@ -1,3 +1,11 @@
+- id: talk-utexas-filler-gap
+  title: "Filler-Gap Dependencies under Developmental Constraints in LMs"
+  venue: "The University of Texas at Austin"
+  date: "2026-02-01"
+  type: research talk
+  slides: null
+  video: null
+
 - id: poster-mcq-july
   title: "Language Models Generate Multiple-Choice Questions with Artifacts"
   venue: "University of Maryland, College Park"
