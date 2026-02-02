@@ -39,12 +39,12 @@
             isHovering = false;
         };
 
-        // Animation loop for smooth cursor movement
+        // Animation loop for cursor movement
         let animationId: number;
         const animate = () => {
-            // Smooth lerp - faster animation
-            cursorX += (targetX - cursorX) * 0.25;
-            cursorY += (targetY - cursorY) * 0.25;
+            // Instant cursor position (no delay)
+            cursorX = targetX;
+            cursorY = targetY;
 
             if (cursorElement) {
                 cursorElement.style.transform = `translate(${cursorX - 10}px, ${cursorY - 10}px)`;
