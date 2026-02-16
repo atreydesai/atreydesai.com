@@ -3,7 +3,16 @@ import { imagetools } from "vite-imagetools";
 import pluginYaml from "@rollup/plugin-yaml";
 import yaml from "js-yaml";
 import { dataToEsm } from "@rollup/pluginutils";
+import { execSync } from "child_process";
 import type { UserConfig } from "vite";
+
+// Get the last commit date from git
+let gitDate: string;
+try {
+  gitDate = execSync("git log -1 --format=%cI").toString().trim();
+} catch {
+  gitDate = new Date().toISOString();
+}
 
 /** A custom Markdown plugin for Vite, with YAML frontmatter support. */
 function markdown() {
@@ -34,6 +43,9 @@ function markdown() {
 
 const config: UserConfig = {
   plugins: [sveltekit(), imagetools(), pluginYaml() as any, markdown()],
+  define: {
+    __BUILD_DATE__: JSON.stringify(gitDate),
+  },
 };
 
 export default config;

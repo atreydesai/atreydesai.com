@@ -67,10 +67,12 @@
   .link {
     @apply text-accent decoration-accent/50 underline underline-offset-[3px];
     @apply transition-all duration-300 ease-out;
+    @apply rounded-sm px-0.5 -mx-0.5;
   }
 
   .link:hover {
     @apply text-accent-dark decoration-accent-dark;
+    @apply bg-cream-300/60;
     transform: translateY(-1px);
   }
 
@@ -80,6 +82,7 @@
 
   .dark .link:hover {
     @apply text-accent-light decoration-accent-light;
+    @apply bg-ink-700/60;
   }
 
   .link-subtle {

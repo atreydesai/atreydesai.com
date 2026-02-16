@@ -30,6 +30,7 @@
     };
 
     export let compact = false;
+    export let highlighted = false;
 
     // Image hover state
     let isHovered = false;
@@ -80,6 +81,11 @@
         ? "relative bg-accent/5 dark:bg-accent/10 rounded-lg px-4 -mx-4 border-l-4 border-l-accent"
         : "";
 
+    // Deep-link highlight class (temporary glow from hash navigation)
+    $: deepLinkClass = highlighted
+        ? "ring-2 ring-accent/40 rounded-lg transition-shadow duration-500"
+        : "transition-shadow duration-500";
+
     // Highlight the author's name
     function formatAuthors(authors: string[]): string {
         return authors
@@ -107,7 +113,7 @@
 <article
     class="group py-4 {compact
         ? ''
-        : 'border-b border-ink-100 dark:border-ink-800'} {highlightClass}"
+        : 'border-b border-ink-100 dark:border-ink-800'} {highlightClass} {deepLinkClass}"
     id={paper.id}
 >
     <div class="flex flex-col md:flex-row gap-4">

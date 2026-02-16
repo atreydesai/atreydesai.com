@@ -70,7 +70,11 @@
         </div>
       </div>
 
-      <!-- Right side - Music player -->
+      <!-- Right side - Last updated + Music player -->
+      <div class="flex flex-col items-center sm:items-end space-y-2">
+        <div class="text-xs text-ink-400 dark:text-ink-500">
+          Last updated {new Date(__BUILD_DATE__).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </div>
       <button
         type="button"
         on:click={toggleMusic}
@@ -95,6 +99,7 @@
           {/if}
         </span>
       </button>
+      </div>
     </div>
   </div>
 </footer>

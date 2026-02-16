@@ -11,6 +11,8 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&display=swap"
     rel="stylesheet" />
+  <!-- RSS Feed -->
+  <link rel="alternate" type="application/rss+xml" title="Atrey Desai - Blog" href="/rss.xml" />
   <!-- Favicons -->
   <link rel="icon" href="%sveltekit.assets%/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="%sveltekit.assets%/favicon-32x32.png" />
@@ -23,6 +25,14 @@
   <!-- Theme color for mobile browsers -->
   <meta name="theme-color" content="#FDF8F3" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#1A1A1A" media="(prefers-color-scheme: dark)" />
+  <script>
+    (function() {
+      var theme = localStorage.getItem('theme');
+      if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
   %sveltekit.head%
 </head>
 

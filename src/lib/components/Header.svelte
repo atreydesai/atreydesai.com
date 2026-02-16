@@ -9,6 +9,7 @@
     { name: "About", href: "/about" },
     { name: "Research", href: "/research" },
     { name: "Photography", href: "/photography" },
+    { name: "Blog", href: "/blog" },
     { name: "Bookshelf", href: "/bookshelf" },
     { name: "Resume", href: "/resume" },
     { name: "CV", href: "/cv" },

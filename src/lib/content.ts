@@ -62,6 +62,16 @@ export interface Category {
 }
 
 
+export interface Post {
+    id: string;
+    title: string;
+    date: string;
+    tags: string[];
+    excerpt: string;
+    published: boolean;
+    content: string;
+}
+
 export interface HomepageData {
     intro: string[];
     researchInterests: {
@@ -132,6 +142,13 @@ export const books: Book[] = Object.values(bookModules)
             notes: data.notes || data.content || undefined
         };
     });
+
+// Import all post markdown files
+const postModules = import.meta.glob<Post>('/src/content/posts/*.md', { eager: true });
+export const posts: Post[] = Object.values(postModules)
+    .map((mod) => mod as unknown as Post)
+    .filter((p) => p.published !== false)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
 // Import YAML files
 import talksYaml from '../content/talks.yaml';

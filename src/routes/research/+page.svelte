@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import Seo from "$lib/components/Seo.svelte";
     import ResearchCard from "$lib/components/ResearchCard.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
@@ -9,6 +10,26 @@
     let selectedYear: string = "all";
     let selectedTag: string = "all";
     let showPreprints: boolean = true;
+
+    // Hash deep-linking
+    let highlightedPaperId: string | null = null;
+
+    onMount(() => {
+        const hash = window.location.hash.slice(1);
+        if (hash) {
+            // Small delay to ensure DOM is rendered
+            requestAnimationFrame(() => {
+                const el = document.getElementById(hash);
+                if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    highlightedPaperId = hash;
+                    setTimeout(() => {
+                        highlightedPaperId = null;
+                    }, 3000);
+                }
+            });
+        }
+    });
 
     // Get unique years and tags
     $: years = [...new Set(papersData.papers.map((p) => p.year))].sort(
@@ -116,7 +137,7 @@
                         </h3>
                         <div class="stagger-children">
                             {#each papersByYear[year].filter((p) => !p.preprint && !p.classProject) as paper (paper.id)}
-                                <ResearchCard {paper} />
+                                <ResearchCard {paper} highlighted={paper.id === highlightedPaperId} />
                             {/each}
                         </div>
                     </div>
@@ -131,7 +152,7 @@
             <h2 class="section-heading">preprints</h2>
             <div class="stagger-children">
                 {#each preprints as paper (paper.id)}
-                    <ResearchCard {paper} />
+                    <ResearchCard {paper} highlighted={paper.id === highlightedPaperId} />
                 {/each}
             </div>
         </section>
@@ -143,7 +164,7 @@
             <h2 class="section-heading">class projects</h2>
             <div class="stagger-children">
                 {#each classProjects as paper (paper.id)}
-                    <ResearchCard {paper} />
+                    <ResearchCard {paper} highlighted={paper.id === highlightedPaperId} />
                 {/each}
             </div>
         </section>

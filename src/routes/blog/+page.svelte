@@ -1,51 +1,30 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
-    import { ExternalLink } from "lucide-svelte";
-    import { CalendarDays } from "@jis3r/icons";
-
-    // Placeholder blog posts - will be replaced with actual content
-    // All marked as external since internal routes don't exist yet
-    const posts = [
-        {
-            id: "post-1",
-            title: "Lorem Ipsum: Thoughts on AI Research",
-            excerpt:
-                "Dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-            date: "2024-12-01",
-            tags: ["ai", "research"],
-            external: true,
-            url: "#", // Placeholder - replace with actual URL
-        },
-        {
-            id: "post-2",
-            title: "Consectetur Adipiscing: A Deep Dive",
-            excerpt:
-                "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-            date: "2024-11-15",
-            tags: ["deep-learning"],
-            external: true,
-            url: "#", // Placeholder - replace with actual URL
-        },
-        {
-            id: "post-3",
-            title: "External Post on Substack",
-            excerpt:
-                "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.",
-            date: "2024-10-20",
-            tags: ["thoughts"],
-            external: true,
-            url: "https://substack.com/@atreydesai",
-        },
-    ];
+    import CustomSelect from "$lib/components/CustomSelect.svelte";
+    import { posts } from "$lib/content";
+    import { ExternalLink, CalendarDays } from "lucide-svelte";
+    import { Blend } from "@jis3r/icons";
 
     const substackUrl = "https://substack.com/@atreydesai";
+
+    // Tag filtering
+    let selectedTag: string = "all";
+
+    $: allTags = [...new Set(posts.flatMap((p) => p.tags))].sort();
+    $: tagOptions = [
+        { value: "all", label: "All Topics" },
+        ...allTags.map((t) => ({ value: t, label: t })),
+    ];
+
+    $: filteredPosts = selectedTag === "all"
+        ? posts
+        : posts.filter((p) => p.tags.includes(selectedTag));
 </script>
 
 <Seo
     title="Blog | Atrey Desai"
     description="Blog posts and writings by Atrey Desai on AI, research, and more."
     url="https://atreydesai.com/blog"
-    noindex={true}
 />
 
 <div class="layout-main py-8 md:py-12">
@@ -54,8 +33,7 @@
     </h1>
 
     <p class="text-ink-600 dark:text-cream-400 mb-4">
-        Thoughts, ideas, and explorations. Lorem ipsum dolor sit amet,
-        consectetur adipiscing elit.
+        Thoughts, ideas, and explorations.
     </p>
 
     <!-- Substack link -->
@@ -74,9 +52,28 @@
         </p>
     </div>
 
+    <!-- Filter -->
+    {#if allTags.length > 1}
+        <div
+            class="flex flex-wrap items-center gap-4 mb-8 p-4 bg-cream-50 dark:bg-ink-800 rounded-lg"
+        >
+            <div
+                class="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400"
+            >
+                <Blend size={16} />
+                <span>Filter:</span>
+            </div>
+            <CustomSelect
+                options={tagOptions}
+                bind:value={selectedTag}
+                placeholder="All Topics"
+            />
+        </div>
+    {/if}
+
     <!-- Blog posts -->
     <div class="space-y-6 stagger-children">
-        {#each posts as post (post.id)}
+        {#each filteredPosts as post (post.id)}
             <article
                 class="py-4 border-b border-ink-100 dark:border-ink-800 group"
             >
@@ -85,24 +82,9 @@
                         <h2
                             class="text-lg font-semibold text-ink-900 dark:text-cream-100 mb-2 group-hover:text-ink-700 dark:group-hover:text-cream-200 transition-colors"
                         >
-                            {#if post.external}
-                                <a
-                                    href={post.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-2"
-                                >
-                                    {post.title}
-                                    <ExternalLink
-                                        size={16}
-                                        class="opacity-50"
-                                    />
-                                </a>
-                            {:else}
-                                <span>
-                                    {post.title}
-                                </span>
-                            {/if}
+                            <a href="/blog/{post.id}" class="hover:underline">
+                                {post.title}
+                            </a>
                         </h2>
 
                         <p class="text-ink-600 dark:text-cream-400 mb-3">
@@ -138,4 +120,18 @@
             </article>
         {/each}
     </div>
+
+    <!-- Empty state -->
+    {#if filteredPosts.length === 0}
+        <div class="text-center py-12 text-ink-500 dark:text-ink-400">
+            <p>No posts match your current filter.</p>
+            <button
+                type="button"
+                class="mt-2 link"
+                on:click={() => { selectedTag = "all"; }}
+            >
+                Clear filter
+            </button>
+        </div>
+    {/if}
 </div>
