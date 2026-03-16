@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { createEventDispatcher, onMount, onDestroy } from "svelte";
+    import { onMount } from "svelte";
+    import { browser } from "$app/environment";
     import { ExternalLink, FileText, Twitter, Pause } from "lucide-svelte";
     import { Binary, Award, PenLine, X, Play } from "@jis3r/icons";
-    import { browser } from "$app/environment";
 
     export let paper: {
         id: string;
@@ -31,37 +31,35 @@
 
     export let compact = false;
     export let highlighted = false;
+    export let variant: "preview" | "full" = "full";
 
-    // Image hover state
     let isHovered = false;
-
-    // Image lightbox
     let lightboxOpen = false;
-    let showAnimated = false; // Toggle between static and animated in lightbox
-
-    // Portal element for lightbox (to escape transform stacking context)
-    let portalTarget: HTMLElement | null = null;
-    let lightboxEl: HTMLElement;
+    let showAnimated = false;
 
     onMount(() => {
-        if (browser) {
-            portalTarget = document.body;
-        }
+        return () => {
+            if (typeof document !== "undefined") {
+                document.body.style.overflow = "";
+            }
+        };
     });
 
     function openLightbox() {
-        if (paper.image) {
-            lightboxOpen = true;
-            showAnimated = false; // Start with static image
-            if (typeof document !== "undefined") {
-                document.body.style.overflow = "hidden";
-            }
+        if (!paper.image) return;
+
+        lightboxOpen = true;
+        showAnimated = false;
+
+        if (typeof document !== "undefined") {
+            document.body.style.overflow = "hidden";
         }
     }
 
     function closeLightbox() {
         lightboxOpen = false;
         showAnimated = false;
+
         if (typeof document !== "undefined") {
             document.body.style.overflow = "";
         }
@@ -71,22 +69,6 @@
         showAnimated = !showAnimated;
     }
 
-    // Check if animated version is a video
-    $: isVideo =
-        paper.imageAnimated?.endsWith(".mp4") ||
-        paper.imageAnimated?.endsWith(".webm");
-
-    // Highlight class for special emphasis
-    $: highlightClass = paper.highlight
-        ? "relative bg-accent/5 dark:bg-accent/10 rounded-lg px-4 -mx-4 border-l-4 border-l-accent"
-        : "";
-
-    // Deep-link highlight class (temporary glow from hash navigation)
-    $: deepLinkClass = highlighted
-        ? "ring-2 ring-accent/40 rounded-lg transition-shadow duration-500"
-        : "transition-shadow duration-500";
-
-    // Highlight the author's name
     function formatAuthors(authors: string[]): string {
         return authors
             .map((author) =>
@@ -97,192 +79,242 @@
             .join(", ");
     }
 
-    // Portal action to move element to document.body
     function portal(node: HTMLElement) {
         document.body.appendChild(node);
+
         return {
             destroy() {
                 node.remove();
             },
         };
     }
+
+    $: isPreview = variant === "preview" || compact;
+    $: isVideo =
+        paper.imageAnimated?.endsWith(".mp4") ||
+        paper.imageAnimated?.endsWith(".webm");
+    $: hasLinks = Boolean(
+        paper.arxiv ||
+            paper.pdf ||
+            paper.code ||
+            paper.demo ||
+            paper.twitter ||
+            paper.blog,
+    );
+    $: surfaceClasses = [
+        "surface-card",
+        "overflow-hidden",
+        "p-4",
+        "md:p-5",
+        "surface-card-hover",
+        paper.highlight
+            ? "border-accent/25 dark:border-accent/30"
+            : "",
+        highlighted
+            ? "ring-2 ring-accent/35 ring-offset-2 ring-offset-cream-100 dark:ring-offset-ink-900"
+            : "",
+    ]
+        .filter(Boolean)
+        .join(" ");
 </script>
 
 <svelte:window on:keydown={(e) => e.key === "Escape" && closeLightbox()} />
 
-<article
-    class="group py-4 {compact
-        ? ''
-        : 'border-b border-ink-100 dark:border-ink-800'} {highlightClass} {deepLinkClass}"
-    id={paper.id}
->
-    <div class="flex flex-col md:flex-row gap-4">
-        <!-- Content -->
-        <div class="flex-1">
-            <!-- Title -->
-            <h3
-                class="text-lg font-semibold text-ink-900 dark:text-cream-100 mb-1 group-hover:text-ink-700 dark:group-hover:text-cream-200 transition-colors"
-            >
-                {#if paper.arxiv}
-                    <a
-                        href={paper.arxiv}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="hover:underline"
-                    >
-                        {paper.title}
-                    </a>
-                {:else}
-                    {paper.title}
-                {/if}
-            </h3>
+<article id={paper.id} class="group relative">
+    <div class={surfaceClasses}>
+        {#if paper.highlight}
+            <div
+                class="absolute inset-y-0 left-0 w-[3px] origin-bottom scale-y-0 bg-accent transition-transform duration-300 ease-out group-hover:scale-y-100"
+            ></div>
+        {/if}
 
-            <!-- Authors -->
-            <p class="text-sm text-ink-600 dark:text-ink-300 mb-2">
-                {@html formatAuthors(paper.authors)}
-            </p>
-
-            <!-- Venue and Year -->
-            <p class="text-sm text-ink-500 dark:text-ink-400 mb-2">
-                {#if paper.venue}<span class="italic">{paper.venue}</span
-                    >,&nbsp;{/if}{paper.year}
-                {#if paper.preprint}
-                    <span
-                        class="ml-2 text-xs bg-cream-300 dark:bg-ink-700 px-2 py-0.5 rounded"
-                        >preprint</span
-                    >
-                {/if}
-            </p>
-
-            <!-- Awards -->
-            {#if paper.awards.length > 0}
-                <div class="flex flex-wrap gap-2 mb-2">
-                    {#each paper.awards as award}
-                        <span
-                            class="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded"
-                        >
-                            <Award size={12} />
-                            {award}
+        <div
+            class={`flex flex-col gap-4 ${paper.image ? "md:flex-row md:items-start md:gap-5" : ""}`}
+        >
+            <div class="min-w-0 flex-1">
+                <div class="mb-2 flex flex-wrap items-center gap-2">
+                    {#if paper.venue}
+                        <span class="meta-label text-accent dark:text-accent-light">
+                            {paper.venue}
                         </span>
-                    {/each}
-                </div>
-            {/if}
+                    {/if}
 
-            <!-- TL;DR (shown for highlighted papers or class projects) -->
-            {#if paper.tldr && !compact && (paper.highlight || paper.classProject)}
-                <p class="text-sm text-ink-600 dark:text-ink-300 mb-3">
-                    <span class="font-medium">TL;DR:</span>
-                    {paper.tldr}
+                    <span
+                        class="rounded-full bg-cream-200 px-2.5 py-1 text-[0.72rem] font-medium text-ink-600 dark:bg-ink-700 dark:text-cream-300"
+                    >
+                        {paper.year}
+                    </span>
+
+                    {#if paper.preprint}
+                        <span
+                            class="rounded-full bg-accent/10 px-2.5 py-1 text-[0.72rem] font-medium text-accent dark:bg-accent/20 dark:text-accent-light"
+                        >
+                            preprint
+                        </span>
+                    {/if}
+                </div>
+
+                <h3
+                    class={`text-balance font-semibold text-ink-900 dark:text-cream-100 ${isPreview ? "text-lg leading-snug" : "text-xl leading-snug"}`}
+                >
+                    {#if paper.arxiv}
+                        <a
+                            href={paper.arxiv}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="transition-colors duration-200 hover:text-accent dark:hover:text-accent-light"
+                        >
+                            {paper.title}
+                        </a>
+                    {:else}
+                        {paper.title}
+                    {/if}
+                </h3>
+
+                <p
+                    class={`mt-2 leading-relaxed text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+                >
+                    {@html formatAuthors(paper.authors)}
                 </p>
-            {/if}
 
-            <!-- Tags -->
-            {#if !compact}
-                <div class="flex flex-wrap gap-2 mb-3">
-                    {#each paper.tags as tag}
-                        <span class="pill text-xs">{tag}</span>
-                    {/each}
-                </div>
-            {/if}
+                {#if paper.awards.length > 0}
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        {#each paper.awards as award}
+                            <span
+                                class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[0.72rem] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                            >
+                                <Award size={12} />
+                                {award}
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
 
-            <!-- Links -->
-            <div class="flex flex-wrap gap-3 text-sm">
-                {#if paper.arxiv}
-                    <a
-                        href={paper.arxiv}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link-subtle inline-flex items-center gap-1"
+                {#if paper.tldr && (isPreview || paper.highlight || paper.classProject)}
+                    <p
+                        class={`mt-3 text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm leading-6" : "text-[0.95rem] leading-6"}`}
                     >
-                        <ExternalLink size={14} />
-                        arXiv
-                    </a>
+                        {paper.tldr}
+                    </p>
                 {/if}
-                {#if paper.pdf}
-                    <a
-                        href={paper.pdf}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link-subtle inline-flex items-center gap-1"
-                    >
-                        <FileText size={14} />
-                        PDF
-                    </a>
+
+                {#if !isPreview && paper.tags.length > 0}
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        {#each paper.tags as tag}
+                            <span
+                                class="rounded-full bg-cream-200/80 px-2.5 py-1 text-[0.72rem] font-medium text-ink-500 dark:bg-ink-700 dark:text-cream-400"
+                            >
+                                {tag}
+                            </span>
+                        {/each}
+                    </div>
                 {/if}
-                {#if paper.code}
-                    <a
-                        href={paper.code}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link-subtle inline-flex items-center gap-1"
+
+                {#if hasLinks}
+                    <div
+                        class={`mt-4 flex flex-wrap gap-x-4 gap-y-2 ${isPreview ? "text-xs" : "text-sm"}`}
                     >
-                        <Binary size={14} />
-                        Code
-                    </a>
-                {/if}
-                {#if paper.demo}
-                    <a
-                        href={paper.demo}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link-subtle inline-flex items-center gap-1"
-                    >
-                        <ExternalLink size={14} />
-                        Demo
-                    </a>
-                {/if}
-                {#if paper.twitter}
-                    <a
-                        href={paper.twitter}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link-subtle inline-flex items-center gap-1"
-                    >
-                        <Twitter size={14} />
-                        Twitter
-                    </a>
-                {/if}
-                {#if paper.blog}
-                    <a
-                        href={paper.blog}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="link-subtle inline-flex items-center gap-1"
-                    >
-                        <PenLine size={14} />
-                        Blog
-                    </a>
+                        {#if paper.arxiv}
+                            <a
+                                href={paper.arxiv}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="link-subtle inline-flex items-center gap-1.5"
+                            >
+                                <ExternalLink size={14} />
+                                arXiv
+                            </a>
+                        {/if}
+
+                        {#if paper.pdf}
+                            <a
+                                href={paper.pdf}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="link-subtle inline-flex items-center gap-1.5"
+                            >
+                                <FileText size={14} />
+                                PDF
+                            </a>
+                        {/if}
+
+                        {#if paper.code}
+                            <a
+                                href={paper.code}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="link-subtle inline-flex items-center gap-1.5"
+                            >
+                                <Binary size={14} />
+                                Code
+                            </a>
+                        {/if}
+
+                        {#if paper.demo}
+                            <a
+                                href={paper.demo}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="link-subtle inline-flex items-center gap-1.5"
+                            >
+                                <ExternalLink size={14} />
+                                Demo
+                            </a>
+                        {/if}
+
+                        {#if paper.twitter}
+                            <a
+                                href={paper.twitter}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="link-subtle inline-flex items-center gap-1.5"
+                            >
+                                <Twitter size={14} />
+                                Twitter
+                            </a>
+                        {/if}
+
+                        {#if paper.blog}
+                            <a
+                                href={paper.blog}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="link-subtle inline-flex items-center gap-1.5"
+                            >
+                                <PenLine size={14} />
+                                Blog
+                            </a>
+                        {/if}
+                    </div>
                 {/if}
             </div>
-        </div>
 
-        <!-- Image with hover animation effect -->
-        {#if !compact}
-            <div class="w-full md:w-40 flex-shrink-0">
-                {#if paper.image}
+            {#if paper.image}
+                <div
+                    class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-36" : "md:w-44"}`}
+                >
                     <button
                         type="button"
                         on:click={openLightbox}
                         on:mouseenter={() => (isHovered = true)}
                         on:mouseleave={() => (isHovered = false)}
-                        class="w-full h-32 md:h-full rounded-lg overflow-hidden cursor-pointer group/img transition-transform duration-300 hover:scale-[1.02] relative"
+                        class={`relative block aspect-[4/3] w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
+                        aria-label={`Open image for ${paper.title}`}
                     >
-                        <!-- Static image (shown by default) -->
                         <img
                             src={paper.image}
-                            alt="{paper.title} preview"
-                            class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
-                            class:opacity-0={isHovered && paper.imageAnimated}
+                            alt={`${paper.title} preview`}
+                            class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+                            class:opacity-0={isHovered && Boolean(paper.imageAnimated)}
                             loading="lazy"
                         />
 
-                        <!-- Animated version (shown on hover) -->
                         {#if paper.imageAnimated}
                             {#if isVideo}
                                 <!-- svelte-ignore a11y-media-has-caption -->
                                 <video
                                     src={paper.imageAnimated}
-                                    class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
+                                    class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
                                     class:opacity-0={!isHovered}
                                     autoplay
                                     loop
@@ -292,43 +324,34 @@
                             {:else}
                                 <img
                                     src={paper.imageAnimated}
-                                    alt="{paper.title} animated preview"
-                                    class="w-full h-full object-cover absolute inset-0 transition-opacity duration-300"
+                                    alt={`${paper.title} animated preview`}
+                                    class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
                                     class:opacity-0={!isHovered}
                                     loading="lazy"
                                 />
                             {/if}
                         {/if}
 
-                        <!-- Play indicator if animated version exists -->
                         {#if paper.imageAnimated}
                             <div
-                                class="absolute bottom-2 right-2 bg-ink-900/70 rounded-full p-1 transition-opacity duration-300"
+                                class="absolute bottom-3 right-3 rounded-full bg-ink-900/75 p-1.5 text-cream-100 transition-opacity duration-300"
                                 class:opacity-0={isHovered}
                             >
-                                <Play size={12} class="text-cream-100" />
+                                <Play size={12} />
                             </div>
                         {/if}
                     </button>
-                {:else}
-                    <!-- Placeholder for image -->
-                    <div
-                        class="w-full h-32 md:h-full bg-cream-200 dark:bg-ink-800 rounded-lg flex items-center justify-center text-ink-400 dark:text-ink-500 text-xs"
-                    >
-                        [diagram]
-                    </div>
-                {/if}
-            </div>
-        {/if}
+                </div>
+            {/if}
+        </div>
     </div>
 </article>
 
-<!-- Image Lightbox (portaled to body to escape transform stacking context) -->
 {#if lightboxOpen && paper.image && browser}
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div class="lightbox-portal" use:portal>
         <div
-            class="fixed inset-0 z-[9999] bg-ink-900/95 flex items-center justify-center p-4"
+            class="fixed inset-0 z-[9999] flex items-center justify-center bg-ink-900/95 p-4"
             on:click={closeLightbox}
             on:keydown={(e) => e.key === "Escape" && closeLightbox()}
             role="dialog"
@@ -336,10 +359,9 @@
             aria-label="Image lightbox"
             tabindex="-1"
         >
-            <!-- Close button -->
             <button
                 type="button"
-                class="absolute top-4 right-4 text-cream-100 hover:text-cream-300 transition-colors z-10"
+                class="absolute right-4 top-4 z-10 text-cream-100 transition-colors hover:text-cream-300"
                 on:click|stopPropagation={closeLightbox}
                 aria-label="Close lightbox"
             >
@@ -348,17 +370,16 @@
 
             <!-- svelte-ignore a11y-no-static-element-interactions -->
             <div
-                class="max-w-3xl max-h-[80vh] flex flex-col items-center"
+                class="flex max-h-[80vh] max-w-3xl flex-col items-center"
                 on:click|stopPropagation={() => {}}
                 on:keydown|stopPropagation={() => {}}
             >
-                <!-- Image/Video display -->
                 {#if showAnimated && paper.imageAnimated}
                     {#if isVideo}
                         <!-- svelte-ignore a11y-media-has-caption -->
                         <video
                             src={paper.imageAnimated}
-                            class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                            class="max-h-[70vh] max-w-full rounded-2xl object-contain"
                             autoplay
                             loop
                             muted
@@ -368,23 +389,22 @@
                     {:else}
                         <img
                             src={paper.imageAnimated}
-                            alt="{paper.title} animated diagram"
-                            class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                            alt={`${paper.title} animated diagram`}
+                            class="max-h-[70vh] max-w-full rounded-2xl object-contain"
                         />
                     {/if}
                 {:else}
                     <img
                         src={paper.image}
-                        alt="{paper.title} diagram"
-                        class="max-w-full max-h-[70vh] object-contain rounded-lg"
+                        alt={`${paper.title} diagram`}
+                        class="max-h-[70vh] max-w-full rounded-2xl object-contain"
                     />
                 {/if}
 
-                <!-- Toggle button for static/animated -->
                 {#if paper.imageAnimated}
                     <button
                         type="button"
-                        class="mt-4 px-4 py-2 bg-ink-700 hover:bg-ink-600 text-cream-100 rounded-full text-sm font-medium inline-flex items-center gap-2 transition-colors"
+                        class="mt-4 inline-flex items-center gap-2 rounded-full bg-ink-700 px-4 py-2 text-sm font-medium text-cream-100 transition-colors hover:bg-ink-600"
                         on:click|stopPropagation={toggleAnimated}
                     >
                         {#if showAnimated}
@@ -397,9 +417,8 @@
                     </button>
                 {/if}
 
-                <!-- Description -->
-                <div class="mt-4 text-cream-300 text-sm text-center max-w-xl">
-                    <p class="font-medium text-cream-100 mb-1">{paper.title}</p>
+                <div class="mt-4 max-w-xl text-center text-sm text-cream-300">
+                    <p class="mb-1 font-medium text-cream-100">{paper.title}</p>
                     {#if paper.imageDescription}
                         <p>{paper.imageDescription}</p>
                     {/if}

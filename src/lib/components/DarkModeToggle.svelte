@@ -6,25 +6,9 @@
     let isDark = false;
 
     onMount(() => {
-        // Check for saved preference or system preference
         const savedTheme = localStorage.getItem("theme");
-        if (savedTheme) {
-            isDark = savedTheme === "dark";
-        } else {
-            isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        }
+        isDark = savedTheme === "dark";
         updateTheme();
-
-        // Listen for system preference changes
-        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-        const handleChange = (e: MediaQueryListEvent) => {
-            if (!localStorage.getItem("theme")) {
-                isDark = e.matches;
-                updateTheme();
-            }
-        };
-        mediaQuery.addEventListener("change", handleChange);
-        return () => mediaQuery.removeEventListener("change", handleChange);
     });
 
     function updateTheme() {

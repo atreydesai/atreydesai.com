@@ -105,11 +105,64 @@
   /* Section headings */
   .section-heading {
     font-family: "neue-haas-grotesk-display", sans-serif;
-    @apply text-xl font-semibold text-ink-900 mb-4;
+    @apply text-xl font-semibold tracking-tight text-ink-900 mb-4;
   }
 
   .dark .section-heading {
     @apply text-cream-100;
+  }
+
+  .section-rule {
+    @apply flex items-center gap-4;
+  }
+
+  .section-rule-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg,
+        rgba(81, 81, 81, 0.18) 0%,
+        rgba(81, 81, 81, 0.18) 35%,
+        rgba(81, 81, 81, 0) 100%);
+  }
+
+  .dark .section-rule-line {
+    background: linear-gradient(90deg,
+        rgba(245, 230, 211, 0.18) 0%,
+        rgba(245, 230, 211, 0.18) 35%,
+        rgba(245, 230, 211, 0) 100%);
+  }
+
+  .meta-label {
+    @apply text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-500;
+  }
+
+  .dark .meta-label {
+    @apply text-cream-400;
+  }
+
+  .surface-card {
+    @apply rounded-xl border border-ink-200/70 bg-blush-100/25;
+    box-shadow: 0 8px 32px rgba(26, 26, 26, 0.05);
+  }
+
+  .dark .surface-card {
+    @apply border-ink-700/80 bg-ink-800/80;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+  }
+
+  .surface-card-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .surface-card-hover:hover {
+    border-color: theme("colors.ink.300");
+    box-shadow: 0 16px 48px rgba(26, 26, 26, 0.08);
+    transform: translateY(-3px);
+  }
+
+  .dark .surface-card-hover:hover {
+    border-color: theme("colors.ink.600");
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
   }
 
   /* Cards and containers */
