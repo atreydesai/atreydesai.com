@@ -133,7 +133,8 @@
   }
 
   .meta-label {
-    @apply text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-ink-500;
+    @apply text-[0.7rem] font-semibold uppercase tracking-[0.15em] text-ink-500;
+    line-height: 1.05;
   }
 
   .dark .meta-label {

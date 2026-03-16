@@ -19,9 +19,9 @@ tags:
 tldr: null
 awards: []
 preprint: false
-featured: true
+featured: false
 highlight: false
-priority: 3
+priority: 99
 image: /images/papers/mcq-artifacts.png
 imageAnimated: null
 imageDescription: "LLMs Questions Look Good At First... But They're Full of Shortcuts!"

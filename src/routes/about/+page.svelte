@@ -138,16 +138,6 @@
                     </p>
                 {/each}
 
-                <p>
-                    {@html parseLinks(
-                        aboutData.professional.researchInterests.intro,
-                    )}
-                </p>
-                <ol class="list-decimal list-inside space-y-1 ml-4">
-                    {#each aboutData.professional.researchInterests.items as item}
-                        <li>{@html parseLinks(item)}</li>
-                    {/each}
-                </ol>
             </div>
         </section>
 
@@ -258,7 +248,7 @@
             <div class="text-ink-700 dark:text-cream-300 space-y-4">
                 <ul class="list-disc list-inside space-y-2">
                     {#each aboutData.thoughts as thought}
-                        <li>{thought}</li>
+                        <li>{@html parseLinks(thought)}</li>
                     {/each}
                 </ul>
             </div>

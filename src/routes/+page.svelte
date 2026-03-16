@@ -41,7 +41,7 @@
 
 <Seo
   title="Atrey Desai"
-  description="Atrey Desai - undergraduate researcher at University of Maryland studying NLP, AI safety, and computational linguistics. Research on benchmark evaluation, multimodal reasoning, and animal vocalizations."
+  description="Atrey Desai - undergraduate researcher at University of Maryland studying NLP, AI safety, and computational linguistics. Research on benchmark evaluation and multimodal reasoning."
   url="https://atreydesai.com"
 />
 
@@ -109,9 +109,7 @@
           hey, i'm <HyperText text="atrey desai." />
         </h1>
 
-        <div
-          class="space-y-4 text-ink-700 dark:text-cream-300"
-        >
+        <div class="space-y-4 text-ink-700 dark:text-cream-300">
           {#each homepageData.intro as paragraph}
             <p class="text-base leading-relaxed max-w-[38rem]">
               {@html parseLinks(paragraph)}
@@ -119,20 +117,20 @@
           {/each}
         </div>
 
-        <div class="surface-card mt-8 p-4 md:p-5">
+        <div class="surface-card mt-8 max-w-[38rem] p-4 md:p-5">
           <p class="meta-label mb-3">Research interests</p>
 
           <p class="text-base leading-7 text-ink-700 dark:text-cream-300">
             {@html parseLinks(homepageData.researchInterests.intro)}
           </p>
 
-          <ol
-            class="mt-4 space-y-2 pl-5 text-sm leading-6 text-ink-600 dark:text-cream-400"
+          <div
+            class="mt-3 space-y-2 text-base leading-7 text-ink-700 dark:text-cream-300"
           >
             {#each homepageData.researchInterests.items as item}
-              <li>{@html parseLinks(item)}</li>
+              <p>{@html parseLinks(item)}</p>
             {/each}
-          </ol>
+          </div>
         </div>
       </div>
     </div>

@@ -9,10 +9,10 @@ authors:
   - Atrey Desai
   - Jordan Boyd-Graber
 year: 2025
-venue: Under Review at ACL
-arxiv: null
-pdf: null
-code: null
+venue: Under Review at ARR
+arxiv: https://arxiv.org/abs/2602.06221
+pdf: https://arxiv.org/pdf/2602.06221
+code: https://github.com/nbalepur/BenchMarker
 demo: null
 twitter: null
 blog: null

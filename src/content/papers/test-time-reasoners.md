@@ -6,10 +6,10 @@ authors:
   - Atrey Desai
   - Rachel Rudinger
 year: 2025
-venue: Under Review at ACL Rolling Review
+venue: Under Review at ARR
 arxiv: https://arxiv.org/abs/2510.07761
-pdf: null
-code: null
+pdf: https://arxiv.org/pdf/2510.07761
+code: https://github.com/nbalepur/mcqa-shortcuts
 demo: null
 twitter: null
 blog: null

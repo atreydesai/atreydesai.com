@@ -12,6 +12,10 @@
     let showPreprints: boolean = true;
     let highlightedPaperId: string | null = null;
 
+    function canonicalizeTalkTitle(title: string): string {
+        return title.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    }
+
     onMount(() => {
         const hash = window.location.hash.slice(1);
 
@@ -71,6 +75,46 @@
     $: preprints = filteredPapers.filter((p) => p.preprint && !p.classProject);
     $: published = filteredPapers.filter((p) => !p.preprint && !p.classProject);
     $: classProjects = filteredPapers.filter((p) => p.classProject);
+    $: groupedTalks = Object.values(
+        papersData.talks.reduce(
+            (acc, talk) => {
+                const title = canonicalizeTalkTitle(talk.title);
+                const existing = acc[title];
+
+                if (!existing) {
+                    acc[title] = {
+                        title,
+                        type: talk.type,
+                        appearances: [talk],
+                    };
+                } else {
+                    existing.appearances.push(talk);
+                }
+
+                return acc;
+            },
+            {} as Record<
+                string,
+                {
+                    title: string;
+                    type: string;
+                    appearances: typeof papersData.talks;
+                }
+            >,
+        ),
+    )
+        .map((group) => ({
+            ...group,
+            appearances: [...group.appearances].sort(
+                (a, b) =>
+                    new Date(b.date).getTime() - new Date(a.date).getTime(),
+            ),
+        }))
+        .sort(
+            (a, b) =>
+                new Date(b.appearances[0].date).getTime() -
+                new Date(a.appearances[0].date).getTime(),
+        );
 </script>
 
 <Seo
@@ -212,7 +256,7 @@
         </section>
     {/if}
 
-    {#if papersData.talks.length > 0}
+    {#if groupedTalks.length > 0}
         <section class="mb-12">
             <div class="section-rule mb-5">
                 <h2 class="section-heading mb-0">talks & presentations</h2>
@@ -220,48 +264,58 @@
             </div>
 
             <div class="space-y-4">
-                {#each papersData.talks as talk}
+                {#each groupedTalks as talkGroup}
                     <article class="surface-card p-4 md:p-5">
-                        <p class="meta-label mb-2">{talk.type}</p>
+                        <p class="meta-label mb-2">{talkGroup.type}</p>
 
                         <h3
                             class="text-lg font-semibold text-ink-900 dark:text-cream-100"
                         >
-                            {talk.title}
+                            {talkGroup.title}
                         </h3>
 
-                        <p class="mt-2 text-sm text-ink-600 dark:text-cream-300">
-                            {talk.venue} · {formatDate(talk.date, {
-                                month: "short",
-                                year: "numeric",
-                            })}
-                        </p>
+                        <div class="mt-3 space-y-2.5">
+                            {#each talkGroup.appearances as appearance}
+                                <div
+                                    class="border-l-2 border-ink-200/80 pl-3 text-sm text-ink-600 dark:border-ink-700 dark:text-cream-300"
+                                >
+                                    <p>
+                                        {appearance.venue} · {formatDate(appearance.date, {
+                                            month: "short",
+                                            year: "numeric",
+                                        })}
+                                    </p>
 
-                        {#if talk.slides || talk.video}
-                            <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                                {#if talk.slides}
-                                    <a
-                                        href={talk.slides}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="link-subtle"
-                                    >
-                                        Slides
-                                    </a>
-                                {/if}
+                                    {#if appearance.slides || appearance.video}
+                                        <div
+                                            class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                                        >
+                                            {#if appearance.slides}
+                                                <a
+                                                    href={appearance.slides}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="link-subtle"
+                                                >
+                                                    Slides
+                                                </a>
+                                            {/if}
 
-                                {#if talk.video}
-                                    <a
-                                        href={talk.video}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="link-subtle"
-                                    >
-                                        Video
-                                    </a>
-                                {/if}
-                            </div>
-                        {/if}
+                                            {#if appearance.video}
+                                                <a
+                                                    href={appearance.video}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="link-subtle"
+                                                >
+                                                    Video
+                                                </a>
+                                            {/if}
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
                     </article>
                 {/each}
             </div>

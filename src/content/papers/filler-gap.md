@@ -5,7 +5,7 @@ authors:
   - Atrey Desai
   - Sathvik Nair
 year: 2025
-venue: Under Review at TLS, ACL
+venue: TLS (Oral), Under Review at ARR
 arxiv: null
 pdf: null
 code: null
@@ -18,7 +18,7 @@ tags:
 tldr: null
 awards: []
 preprint: true
-featured: false
+featured: true
 highlight: false
 priority: 99
 image: /images/papers/dasfigure.png

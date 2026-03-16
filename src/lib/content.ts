@@ -91,10 +91,6 @@ export interface AboutData {
     professional: {
         intro: string;
         paragraphs: Array<{ text: string; footnote?: number }>;
-        researchInterests: {
-            intro: string;
-            items: string[];
-        };
     };
     personal: {
         descriptions: string[];

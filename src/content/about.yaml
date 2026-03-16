@@ -3,9 +3,9 @@
 # Footnotes shown in the sidebar (desktop) or bottom (mobile)
 footnotes:
   - id: 1
-    content: "HackAPrompt is the world's largest red-teaming hackathon."
-  - id: 2
     content: "This work at ACL2 aims to eventually create an end-to-end machine translation pipeline for animal vocalizations. Our research is also graciously supported by the NSF."
+  - id: 2
+    content: "HackAPrompt is the world's largest red-teaming hackathon."
   - id: 3
     content: "Our findings were published at the AAAI-22 Workshop on Interactive Machine Learning (IMLW) and the Conference on Reinforcement Learning and Decision Making (RLDM-22). And also my first publications!"
   - id: 4
@@ -13,7 +13,7 @@ footnotes:
   - id: 5
     content: "A relic of high school newspaper and my wonderful journalism teacher, Mr. Tyler. I had also been an editor for STYLUS, Maryland's literary arts and photography magazine my freshman year."
   - id: 6
-    content: "This had started out as a fun thing with my roommate, but we both discovered we were really good at predictions. It became a nightly tradition to come back and talk about the progress of our trades for the day (much to the chagrin of our friends)."
+    content: "This had started out as a fun thing with my roommate, but we both discovered we were really good at predictions. It became a nightly tradition to come back to the apartment and talk about the progress of our trades for the day (much to the chagrin of our friends)."
     
 
 # Professional section - your academic/research bio
@@ -23,29 +23,21 @@ professional:
   paragraphs:
     - text: "I am also eternally thankful for [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for taking a curious undergraduate under their wing."
 
-    - text: "I am a member of the [Computational Linguistics and Information Processing (CLIP) lab](https://clip.umd.edu/) in UMIACS. I am also currently a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I work on HackAPrompt and research on creating trustworthy and robust AI safety judges."
+    - text: "I am a member of the [Computational Linguistics and Information Processing (CLIP) lab](https://clip.umd.edu/) in UMIACS. Currently, I'm also a visiting researcher under [Professor Kenny Zhu](https://kenzhu2000.github.io/) at the [Arlington Computational Linguistics Lab (ACL2)](https://uta-acl2.github.io/) at the University of Texas at Arlington. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights about the language of animal species."
       footnote: 1
       
-    - text: "Currently, I'm also a visiting researcher under [Professor Kenny Zhu](https://kenzhu2000.github.io/) at the [Arlington Computational Linguistics Lab (ACL2)](https://uta-acl2.github.io/) at the University of Texas at Arlington. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights about the language of animal species."
+    - text: "I was previously a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I worked on HackAPrompt and research on creating trustworthy and robust AI safety judges."
       footnote: 2
       
     - text: "Previously, I worked under [Professor Michael Littman](https://littmania.com/) at the [Reinforcement Learning & Adaptive Behavior (RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
       footnote: 3
 
-  # Research interests - each item can have emphasized words wrapped in **
-  researchInterests:
-    intro: "My research interests lie in **natural language processing**, particularly:"
-    items:
-      - "How can we **verify** validity and robustness of *existing benchmarks*?"
-      - "How can humans and AI **collaborate** in data creation?"
-      - "How can we **create** new evaluation methods that probe *multimodal*, *linguistic*, and *spatiotemporal* understanding?"
-
 # Personal section
 personal:
   descriptions:
-    - "I would describe myself as **curious** and **bubbly** with a healthy dose of whimsy. I love exploring new ideas and live at the boundary between disciplines, especially when they reveal unexpected structure. Naturally, this impulse led me to NLP, a field where computer science meets reading and journalism, my favorite pastimes growing up."
+    - "I would describe myself as **curious** and **bubbly**. I love exploring new ideas and live at the boundary between disciplines, especially when they reveal unexpected structure. Naturally, this impulse led me to NLP, a field where computer science meets reading and journalism, my favorite pastimes growing up."
     - "On the day to day, you'll probably find me at the lab, or at the gym, or at [Moge Tea](https://share.google/uG66fHdt79TEs0HtE), or wandering about aimlessly looking through my camera viewfinder!"
-  interests: "photography, reading[^4], graphic design[^5], learning languages, repeatedly lifting chunky objects, music (especially edm and indie pop), [manifold](https://manifold.markets)[^6], and cultures of the world"
+  interests: "photography, reading[^4], graphic design[^5], learning languages, punching the air, music (especially edm and indie pop), [manifold](https://manifold.markets)[^6], and cultures of the world"
   blogs: []
 
 # Location section  
@@ -89,7 +81,10 @@ website:
     - name: "Shashwat"
       url: "https://shashwatt.tech/#about"
       description: "For inspiring a custom cursor."
-  builtWith: "This website was built in [Antigravity](https://antigravity.google), with assistance from Claude Opus 4.5 and Gemini 3 Flash. It uses SvelteKit, Tailwind CSS, and is deployed on Vercel."
+    - name: "Christy Li"
+      url: "https://christykl.github.io/"
+      description: "For the hover and shadow animations on highlighted cards"
+  builtWith: "This website was built in [Antigravity](https://antigravity.google), with assistance from GPT 5.4, Opus 4.5 and Gemini 3 Flash. It uses SvelteKit, Tailwind CSS, and is deployed on Vercel."
 
 # Things you're thinking about
 thoughts:
@@ -97,3 +92,5 @@ thoughts:
   - "things to photograph in my daily life"
   - "why are sparkling ice drinks so good"
   - "cheesecake"
+  - "how does the weather change from [mid-80s](https://www.wunderground.com/history/daily/us/va/arlington/KDCA/date/2026-3-11) to [snow](https://www.wunderground.com/history/daily/us/va/arlington/KDCA/date/2026-3-12) in 1 day"
+  - "key lime pie"
