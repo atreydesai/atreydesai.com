@@ -1,9 +1,11 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
+    import { formatDate } from "$lib/utils/date";
     import { marked } from "marked";
     import { ArrowLeft, CalendarDays } from "lucide-svelte";
+    import type { PageData } from "./$types";
 
-    export let data;
+    export let data: PageData;
 
     $: post = data.post;
     $: htmlContent = marked(post.content);
@@ -35,7 +37,7 @@
         <div class="flex items-center gap-4 text-sm">
             <span class="flex items-center gap-1 text-ink-500 dark:text-ink-400">
                 <CalendarDays size={14} class="translate-y-[0.5px]" />
-                {new Date(post.date).toLocaleDateString("en-US", {
+                {formatDate(post.date, {
                     month: "long",
                     day: "numeric",
                     year: "numeric",

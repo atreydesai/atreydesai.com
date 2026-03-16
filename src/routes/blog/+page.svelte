@@ -2,6 +2,7 @@
     import Seo from "$lib/components/Seo.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import { posts } from "$lib/content";
+    import { formatDate } from "$lib/utils/date";
     import { ExternalLink, CalendarDays } from "lucide-svelte";
     import { Blend } from "@jis3r/icons";
 
@@ -99,14 +100,11 @@
                                     size={14}
                                     class="translate-y-[0.5px]"
                                 />
-                                {new Date(post.date).toLocaleDateString(
-                                    "en-US",
-                                    {
-                                        month: "long",
-                                        day: "numeric",
-                                        year: "numeric",
-                                    },
-                                )}
+                                {formatDate(post.date, {
+                                    month: "long",
+                                    day: "numeric",
+                                    year: "numeric",
+                                })}
                             </span>
 
                             <div class="flex gap-2">

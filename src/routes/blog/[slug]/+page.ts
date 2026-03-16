@@ -2,6 +2,8 @@ import { posts } from '$lib/content';
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
+export const prerender = false;
+
 export const load: PageLoad = ({ params }) => {
     const post = posts.find((p) => p.id === params.slug);
     if (!post) {

@@ -28,9 +28,10 @@
   let audioElement: HTMLAudioElement | null = null;
 
   // Dynamically import all mp3 files from /static/audio using Vite's glob
-  const audioModules = import.meta.glob("/static/audio/*.mp3", {
+  const audioModules = import.meta.glob<string>("/static/audio/*.mp3", {
     eager: true,
-    as: "url",
+    query: "?url",
+    import: "default",
   });
   const musicSamples = Object.values(audioModules).map((url) =>
     url.replace("/static", ""),

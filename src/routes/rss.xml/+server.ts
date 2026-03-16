@@ -1,4 +1,5 @@
 import { posts } from '$lib/content';
+import { formatUtcDate } from '$lib/utils/date';
 import type { RequestHandler } from './$types';
 
 export const prerender = true;
@@ -14,7 +15,7 @@ export const GET: RequestHandler = () => {
       <link>${siteUrl}/blog/${post.id}</link>
       <guid isPermaLink="true">${siteUrl}/blog/${post.id}</guid>
       <description>${escapeXml(post.excerpt)}</description>
-      <pubDate>${new Date(post.date).toUTCString()}</pubDate>
+      <pubDate>${formatUtcDate(post.date)}</pubDate>
       ${post.tags.map((tag) => `<category>${escapeXml(tag)}</category>`).join('\n      ')}
     </item>`
         )

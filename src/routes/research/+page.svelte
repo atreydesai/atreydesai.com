@@ -4,6 +4,7 @@
     import ResearchCard from "$lib/components/ResearchCard.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import { papersData } from "$lib/content";
+    import { formatDate } from "$lib/utils/date";
     import { Blend } from "@jis3r/icons";
 
     // State for filtering
@@ -186,9 +187,7 @@
                             {talk.title}
                         </h3>
                         <p class="text-sm text-ink-600 dark:text-ink-400">
-                            {talk.venue} · {new Date(
-                                talk.date,
-                            ).toLocaleDateString("en-US", {
+                            {talk.venue} · {formatDate(talk.date, {
                                 month: "short",
                                 year: "numeric",
                             })}

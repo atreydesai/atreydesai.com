@@ -1,6 +1,7 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
     import OptimizedImage from "$lib/components/OptimizedImage.svelte";
+    import { formatDate } from "$lib/utils/date";
     import { X, ChevronLeft, ChevronRight } from "@jis3r/icons";
     import { Instagram } from "lucide-svelte";
     import { onMount } from "svelte";
@@ -252,9 +253,7 @@
                     {/if}
                     {#if currentPhoto.exif.date}
                         <p class="text-cream-500">
-                            {new Date(
-                                currentPhoto.exif.date,
-                            ).toLocaleDateString("en-US", {
+                            {formatDate(currentPhoto.exif.date, {
                                 month: "long",
                                 day: "numeric",
                                 year: "numeric",

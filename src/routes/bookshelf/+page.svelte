@@ -2,6 +2,7 @@
     import Seo from "$lib/components/Seo.svelte";
     import RatingCircle from "$lib/components/RatingCircle.svelte";
     import { booksData } from "$lib/content";
+    import { formatDate } from "$lib/utils/date";
     import {
         Star,
         BookOpenText,
@@ -643,9 +644,7 @@
                                 <span
                                     class="text-xs text-ink-400 dark:text-ink-500"
                                 >
-                                    Added {new Date(
-                                        book.dateAdded,
-                                    ).toLocaleDateString("en-US", {
+                                    Added {formatDate(book.dateAdded, {
                                         month: "short",
                                         year: "numeric",
                                     })}
