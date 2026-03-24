@@ -1,6 +1,8 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
     import { Download } from "@jis3r/icons";
+
+    let hoveredDownload = false;
 </script>
 
 <Seo
@@ -19,8 +21,10 @@
             href="/resume.pdf"
             download="Atrey_Desai_Resume.pdf"
             class="btn-primary inline-flex items-center gap-2 transition-all duration-300 hover:-translate-y-0.5"
+            on:mouseenter={() => (hoveredDownload = true)}
+            on:mouseleave={() => (hoveredDownload = false)}
         >
-            <Download size={16} />
+            <Download size={16} isHovered={hoveredDownload} />
             Download PDF
         </a>
     </div>

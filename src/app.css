@@ -104,8 +104,8 @@
 
   /* Section headings */
   .section-heading {
-    font-family: "neue-haas-grotesk-display", sans-serif;
-    @apply text-xl font-semibold tracking-tight text-ink-900 mb-4;
+    font-family: "Source Serif 4", serif;
+    @apply text-xl italic text-ink-900 mb-4;
   }
 
   .dark .section-heading {

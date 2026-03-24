@@ -7,11 +7,11 @@ intro:
   - "I am fortunate to be advised by Professors [Rachel Rudinger](https://rudinger.github.io/) and [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
 
 researchInterests:
-  intro: "Natural language processing, broadly:"
+  intro: "Language models are increasingly capable, but our methods for measuring and building that capability lag behind. I work on evaluation and data pipelines for reliable NLP, namely:"
   items:
-    - "1. Verifying validity and robustness of existing benchmarks"
-    - "2. Supporting effective human-AI collaboration for data creation"
-    - "3. Creating new evaluation methods that probe linguistic and spatiotemporal understanding"
+    - "1. Benchmark validity and the limits of what our evaluations actually measure"
+    - "2. Human-AI collaboration in data annotation and curation"
+    - "3. Evaluation for systems that reason, perceive, and act in the world"
 
 social:
   github: https://github.com/atreydesai

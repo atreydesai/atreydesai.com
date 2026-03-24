@@ -37,6 +37,9 @@
     let lightboxOpen = false;
     let showAnimated = false;
 
+    // Per-link hover states for icon animation triggering
+    let hoveredLink: string | null = null;
+
     onMount(() => {
         return () => {
             if (typeof document !== "undefined") {
@@ -107,9 +110,7 @@
         "p-4",
         "md:p-5",
         "surface-card-hover",
-        paper.highlight
-            ? "border-accent/25 dark:border-accent/30"
-            : "",
+        paper.highlight ? "border-accent/25 dark:border-accent/30" : "",
         highlighted
             ? "ring-2 ring-accent/35 ring-offset-2 ring-offset-cream-100 dark:ring-offset-ink-900"
             : "",
@@ -123,9 +124,24 @@
 <article id={paper.id} class="group relative">
     <div class={surfaceClasses}>
         {#if paper.highlight}
-            <div
-                class="absolute inset-y-0 left-0 w-[3px] origin-bottom scale-y-0 bg-accent transition-transform duration-300 ease-out group-hover:scale-y-100"
-            ></div>
+            <!-- Bottom-left corner accent: SVG with rounded ends + matching arc -->
+            <div class="absolute -bottom-px -left-px w-10 h-10 pointer-events-none origin-bottom-left scale-0 transition-transform duration-300 ease-out group-hover:scale-100">
+                <svg width="40" height="40" overflow="visible" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Up the left side, arc through BL corner, right along bottom -->
+                    <path d="M 2 2 L 2 26 A 12 12 0 0 0 14 38 L 38 38"
+                        fill="none" stroke="#E85D4C" stroke-width="4"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <!-- Top-right corner accent -->
+            <div class="absolute -top-px -right-px w-10 h-10 pointer-events-none origin-top-right scale-0 transition-transform duration-300 ease-out group-hover:scale-100">
+                <svg width="40" height="40" overflow="visible" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Down the right side, arc through TR corner, left along top -->
+                    <path d="M 38 38 L 38 14 A 12 12 0 0 0 26 2 L 2 2"
+                        fill="none" stroke="#E85D4C" stroke-width="4"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
         {/if}
 
         <div
@@ -134,7 +150,9 @@
             <div class="min-w-0 flex-1">
                 <div class="mb-2 flex flex-wrap items-center gap-2">
                     {#if paper.venue}
-                        <span class="meta-label text-accent dark:text-accent-light">
+                        <span
+                            class="meta-label text-accent dark:text-accent-light"
+                        >
                             {paper.venue}
                         </span>
                     {/if}
@@ -179,11 +197,14 @@
 
                 {#if paper.awards.length > 0}
                     <div class="mt-3 flex flex-wrap gap-2">
-                        {#each paper.awards as award}
+                        {#each paper.awards as award, i}
+                            <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <span
                                 class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[0.72rem] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                on:mouseenter={() => (hoveredLink = `award-${i}`)}
+                                on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <Award size={12} />
+                                <Award size={12} isHovered={hoveredLink === `award-${i}`} />
                                 {award}
                             </span>
                         {/each}
@@ -220,6 +241,8 @@
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="link-subtle inline-flex items-center gap-1.5"
+                                on:mouseenter={() => (hoveredLink = 'arxiv')}
+                                on:mouseleave={() => (hoveredLink = null)}
                             >
                                 <ExternalLink size={14} />
                                 arXiv
@@ -232,6 +255,8 @@
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="link-subtle inline-flex items-center gap-1.5"
+                                on:mouseenter={() => (hoveredLink = 'pdf')}
+                                on:mouseleave={() => (hoveredLink = null)}
                             >
                                 <FileText size={14} />
                                 PDF
@@ -244,8 +269,10 @@
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="link-subtle inline-flex items-center gap-1.5"
+                                on:mouseenter={() => (hoveredLink = 'code')}
+                                on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <Binary size={14} />
+                                <Binary size={14} isHovered={hoveredLink === 'code'} />
                                 Code
                             </a>
                         {/if}
@@ -268,6 +295,8 @@
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="link-subtle inline-flex items-center gap-1.5"
+                                on:mouseenter={() => (hoveredLink = 'twitter')}
+                                on:mouseleave={() => (hoveredLink = null)}
                             >
                                 <Twitter size={14} />
                                 Twitter
@@ -280,8 +309,10 @@
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="link-subtle inline-flex items-center gap-1.5"
+                                on:mouseenter={() => (hoveredLink = 'blog')}
+                                on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <PenLine size={14} />
+                                <PenLine size={14} isHovered={hoveredLink === 'blog'} />
                                 Blog
                             </a>
                         {/if}
@@ -305,7 +336,8 @@
                             src={paper.image}
                             alt={`${paper.title} preview`}
                             class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-                            class:opacity-0={isHovered && Boolean(paper.imageAnimated)}
+                            class:opacity-0={isHovered &&
+                                Boolean(paper.imageAnimated)}
                             loading="lazy"
                         />
 

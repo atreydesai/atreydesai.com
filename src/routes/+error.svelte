@@ -2,6 +2,9 @@
   import { page } from "$app/stores";
   import Seo from "$lib/components/Seo.svelte";
   import { House, ArrowLeft } from "@jis3r/icons";
+
+  let hoveredHome = false;
+  let hoveredBack = false;
 </script>
 
 <Seo
@@ -29,8 +32,13 @@
     <div
       class="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
     >
-      <a href="/" class="btn-primary inline-flex items-center gap-2">
-        <House size={16} />
+      <a
+        href="/"
+        class="btn-primary inline-flex items-center gap-2"
+        on:mouseenter={() => (hoveredHome = true)}
+        on:mouseleave={() => (hoveredHome = false)}
+      >
+        <House size={16} isHovered={hoveredHome} />
         Back to Home
       </a>
 
@@ -38,8 +46,10 @@
         type="button"
         on:click={() => history.back()}
         class="btn bg-cream-200 dark:bg-ink-700 text-ink-700 dark:text-cream-300 hover:bg-cream-300 dark:hover:bg-ink-600 inline-flex items-center gap-2"
+        on:mouseenter={() => (hoveredBack = true)}
+        on:mouseleave={() => (hoveredBack = false)}
       >
-        <ArrowLeft size={16} />
+        <ArrowLeft size={16} isHovered={hoveredBack} />
         Go Back
       </button>
     </div>

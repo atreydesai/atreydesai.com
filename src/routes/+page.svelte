@@ -14,6 +14,7 @@
     .slice(0, 3);
 
   let emailRevealed = false;
+  let hoveredSeeAll = false;
 
   function revealEmail() {
     emailRevealed = true;
@@ -144,9 +145,11 @@
         <a
           href="/research"
           class="link-subtle inline-flex items-center gap-1 text-sm whitespace-nowrap"
+          on:mouseenter={() => (hoveredSeeAll = true)}
+          on:mouseleave={() => (hoveredSeeAll = false)}
         >
           see all
-          <ArrowRight size={14} />
+          <ArrowRight size={14} isHovered={hoveredSeeAll} />
         </a>
       </div>
 

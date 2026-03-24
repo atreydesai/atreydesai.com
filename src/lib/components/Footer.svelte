@@ -25,6 +25,7 @@
 
   // Music player
   let isPlaying = false;
+  let hoveredMusic = false;
   let audioElement: HTMLAudioElement | null = null;
 
   // Dynamically import all mp3 files from /static/audio using Vite's glob
@@ -79,13 +80,15 @@
       <button
         type="button"
         on:click={toggleMusic}
+        on:mouseenter={() => (hoveredMusic = true)}
+        on:mouseleave={() => (hoveredMusic = false)}
         class="flex items-center space-x-2 text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-cream-300 transition-all duration-300 group"
       >
         <span
           class="transition-transform duration-300 group-hover:scale-110"
           class:animate-pulse={isPlaying}
         >
-          <Disc3 size={16} class="translate-y-[1px]" />
+          <Disc3 size={16} class="translate-y-[1px]" isHovered={hoveredMusic} />
         </span>
         <span class="text-xs uppercase tracking-wider">let's get groovy</span>
         <span class="transition-all duration-300">
