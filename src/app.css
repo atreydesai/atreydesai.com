@@ -25,6 +25,11 @@
     @apply bg-ink-900 text-cream-200;
   }
 
+  .dark strong,
+  .dark b {
+    color: inherit;
+  }
+
   hr {
     @apply border-ink-200;
   }
