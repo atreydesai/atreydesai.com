@@ -70,8 +70,9 @@
                 </p>
                 <p class="text-sm text-ink-500 dark:text-ink-400 mt-1">
                     <strong>Coursework:</strong> Natural Language Processing (Grad),
-                    Commonsense Reasoning (Grad), Machine Learning, Data Science,
-                    Parallel Computing*, Computer Systems, Syntax, Phonetics, Psycholinguistics.
+                    Commonsense Reasoning (Grad), Mechanistic Interpretability (Grad)*,
+                    Machine Learning, Data Science, Parallel Computing*, Computer
+                    Systems, Syntax, Semantics*, Phonetics, Psycholinguistics.
                 </p>
             </div>
         </section>
@@ -80,34 +81,6 @@
         <section>
             <h2 class="section-heading">experience</h2>
             <div class="space-y-6 text-ink-700 dark:text-cream-300">
-                <!-- Learn Prompting -->
-                <div>
-                    <div
-                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
-                    >
-                        <p class="font-medium text-ink-900 dark:text-cream-100">
-                            Learn Prompting
-                        </p>
-                        <p class="text-sm text-ink-500 dark:text-ink-400">
-                            May 2025 – present
-                        </p>
-                    </div>
-                    <p class="italic">
-                        Member of Technical Staff (San Francisco, CA)
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            Researching robustness of AI safety judges against
-                            CBRNE-related adversarial content.
-                        </li>
-                        <li>
-                            Running Hackaprompt, the world's largest red-teaming
-                            hackathon, overseeing user engagement and technical
-                            challenges.
-                        </li>
-                    </ul>
-                </div>
-
                 <!-- UMD CLIP Lab -->
                 <div>
                     <div
@@ -127,17 +100,34 @@
                     </p>
                     <ul class="list-disc list-inside text-sm mt-2 space-y-1">
                         <li>
-                            Validated robustness of LLM-generated MCQs for
-                            unintended artifacts to assess if questions are
-                            solvable without full context, providing a framework
-                            that improves the reliability of synthetic data for
-                            benchmark evaluation.
+                            Quantified differential LLM susceptibility to
+                            human-written vs. LLM-generated MCQs to assess if
+                            questions contain unintended artifacts and are
+                            solvable without full context; created tools to
+                            isolate distractor-choice provenance effects and
+                            improve the reliability of human synthetic data for
+                            model evaluation and distillation.
                         </li>
                         <li>
-                            Architected an adversarial benchmark to test VLM
+                            Constructed an adversarial benchmark to test VLM
                             capabilities in detecting out-of-context (OOC)
                             video-based misinformation on social media based on
-                            multimodal clues and user interactions.
+                            multimodal clues and user interactions to probe
+                            reasoning under deceptive framing.
+                        </li>
+                        <li>
+                            Applied causal interpretability techniques to
+                            demonstrate that LMs require significantly more data
+                            than humans to acquire general syntactic
+                            representations, revealing heightened sensitivity to
+                            item-level and construction-level variation.
+                        </li>
+                        <li>
+                            Developed an oracle-free framework for estimating
+                            process reward annotation quality without ground
+                            truth using behavioral signals, inducing better
+                            step-by-step reasoning in Process Reward Models
+                            (PRMs) for RL in non-verifiable tasks.
                         </li>
                     </ul>
                 </div>
@@ -172,6 +162,34 @@
                             accuracy in action recognition, setting a new
                             state-of-the-art for automated animal vocalization
                             analysis.
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Learn Prompting -->
+                <div>
+                    <div
+                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
+                    >
+                        <p class="font-medium text-ink-900 dark:text-cream-100">
+                            Learn Prompting
+                        </p>
+                        <p class="text-sm text-ink-500 dark:text-ink-400">
+                            May 2025 – Jan 2026
+                        </p>
+                    </div>
+                    <p class="italic">
+                        Member of Technical Staff (San Francisco, CA)
+                    </p>
+                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
+                        <li>
+                            Ran Hackaprompt, the world's largest red-teaming
+                            hackathon, overseeing user engagement and technical
+                            challenges.
+                        </li>
+                        <li>
+                            Researched the robustness of AI safety judges
+                            against CBRNE-related adversarial content.
                         </li>
                     </ul>
                 </div>
@@ -253,34 +271,58 @@
                     <h3
                         class="font-medium text-ink-900 dark:text-cream-100 mb-3"
                     >
-                        Preprints <span class="text-sm font-normal text-ink-500"
-                            >* — equal contribution</span
-                        >
+                        Preprints
                     </h3>
                     <ol class="list-decimal list-inside space-y-3 text-sm">
                         <li>
                             <strong
-                                >BenchMarker: An Education-Inspired Toolkit for
-                                Highlighting Flaws in Multiple-Choice Benchmarks</strong
-                            >.<br />Nishant Balepur, Bhavya Rajasekaran, Jane
-                            Oh, Michael Xie,
-                            <span class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            >, …, Jordan Boyd-Graber.<br /><em
-                                >(Under Review at ACL)</em
-                            >.
-                        </li>
-                        <li>
-                            <strong
-                                >Emergence of Filler–Gap Mechanisms in
-                                Developmentally Constrained Language Models</strong
+                                >A Preview of Computational Animal
+                                Linguistics</strong
                             >.<br /><span
                                 class="text-ink-900 dark:text-cream-100"
                                 >Atrey Desai</span
-                            >
-                            and Sathvik Nair.<br /><em
-                                >(Under Review at TLS, ACL)</em
+                            >, Tirza Panunto, Lindsay Pike, Theron S. Wang, Tuan
+                            M. Dang, Hridayesh Lekhak and Kenny Q. Zhu.<br /><em
+                                >Under Review (ACM Computing Surveys)</em
                             >.
+                        </li>
+                    </ol>
+                </div>
+
+                <!-- Publications -->
+                <div>
+                    <h3
+                        class="font-medium text-ink-900 dark:text-cream-100 mb-3"
+                    >
+                        Publications
+                    </h3>
+                    <ol class="list-decimal list-inside space-y-3 text-sm">
+                        <li>
+                            <strong
+                                >Filling in the Mechanisms: How do LMs Learn
+                                Filler-Gap Dependencies under Developmental
+                                Constraints?</strong
+                            ><br />ACL 2026 (Findings) · <em
+                                >Oral at TLS 2026</em
+                            ><br /><span
+                                class="text-ink-900 dark:text-cream-100"
+                                >Atrey Desai</span
+                            > and Sathvik Nair.
+                        </li>
+                        <li>
+                            <a
+                                href="https://arxiv.org/abs/2602.06221"
+                                class="link"
+                                ><strong
+                                    >BenchMarker: An Education-Inspired Toolkit
+                                    for Highlighting Flaws in Multiple-Choice
+                                    Benchmarks</strong
+                                ></a
+                            >.<br />ACL 2026<br />Nishant Balepur, Bhavya
+                            Rajasekaran, Jane Oh, Michael Xie,
+                            <span class="text-ink-900 dark:text-cream-100"
+                                >Atrey Desai</span
+                            >, …, Jordan Boyd-Graber.
                         </li>
                         <li>
                             <a
@@ -290,37 +332,11 @@
                                     >Test-Time Reasoners Are Strategic
                                     Multiple-Choice Test-Takers</strong
                                 ></a
-                            >.<br />Nishant Balepur,
+                            >.<br />ACL 2026<br />Nishant Balepur,
                             <span class="text-ink-900 dark:text-cream-100"
                                 >Atrey Desai</span
-                            >
-                            and Rachel Rudinger.<br /><em
-                                >arXiv:2510.07761 (Under Review at ACL Rolling
-                                Review)</em
-                            >.
+                            > and Rachel Rudinger.
                         </li>
-                        <li>
-                            <strong
-                                >A Preview of Computational Animal Linguistics</strong
-                            >.<br /><span
-                                class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            >, Tirza Panunto, Lindsay Pike, Theron S. Wang, Tuan
-                            M. Dang, Hridayesh Lekhak and Kenny Q. Zhu.<br /><em
-                                >(Under Review at Computational Linguistics)</em
-                            >.
-                        </li>
-                    </ol>
-                </div>
-
-                <!-- Conference Publications -->
-                <div>
-                    <h3
-                        class="font-medium text-ink-900 dark:text-cream-100 mb-3"
-                    >
-                        Conference Publications
-                    </h3>
-                    <ol class="list-decimal list-inside space-y-3 text-sm">
                         <li>
                             <a
                                 href="https://scholar.google.com/citations?view_op=view_citation&hl=en&user=hTDzj6cAAAAJ&citation_for_view=hTDzj6cAAAAJ:d1gkVwhDpl0C"
@@ -329,14 +345,10 @@
                                     >Language Models Generate Multiple-Choice
                                     Questions with Artifacts</strong
                                 ></a
-                            >.<br /><span
+                            >.<br />MASC-SLL 2025<br /><span
                                 class="text-ink-900 dark:text-cream-100"
                                 >Atrey Desai</span
-                            >, Nishant Balepur and Rachel Rudinger.<br /><em
-                                >Mid-Atlantic Student Colloquium on Speech,
-                                Language and Learning (<strong>MASC-SLL</strong
-                                >), 2025</em
-                            >.
+                            >, Nishant Balepur and Rachel Rudinger.
                         </li>
                         <li>
                             <a
@@ -346,19 +358,11 @@
                                     >Reinforcement Learning As End-User
                                     Trigger-Action Programming</strong
                                 ></a
-                            >.<br />Chace Hayhurst, Hyojae Park,
+                            >.<br />IML Workshop @ AAAI 2022 · RLDM
+                            2022<br />Chace Hayhurst, Hyojae Park,
                             <span class="text-ink-900 dark:text-cream-100"
                                 >Atrey Desai</span
-                            >, Suheidy De Los Santos and Michael Littman.<br
-                            /><em
-                                >AAAI Conference on Artificial Intelligence (<strong
-                                    >AAAI</strong
-                                >) IML Workshop, 2022</em
-                            >.<br /><em
-                                >Reinforcement Learning and Decision Making (<strong
-                                    >RLDM</strong
-                                >), 2022</em
-                            >.
+                            >, Suheidy De Los Santos and Michael Littman.
                         </li>
                     </ol>
                 </div>
@@ -388,7 +392,7 @@
                 <div class="flex flex-col sm:flex-row sm:justify-between">
                     <span><strong>CMSC & ARHU Dean's List</strong></span>
                     <span class="text-ink-500 dark:text-ink-400"
-                        >2023 – 2025</span
+                        >2023 – 2026</span
                     >
                 </div>
                 <div class="flex flex-col sm:flex-row sm:justify-between">
@@ -418,22 +422,40 @@
             <div class="space-y-4 text-ink-700 dark:text-cream-300">
                 <div>
                     <p class="font-medium text-ink-900 dark:text-cream-100">
+                        Filler-Gap Dependencies under Developmental Constraints
+                        in LMs
+                    </p>
+                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
+                        <li>
+                            Texas Linguistics Society <span
+                                class="text-ink-500 dark:text-ink-400"
+                                >— Feb 2026</span
+                            >
+                        </li>
+                        <li>
+                            UMD Computational Cognitive Science Reading Group <span
+                                class="text-ink-500 dark:text-ink-400"
+                                >— Feb 2026</span
+                            >
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="font-medium text-ink-900 dark:text-cream-100">
                         Adaptor Grammars and Neural Networks for Feline Lexical
                         Discovery
                     </p>
                     <ul class="list-disc list-inside text-sm mt-2 space-y-1">
                         <li>
-                            The University of Texas at Arlington <span
+                            University of Maryland, College Park <span
                                 class="text-ink-500 dark:text-ink-400"
-                                >— July 2024</span
+                                >— Nov 2024</span
                             >
                         </li>
                         <li>
-                            University of Maryland, College Park <span
-                                class="italic">(adapted)</span
-                            >
-                            <span class="text-ink-500 dark:text-ink-400"
-                                >— Nov 2024</span
+                            UT Arlington, Department of Computer Science <span
+                                class="text-ink-500 dark:text-ink-400"
+                                >— July 2024</span
                             >
                         </li>
                     </ul>
@@ -449,7 +471,9 @@
                     <span
                         ><strong>Subreviewer</strong>, ACL Rolling Review (ARR)</span
                     >
-                    <span class="text-ink-500 dark:text-ink-400">2025</span>
+                    <span class="text-ink-500 dark:text-ink-400"
+                        >2025 – present</span
+                    >
                 </div>
                 <div class="flex flex-col sm:flex-row sm:justify-between">
                     <span
@@ -473,8 +497,8 @@
                     <p
                         class="text-sm text-ink-500 dark:text-ink-400 italic ml-4"
                     >
-                        Appointed by faculty and student body to serve as vice
-                        chair; represent 4,200+ CS undergraduates.
+                        Appointed by faculty and student body; represent 4,200+
+                        CS undergraduates.
                     </p>
                 </div>
                 <div>
@@ -528,15 +552,8 @@
                             >
                         </li>
                         <li>
-                            <strong>Technica Hackathon:</strong> Volunteer and
-                            mentor
-                            <span class="text-ink-500 dark:text-ink-400"
-                                >— Oct 2024</span
-                            >
-                        </li>
-                        <li>
-                            <strong>MSET Robotics Workshops:</strong> Organizer
-                            and curriculum designer
+                            <strong>MSET Robotics:</strong> Workshop organizer and
+                            curriculum designer
                             <span class="text-ink-500 dark:text-ink-400"
                                 >— 2020 – 2022</span
                             >

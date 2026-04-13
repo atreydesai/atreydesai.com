@@ -5,8 +5,8 @@ authors:
   - Nishant Balepur
   - Atrey Desai
   - Rachel Rudinger
-year: 2025
-venue: Under Review at ARR
+year: 2026
+venue: ACL Main
 arxiv: https://arxiv.org/abs/2510.07761
 pdf: https://arxiv.org/pdf/2510.07761
 code: https://github.com/nbalepur/mcqa-shortcuts
@@ -18,7 +18,7 @@ tags:
   - Reasoning
 tldr: While choices-only success is often deemed problematic, reasoning traces reveal that LLMs use less problematic strategies like inferring missing questions, challenging claims that partial-input success is always a flaw. Consequently, reasoning traces could help separate problematic data from less problematic reasoning.
 awards: []
-preprint: true
+preprint: false
 featured: true
 highlight: true
 priority: 1

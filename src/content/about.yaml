@@ -35,18 +35,18 @@ professional:
 # Personal section
 personal:
   descriptions:
-    - "I would describe myself as **curious** and **bubbly**. I love exploring new ideas and live at the boundary between disciplines, especially when they reveal unexpected structure. Naturally, this impulse led me to NLP, a field where computer science meets reading and journalism, my favorite pastimes growing up."
+    - "I would describe myself as **curious** and **bubbly**. I love exploring new ideas and enjoy working at the boundary between disciplines, especially when they reveal unexpected connections. Naturally, this led me to NLP, where I found computer science meets reading and journalism, my favorite pastimes growing up."
     - "On the day to day, you'll probably find me at the lab, or at the gym, or at [Moge Tea](https://share.google/uG66fHdt79TEs0HtE), or wandering about aimlessly looking through my camera viewfinder!"
   interests: "photography, reading[^4], graphic design[^5], learning languages, punching the air, music (especially edm and indie pop), [manifold](https://manifold.markets)[^6], and cultures of the world"
   blogs: []
 
 # Location section  
 location:
-  text: "I was born and grew up in **Saratoga, California**, attending the lovely [Saratoga High School](https://www.saratogahigh.org/). I currently live in the Washington, DC area, specifically in College Park, MD. I also tend to frequent the New York City and Boston areas for work and visiting friends. If you are ever around and want to talk, feel free to reach out!"
+  text: "I was born and grew up in **Saratoga, California**, attending the lovely [Saratoga High School](https://www.saratogahigh.org/). I currently live near the Washington, DC area. I also tend to frequent New York City and Boston for work and visiting friends. If you are ever around and want to talk, feel free to reach out!"
 
 # Website section
 website:
-  inspiration: "This site draws inspiration from many beautiful personal websites that I had been collecting for the better half of 2025."
+  inspiration: "This site draws inspiration from many beautiful personal websites that I had been collecting for many moons."
   inspirationList:
     - name: "Aryaman Arora"
       url: "https://aryaman.io/"
@@ -84,7 +84,7 @@ website:
     - name: "Christy Li"
       url: "https://christykl.github.io/"
       description: "For the hover and shadow animations on highlighted cards"
-  builtWith: "This website was built in [Antigravity](https://antigravity.google), with assistance from GPT 5.4, Opus 4.5 and Gemini 3 Flash. It uses SvelteKit, Tailwind CSS, and is deployed on Vercel."
+  builtWith: "This website was built in [Antigravity](https://antigravity.google), though it now largely maintained by [Claude Code](https://code.claude.com/docs/en/overview). It uses SvelteKit, Tailwind CSS, and is deployed on Vercel."
 
 # Things you're thinking about
 thoughts:

@@ -4,8 +4,8 @@ title: "Filling in the Mechanisms: How do LMs Learn Filler-Gap Dependencies unde
 authors:
   - Atrey Desai
   - Sathvik Nair
-year: 2025
-venue: TLS (Oral), Under Review at ARR
+year: 2026
+venue: ACL Findings, TLS (Oral)
 arxiv: null
 pdf: null
 code: null
@@ -17,7 +17,7 @@ tags:
   - Linguistics
 tldr: null
 awards: []
-preprint: true
+preprint: false
 featured: true
 highlight: false
 priority: 99

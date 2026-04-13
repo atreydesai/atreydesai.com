@@ -10,7 +10,7 @@ authors:
   - Hridayesh Lekhak
   - Kenny Q. Zhu
 year: 2025
-venue: Under Review at Computational Linguistics
+venue: Under Review at ACM Computing Surveys
 arxiv: null
 pdf: null
 code: null

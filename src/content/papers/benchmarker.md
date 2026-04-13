@@ -8,8 +8,8 @@ authors:
   - Michael Xie
   - Atrey Desai
   - Jordan Boyd-Graber
-year: 2025
-venue: Under Review at ARR
+year: 2026
+venue: ACL Main
 arxiv: https://arxiv.org/abs/2602.06221
 pdf: https://arxiv.org/pdf/2602.06221
 code: https://github.com/nbalepur/BenchMarker
@@ -21,7 +21,7 @@ tags:
   - Benchmarking
 tldr: null
 awards: []
-preprint: true
+preprint: false
 featured: true
 highlight: false
 priority: 2

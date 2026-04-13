@@ -164,23 +164,21 @@
     url="https://atreydesai.com/bookshelf"
 />
 
-<div class="layout-main py-8 md:py-12 pb-4">
-    <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100 mb-4">
-        bookshelf
-    </h1>
+<div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">
+    <div class="mb-6">
+        <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100 mb-4">
+            bookshelf
+        </h1>
 
-    <p class="text-ink-600 dark:text-cream-400 mb-4">
-        A collection of books, essays, papers, and articles I've found valuable.
-    </p>
+        <p class="text-ink-600 dark:text-cream-400 mb-4">
+            A collection of books, essays, papers, and articles I've found valuable.
+        </p>
 
-    <!-- Instructions about TL;DR -->
-    <p class="text-sm text-ink-500 dark:text-ink-400 mb-0 italic">
-        Click on a book to reveal my notes/TL;DR.
-    </p>
-</div>
-
-<!-- Expanded width container for bookshelf content -->
-<div class="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
+        <!-- Instructions about TL;DR -->
+        <p class="text-sm text-ink-500 dark:text-ink-400 mb-0 italic">
+            Click on a book to reveal my thoughts.
+        </p>
+    </div>
     <!-- Category filters -->
     <div class="flex flex-wrap gap-2 mb-6">
         {#each booksData.categories as category}

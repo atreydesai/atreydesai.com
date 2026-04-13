@@ -15,6 +15,7 @@
 
   let emailRevealed = false;
   let hoveredSeeAll = false;
+  let hoveredSeeAllAbout = false;
 
   function revealEmail() {
     emailRevealed = true;
@@ -47,11 +48,15 @@
 />
 
 <div class="layout-main py-8 md:py-12">
-  <section class="mb-16 md:mb-20">
-    <div class="flex flex-col md:flex-row items-start gap-8">
-      <div class="w-full md:w-1/3 flex-shrink-0">
+  <section class="mb-8 md:mb-10">
+    <!-- Mobile: flex-col. Desktop: grid with image spanning both rows so icons bottom = image bottom -->
+    <div
+      class="flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,250px)_1fr] md:grid-rows-[1fr_auto]"
+    >
+      <!-- Image: col 1, spans both rows -->
+      <div class="md:row-span-2">
         <div
-          class="aspect-square w-full max-w-[300px] mx-auto md:mx-0 rounded-lg overflow-hidden mb-6"
+          class="aspect-square w-full max-w-[250px] mx-auto md:mx-0 rounded-lg overflow-hidden"
         >
           <LegoImage
             src="/images/profile.JPG"
@@ -59,51 +64,10 @@
             blockSize={48}
           />
         </div>
-
-        <div class="space-y-3 max-w-[300px] mx-auto md:mx-0">
-          {#each socialLinks as link}
-            <a
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="flex items-center space-x-3 text-ink-600 dark:text-cream-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 group"
-            >
-              <svelte:component
-                this={link.icon}
-                size={18}
-                class="transition-transform duration-300 group-hover:-translate-y-0.5"
-              />
-              <span class="text-sm">@atreydesai</span>
-            </a>
-          {/each}
-
-          {#if emailRevealed}
-            <a
-              href="mailto:{homepageData.social.email}"
-              class="flex items-center space-x-3 text-sm text-accent dark:text-accent-light hover:text-accent-dark transition-all duration-300"
-            >
-              <Mail size={18} />
-              <span>{homepageData.social.email}</span>
-            </a>
-          {:else}
-            <div class="flex items-center space-x-3">
-              <span class="text-ink-600 dark:text-cream-400">
-                <Mail size={18} />
-              </span>
-              <button
-                type="button"
-                on:click={revealEmail}
-                class="text-sm text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 cursor-pointer underline underline-offset-2 decoration-dotted"
-                aria-label="Reveal email address"
-              >
-                click to reveal
-              </button>
-            </div>
-          {/if}
-        </div>
       </div>
 
-      <div class="flex-1">
+      <!-- Text: col 2, row 1 -->
+      <div>
         <h1
           class="heading-display text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
         >
@@ -117,28 +81,92 @@
             </p>
           {/each}
         </div>
+      </div>
 
-        <div class="surface-card mt-8 max-w-[38rem] p-4 md:p-5">
-          <p class="meta-label mb-3">Research interests</p>
-
-          <p class="text-base leading-7 text-ink-700 dark:text-cream-300">
-            {@html parseLinks(homepageData.researchInterests.intro)}
-          </p>
-
-          <div
-            class="mt-3 space-y-2 text-base leading-7 text-ink-700 dark:text-cream-300"
+      <!-- Icons: col 2, row 2 — bottom aligns with image bottom -->
+      <div class="-mt-4 flex items-center gap-5">
+        {#each socialLinks as link}
+          <a
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={link.name}
+            class="text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 group"
           >
-            {#each homepageData.researchInterests.items as item}
-              <p>{@html parseLinks(item)}</p>
-            {/each}
-          </div>
-        </div>
+            <svelte:component
+              this={link.icon}
+              size={20}
+              class="transition-transform duration-300 group-hover:-translate-y-0.5"
+            />
+          </a>
+        {/each}
+
+        {#if emailRevealed}
+          <a
+            href="mailto:{homepageData.social.email}"
+            class="flex items-center gap-2 text-sm text-accent dark:text-accent-light hover:text-accent-dark transition-all duration-300"
+          >
+            <Mail size={20} />
+            <span class="inline-flex">
+              {#each homepageData.social.email.split("") as char, i}
+                <span class="letter-drop" style="animation-delay: {i * 25}ms"
+                  >{char === "@" ? "@" : char}</span
+                >
+              {/each}
+            </span>
+          </a>
+        {:else}
+          <button
+            type="button"
+            on:click={revealEmail}
+            title="Reveal email"
+            class="flex items-center gap-2 text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 group cursor-pointer"
+            aria-label="Reveal email address"
+          >
+            <Mail
+              size={20}
+              class="transition-transform duration-300 group-hover:-translate-y-0.5"
+            />
+            <span class="text-sm underline underline-offset-2 decoration-dotted"
+              >click to reveal</span
+            >
+          </button>
+        {/if}
       </div>
     </div>
   </section>
 
   <ScrollReveal animation="fade-up" delay={60}>
-    <section class="mb-12">
+    <section class="mb-8">
+      <div class="section-rule mb-6">
+        <h2 class="section-heading mb-0">research interests</h2>
+        <div class="section-rule-line"></div>
+        <a
+          href="/about"
+          class="link-subtle inline-flex items-center gap-1 text-sm whitespace-nowrap"
+          on:mouseenter={() => (hoveredSeeAllAbout = true)}
+          on:mouseleave={() => (hoveredSeeAllAbout = false)}
+        >
+          see more
+          <ArrowRight size={14} isHovered={hoveredSeeAllAbout} />
+        </a>
+      </div>
+
+      <div class="space-y-4 text-ink-700 dark:text-cream-300 max-w-[38rem]">
+        <p class="text-base leading-relaxed">
+          {@html parseLinks(homepageData.researchInterests.intro)}
+        </p>
+        <div class="space-y-2 text-base leading-7">
+          {#each homepageData.researchInterests.items as item}
+            <p>{@html parseLinks(item)}</p>
+          {/each}
+        </div>
+      </div>
+    </section>
+  </ScrollReveal>
+
+  <ScrollReveal animation="fade-up" delay={60}>
+    <section class="mb-8">
       <div class="section-rule mb-6">
         <h2 class="section-heading mb-0">research</h2>
         <div class="section-rule-line"></div>
@@ -148,7 +176,7 @@
           on:mouseenter={() => (hoveredSeeAll = true)}
           on:mouseleave={() => (hoveredSeeAll = false)}
         >
-          see all
+          see more
           <ArrowRight size={14} isHovered={hoveredSeeAll} />
         </a>
       </div>
@@ -161,3 +189,22 @@
     </section>
   </ScrollReveal>
 </div>
+
+<style>
+  .letter-drop {
+    display: inline-block;
+    opacity: 0;
+    animation: letter-drop 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes letter-drop {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) rotate(-4deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) rotate(0deg);
+    }
+  }
+</style>

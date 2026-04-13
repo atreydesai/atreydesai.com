@@ -73,30 +73,28 @@
     url="https://atreydesai.com/photography"
 />
 
-<div class="layout-main py-8 md:py-12">
-    <div class="flex items-center justify-between mb-8">
-        <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
-            photography
-        </h1>
-        <a
-            href="https://instagram.com/framedbyatrey"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-accent transition-colors"
-        >
-            <Instagram size={18} />
-            <span>@framedbyatrey</span>
-        </a>
+<div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
+                photography
+            </h1>
+            <a
+                href="https://instagram.com/framedbyatrey"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-accent transition-colors"
+            >
+                <Instagram size={18} />
+                <span>@framedbyatrey</span>
+            </a>
+        </div>
+
+        <p class="text-ink-600 dark:text-cream-400">
+            Photography from over the years, semi-randomized. Selected work is also
+            on my Instagram.
+        </p>
     </div>
-
-    <p class="text-ink-600 dark:text-cream-400 mb-8">
-        Photography from over the years, semi-randomized. Selected work is also
-        on my Instagram.
-    </p>
-</div>
-
-<!-- Expanded width container for photography grid -->
-<div class="max-w-6xl mx-auto px-4 sm:px-6 pb-12">
     <!-- Masonry-style Grid - supports items spanning 2 columns -->
     {#if photos.length > 0}
         <div

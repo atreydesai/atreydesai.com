@@ -110,7 +110,8 @@
         "p-4",
         "md:p-5",
         "surface-card-hover",
-        paper.highlight ? "border-accent/25 dark:border-accent/30" : "",
+        "border-transparent",
+        paper.highlight ? "border-transparent" : "",
         highlighted
             ? "ring-2 ring-accent/35 ring-offset-2 ring-offset-cream-100 dark:ring-offset-ink-900"
             : "",
@@ -377,6 +378,7 @@
             {/if}
         </div>
     </div>
+
 </article>
 
 {#if lightboxOpen && paper.image && browser}

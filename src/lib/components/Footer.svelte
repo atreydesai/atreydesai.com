@@ -35,7 +35,7 @@
     import: "default",
   });
   const musicSamples = Object.values(audioModules).map((url) =>
-    url.replace("/static", ""),
+    url.replace(/^\/static/, ""),
   );
 
   function toggleMusic() {

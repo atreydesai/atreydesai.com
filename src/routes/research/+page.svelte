@@ -265,7 +265,7 @@
 
             <div class="space-y-4">
                 {#each groupedTalks as talkGroup}
-                    <article class="surface-card p-4 md:p-5">
+                    <article class="surface-card surface-card-hover border-transparent p-4 md:p-5">
                         <p class="meta-label mb-2">{talkGroup.type}</p>
 
                         <h3
