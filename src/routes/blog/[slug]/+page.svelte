@@ -53,7 +53,7 @@
     </header>
 
     <!-- Post content -->
-    <article class="prose-custom">
+    <article class="prose-custom font-serif">
         {@html htmlContent}
     </article>
 </div>

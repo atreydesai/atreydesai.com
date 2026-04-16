@@ -6,7 +6,7 @@
     import { ExternalLink, CalendarDays } from "lucide-svelte";
     import { Blend } from "@jis3r/icons";
 
-    const substackUrl = "https://substack.com/@atreydesai";
+    const substackUrl = "https://substack.com/@aydi1";
 
     // Tag filtering
     let selectedTag: string = "all";
