@@ -51,16 +51,24 @@
 <CustomCursor />
 
 <div class="min-h-screen flex flex-col cursor-custom">
+  <a
+    href="#main-content"
+    class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] btn-primary focus:cursor-auto"
+  >
+    Skip to content
+  </a>
+
   <Header />
 
   {#if isMobile || reducedMotion}
     <!-- Disable page transitions on mobile / reduced motion -->
-    <main class="flex-1">
+    <main id="main-content" class="flex-1">
       <slot />
     </main>
   {:else}
     {#key data.pathname}
       <main
+        id="main-content"
         class="flex-1"
         in:fly={{ x: -10, duration: 350, delay: 350 }}
         out:fly={{ y: 5, duration: 350 }}

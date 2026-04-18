@@ -6,9 +6,9 @@ authors:
   - Sathvik Nair
 year: 2026
 venue: ACL Findings, TLS (Oral)
-arxiv: null
-pdf: null
-code: null
+arxiv: "https://arxiv.org/abs/2604.14459"
+pdf: "https://arxiv.org/pdf/2604.14459"
+code: "https://github.com/atreydesai/developmental-filler-gap"
 demo: null
 twitter: null
 blog: null

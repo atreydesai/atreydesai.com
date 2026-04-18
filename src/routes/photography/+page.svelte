@@ -4,8 +4,6 @@
     import { formatDate } from "$lib/utils/date";
     import { X, ChevronLeft, ChevronRight } from "@jis3r/icons";
     import { Instagram } from "lucide-svelte";
-    import { onMount } from "svelte";
-
     // Photos loaded from server (auto-scanned from folder with EXIF extraction)
     export let data;
     $: photos = data.photos;
@@ -24,20 +22,47 @@
     let lightboxOpen = false;
     let currentPhotoIndex = 0;
     let lightboxImageLoaded = false;
+    let triggerElement: HTMLElement | null = null;
+    let dialogElement: HTMLElement | null = null;
 
-    function openLightbox(index: number) {
+    function openLightbox(index: number, trigger: HTMLElement) {
         currentPhotoIndex = index;
         lightboxOpen = true;
         lightboxImageLoaded = false;
+        triggerElement = trigger;
         if (typeof document !== "undefined") {
             document.body.style.overflow = "hidden";
         }
+        // Move focus into dialog on next tick after it renders
+        setTimeout(() => dialogElement?.focus(), 0);
     }
 
     function closeLightbox() {
         lightboxOpen = false;
         if (typeof document !== "undefined") {
             document.body.style.overflow = "";
+        }
+        // Return focus to the photo button that opened the lightbox
+        triggerElement?.focus();
+        triggerElement = null;
+    }
+
+    function trapFocus(e: KeyboardEvent) {
+        if (!dialogElement) return;
+        const focusable = Array.from(
+            dialogElement.querySelectorAll<HTMLElement>(
+                'button, [href], input, [tabindex]:not([tabindex="-1"])'
+            )
+        ).filter(el => !el.hasAttribute('disabled'));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.key === "Tab") {
+            if (e.shiftKey) {
+                if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+            } else {
+                if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
         }
     }
 
@@ -52,17 +77,6 @@
             (currentPhotoIndex - 1 + photos.length) % photos.length;
     }
 
-    // Keyboard navigation
-    onMount(() => {
-        const handleKeydown = (e: KeyboardEvent) => {
-            if (!lightboxOpen) return;
-            if (e.key === "Escape") closeLightbox();
-            if (e.key === "ArrowRight") nextPhoto();
-            if (e.key === "ArrowLeft") prevPhoto();
-        };
-        window.addEventListener("keydown", handleKeydown);
-        return () => window.removeEventListener("keydown", handleKeydown);
-    });
 
     $: currentPhoto = photos[currentPhotoIndex];
 </script>
@@ -119,7 +133,7 @@
                               : 16
                           : 20};
                     "
-                    on:click={() => openLightbox(index)}
+                    on:click={(e) => openLightbox(index, e.currentTarget)}
                 >
                     <div
                         class="h-full w-full transition-transform duration-300 group-hover:scale-[1.02]"
@@ -151,9 +165,10 @@
 {#if lightboxOpen && currentPhoto}
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div
+        bind:this={dialogElement}
         class="fixed inset-0 z-50 bg-ink-900/95 flex items-center justify-center"
         on:click={closeLightbox}
-        on:keydown={(e) => e.key === "Escape" && closeLightbox()}
+        on:keydown={(e) => { trapFocus(e); if (e.key === "Escape") closeLightbox(); if (e.key === "ArrowRight") nextPhoto(); if (e.key === "ArrowLeft") prevPhoto(); }}
         role="dialog"
         aria-modal="true"
         aria-label="Photo lightbox"
@@ -195,7 +210,6 @@
         <div
             class="max-w-5xl max-h-[85vh] flex flex-col items-center px-4"
             on:click|stopPropagation={() => {}}
-            aria-hidden="true"
         >
             <!-- Image with loading state -->
             <div

@@ -64,7 +64,7 @@
         // Convert [^N] to footnote markers
         text = text.replace(
             /\[\^(\d+)\]/g,
-            '<sup class="footnote-ref" data-footnote="$1">[$1]</sup>',
+            '<a href="#fn-$1" class="footnote-ref" data-footnote="$1">[$1]</a>',
         );
         return text;
     }
@@ -80,7 +80,7 @@
 <div class="relative">
     <!-- Footnotes Sidebar (desktop only) - positioned absolutely on the right -->
     <aside
-        class="hidden lg:block fixed right-4 xl:right-8 top-24 w-48 xl:w-56 z-10"
+        class="hidden xl:block fixed right-8 top-24 w-56 z-10"
     >
         <div class="space-y-4">
             {#each aboutData.footnotes as footnote}
@@ -283,6 +283,7 @@
         vertical-align: super;
         color: theme("colors.accent.DEFAULT");
         cursor: pointer;
+        text-decoration: none;
         transition: color 0.2s;
     }
 

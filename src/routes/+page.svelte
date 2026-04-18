@@ -2,7 +2,6 @@
   import Seo from "$lib/components/Seo.svelte";
   import ResearchCard from "$lib/components/ResearchCard.svelte";
   import LegoImage from "$lib/components/LegoImage.svelte";
-  import { ArrowRight } from "@jis3r/icons";
   import { Github, Twitter, GraduationCap, Mail } from "lucide-svelte";
   import { papersData, homepageData } from "$lib/content";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
@@ -12,14 +11,6 @@
     .filter((p) => p.featured)
     .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
     .slice(0, 3);
-
-  let emailRevealed = false;
-  let hoveredSeeAll = false;
-  let hoveredSeeAllAbout = false;
-
-  function revealEmail() {
-    emailRevealed = true;
-  }
 
   function parseLinks(text: string): string {
     text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -51,23 +42,10 @@
   <section class="mb-8 md:mb-10">
     <!-- Mobile: flex-col. Desktop: grid with image spanning both rows so icons bottom = image bottom -->
     <div
-      class="flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,250px)_1fr] md:grid-rows-[1fr_auto]"
+      class="flex flex-col gap-8 md:grid md:grid-cols-[1fr_minmax(0,250px)] md:grid-rows-[1fr_auto]"
     >
-      <!-- Image: col 1, spans both rows -->
-      <div class="md:row-span-2">
-        <div
-          class="aspect-square w-full max-w-[250px] mx-auto md:mx-0 rounded-lg overflow-hidden"
-        >
-          <LegoImage
-            src="/images/profile.JPG"
-            alt="Atrey Desai"
-            blockSize={48}
-          />
-        </div>
-      </div>
-
-      <!-- Text: col 2, row 1 -->
-      <div>
+      <!-- Text: col 1, row 1 -->
+      <div class="md:col-start-1 md:row-start-1">
         <h1
           class="heading-display text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
         >
@@ -83,8 +61,21 @@
         </div>
       </div>
 
-      <!-- Icons: col 2, row 2 — bottom aligns with image bottom -->
-      <div class="-mt-4 flex items-center gap-5">
+      <!-- Image: col 2, spans both rows -->
+      <div class="md:col-start-2 md:row-start-1 md:row-span-2">
+        <div
+          class="aspect-square w-full max-w-[250px] mx-auto md:mx-0 rounded-lg overflow-hidden"
+        >
+          <LegoImage
+            src="/images/profile.JPG"
+            alt="Atrey Desai"
+            blockSize={48}
+          />
+        </div>
+      </div>
+
+      <!-- Icons: col 1, row 2 — bottom aligns with image bottom -->
+      <div class="md:col-start-1 md:row-start-2 -mt-4 flex items-center gap-5">
         {#each socialLinks as link}
           <a
             href={link.href}
@@ -101,37 +92,18 @@
           </a>
         {/each}
 
-        {#if emailRevealed}
-          <a
-            href="mailto:{homepageData.social.email}"
-            class="flex items-center gap-2 text-sm text-accent dark:text-accent-light hover:text-accent-dark transition-all duration-300"
-          >
-            <Mail size={20} />
-            <span class="inline-flex">
-              {#each homepageData.social.email.split("") as char, i}
-                <span class="letter-drop" style="animation-delay: {i * 25}ms"
-                  >{char === "@" ? "@" : char}</span
-                >
-              {/each}
-            </span>
-          </a>
-        {:else}
-          <button
-            type="button"
-            on:click={revealEmail}
-            title="Reveal email"
-            class="flex items-center gap-2 text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 group cursor-pointer"
-            aria-label="Reveal email address"
-          >
-            <Mail
-              size={20}
-              class="transition-transform duration-300 group-hover:-translate-y-0.5"
-            />
-            <span class="text-sm underline underline-offset-2 decoration-dotted"
-              >click to reveal</span
-            >
-          </button>
-        {/if}
+        <a
+          href="mailto:{homepageData.social.email}"
+          title="Email"
+          class="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300"
+        >
+          <Mail size={20} class="transition-transform duration-300 group-hover:-translate-y-0.5" />
+          <span class="inline-flex">
+            {#each homepageData.social.email.split("") as char, i}
+              <span class="letter-drop" style="animation-delay: {i * 25}ms">{char}</span>
+            {/each}
+          </span>
+        </a>
       </div>
     </div>
   </section>
@@ -139,17 +111,8 @@
   <ScrollReveal animation="fade-up" delay={60}>
     <section class="mb-8">
       <div class="section-rule mb-6">
-        <h2 class="section-heading mb-0">research interests</h2>
+        <a href="/about" class="section-heading mb-0 hover:text-accent dark:hover:text-accent-light transition-colors duration-200">interests</a>
         <div class="section-rule-line"></div>
-        <a
-          href="/about"
-          class="link-subtle inline-flex items-center gap-1 text-sm whitespace-nowrap"
-          on:mouseenter={() => (hoveredSeeAllAbout = true)}
-          on:mouseleave={() => (hoveredSeeAllAbout = false)}
-        >
-          see more
-          <ArrowRight size={14} isHovered={hoveredSeeAllAbout} />
-        </a>
       </div>
 
       <div class="space-y-4 text-ink-700 dark:text-cream-300 max-w-[38rem]">
@@ -168,17 +131,8 @@
   <ScrollReveal animation="fade-up" delay={60}>
     <section class="mb-8">
       <div class="section-rule mb-6">
-        <h2 class="section-heading mb-0">research</h2>
+        <a href="/research" class="section-heading mb-0 hover:text-accent dark:hover:text-accent-light transition-colors duration-200">research</a>
         <div class="section-rule-line"></div>
-        <a
-          href="/research"
-          class="link-subtle inline-flex items-center gap-1 text-sm whitespace-nowrap"
-          on:mouseenter={() => (hoveredSeeAll = true)}
-          on:mouseleave={() => (hoveredSeeAll = false)}
-        >
-          see more
-          <ArrowRight size={14} isHovered={hoveredSeeAll} />
-        </a>
       </div>
 
       <div class="space-y-2 stagger-children">

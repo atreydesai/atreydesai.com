@@ -2,6 +2,9 @@
     import Seo from "$lib/components/Seo.svelte";
     import { Download } from "@jis3r/icons";
 
+    import type { PageData } from './$types';
+    export let data: PageData;
+
     let hoveredDownload = false;
 </script>
 
@@ -29,10 +32,13 @@
         </a>
     </div>
 
-    <p class="text-ink-600 dark:text-cream-400 mb-8">
+    <p class="text-ink-600 dark:text-cream-400 mb-3">
         A comprehensive overview of my academic and professional history. For a
         condensed version, see my <a href="/resume" class="link">resume</a>.
     </p>
+    {#if data.cvLastUpdated}
+        <p class="meta-label mb-8">Updated {data.cvLastUpdated}</p>
+    {/if}
 
     <!-- PDF Embed -->
     <div

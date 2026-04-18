@@ -36,6 +36,8 @@
     let isHovered = false;
     let lightboxOpen = false;
     let showAnimated = false;
+    let triggerElement: HTMLElement | null = null;
+    let dialogElement: HTMLElement | null = null;
 
     // Per-link hover states for icon animation triggering
     let hoveredLink: string | null = null;
@@ -48,15 +50,18 @@
         };
     });
 
-    function openLightbox() {
+    function openLightbox(trigger: HTMLElement) {
         if (!paper.image) return;
 
         lightboxOpen = true;
         showAnimated = false;
+        triggerElement = trigger;
 
         if (typeof document !== "undefined") {
             document.body.style.overflow = "hidden";
         }
+
+        setTimeout(() => dialogElement?.focus(), 0);
     }
 
     function closeLightbox() {
@@ -65,6 +70,28 @@
 
         if (typeof document !== "undefined") {
             document.body.style.overflow = "";
+        }
+
+        triggerElement?.focus();
+        triggerElement = null;
+    }
+
+    function trapFocus(e: KeyboardEvent) {
+        if (!dialogElement) return;
+        const focusable = Array.from(
+            dialogElement.querySelectorAll<HTMLElement>(
+                'button, [href], input, [tabindex]:not([tabindex="-1"])'
+            )
+        ).filter(el => !el.hasAttribute('disabled'));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.key === "Tab") {
+            if (e.shiftKey) {
+                if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+            } else {
+                if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
         }
     }
 
@@ -212,7 +239,7 @@
                     </div>
                 {/if}
 
-                {#if paper.tldr && (isPreview || paper.highlight || paper.classProject)}
+                {#if paper.tldr}
                     <p
                         class={`mt-3 text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm leading-6" : "text-[0.95rem] leading-6"}`}
                     >
@@ -327,7 +354,7 @@
                 >
                     <button
                         type="button"
-                        on:click={openLightbox}
+                        on:click={(e) => openLightbox(e.currentTarget)}
                         on:mouseenter={() => (isHovered = true)}
                         on:mouseleave={() => (isHovered = false)}
                         class={`relative block aspect-[4/3] w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
@@ -385,9 +412,10 @@
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div class="lightbox-portal" use:portal>
         <div
+            bind:this={dialogElement}
             class="fixed inset-0 z-[9999] flex items-center justify-center bg-ink-900/95 p-4"
             on:click={closeLightbox}
-            on:keydown={(e) => e.key === "Escape" && closeLightbox()}
+            on:keydown={(e) => { trapFocus(e); if (e.key === "Escape") closeLightbox(); }}
             role="dialog"
             aria-modal="true"
             aria-label="Image lightbox"

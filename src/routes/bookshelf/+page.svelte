@@ -221,7 +221,7 @@
                 <button
                     type="button"
                     class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-cream-300"
-                    on:click={() => (searchQuery = "")}
+                    on:click={() => { searchQuery = ""; }}
                 >
                     <X size={14} />
                 </button>
@@ -307,7 +307,7 @@
                     "{searchQuery}"
                     <button
                         type="button"
-                        on:click={() => (searchQuery = "")}
+                        on:click={() => { searchQuery = ""; }}
                         class="hover:text-blue-800 dark:hover:text-blue-300"
                     >
                         <X size={12} />

@@ -8,11 +8,10 @@
   const links = [
     { name: "About", href: "/about" },
     { name: "Research", href: "/research" },
-    { name: "Blog", href: "/blog" },
-    { name: "Photography", href: "/photography" },
-    { name: "Bookshelf", href: "/bookshelf" },
-    { name: "Resume", href: "/resume" },
     { name: "CV", href: "/cv" },
+    { name: "Photography", href: "/photography" },
+    { name: "Blog", href: "/blog" },
+    { name: "Bookshelf", href: "/bookshelf" },
   ];
 
   let mobileMenuOpen = false;

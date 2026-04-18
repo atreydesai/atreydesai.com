@@ -8,7 +8,15 @@
     export let data: PageData;
 
     $: post = data.post;
+    $: prevPost = data.prevPost;
+    $: nextPost = data.nextPost;
     $: htmlContent = marked(post.content);
+
+    function readingTime(content: string): string {
+        const words = content.trim().split(/\s+/).length;
+        const mins = Math.max(1, Math.round(words / 250));
+        return `${mins} min read`;
+    }
 </script>
 
 <Seo
@@ -44,6 +52,10 @@
                 })}
             </span>
 
+            <span class="text-ink-400 dark:text-ink-500">
+                {readingTime(post.content)}
+            </span>
+
             <div class="flex gap-2">
                 {#each post.tags as tag}
                     <span class="pill text-xs">{tag}</span>
@@ -56,6 +68,42 @@
     <article class="prose-custom font-serif">
         {@html htmlContent}
     </article>
+
+    <!-- Prev/next navigation -->
+    {#if prevPost || nextPost}
+        <nav
+            class="mt-12 pt-6 border-t border-ink-100 dark:border-ink-800 flex items-start justify-between gap-4"
+            aria-label="Post navigation"
+        >
+            <div class="flex-1">
+                {#if prevPost}
+                    <a
+                        href="/blog/{prevPost.id}"
+                        class="group flex flex-col gap-1 text-sm"
+                    >
+                        <span class="meta-label">← older</span>
+                        <span class="text-ink-700 dark:text-cream-300 group-hover:text-accent dark:group-hover:text-accent-light transition-colors">
+                            {prevPost.title}
+                        </span>
+                    </a>
+                {/if}
+            </div>
+
+            <div class="flex-1 text-right">
+                {#if nextPost}
+                    <a
+                        href="/blog/{nextPost.id}"
+                        class="group flex flex-col gap-1 text-sm items-end"
+                    >
+                        <span class="meta-label">newer →</span>
+                        <span class="text-ink-700 dark:text-cream-300 group-hover:text-accent dark:group-hover:text-accent-light transition-colors">
+                            {nextPost.title}
+                        </span>
+                    </a>
+                {/if}
+            </div>
+        </nav>
+    {/if}
 </div>
 
 <style>
@@ -75,8 +123,14 @@
         margin-bottom: 0.5rem;
     }
 
+    /* 17px prose: Rello et al. (2016) found comprehension peaks at 18pt on screen;
+       1.4rem paragraph gap satisfies WCAG 1.4.12 (≥2× font-size at this scale) */
+    .prose-custom {
+        font-size: 1.0625rem;
+    }
+
     .prose-custom :global(p) {
-        margin-bottom: 1rem;
+        margin-bottom: 1.4rem;
         line-height: 1.7;
     }
 

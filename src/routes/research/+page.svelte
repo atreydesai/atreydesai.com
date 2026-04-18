@@ -124,7 +124,7 @@
 />
 
 <div class="layout-main py-8 md:py-12">
-    <section class="mb-8 md:mb-10">
+    <section class="mb-4">
         <div class="section-rule mb-4">
             <h1
                 class="heading-display mb-0 text-3xl text-ink-900 dark:text-cream-100"
@@ -143,21 +143,11 @@
         <div
             class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
         >
-            <div class="flex items-start gap-3">
+            <div class="flex items-center gap-3">
                 <div
                     class="rounded-full bg-accent/10 p-2 text-accent dark:bg-accent/20 dark:text-accent-light"
                 >
                     <Blend size={16} />
-                </div>
-
-                <div>
-                    <p class="meta-label mb-1">Filter</p>
-                    <p
-                        class="text-sm leading-6 text-ink-500 dark:text-cream-400"
-                    >
-                        Refine by year and topic without changing the reading
-                        order.
-                    </p>
                 </div>
             </div>
 
