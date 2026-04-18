@@ -18,18 +18,18 @@ footnotes:
 
 # Professional section - your academic/research bio
 professional:
-  intro: "I'm **Atrey Desai**, a third-year undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu). I am fortunate to be advised by [Professor Rachel Rudinger](https://rudinger.github.io/) and [Professor Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
+  intro: "I'm **Atrey Desai**, a third-year undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu). I am fortunate to be advised by Professor [Rachel Rudinger](https://rudinger.github.io/) and Professor [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
   
   paragraphs:
     - text: "I am also eternally thankful for [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for taking a curious undergraduate under their wing."
 
-    - text: "I am a member of the [Computational Linguistics and Information Processing (CLIP) lab](https://clip.umd.edu/) in UMIACS. Currently, I'm also a visiting researcher under [Professor Kenny Zhu](https://kenzhu2000.github.io/) at the [Arlington Computational Linguistics Lab (ACL2)](https://uta-acl2.github.io/) at the University of Texas at Arlington. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights about the language of animal species."
+    - text: "I am a member of the Computational Linguistics and Information Processing [(CLIP)](https://clip.umd.edu/) lab in UMIACS. Currently, I'm also a visiting researcher under Professor [Kenny Zhu](https://kenzhu2000.github.io/) at the Arlington Computational Linguistics [(ACL2)](https://uta-acl2.github.io/) Lab at the University of Texas at Arlington. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights about the language of animal species."
       footnote: 1
       
     - text: "I was previously a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I worked on HackAPrompt and research on creating trustworthy and robust AI safety judges."
       footnote: 2
       
-    - text: "Previously, I worked under [Professor Michael Littman](https://littmania.com/) at the [Reinforcement Learning & Adaptive Behavior (RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
+    - text: "Previously, I worked under Professor [Michael Littman](https://littmania.com/) at the Reinforcement Learning & Adaptive Behavior [(RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
       footnote: 3
 
 # Personal section
@@ -42,7 +42,7 @@ personal:
 
 # Location section  
 location:
-  text: "I was born and grew up in **Saratoga, California**, attending the lovely [Saratoga High School](https://www.saratogahigh.org/). I currently live near the Washington, DC area. I also tend to frequent New York City and Boston for work and visiting friends. If you are ever around and want to talk, feel free to reach out!"
+  text: "I was born and grew up in Saratoga, California, attending the lovely [Saratoga High School](https://www.saratogahigh.org/). I currently live near the Washington, DC area. I also tend to frequent New York City and Boston for work and visiting friends. If you are ever around and want to talk, feel free to reach out!"
 
 # Website section
 website:

@@ -72,11 +72,21 @@ export interface Post {
     content: string;
 }
 
+export interface ResearchInterestCitation {
+    label: string;
+    url: string | null;
+}
+
+export interface ResearchInterestItem {
+    text: string;
+    citations?: ResearchInterestCitation[];
+}
+
 export interface HomepageData {
     intro: string[];
     researchInterests: {
         intro: string;
-        items: string[];
+        items: ResearchInterestItem[];
     };
     social: {
         github: string;

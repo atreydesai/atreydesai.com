@@ -1,6 +1,7 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { afterNavigate } from "$app/navigation";
     import Seo from "$lib/components/Seo.svelte";
+    import { tick } from "svelte";
     import ResearchCard from "$lib/components/ResearchCard.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import { papersData } from "$lib/content";
@@ -16,23 +17,27 @@
         return title.replace(/\s*\([^)]*\)\s*$/, "").trim();
     }
 
-    onMount(() => {
+    afterNavigate(async () => {
         const hash = window.location.hash.slice(1);
 
         if (!hash) return;
 
-        requestAnimationFrame(() => {
+        await tick();
+
+        highlightedPaperId = hash;
+
+        // Wait for the layout's page transition (out: 350ms) to finish so the
+        // outgoing page is removed from the DOM before we measure scroll position.
+        setTimeout(() => {
             const el = document.getElementById(hash);
+            if (el) {
+                el.scrollIntoView({ behavior: "auto", block: "start" });
+            }
+        }, 400);
 
-            if (!el) return;
-
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            highlightedPaperId = hash;
-
-            setTimeout(() => {
-                highlightedPaperId = null;
-            }, 3000);
-        });
+        setTimeout(() => {
+            highlightedPaperId = null;
+        }, 3000);
     });
 
     $: years = [...new Set(papersData.papers.map((p) => p.year))].sort(

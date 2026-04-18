@@ -9,9 +9,26 @@ intro:
 researchInterests:
   intro: "Language models are increasingly capable, but our methods for measuring and building that capability lag behind. I work on evaluation and data pipelines for reliable NLP, namely:"
   items:
-    - "1. Benchmark validity and the limits of what our evaluations actually measure"
-    - "2. Human-AI collaboration in synthetic data creation and annotation"
-    - "3. Evaluation for systems that reason and perceive in the world"
+    - text: "1. Benchmark validity and the limits of what our evaluations actually measure"
+      citations:
+        - label: "ttr"
+          url: "/research#test-time-reasoners"
+        - label: "benchmarker"
+          url: "/research#benchmarker"
+        - label: "IP1"
+          url: null
+    - text: "2. Human-AI collaboration in synthetic data creation and annotation"
+      citations: 
+        - label: "artifacts"
+          url: "/research#mcq-artifacts"
+        - label: "IP1"
+          url: null
+        - label: "IP2"
+          url: null
+    - text: "3. Evaluation for systems that reason and perceive in the world"
+      citations: 
+        - label: "IP2"
+          url: null
 
 social:
   github: https://github.com/atreydesai

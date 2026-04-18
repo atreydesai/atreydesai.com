@@ -119,9 +119,26 @@
         <p class="text-base leading-relaxed">
           {@html parseLinks(homepageData.researchInterests.intro)}
         </p>
-        <div class="space-y-2 text-base leading-7">
+        <div class="space-y-3 text-base leading-7">
           {#each homepageData.researchInterests.items as item}
-            <p>{@html parseLinks(item)}</p>
+            <div>
+              <p>{@html parseLinks(item.text)}</p>
+              {#if item.citations && item.citations.length > 0}
+                <div class="mt-0.5 ml-6 flex gap-1.5 text-xs font-mono text-ink-400 dark:text-cream-500 leading-none">
+                  <span class="text-ink-300 dark:text-cream-600">↳</span>
+                  {#each item.citations as citation}
+                    {#if citation.url}
+                      <a
+                        href={citation.url}
+                        class="hover:text-accent dark:hover:text-accent-light transition-colors duration-150"
+                      >[{citation.label}]</a>
+                    {:else}
+                      <span>[{citation.label}]</span>
+                    {/if}
+                  {/each}
+                </div>
+              {/if}
+            </div>
           {/each}
         </div>
       </div>

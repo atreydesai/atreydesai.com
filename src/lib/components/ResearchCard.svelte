@@ -149,7 +149,7 @@
 
 <svelte:window on:keydown={(e) => e.key === "Escape" && closeLightbox()} />
 
-<article id={paper.id} class="group relative">
+<article id={paper.id} class="group relative" style="scroll-margin-top: 80px">
     <div class={surfaceClasses}>
         {#if paper.highlight}
             <!-- Bottom-left corner accent: SVG with rounded ends + matching arc -->
