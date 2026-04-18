@@ -1,5 +1,6 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
+    import ShaderCanvas from "$lib/components/ShaderCanvas.svelte";
     import { formatDate } from "$lib/utils/date";
     import { marked } from "marked";
     import { ArrowLeft, CalendarDays } from "lucide-svelte";
@@ -10,7 +11,37 @@
     $: post = data.post;
     $: prevPost = data.prevPost;
     $: nextPost = data.nextPost;
-    $: htmlContent = marked(post.content);
+
+    // Split content on [[shader:variant]] markers so we can interleave live
+    // shader canvases between rendered markdown segments.
+    type Segment =
+        | { type: "html"; content: string }
+        | { type: "shader"; variant: "mound" | "nebula" }
+        | { type: "image"; src: string; caption: string };
+
+    function parseSegments(src: string): Segment[] {
+        const re = /\[\[shader:(mound|nebula)\]\]|\[\[image:([^\]|]+)\|([^\]]+)\]\]/g;
+        const out: Segment[] = [];
+        let last = 0;
+        let match: RegExpExecArray | null;
+        while ((match = re.exec(src)) !== null) {
+            if (match.index > last) {
+                out.push({ type: "html", content: marked(src.slice(last, match.index)) as string });
+            }
+            if (match[1]) {
+                out.push({ type: "shader", variant: match[1] as "mound" | "nebula" });
+            } else {
+                out.push({ type: "image", src: match[2], caption: match[3] });
+            }
+            last = match.index + match[0].length;
+        }
+        if (last < src.length) {
+            out.push({ type: "html", content: marked(src.slice(last)) as string });
+        }
+        return out;
+    }
+
+    $: segments = parseSegments(post.content);
 
     function readingTime(content: string): string {
         const words = content.trim().split(/\s+/).length;
@@ -66,7 +97,18 @@
 
     <!-- Post content -->
     <article class="prose-custom font-serif">
-        {@html htmlContent}
+        {#each segments as seg}
+            {#if seg.type === "html"}
+                {@html seg.content}
+            {:else if seg.type === "shader"}
+                <ShaderCanvas variant={seg.variant} />
+            {:else}
+                <figure class="blog-figure">
+                    <img src={seg.src} alt={seg.caption} />
+                    <figcaption>{seg.caption}</figcaption>
+                </figure>
+            {/if}
+        {/each}
     </article>
 
     <!-- Prev/next navigation -->
@@ -203,5 +245,26 @@
 
     .prose-custom :global(hr) {
         margin: 2rem 0;
+    }
+
+    .blog-figure {
+        margin: 2rem 0;
+    }
+
+    .blog-figure img {
+        width: 100%;
+        border-radius: 0.5rem;
+    }
+
+    .blog-figure figcaption {
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        font-style: italic;
+        color: theme("colors.ink.500");
+        text-align: center;
+    }
+
+    :global(.dark) .blog-figure figcaption {
+        color: theme("colors.ink.400");
     }
 </style>
