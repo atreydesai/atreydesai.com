@@ -131,7 +131,7 @@
   <ScrollReveal animation="fade-up" delay={60}>
     <section class="mb-8">
       <div class="section-rule mb-6">
-        <a href="/research" class="section-heading mb-0 hover:text-accent dark:hover:text-accent-light transition-colors duration-200">research</a>
+        <a href="/research" class="section-heading mb-0 hover:text-accent dark:hover:text-accent-light transition-colors duration-200">research highlights</a>
         <div class="section-rule-line"></div>
       </div>
 
