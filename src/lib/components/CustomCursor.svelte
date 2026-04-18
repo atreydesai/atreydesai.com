@@ -17,26 +17,17 @@
 
         isVisible = true;
 
+        const HOVER_SELECTOR = "a, button, .cursor-pointer";
+
+        const updateHoverState = (x: number, y: number) => {
+            const el = document.elementFromPoint(x, y) as HTMLElement | null;
+            isHovering = !!el?.closest?.(HOVER_SELECTOR);
+        };
+
         const handleMouseMove = (e: MouseEvent) => {
             targetX = e.clientX;
             targetY = e.clientY;
-        };
-
-        const handleMouseEnter = (e: Event) => {
-            const target = e.target as HTMLElement;
-            if (
-                target.tagName === "A" ||
-                target.tagName === "BUTTON" ||
-                target.closest("a") ||
-                target.closest("button") ||
-                target.classList.contains("cursor-pointer")
-            ) {
-                isHovering = true;
-            }
-        };
-
-        const handleMouseLeave = () => {
-            isHovering = false;
+            updateHoverState(e.clientX, e.clientY);
         };
 
         // Animation loop for cursor movement
@@ -54,14 +45,10 @@
         };
 
         document.addEventListener("mousemove", handleMouseMove);
-        document.addEventListener("mouseover", handleMouseEnter);
-        document.addEventListener("mouseout", handleMouseLeave);
         animate();
 
         return () => {
             document.removeEventListener("mousemove", handleMouseMove);
-            document.removeEventListener("mouseover", handleMouseEnter);
-            document.removeEventListener("mouseout", handleMouseLeave);
             cancelAnimationFrame(animationId);
         };
     });

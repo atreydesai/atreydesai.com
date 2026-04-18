@@ -80,17 +80,22 @@
           {@const isRaised = shouldRaise(link.href, currentPath, hoveredLink)}
           <a
             href={link.href}
-            class="nav-link text-sm transition-all duration-200 ease-out"
-            class:text-ink-900={isRaised}
-            class:dark:text-cream-100={isRaised}
+            class="nav-link text-sm"
+            class:is-raised={isRaised}
             class:font-medium={isLinkActive}
-            class:-translate-y-0.5={isRaised}
-            class:text-ink-500={!isRaised}
-            class:dark:text-ink-400={!isRaised}
             on:mouseenter={() => (hoveredLink = link.href)}
             on:mouseleave={() => (hoveredLink = null)}
           >
-            {link.name}
+            <span
+              class="nav-link-inner inline-block transition-all duration-200 ease-out"
+              class:text-ink-900={isRaised}
+              class:dark:text-cream-100={isRaised}
+              class:-translate-y-0.5={isRaised}
+              class:text-ink-500={!isRaised}
+              class:dark:text-ink-400={!isRaised}
+            >
+              {link.name}
+            </span>
           </a>
         {/each}
         <DarkModeToggle />
@@ -155,13 +160,16 @@
     bottom: -2px;
     left: 0;
     width: 0;
-    height: 1px;
+    height: 3px;
     background-color: currentColor;
+    background-clip: content-box;
+    padding-top: 2px;
+    box-sizing: border-box;
     transition: width 0.2s ease-out;
   }
 
   .nav-link:hover::after,
-  .nav-link.-translate-y-0\.5::after {
+  .nav-link.is-raised::after {
     width: 100%;
   }
 </style>
