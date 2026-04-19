@@ -141,6 +141,9 @@
             </div>
           {/each}
         </div>
+        <p class="mt-4 text-xs font-mono text-ink-400 dark:text-cream-500">
+          [IP] = in progress
+        </p>
       </div>
     </section>
   </ScrollReveal>
