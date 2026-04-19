@@ -5,7 +5,7 @@ authors:
   - Atrey Desai
   - Sathvik Nair
 year: 2026
-venue: ACL Findings, TLS (Oral)
+venue: ACL Findings, TLS
 arxiv: "https://arxiv.org/abs/2604.14459"
 pdf: "https://arxiv.org/pdf/2604.14459"
 code: "https://github.com/atreydesai/developmental-filler-gap"
@@ -16,7 +16,8 @@ tags:
   - NLP
   - Linguistics
 tldr: null
-awards: []
+awards:
+  - Oral Presentation (TLS)
 preprint: false
 featured: true
 highlight: false

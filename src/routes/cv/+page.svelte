@@ -338,7 +338,7 @@
                                     >Test-Time Reasoners Are Strategic
                                     Multiple-Choice Test-Takers</strong
                                 ></a
-                            >.<br />ACL 2026<br />Nishant Balepur,
+                            >.<br />ACL 2026 (Oral)<br />Nishant Balepur,
                             <span class="text-ink-900 dark:text-cream-100"
                                 >Atrey Desai</span
                             > and Rachel Rudinger.
