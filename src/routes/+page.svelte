@@ -67,7 +67,7 @@
           class="aspect-square w-full max-w-[250px] mx-auto md:mx-0 rounded-lg overflow-hidden"
         >
           <LegoImage
-            src="/images/profile.JPG"
+            src="/images/profile.webp"
             alt="Atrey Desai"
             blockSize={48}
           />
@@ -111,7 +111,9 @@
   <ScrollReveal animation="fade-up" delay={60}>
     <section class="mb-8">
       <div class="section-rule mb-6">
-        <a href="/about" class="section-heading mb-0 hover:text-accent dark:hover:text-accent-light transition-colors duration-200">interests</a>
+        <h2 class="section-heading mb-0">
+          <a href="/about" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">interests</a>
+        </h2>
         <div class="section-rule-line"></div>
       </div>
 
@@ -151,7 +153,9 @@
   <ScrollReveal animation="fade-up" delay={60}>
     <section class="mb-8">
       <div class="section-rule mb-6">
-        <a href="/research" class="section-heading mb-0 hover:text-accent dark:hover:text-accent-light transition-colors duration-200">research highlights</a>
+        <h2 class="section-heading mb-0">
+          <a href="/research" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">research highlights</a>
+        </h2>
         <div class="section-rule-line"></div>
       </div>
 

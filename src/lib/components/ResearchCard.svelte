@@ -360,14 +360,23 @@
                         class={`relative block aspect-[4/3] w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
                         aria-label={`Open image for ${paper.title}`}
                     >
-                        <img
-                            src={paper.image}
-                            alt={`${paper.title} preview`}
-                            class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-                            class:opacity-0={isHovered &&
-                                Boolean(paper.imageAnimated)}
-                            loading="lazy"
-                        />
+                        <picture>
+                            <source
+                                srcset={paper.image.replace(/\.(png|jpe?g)$/i, ".webp")}
+                                type="image/webp"
+                            />
+                            <img
+                                src={paper.image}
+                                alt={`${paper.title} preview`}
+                                width="800"
+                                height="600"
+                                class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+                                class:opacity-0={isHovered &&
+                                    Boolean(paper.imageAnimated)}
+                                loading="lazy"
+                                decoding="async"
+                            />
+                        </picture>
 
                         {#if paper.imageAnimated}
                             {#if isVideo}

@@ -74,20 +74,25 @@
         ctx.clearRect(0, 0, width, height);
         ctx.drawImage(tempCanvas, 0, 0, width, height);
 
-        // Draw grid lines for lego effect
+        // Draw grid lines for lego effect — align with actual pixel block boundaries
         if (progress > 0.5) {
             const gridOpacity = (progress - 0.5) * 0.3;
             ctx.strokeStyle = `rgba(0, 0, 0, ${gridOpacity})`;
             ctx.lineWidth = 1;
 
-            for (let x = 0; x <= width; x += currentBlockSize) {
+            const stepX = width / smallWidth;
+            const stepY = height / smallHeight;
+
+            for (let i = 0; i <= smallWidth; i++) {
+                const x = Math.round(i * stepX) + 0.5; // +0.5 for crisp 1px line
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, height);
                 ctx.stroke();
             }
 
-            for (let y = 0; y <= height; y += currentBlockSize) {
+            for (let j = 0; j <= smallHeight; j++) {
+                const y = Math.round(j * stepY) + 0.5;
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(width, y);
@@ -139,7 +144,7 @@
     role="img"
     aria-label={alt}
 >
-    <canvas bind:this={canvas} class="lego-canvas" class:loaded={imageLoaded}
+    <canvas bind:this={canvas} class="lego-canvas" class:loaded={imageLoaded} width="500" height="500"
     ></canvas>
     {#if !imageLoaded}
         <div class="loading-placeholder">

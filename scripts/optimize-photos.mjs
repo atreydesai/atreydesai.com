@@ -61,33 +61,74 @@ async function optimizePhoto(filename) {
     }
 }
 
-async function main() {
-    console.log('📸 Optimizing photography thumbnails...\n');
+// Resize + webp conversion for a single source file.
+// width: target width (won't enlarge); quality: webp quality 0-100.
+async function toWebp(srcPath, destPath, width, quality) {
+    if (!(await needsUpdate(srcPath, destPath))) {
+        return { src: srcPath, status: 'skipped' };
+    }
+    try {
+        await sharp(srcPath)
+            .resize(width, null, { withoutEnlargement: true, fit: 'inside' })
+            .webp({ quality })
+            .toFile(destPath);
+        return { src: srcPath, status: 'optimized' };
+    } catch (err) {
+        return { src: srcPath, status: 'error', error: err.message };
+    }
+}
 
+async function optimizePhotography() {
+    console.log('📸 Optimizing photography thumbnails...');
     await ensureDir(THUMBS_DIR);
-
     const files = await readdir(PHOTOS_DIR);
     const imageFiles = files.filter(f =>
         /\.(jpg|jpeg|png|webp)$/i.test(f) && !f.startsWith('.')
     );
-
-    console.log(`Found ${imageFiles.length} images\n`);
-
     const results = await Promise.all(imageFiles.map(optimizePhoto));
+    summarize(results);
+}
 
+async function optimizeProfile() {
+    console.log('\n👤 Optimizing profile image...');
+    const src = 'static/images/profile.JPG';
+    const dest = 'static/images/profile.webp';
+    const result = await toWebp(src, dest, 500, 82);
+    summarize([{ filename: 'profile.webp', ...result }]);
+}
+
+async function optimizePapers() {
+    console.log('\n📄 Optimizing paper preview images...');
+    const PAPERS_DIR = 'static/images/papers';
+    const files = await readdir(PAPERS_DIR);
+    const imageFiles = files.filter(f =>
+        /\.(jpg|jpeg|png)$/i.test(f) && !f.startsWith('.')
+    );
+    const results = await Promise.all(imageFiles.map(async (filename) => {
+        const srcPath = join(PAPERS_DIR, filename);
+        const { name } = parse(filename);
+        const destPath = join(PAPERS_DIR, `${name}.webp`);
+        const r = await toWebp(srcPath, destPath, 800, 80);
+        return { filename, ...r };
+    }));
+    summarize(results);
+}
+
+function summarize(results) {
     const optimized = results.filter(r => r.status === 'optimized');
     const skipped = results.filter(r => r.status === 'skipped');
     const errors = results.filter(r => r.status === 'error');
-
-    console.log(`✅ Optimized: ${optimized.length}`);
-    console.log(`⏭️  Skipped (up-to-date): ${skipped.length}`);
-
+    console.log(`   ✅ Optimized: ${optimized.length}   ⏭️  Skipped: ${skipped.length}${errors.length ? `   ❌ Errors: ${errors.length}` : ''}`);
     if (errors.length > 0) {
-        console.log(`❌ Errors: ${errors.length}`);
-        errors.forEach(e => console.log(`   - ${e.filename}: ${e.error}`));
+        errors.forEach(e => console.log(`   - ${e.filename || e.src}: ${e.error}`));
     }
+}
 
-    console.log('\n✨ Done! Thumbnails saved to:', THUMBS_DIR);
+async function main() {
+    await optimizePhotography();
+    await optimizeProfile();
+    await optimizePapers();
+    console.log('\n✨ Done!');
 }
 
 main().catch(console.error);

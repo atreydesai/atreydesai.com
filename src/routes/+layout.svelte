@@ -2,6 +2,7 @@
   import "../app.css";
 
   import { browser, dev } from "$app/environment";
+  import { onMount } from "svelte";
 
   import { inject } from "@vercel/analytics";
   import { injectSpeedInsights } from "@vercel/speed-insights/sveltekit";
@@ -20,32 +21,27 @@
   const isMobile = browser && /Android|iPhone/i.test(navigator.userAgent);
   const reducedMotion =
     browser && matchMedia("(prefers-reduced-motion: reduce)").matches;
-</script>
 
-<svelte:head>
-  <!-- Google Analytics 4 -->
-  <script
-    async
-    src="https://www.googletagmanager.com/gtag/js?id=G-4NTR1HXBLW"
-  ></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() {
-      dataLayer.push(arguments);
+  onMount(() => {
+    if (dev) return;
+    const loadGa = () => {
+      const w = window as any;
+      w.dataLayer = w.dataLayer || [];
+      function gtag(...args: any[]) { w.dataLayer.push(args); }
+      gtag("js", new Date());
+      gtag("config", "G-4NTR1HXBLW");
+      const s = document.createElement("script");
+      s.async = true;
+      s.src = "https://www.googletagmanager.com/gtag/js?id=G-4NTR1HXBLW";
+      document.head.appendChild(s);
+    };
+    if ("requestIdleCallback" in window) {
+      (window as any).requestIdleCallback(loadGa, { timeout: 3000 });
+    } else {
+      setTimeout(loadGa, 1500);
     }
-    gtag("js", new Date());
-    gtag("config", "G-4NTR1HXBLW");
-  </script>
-
-  <!-- Preconnect to external resources for performance -->
-  <link rel="preconnect" href="https://use.typekit.net" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link
-    rel="preconnect"
-    href="https://fonts.gstatic.com"
-    crossorigin="anonymous"
-  />
-</svelte:head>
+  });
+</script>
 
 <!-- Custom Cursor (desktop only) -->
 <CustomCursor />
