@@ -6,8 +6,6 @@
 
   import { inject } from "@vercel/analytics";
   import { injectSpeedInsights } from "@vercel/speed-insights/sveltekit";
-  inject({ mode: dev ? "development" : "production" });
-  injectSpeedInsights();
 
   import { fly } from "svelte/transition";
 
@@ -23,6 +21,12 @@
     browser && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   onMount(() => {
+    // Vercel Analytics + Speed Insights use buffered PerformanceObservers,
+    // so deferring their injection still captures paint/LCP events that
+    // occurred earlier in the page lifecycle.
+    inject({ mode: dev ? "development" : "production" });
+    injectSpeedInsights();
+
     if (dev) return;
     const loadGa = () => {
       const w = window as any;

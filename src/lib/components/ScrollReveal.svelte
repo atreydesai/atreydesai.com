@@ -62,12 +62,16 @@
                 entries.forEach((entry) => {
                     if (entry.isIntersecting) {
                         if (!hasAnimated || !once) {
-                            element.animate(getKeyframes(), {
+                            element.style.willChange = "opacity, transform";
+                            const anim = element.animate(getKeyframes(), {
                                 delay,
                                 duration,
                                 easing: "cubic-bezier(0.16, 1, 0.3, 1)",
                                 fill: "both",
                             });
+                            anim.onfinish = () => {
+                                element.style.willChange = "auto";
+                            };
                             hasAnimated = true;
                         }
                         if (once) {
@@ -93,9 +97,3 @@
 >
     <slot />
 </div>
-
-<style>
-    .scroll-reveal {
-        will-change: opacity, transform;
-    }
-</style>
