@@ -108,7 +108,7 @@ async function optimizePapers() {
         const srcPath = join(PAPERS_DIR, filename);
         const { name } = parse(filename);
         const destPath = join(PAPERS_DIR, `${name}.webp`);
-        const r = await toWebp(srcPath, destPath, 800, 80);
+        const r = await toWebp(srcPath, destPath, 800, 70);
         return { filename, ...r };
     }));
     summarize(results);

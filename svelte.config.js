@@ -8,6 +8,9 @@ const config = {
     adapter: adapter({
       runtime: 'nodejs20.x'
     }),
+    // Inline CSS chunks under ~12 KB directly into the HTML response to
+    // eliminate render-blocking stylesheet requests on the critical path.
+    inlineStyleThreshold: 12288,
   },
 };
 export default config;
