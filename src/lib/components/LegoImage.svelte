@@ -144,13 +144,12 @@
     role="img"
     aria-label={alt}
 >
-    <canvas bind:this={canvas} class="lego-canvas" class:loaded={imageLoaded} width="500" height="500"
+    <!-- Plain <img> is the LCP element — renders from the <link rel=preload>
+         in app.html immediately, no JS needed. The canvas sits on top and
+         stays transparent until the user hovers. -->
+    <img {src} {alt} class="lego-img" width="500" height="500" fetchpriority="high" decoding="async" />
+    <canvas bind:this={canvas} class="lego-canvas" class:loaded={imageLoaded && isHovering} width="500" height="500"
     ></canvas>
-    {#if !imageLoaded}
-        <div class="loading-placeholder">
-            <span class="loading-text">Loading...</span>
-        </div>
-    {/if}
 </div>
 
 <style>
@@ -162,34 +161,28 @@
         cursor: pointer;
     }
 
+    .lego-img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
     .lego-canvas {
+        position: absolute;
+        inset: 0;
         width: 100%;
         height: 100%;
         object-fit: cover;
         display: block;
         opacity: 0;
-        transition: opacity 0.3s ease;
+        transition: opacity 0.15s ease;
+        pointer-events: none;
     }
 
     .lego-canvas.loaded {
         opacity: 1;
-    }
-
-    .loading-placeholder {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: theme("colors.cream.200");
-    }
-
-    :global(.dark) .loading-placeholder {
-        background: theme("colors.ink.800");
-    }
-
-    .loading-text {
-        font-size: 0.875rem;
-        color: theme("colors.ink.400");
     }
 </style>

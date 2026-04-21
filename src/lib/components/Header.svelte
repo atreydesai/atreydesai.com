@@ -22,10 +22,16 @@
   $: currentPath = $page.url.pathname;
 
   onMount(() => {
+    let ticking = false;
     const handleScroll = () => {
-      scrolled = window.scrollY > 20;
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        scrolled = window.scrollY > 20;
+        ticking = false;
+      });
     };
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   });
 
