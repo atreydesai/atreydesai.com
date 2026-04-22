@@ -26,23 +26,23 @@ professional:
     - text: "I am a member of the Computational Linguistics and Information Processing [(CLIP)](https://clip.umd.edu/) lab in UMIACS. Currently, I'm also a visiting researcher under Professor [Kenny Zhu](https://kenzhu2000.github.io/) at the Arlington Computational Linguistics [(ACL2)](https://uta-acl2.github.io/) Lab at the University of Texas at Arlington. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights about the language of animal species."
       footnote: 1
       
-    - text: "I was previously a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I worked on HackAPrompt and research on creating trustworthy and robust AI safety judges."
+    - text: "I was a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I worked on HackAPrompt and research on creating trustworthy and robust AI safety judges."
       footnote: 2
       
-    - text: "Previously, I worked under Professor [Michael Littman](https://littmania.com/) at the Reinforcement Learning & Adaptive Behavior [(RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
+    - text: "Before college, I worked under Professor [Michael Littman](https://littmania.com/) at the Reinforcement Learning & Adaptive Behavior [(RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
       footnote: 3
 
 # Personal section
 personal:
   descriptions:
-    - "I would describe myself as **curious** and **bubbly**. I love exploring new ideas and enjoy working at the boundary between disciplines, especially when they reveal unexpected connections. Naturally, this led me to NLP, where I found computer science meets reading and journalism, my favorite pastimes growing up."
-    - "On the day to day, you'll probably find me at the lab, or at the gym, or at [Moge Tea](https://share.google/uG66fHdt79TEs0HtE), or wandering about aimlessly looking through my camera viewfinder!"
-  interests: "photography, reading[^4], graphic design[^5], learning languages, punching the air, music (especially edm and indie pop), [manifold](https://manifold.markets)[^6], and cultures of the world"
+    - "I would describe myself as curious, bubbly, and passionate. I love exploring new ideas and enjoy working at the boundary between disciplines, especially when they reveal unexpected connections. Naturally, this led me to NLP, where I found computer science meets reading and journalism, my favorite pastimes growing up."
+    - "On the day to day, you'll probably find me at the lab, or at the gym, or at [a boba shop](https://share.google/uG66fHdt79TEs0HtE), or wandering about aimlessly looking through my camera viewfinder!"
+  interests: "photography, reading[^4], graphic design[^5], learning languages, punching the air, music (especially indie pop, edm, and baroque classical), [manifold](https://manifold.markets)[^6], and cultures of the world"
   blogs: []
 
 # Location section  
 location:
-  text: "I was born and grew up in Saratoga, California, attending the lovely [Saratoga High School](https://www.saratogahigh.org/). I currently live near the Washington, DC area. I also tend to frequent New York City and Boston for work and visiting friends. If you are ever around and want to talk, feel free to reach out!"
+  text: "I was born and grew up in Saratoga, California, attending the lovely [Saratoga High School](https://www.saratogahigh.org/). I currently live in the Washington, DC area. I also tend to frequent New York City and Boston for work and visiting friends. If you are ever around and want to talk, feel free to reach out!"
 
 # Website section
 website:
