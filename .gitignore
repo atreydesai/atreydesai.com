@@ -15,3 +15,7 @@ src/projects
 # Generated files
 static/images/photography/thumbs/
 build_*.txt
+
+# Local Codex skills
+.agents/
+skills-lock.json
