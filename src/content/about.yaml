@@ -21,15 +21,15 @@ professional:
   intro: "I'm **Atrey Desai**, a third-year undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu). I am fortunate to be advised by Professor [Rachel Rudinger](https://rudinger.github.io/) and Professor [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
   
   paragraphs:
-    - text: "I am also eternally thankful for [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for taking a curious undergraduate under their wing."
+    - text: "I am also eternally indebted to [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for their mentoring and taking a curious undergraduate under their wing!"
 
-    - text: "I am a member of the Computational Linguistics and Information Processing [(CLIP)](https://clip.umd.edu/) lab in UMIACS. Currently, I'm also a visiting researcher under Professor [Kenny Zhu](https://kenzhu2000.github.io/) at the Arlington Computational Linguistics [(ACL2)](https://uta-acl2.github.io/) Lab at the University of Texas at Arlington. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights about the language of animal species."
+    - text: "I am a member of the Computational Linguistics and Information Processing [(CLIP)](https://clip.umd.edu/) lab in UMIACS. I'm also a visiting researcher under Professor [Kenny Zhu](https://kenzhu2000.github.io/) at the Arlington Computational Linguistics [(ACL2)](https://uta-acl2.github.io/) Lab. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights into their language."
       footnote: 1
       
-    - text: "I was a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I worked on HackAPrompt and research on creating trustworthy and robust AI safety judges."
+    - text: "I was previously a member of the technical staff of [Learn Prompting](https://learnprompting.org), where I worked on HackAPrompt and research on creating trustworthy and robust AI safety judges."
       footnote: 2
       
-    - text: "Before college, I worked under Professor [Michael Littman](https://littmania.com/) at the Reinforcement Learning & Adaptive Behavior [(RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
+    - text: "Before college, I worked with Professor [Michael Littman](https://littmania.com/) at the Reinforcement Learning & Adaptive Behavior [(RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
       footnote: 3
 
 # Personal section

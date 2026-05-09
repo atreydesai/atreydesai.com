@@ -84,6 +84,10 @@ export interface ResearchInterestItem {
 
 export interface HomepageData {
     intro: string[];
+    banner?: {
+        lead: string;
+        body: string;
+    };
     researchInterests: {
         intro: string;
         items: ResearchInterestItem[];

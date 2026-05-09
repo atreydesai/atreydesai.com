@@ -6,6 +6,10 @@ intro:
   - "I am a third-year undergraduate student studying computer science and linguistics with a minor in korean studies at the [University of Maryland](https://umd.edu)."
   - "I am fortunate to be advised by Professors [Rachel Rudinger](https://rudinger.github.io/) and [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
 
+banner:
+  lead: "I am **applying to Ph.D. programs this fall (2026-27 cycle)**. I'm happy [to talk]() and open to collaborations & invited talks!"
+  body: "This summer, I will be **(1)** organizing [QUANTA](https://qanta-org.github.io/) and the [EMM-QA ICML workshop](https://qanta-org.github.io/competition/2026/icml/), and **(2)** working with Professor [Mohit Iyyer](https://www.cs.umd.edu/~miyyer/) on AI agents for long-form text generation. I also be attending ACL and ICML. See you in San Diego and Seoul!"
+
 researchInterests:
   intro: "Language models are increasingly capable, but our methods for measuring and building that capability lag behind. I work on evaluation and data pipelines for reliable NLP, namely:"
   items:
