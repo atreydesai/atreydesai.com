@@ -365,7 +365,7 @@
     content: "";
     position: absolute;
     inset: 0;
-    border: 1.5px solid #1A1A1A;
+    border: 2.25px solid #1A1A1A;
     border-radius: 14px 20px 14px 18px;
     filter: url(#banner-rough-strong);
     pointer-events: none;
