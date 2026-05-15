@@ -15,7 +15,7 @@ twitter: null
 blog: null
 tags:
   - NLP
-  - Benchmarking
+  - Evaluation
 tldr: null
 awards: []
 preprint: false

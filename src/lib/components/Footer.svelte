@@ -62,47 +62,47 @@
   <div class="border-t border-ink-200 dark:border-ink-700 pt-6">
     <!-- Footer - full width, left/right justified -->
     <div
-      class="flex flex-col sm:flex-row items-center sm:items-end justify-between text-sm space-y-4 sm:space-y-0"
+      class="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-y-4"
     >
       <!-- Left side - DC Time -->
-      <div class="text-ink-500 dark:text-ink-400 text-center sm:text-left">
-        <div class="font-mono text-lg tabular-nums">{dcTime}</div>
+      <div class="text-ink-500 dark:text-ink-400 text-center sm:text-left space-y-1">
+        <div class="text-xs uppercase tracking-wider tabular-nums">{dcTime}</div>
         <div class="text-xs uppercase tracking-wider opacity-75">
           Washington, DC
         </div>
       </div>
 
       <!-- Right side - Last updated + Music player -->
-      <div class="flex flex-col items-center sm:items-end space-y-2">
-        <div class="text-xs text-ink-400 dark:text-ink-500">
+      <div class="flex flex-col items-center sm:items-end space-y-1">
+        <div class="text-xs uppercase tracking-wider text-ink-500 dark:text-ink-400 opacity-75">
           Last updated {new Date(__BUILD_DATE__).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </div>
-      <button
-        type="button"
-        on:click={toggleMusic}
-        on:mouseenter={() => (hoveredMusic = true)}
-        on:mouseleave={() => (hoveredMusic = false)}
-        class="flex items-center space-x-2 text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-cream-300 transition-all duration-300 group"
-      >
-        <span
-          class="transition-transform duration-300 group-hover:scale-110"
-          class:animate-pulse={isPlaying}
+        <button
+          type="button"
+          on:click={toggleMusic}
+          on:mouseenter={() => (hoveredMusic = true)}
+          on:mouseleave={() => (hoveredMusic = false)}
+          class="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-cream-300 transition-all duration-300 group"
         >
-          <Disc3 size={16} class="translate-y-[1px]" isHovered={hoveredMusic} />
-        </span>
-        <span class="text-xs uppercase tracking-wider">let's get groovy</span>
-        <span class="transition-all duration-300">
-          {#if isPlaying}
-            <span in:fade={{ duration: 200 }}>
-              <Volume2 size={16} class="translate-y-[0px]" />
-            </span>
-          {:else}
-            <span in:fade={{ duration: 200 }}>
-              <VolumeOff size={16} class="translate-y-[2px]" />
-            </span>
-          {/if}
-        </span>
-      </button>
+          <span
+            class="inline-flex items-center transition-transform duration-300 group-hover:scale-110"
+            class:animate-pulse={isPlaying}
+          >
+            <Disc3 size={14} isHovered={hoveredMusic} />
+          </span>
+          <span>let's get groovy</span>
+          <span class="inline-flex items-center transition-all duration-300">
+            {#if isPlaying}
+              <span in:fade={{ duration: 200 }} class="inline-flex">
+                <Volume2 size={14} />
+              </span>
+            {:else}
+              <span in:fade={{ duration: 200 }} class="inline-flex">
+                <VolumeOff size={14} />
+              </span>
+            {/if}
+          </span>
+        </button>
       </div>
     </div>
   </div>

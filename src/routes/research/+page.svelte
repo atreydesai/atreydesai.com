@@ -6,7 +6,6 @@
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import { papersData } from "$lib/content";
     import { formatDate } from "$lib/utils/date";
-    import { Blend } from "@jis3r/icons";
 
     let selectedYear: string = "all";
     let selectedTag: string = "all";
@@ -120,6 +119,9 @@
                 new Date(b.appearances[0].date).getTime() -
                 new Date(a.appearances[0].date).getTime(),
         );
+
+    $: talkGroups = groupedTalks.filter((g) => g.type === "research talk");
+    $: presentationGroups = groupedTalks.filter((g) => g.type === "poster");
 </script>
 
 <Seo
@@ -129,58 +131,26 @@
 />
 
 <div class="layout-main py-8 md:py-12">
-    <section class="mb-4">
-        <div class="section-rule mb-4">
-            <h1
-                class="heading-display mb-0 text-3xl text-ink-900 dark:text-cream-100"
-            >
-                research
-            </h1>
-            <div class="section-rule-line"></div>
-        </div>
-
-        <p class="max-w-2xl text-sm leading-6 text-ink-500 dark:text-cream-400">
-            Publications, preprints, class projects, and talks in one place.
-        </p>
+    <section class="mb-6">
+        <h1
+            class="heading-display mb-4 text-3xl text-ink-900 dark:text-cream-100"
+        >
+            research
+        </h1>
     </section>
 
-    <div class="surface-card mb-8 p-4">
-        <div
-            class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-        >
-            <div class="flex items-center gap-3">
-                <div
-                    class="rounded-full bg-accent/10 p-2 text-accent dark:bg-accent/20 dark:text-accent-light"
-                >
-                    <Blend size={16} />
-                </div>
-            </div>
+    <div class="mb-8 flex flex-wrap items-center gap-3">
+        <CustomSelect
+            options={yearOptions}
+            bind:value={selectedYear}
+            placeholder="All Years"
+        />
 
-            <div class="flex flex-wrap items-center gap-3">
-                <CustomSelect
-                    options={yearOptions}
-                    bind:value={selectedYear}
-                    placeholder="All Years"
-                />
-
-                <CustomSelect
-                    options={tagOptions}
-                    bind:value={selectedTag}
-                    placeholder="All Topics"
-                />
-
-                <label
-                    class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-ink-200/70 bg-cream-100/80 px-3 py-2 text-sm text-ink-600 dark:border-ink-700 dark:bg-ink-900/70 dark:text-cream-300"
-                >
-                    <input
-                        type="checkbox"
-                        bind:checked={showPreprints}
-                        class="h-4 w-4 rounded border-ink-300 accent-accent dark:border-ink-600"
-                    />
-                    <span>Show preprints</span>
-                </label>
-            </div>
-        </div>
+        <CustomSelect
+            options={tagOptions}
+            bind:value={selectedTag}
+            placeholder="All Topics"
+        />
     </div>
 
     {#if published.length > 0}
@@ -251,18 +221,16 @@
         </section>
     {/if}
 
-    {#if groupedTalks.length > 0}
+    {#if talkGroups.length > 0}
         <section class="mb-12">
             <div class="section-rule mb-5">
-                <h2 class="section-heading mb-0">talks & presentations</h2>
+                <h2 class="section-heading mb-0">talks</h2>
                 <div class="section-rule-line"></div>
             </div>
 
             <div class="space-y-4">
-                {#each groupedTalks as talkGroup}
-                    <article class="surface-card surface-card-hover border-transparent p-4 md:p-5">
-                        <p class="meta-label mb-2">{talkGroup.type}</p>
-
+                {#each talkGroups as talkGroup}
+                    <article class="surface-card !rounded surface-card-hover border-transparent p-4 md:p-5">
                         <h3
                             class="text-lg font-semibold text-ink-900 dark:text-cream-100"
                         >
@@ -271,11 +239,71 @@
 
                         <div class="mt-3 space-y-2.5">
                             {#each talkGroup.appearances as appearance}
-                                <div
-                                    class="border-l-2 border-ink-200/80 pl-3 text-sm text-ink-600 dark:border-ink-700 dark:text-cream-300"
-                                >
+                                <div class="text-sm text-ink-600 dark:text-cream-300">
                                     <p>
-                                        {appearance.venue} · {formatDate(appearance.date, {
+                                        {appearance.venue}, {formatDate(appearance.date, {
+                                            month: "short",
+                                            year: "numeric",
+                                        })}
+                                    </p>
+
+                                    {#if appearance.slides || appearance.video}
+                                        <div
+                                            class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                                        >
+                                            {#if appearance.slides}
+                                                <a
+                                                    href={appearance.slides}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="link-subtle"
+                                                >
+                                                    Slides
+                                                </a>
+                                            {/if}
+
+                                            {#if appearance.video}
+                                                <a
+                                                    href={appearance.video}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    class="link-subtle"
+                                                >
+                                                    Video
+                                                </a>
+                                            {/if}
+                                        </div>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                    </article>
+                {/each}
+            </div>
+        </section>
+    {/if}
+
+    {#if presentationGroups.length > 0}
+        <section class="mb-12">
+            <div class="section-rule mb-5">
+                <h2 class="section-heading mb-0">presentations</h2>
+                <div class="section-rule-line"></div>
+            </div>
+
+            <div class="space-y-4">
+                {#each presentationGroups as talkGroup}
+                    <article class="surface-card !rounded surface-card-hover border-transparent p-4 md:p-5">
+                        <h3
+                            class="text-lg font-semibold text-ink-900 dark:text-cream-100"
+                        >
+                            {talkGroup.title}
+                        </h3>
+
+                        <div class="mt-3 space-y-2.5">
+                            {#each talkGroup.appearances as appearance}
+                                <div class="text-sm text-ink-600 dark:text-cream-300">
+                                    <p>
+                                        {appearance.venue}, {formatDate(appearance.date, {
                                             month: "short",
                                             year: "numeric",
                                         })}

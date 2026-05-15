@@ -96,7 +96,7 @@
 
         <div class="space-y-4 text-ink-700 dark:text-cream-300">
           {#each homepageData.intro as paragraph}
-            <p class="text-base leading-relaxed max-w-[38rem]">
+            <p class="max-w-[38rem]">
               {@html parseLinks(paragraph)}
             </p>
           {/each}
@@ -211,10 +211,10 @@
       </div>
 
       <div class="space-y-4 text-ink-700 dark:text-cream-300 max-w-[38rem]">
-        <p class="text-base leading-relaxed">
+        <p>
           {@html parseLinks(homepageData.researchInterests.intro)}
         </p>
-        <div class="space-y-3 text-base leading-7">
+        <div class="space-y-3">
           {#each homepageData.researchInterests.items as item}
             <div>
               <p>{@html parseLinks(item.text)}</p>

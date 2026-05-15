@@ -18,10 +18,10 @@ tags:
   - Reasoning
 tldr: While choices-only success is often deemed problematic, reasoning traces reveal that LLMs use less problematic strategies like inferring missing questions, challenging claims that partial-input success is always a flaw. Consequently, reasoning traces could help separate problematic data from less problematic reasoning.
 awards:
-  - Oral Presentation
+  - Oral
 preprint: false
 featured: true
-highlight: true
+highlight: false
 priority: 1
 image: /images/papers/ttr-accuracy.png
 imageAnimated: null

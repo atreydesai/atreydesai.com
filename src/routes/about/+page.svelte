@@ -118,9 +118,7 @@
             <div
                 class="prose prose-lg text-ink-700 dark:text-cream-300 space-y-4"
             >
-                <p class="text-serif text-xl">
-                    <em>professionally speaking...</em>
-                </p>
+                <h2 class="section-heading">professionally speaking...</h2>
 
                 <p>
                     {@html parseLinks(aboutData.professional.intro)}
@@ -143,9 +141,7 @@
 
         <!-- Personal Section -->
         <section class="mb-12">
-            <p class="text-serif text-xl mb-4">
-                <em>personally speaking...</em>
-            </p>
+            <h2 class="section-heading">personally speaking...</h2>
 
             <div
                 class="prose prose-lg text-ink-700 dark:text-cream-300 space-y-4"
@@ -255,9 +251,7 @@
         </section>
 
         <!-- Mobile footnotes (shown at bottom) -->
-        <div
-            class="lg:hidden mt-12 pt-8 border-t border-ink-200 dark:border-ink-700"
-        >
+        <div class="lg:hidden mt-12 pt-8">
             <h3 class="section-heading text-sm">footnotes</h3>
             <div class="space-y-4">
                 {#each aboutData.footnotes as footnote}
@@ -292,7 +286,6 @@
     }
 
     .footnote-item {
-        padding-left: 0.75rem;
-        border-left: 2px solid theme("colors.accent.DEFAULT");
+        padding-left: 0;
     }
 </style>

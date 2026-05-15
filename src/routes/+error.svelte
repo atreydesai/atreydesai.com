@@ -20,9 +20,7 @@
       404
     </h1>
 
-    <h2 class="text-2xl font-medium text-ink-900 dark:text-cream-100">
-      page not found
-    </h2>
+    <h2 class="section-heading">page not found</h2>
 
     <p class="text-ink-600 dark:text-cream-400 max-w-md mx-auto">
       The page you're looking for doesn't exist or has been moved ┻━┻︵ \(°□°)/

@@ -1,26 +1,23 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
     import RatingCircle from "$lib/components/RatingCircle.svelte";
+    import CustomSelect from "$lib/components/CustomSelect.svelte";
     import { booksData } from "$lib/content";
     import { formatDate } from "$lib/utils/date";
     import {
         Star,
         BookOpenText,
         ChevronDown,
-        ExternalLink,
         Search,
-        X,
-        Filter,
-        ArrowUp,
-        ArrowDown,
     } from "lucide-svelte";
-    import { slide, fade } from "svelte/transition";
+    import { ArrowUp, ArrowDown, X, CircleArrowOutUpRight } from "@jis3r/icons";
+    import { fade, slide } from "svelte/transition";
+    import { flip } from "svelte/animate";
 
     // Filter state
     let selectedCategory = "all";
-    let selectedTag: string | null = null;
+    let selectedTag: string = "all";
     let searchQuery = "";
-    let showTagFilter = false;
 
     // Sort state
     let sortField:
@@ -66,6 +63,15 @@
         ]),
     ].sort();
 
+    $: categoryOptions = booksData.categories.map((c) => ({
+        value: c.id,
+        label: c.name,
+    }));
+    $: tagOptions = [
+        { value: "all", label: "All Tags" },
+        ...allTags.map((t) => ({ value: t, label: t })),
+    ];
+
     // Get all unique mediums
     $: allMediums = [
         ...new Set(booksData.books.map((book) => book.medium).filter(Boolean)),
@@ -85,7 +91,7 @@
         }
 
         // Tag filter (checks tags AND subcategories)
-        if (selectedTag) {
+        if (selectedTag && selectedTag !== "all") {
             const hasTag = book.tags && book.tags.includes(selectedTag);
             const hasSubcategory =
                 book.subcategory && book.subcategory.includes(selectedTag);
@@ -131,31 +137,28 @@
 
     function clearFilters() {
         selectedCategory = "all";
-        selectedTag = null;
+        selectedTag = "all";
         searchQuery = "";
     }
 
     function selectTag(tag: string) {
-        selectedTag = selectedTag === tag ? null : tag;
-        showTagFilter = false;
+        selectedTag = selectedTag === tag ? "all" : tag;
     }
 
-    // Helper to get category display color
+    // Helper to get category display color (text/border only — transparent bg)
     function getCategoryColor(category: string): string {
         const colors: Record<string, string> = {
-            science:
-                "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
-            advice: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-            fiction:
-                "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-            nonfiction:
-                "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+            science: "text-sage-dark dark:text-sage-light",
+            advice: "text-ochre-dark dark:text-ochre-light",
+            fiction: "text-wine-dark dark:text-wine-light",
+            nonfiction: "text-steel-dark dark:text-steel-light",
+            "blog post": "text-plum-dark dark:text-plum-light",
         };
-        return (
-            colors[category] ||
-            "bg-cream-200 text-ink-600 dark:bg-ink-700 dark:text-cream-300"
-        );
+        return colors[category] || "text-ink-600 dark:text-cream-300";
     }
+
+    let hoveredSortCol: string | null = null;
+    let hoveredSourceId: string | null = null;
 </script>
 
 <Seo
@@ -170,130 +173,66 @@
             bookshelf
         </h1>
 
-        <p class="text-ink-600 dark:text-cream-400 mb-4">
+        <p class="deck text-ink-600 dark:text-cream-400 mb-4">
             A collection of books, essays, papers, and articles I've found valuable.
         </p>
 
-        <!-- Instructions about TL;DR -->
-        <p class="text-sm text-ink-500 dark:text-ink-400 mb-0 italic">
-            Click on a book to reveal my thoughts.
-        </p>
-    </div>
-    <!-- Category filters -->
-    <div class="flex flex-wrap gap-2 mb-6">
-        {#each booksData.categories as category}
-            <button
-                type="button"
-                class="px-3 py-1.5 text-sm rounded-full transition-all duration-300"
-                class:bg-ink-900={selectedCategory === category.id}
-                class:text-cream-100={selectedCategory === category.id}
-                class:dark:bg-cream-100={selectedCategory === category.id}
-                class:dark:text-ink-900={selectedCategory === category.id}
-                class:bg-cream-200={selectedCategory !== category.id}
-                class:text-ink-700={selectedCategory !== category.id}
-                class:dark:bg-ink-700={selectedCategory !== category.id}
-                class:dark:text-cream-300={selectedCategory !== category.id}
-                class:hover:bg-cream-300={selectedCategory !== category.id}
-                class:dark:hover:bg-ink-600={selectedCategory !== category.id}
-                class:hover:-translate-y-0.5={selectedCategory !== category.id}
-                on:click={() => (selectedCategory = category.id)}
-            >
-                {category.name}
-            </button>
-        {/each}
     </div>
 
-    <!-- Search and Filter Bar -->
-    <div class="flex flex-col sm:flex-row gap-4 mb-6">
+    <!-- Filters bar -->
+    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <!-- Search Input -->
         <div class="relative flex-1">
             <Search
-                size={16}
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+                size={14}
+                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400"
             />
             <input
                 type="text"
                 placeholder="Search reading notes..."
                 bind:value={searchQuery}
-                class="w-full pl-10 pr-10 py-2 text-sm bg-cream-100 dark:bg-ink-800 border border-cream-300 dark:border-ink-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/50 dark:focus:ring-accent-light/50 text-ink-800 dark:text-cream-200 placeholder:text-ink-400"
+                class="w-full pl-8 pr-8 py-1.5 text-[0.78rem] font-medium tracking-[0.01em] bg-transparent border border-ink-200 dark:border-ink-700 rounded text-ink-700 dark:text-cream-300 placeholder:text-ink-400 placeholder:font-normal focus:outline-none focus:border-accent dark:focus:border-accent-light transition-colors duration-300"
             />
             {#if searchQuery}
                 <button
                     type="button"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-cream-300"
+                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-cream-300"
                     on:click={() => { searchQuery = ""; }}
                 >
-                    <X size={14} />
+                    <X size={12} />
                 </button>
             {/if}
         </div>
 
-        <!-- Tag Filter Dropdown -->
-        <div class="relative">
-            <button
-                type="button"
-                class="flex items-center gap-2 px-4 py-2 text-sm bg-cream-100 dark:bg-ink-800 border border-cream-300 dark:border-ink-700 rounded-lg hover:bg-cream-200 dark:hover:bg-ink-700 transition-colors"
-                on:click={() => (showTagFilter = !showTagFilter)}
-            >
-                <Filter size={14} />
-                <span>{selectedTag || "Filter by tag"}</span>
-                <ChevronDown
-                    size={14}
-                    class={`transition-transform ${showTagFilter ? "rotate-180" : ""}`}
-                />
-            </button>
-
-            {#if showTagFilter}
-                <div
-                    class="absolute right-0 mt-2 w-64 max-h-64 overflow-y-auto bg-cream-50 dark:bg-ink-800 border border-cream-300 dark:border-ink-700 rounded-lg shadow-lg z-50"
-                    transition:slide={{ duration: 200 }}
-                >
-                    {#if selectedTag}
-                        <button
-                            type="button"
-                            class="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-cream-100 dark:hover:bg-ink-700"
-                            on:click={() => selectTag(selectedTag || "")}
-                        >
-                            Clear filter
-                        </button>
-                        <hr class="border-cream-200 dark:border-ink-700" />
-                    {/if}
-                    {#each allTags as tag}
-                        <button
-                            type="button"
-                            class="w-full px-4 py-2 text-left text-sm hover:bg-cream-100 dark:hover:bg-ink-700 transition-colors"
-                            class:bg-accent-subtle={selectedTag === tag}
-                            class:text-accent={selectedTag === tag}
-                            on:click={() => selectTag(tag)}
-                        >
-                            {tag}
-                        </button>
-                    {/each}
-                    {#if allTags.length === 0}
-                        <p class="px-4 py-2 text-sm text-ink-400">
-                            No tags available
-                        </p>
-                    {/if}
-                </div>
-            {/if}
+        <div class="flex flex-wrap items-center gap-3">
+            <CustomSelect
+                options={categoryOptions}
+                bind:value={selectedCategory}
+                placeholder="All Categories"
+            />
+            <CustomSelect
+                options={tagOptions}
+                bind:value={selectedTag}
+                placeholder="All Tags"
+            />
         </div>
     </div>
 
     <!-- Active filters indicator -->
-    {#if selectedTag || searchQuery}
+    {#if (selectedTag && selectedTag !== "all") || searchQuery}
         <div
             class="flex items-center gap-2 mb-4"
             transition:fade={{ duration: 150 }}
         >
             <span class="text-sm text-ink-500 dark:text-ink-400">Filters:</span>
-            {#if selectedTag}
+            {#if selectedTag && selectedTag !== "all"}
                 <span
-                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-accent/10 text-accent dark:text-accent-light rounded-full"
+                    class="pill text-accent dark:text-accent-light"
                 >
                     {selectedTag}
                     <button
                         type="button"
-                        on:click={() => (selectedTag = null)}
+                        on:click={() => (selectedTag = "all")}
                         class="hover:text-accent-dark"
                     >
                         <X size={12} />
@@ -302,13 +241,13 @@
             {/if}
             {#if searchQuery}
                 <span
-                    class="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full"
+                    class="pill text-steel-dark dark:text-steel-light"
                 >
                     "{searchQuery}"
                     <button
                         type="button"
                         on:click={() => { searchQuery = ""; }}
-                        class="hover:text-blue-800 dark:hover:text-blue-300"
+                        class="hover:text-steel dark:hover:text-steel-light"
                     >
                         <X size={12} />
                     </button>
@@ -326,79 +265,89 @@
 
     <!-- Table Header (desktop only) -->
     <div
-        class="hidden md:grid grid-cols-12 gap-4 px-2 py-2 text-xs font-medium text-ink-500 dark:text-ink-400 border-b border-ink-200 dark:border-ink-700 mb-2"
+        class="hidden md:grid grid-cols-12 gap-4 py-2 text-xs font-medium text-ink-500 dark:text-ink-400 border-b border-ink-200 dark:border-ink-700 mb-2"
     >
         <button
             on:click={() => handleSort("title")}
+            on:mouseenter={() => (hoveredSortCol = "title")}
+            on:mouseleave={() => (hoveredSortCol = null)}
             class="col-span-6 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
         >
             Title
             {#if sortField === "title"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} />
+                        <ArrowUp size={12} isHovered={hoveredSortCol === "title"} />
                     {:else}
-                        <ArrowDown size={12} />
+                        <ArrowDown size={12} isHovered={hoveredSortCol === "title"} />
                     {/if}
                 </div>
             {/if}
         </button>
         <button
             on:click={() => handleSort("category")}
+            on:mouseenter={() => (hoveredSortCol = "category")}
+            on:mouseleave={() => (hoveredSortCol = null)}
             class="col-span-2 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
         >
             Category
             {#if sortField === "category"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} />
+                        <ArrowUp size={12} isHovered={hoveredSortCol === "category"} />
                     {:else}
-                        <ArrowDown size={12} />
+                        <ArrowDown size={12} isHovered={hoveredSortCol === "category"} />
                     {/if}
                 </div>
             {/if}
         </button>
         <button
             on:click={() => handleSort("medium")}
+            on:mouseenter={() => (hoveredSortCol = "medium")}
+            on:mouseleave={() => (hoveredSortCol = null)}
             class="col-span-2 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
         >
             Medium
             {#if sortField === "medium"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} />
+                        <ArrowUp size={12} isHovered={hoveredSortCol === "medium"} />
                     {:else}
-                        <ArrowDown size={12} />
+                        <ArrowDown size={12} isHovered={hoveredSortCol === "medium"} />
                     {/if}
                 </div>
             {/if}
         </button>
         <button
             on:click={() => handleSort("enjoyment")}
-            class="col-span-1 flex items-center justify-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
+            on:mouseenter={() => (hoveredSortCol = "enjoyment")}
+            on:mouseleave={() => (hoveredSortCol = null)}
+            class="col-span-1 flex items-center justify-center gap-1 text-center hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
         >
             Enjoyment
             {#if sortField === "enjoyment"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} />
+                        <ArrowUp size={12} isHovered={hoveredSortCol === "enjoyment"} />
                     {:else}
-                        <ArrowDown size={12} />
+                        <ArrowDown size={12} isHovered={hoveredSortCol === "enjoyment"} />
                     {/if}
                 </div>
             {/if}
         </button>
         <button
             on:click={() => handleSort("importance")}
-            class="col-span-1 flex items-center justify-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
+            on:mouseenter={() => (hoveredSortCol = "importance")}
+            on:mouseleave={() => (hoveredSortCol = null)}
+            class="col-span-1 flex items-center justify-center gap-1 text-center hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
         >
             Importance
             {#if sortField === "importance"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} />
+                        <ArrowUp size={12} isHovered={hoveredSortCol === "importance"} />
                     {:else}
-                        <ArrowDown size={12} />
+                        <ArrowDown size={12} isHovered={hoveredSortCol === "importance"} />
                     {/if}
                 </div>
             {/if}
@@ -406,9 +355,14 @@
     </div>
 
     <!-- Books list -->
-    <div class="space-y-0 stagger-children">
-        {#each sortedBooks as book (book.id)}
-            <div class="border-b border-ink-100 dark:border-ink-800">
+    <div class="space-y-0">
+        {#each sortedBooks as book, i (book.id)}
+            <div
+                class="border-b border-ink-100 dark:border-ink-800"
+                in:fade|local={{ duration: 220, delay: Math.min(i, 9) * 25 }}
+                out:fade|local={{ duration: 140 }}
+                animate:flip={{ duration: 280 }}
+            >
                 <!-- Clickable header -->
                 <button
                     type="button"
@@ -443,9 +397,9 @@
                         </div>
 
                         <!-- Category -->
-                        <div class="col-span-2">
+                        <div class="col-span-2 pl-1">
                             <span
-                                class="inline-block px-2 py-0.5 text-xs rounded {getCategoryColor(
+                                class="inline-block px-2 py-0.5 text-xs rounded border border-current bg-transparent {getCategoryColor(
                                     book.category,
                                 )}"
                             >
@@ -454,10 +408,10 @@
                         </div>
 
                         <!-- Medium -->
-                        <div class="col-span-2">
+                        <div class="col-span-2 pl-1">
                             {#if book.medium}
                                 <span
-                                    class="text-xs text-ink-500 dark:text-ink-400 bg-cream-200 dark:bg-ink-700 px-2 py-0.5 rounded"
+                                    class="pill !font-normal"
                                 >
                                     {book.medium}
                                 </span>
@@ -528,7 +482,7 @@
                                     </span>
                                     {#if book.medium}
                                         <span
-                                            class="text-xs text-ink-500 dark:text-ink-400 bg-cream-200 dark:bg-ink-700 px-2 py-0.5 rounded"
+                                            class="pill"
                                         >
                                             {book.medium}
                                         </span>
@@ -603,7 +557,7 @@
                                     {#each book.tags as tag}
                                         <button
                                             type="button"
-                                            class="text-xs px-2 py-0.5 bg-cream-200 dark:bg-ink-700 text-ink-600 dark:text-cream-400 rounded hover:bg-cream-300 dark:hover:bg-ink-600 transition-colors"
+                                            class="pill hover:bg-cream-200/40 dark:hover:bg-ink-700/40 transition-colors"
                                             on:click|stopPropagation={() =>
                                                 selectTag(tag)}
                                         >
@@ -620,10 +574,12 @@
                                         href={book.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        class="inline-flex items-center gap-1 text-sm text-accent dark:text-accent-light hover:underline"
+                                        class="inline-flex items-center gap-1.5 text-sm text-accent dark:text-accent-light hover:underline"
                                         on:click|stopPropagation
+                                        on:mouseenter={() => (hoveredSourceId = book.id)}
+                                        on:mouseleave={() => (hoveredSourceId = null)}
                                     >
-                                        <ExternalLink size={14} />
+                                        <CircleArrowOutUpRight size={14} isHovered={hoveredSourceId === book.id} />
                                         View Source
                                     </a>
                                 {/if}
@@ -631,7 +587,7 @@
                                     {#each book.subcategory as sub}
                                         <button
                                             type="button"
-                                            class="pill text-xs px-2 py-0.5 bg-cream-200 dark:bg-ink-700 rounded text-ink-600 dark:text-cream-400 hover:bg-cream-300 dark:hover:bg-ink-600 transition-colors cursor-pointer"
+                                            class="pill hover:bg-cream-200/40 dark:hover:bg-ink-700/40 transition-colors cursor-pointer"
                                             on:click|stopPropagation={() =>
                                                 selectTag(sub)}
                                         >
@@ -659,7 +615,7 @@
     {#if sortedBooks.length === 0}
         <div class="text-center py-12 text-ink-500 dark:text-ink-400">
             <BookOpenText size={48} class="mx-auto mb-4 opacity-50" />
-            {#if searchQuery || selectedTag}
+            {#if searchQuery || (selectedTag && selectedTag !== "all")}
                 <p>No books match your filters.</p>
                 <button
                     type="button"

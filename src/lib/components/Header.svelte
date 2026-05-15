@@ -63,7 +63,7 @@
 </script>
 
 <header
-  class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-cream-100 dark:bg-ink-900"
+  class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-cream-100/70 dark:bg-ink-900/65 backdrop-blur-lg backdrop-saturate-150 supports-[backdrop-filter]:bg-cream-100/55 dark:supports-[backdrop-filter]:bg-ink-900/55"
   class:shadow-sm={scrolled}
   data-sveltekit-preload-code="eager"
 >
@@ -85,9 +85,9 @@
           {@const isRaised = shouldRaise(link.href, currentPath, hoveredLink)}
           <a
             href={link.href}
-            class="nav-link text-sm"
+            class="nav-link text-sm font-medium"
             class:is-raised={isRaised}
-            class:font-medium={isLinkActive}
+            class:font-bold={isLinkActive}
             on:mouseenter={() => (hoveredLink = link.href)}
             on:mouseleave={() => (hoveredLink = null)}
           >

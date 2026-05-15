@@ -29,7 +29,7 @@
         </a>
     </div>
 
-    <p class="text-ink-600 dark:text-cream-400 mb-8">
+    <p class="deck text-ink-600 dark:text-cream-400 mb-8">
         A one-page summary of my experience, skills, and education. For a more
         comprehensive overview, see my <a href="/cv" class="link">CV</a>.
     </p>

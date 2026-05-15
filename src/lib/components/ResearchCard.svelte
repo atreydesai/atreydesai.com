@@ -1,8 +1,9 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
-    import { ExternalLink, FileText, Twitter, Pause } from "lucide-svelte";
-    import { Binary, Award, PenLine, X, Play } from "@jis3r/icons";
+    import { Twitter, Pause } from "lucide-svelte";
+    import { Binary, Award, PenLine, X, Play, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight } from "@jis3r/icons";
+    import FileText from "$lib/components/icons/FileText.svelte";
 
     export let paper: {
         id: string;
@@ -36,14 +37,67 @@
     let isHovered = false;
     let lightboxOpen = false;
     let showAnimated = false;
+    let tldrOpen = false;
+    let authorsExpanded = false;
+    let authorsEl: HTMLElement | null = null;
+    let isAuthorsOverflowing = false;
+    let visibleCharCount = 0;
+
+    function expandAuthors() {
+        if (customCollapse) {
+            visibleCharCount =
+                paper.authors[0].length + 2 + paper.authors[1].length;
+        } else if (authorsEl && authorsEl.scrollWidth > 0) {
+            const ratio = authorsEl.clientWidth / authorsEl.scrollWidth;
+            visibleCharCount = Math.max(0, Math.floor(authorChars.length * ratio) - 2);
+        } else {
+            visibleCharCount = 0;
+        }
+        authorsExpanded = true;
+    }
+
+    $: atreyIdx = paper.authors.findIndex((a) => a.includes("Atrey Desai"));
+    $: customCollapse = atreyIdx > 1;
+    $: collapsedAuthorList = customCollapse
+        ? [
+              paper.authors[0],
+              paper.authors[1],
+              "...",
+              paper.authors[atreyIdx],
+              ...(atreyIdx < paper.authors.length - 1 ? ["..."] : []),
+          ]
+        : paper.authors;
+    $: hasHiddenAuthors = customCollapse || isAuthorsOverflowing;
     let triggerElement: HTMLElement | null = null;
     let dialogElement: HTMLElement | null = null;
+
+    function checkAuthorsOverflow() {
+        if (authorsEl) {
+            isAuthorsOverflowing = authorsEl.scrollWidth > authorsEl.clientWidth + 1;
+        }
+    }
+
+    $: authorChars = (() => {
+        const out: { c: string; bold: boolean }[] = [];
+        paper.authors.forEach((author, idx) => {
+            const bold = author.includes("Atrey Desai");
+            for (const ch of author) out.push({ c: ch, bold });
+            if (idx < paper.authors.length - 1) {
+                out.push({ c: ",", bold: false });
+                out.push({ c: " ", bold: false });
+            }
+        });
+        return out;
+    })();
 
     // Per-link hover states for icon animation triggering
     let hoveredLink: string | null = null;
 
     onMount(() => {
+        checkAuthorsOverflow();
+        window.addEventListener("resize", checkAuthorsOverflow);
         return () => {
+            window.removeEventListener("resize", checkAuthorsOverflow);
             if (typeof document !== "undefined") {
                 document.body.style.overflow = "";
             }
@@ -101,11 +155,12 @@
 
     function formatAuthors(authors: string[]): string {
         return authors
-            .map((author) =>
-                author.includes("Atrey Desai")
+            .map((author) => {
+                if (author === "...") return "…";
+                return author.includes("Atrey Desai")
                     ? `<strong class="text-ink-900 dark:text-cream-100">${author}</strong>`
-                    : author,
-            )
+                    : author;
+            })
             .join(", ");
     }
 
@@ -133,6 +188,7 @@
     );
     $: surfaceClasses = [
         "surface-card",
+        "!rounded",
         "overflow-hidden",
         "p-4",
         "md:p-5",
@@ -176,30 +232,6 @@
             class={`flex flex-col gap-4 ${paper.image ? "md:flex-row md:items-start md:gap-5" : ""}`}
         >
             <div class="min-w-0 flex-1">
-                <div class="mb-2 flex flex-wrap items-center gap-2">
-                    {#if paper.venue}
-                        <span
-                            class="meta-label text-accent dark:text-accent-light"
-                        >
-                            {paper.venue}
-                        </span>
-                    {/if}
-
-                    <span
-                        class="rounded-full bg-cream-200 px-2.5 py-1 text-[0.72rem] font-medium text-ink-600 dark:bg-ink-700 dark:text-cream-300"
-                    >
-                        {paper.year}
-                    </span>
-
-                    {#if paper.preprint}
-                        <span
-                            class="rounded-full bg-accent/10 px-2.5 py-1 text-[0.72rem] font-medium text-accent dark:bg-accent/20 dark:text-accent-light"
-                        >
-                            preprint
-                        </span>
-                    {/if}
-                </div>
-
                 <h3
                     class={`text-balance font-semibold text-ink-900 dark:text-cream-100 ${isPreview ? "text-lg leading-snug" : "text-xl leading-snug"}`}
                 >
@@ -217,18 +249,56 @@
                     {/if}
                 </h3>
 
-                <p
-                    class={`mt-2 leading-relaxed text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
-                >
-                    {@html formatAuthors(paper.authors)}
-                </p>
+                <div class="mt-2 min-w-0">
+                    {#if authorsExpanded && hasHiddenAuthors}
+                        <p
+                            class={`leading-snug text-ink-600 dark:text-cream-300 break-words ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+                        >
+                            {#each authorChars as item, i}
+                                <span
+                                    class="{i < visibleCharCount ? '' : 'char-reveal'} {item.bold ? 'font-semibold text-ink-900 dark:text-cream-100' : ''}"
+                                    style="animation-delay: {(i - visibleCharCount) * 8}ms"
+                                >{item.c === " " ? " " : item.c}</span>
+                            {/each}
+                        </p>
+                    {:else if hasHiddenAuthors}
+                        <button
+                            type="button"
+                            on:click={expandAuthors}
+                            class="block w-full overflow-hidden text-left"
+                            aria-expanded={authorsExpanded}
+                        >
+                            <p
+                                bind:this={authorsEl}
+                                class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+                            >
+                                {@html formatAuthors(collapsedAuthorList)}
+                            </p>
+                        </button>
+                    {:else}
+                        <p
+                            bind:this={authorsEl}
+                            class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+                        >
+                            {@html formatAuthors(paper.authors)}
+                        </p>
+                    {/if}
+                </div>
 
-                {#if paper.awards.length > 0}
-                    <div class="mt-3 flex flex-wrap gap-2">
+                {#if paper.venue || paper.awards.length > 0 || paper.preprint}
+                    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        {#if paper.venue}
+                            <span class="font-serif italic text-ink-500 dark:text-cream-400 {isPreview ? 'text-sm' : 'text-[0.95rem]'}">
+                                {paper.venue}{paper.year ? `, ${paper.year}` : ""}
+                            </span>
+                        {/if}
+                        {#if paper.preprint}
+                            <span class="pill text-accent dark:text-accent-light">preprint</span>
+                        {/if}
                         {#each paper.awards as award, i}
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <span
-                                class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[0.72rem] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                class="pill text-ochre-dark dark:text-ochre-light"
                                 on:mouseenter={() => (hoveredLink = `award-${i}`)}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
@@ -239,30 +309,27 @@
                     </div>
                 {/if}
 
-                {#if paper.tldr}
-                    <p
-                        class={`mt-3 text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm leading-6" : "text-[0.95rem] leading-6"}`}
-                    >
-                        {paper.tldr}
-                    </p>
-                {/if}
-
-                {#if !isPreview && paper.tags.length > 0}
-                    <div class="mt-4 flex flex-wrap gap-2">
-                        {#each paper.tags as tag}
-                            <span
-                                class="rounded-full bg-cream-200/80 px-2.5 py-1 text-[0.72rem] font-medium text-ink-500 dark:bg-ink-700 dark:text-cream-400"
-                            >
-                                {tag}
-                            </span>
-                        {/each}
-                    </div>
-                {/if}
-
-                {#if hasLinks}
+                {#if hasLinks || paper.tldr}
                     <div
-                        class={`mt-4 flex flex-wrap gap-x-4 gap-y-2 ${isPreview ? "text-xs" : "text-sm"}`}
+                        class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs"
                     >
+                        {#if paper.tldr}
+                            <button
+                                type="button"
+                                on:click={() => (tldrOpen = !tldrOpen)}
+                                on:mouseenter={() => (hoveredLink = 'tldr')}
+                                on:mouseleave={() => (hoveredLink = null)}
+                                class="link-subtle inline-flex items-center gap-1.5"
+                                aria-expanded={tldrOpen}
+                            >
+                                {#if tldrOpen}
+                                    <ChevronsDownUp size={14} isHovered={hoveredLink === 'tldr'} />
+                                {:else}
+                                    <ChevronsUpDown size={14} isHovered={hoveredLink === 'tldr'} />
+                                {/if}
+                                tldr
+                            </button>
+                        {/if}
                         {#if paper.arxiv}
                             <a
                                 href={paper.arxiv}
@@ -272,8 +339,8 @@
                                 on:mouseenter={() => (hoveredLink = 'arxiv')}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <ExternalLink size={14} />
-                                arXiv
+                                <CircleArrowOutUpRight size={14} isHovered={hoveredLink === 'arxiv'} />
+                                arxiv
                             </a>
                         {/if}
 
@@ -286,8 +353,8 @@
                                 on:mouseenter={() => (hoveredLink = 'pdf')}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <FileText size={14} />
-                                PDF
+                                <FileText size={14} animate={hoveredLink === 'pdf'} />
+                                pdf
                             </a>
                         {/if}
 
@@ -301,7 +368,7 @@
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
                                 <Binary size={14} isHovered={hoveredLink === 'code'} />
-                                Code
+                                code
                             </a>
                         {/if}
 
@@ -311,9 +378,11 @@
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 class="link-subtle inline-flex items-center gap-1.5"
+                                on:mouseenter={() => (hoveredLink = 'demo')}
+                                on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <ExternalLink size={14} />
-                                Demo
+                                <CircleArrowOutUpRight size={14} isHovered={hoveredLink === 'demo'} />
+                                demo
                             </a>
                         {/if}
 
@@ -327,7 +396,7 @@
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
                                 <Twitter size={14} />
-                                Twitter
+                                twitter
                             </a>
                         {/if}
 
@@ -341,23 +410,39 @@
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
                                 <PenLine size={14} isHovered={hoveredLink === 'blog'} />
-                                Blog
+                                blog
                             </a>
                         {/if}
+                    </div>
+                {/if}
+
+                {#if paper.tldr && tldrOpen}
+                    <p
+                        class={`mt-2 text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm leading-6" : "text-[0.95rem] leading-6"}`}
+                    >
+                        {paper.tldr}
+                    </p>
+                {/if}
+
+                {#if !isPreview && paper.tags.length > 0}
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        {#each paper.tags as tag}
+                            <span class="pill">{tag}</span>
+                        {/each}
                     </div>
                 {/if}
             </div>
 
             {#if paper.image}
                 <div
-                    class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-36" : "md:w-44"}`}
+                    class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-24" : "md:w-32"}`}
                 >
                     <button
                         type="button"
                         on:click={(e) => openLightbox(e.currentTarget)}
                         on:mouseenter={() => (isHovered = true)}
                         on:mouseleave={() => (isHovered = false)}
-                        class={`relative block aspect-[4/3] w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
+                        class={`relative block aspect-square w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
                         aria-label={`Open image for ${paper.title}`}
                     >
                         <picture>
@@ -498,3 +583,15 @@
         </div>
     </div>
 {/if}
+
+<style>
+    .char-reveal {
+        display: inline;
+        opacity: 0;
+        animation: charReveal 110ms ease-out forwards;
+    }
+    @keyframes charReveal {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+</style>

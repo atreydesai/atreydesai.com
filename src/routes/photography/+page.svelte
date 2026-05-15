@@ -88,9 +88,11 @@
 />
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">
-    <div class="mb-8">
-        <div class="flex items-center justify-between mb-4">
-            <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
+    <section class="mb-8">
+        <div class="flex items-baseline justify-between mb-4 gap-4">
+            <h1
+                class="heading-display mb-0 text-3xl text-ink-900 dark:text-cream-100"
+            >
                 photography
             </h1>
             <a
@@ -103,12 +105,7 @@
                 <span>@framedbyatrey</span>
             </a>
         </div>
-
-        <p class="text-ink-600 dark:text-cream-400">
-            Photography from over the years, semi-randomized. Selected work is also
-            on my Instagram.
-        </p>
-    </div>
+    </section>
     <!-- Masonry-style Grid - supports items spanning 2 columns -->
     {#if photos.length > 0}
         <div
@@ -153,7 +150,7 @@
             <p class="mb-4">No photos yet.</p>
             <p class="text-sm">
                 Add photos to <code
-                    class="bg-cream-200 dark:bg-ink-700 px-2 py-1 rounded"
+                    class="border border-ink-300 dark:border-ink-600 px-2 py-1 rounded"
                     >static/images/photography/</code
                 >
             </p>

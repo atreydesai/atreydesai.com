@@ -1,6 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
+    import { fly } from "svelte/transition";
+    import { cubicOut } from "svelte/easing";
     import { ChevronDown } from "@jis3r/icons";
 
     export let options: Array<{ value: string; label: string }>;
@@ -53,15 +55,20 @@
     </button>
 
     {#if isOpen}
-        <div class="select-dropdown" role="listbox">
-            {#each options as option}
+        <div
+            class="select-dropdown"
+            role="listbox"
+            out:fly={{ y: -6, duration: 140, easing: cubicOut }}
+        >
+            {#each options as option, i}
                 <button
                     type="button"
-                    class="select-option"
+                    class="select-option cascade-in"
                     class:selected={option.value === value}
                     on:click={() => select(option.value)}
                     role="option"
                     aria-selected={option.value === value}
+                    style="--cascade-delay: {i * 55}ms"
                 >
                     {option.label}
                 </button>
@@ -77,39 +84,54 @@
     }
 
     .select-trigger {
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        padding: 0.375rem 0.75rem;
-        font-size: 0.875rem;
-        background-color: theme("colors.cream.100");
+        padding: 0.3rem 0.65rem;
+        font-family: "neue-haas-grotesk-text", sans-serif;
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        background-color: transparent;
         border: 1px solid theme("colors.ink.200");
-        border-radius: 0.5rem;
-        color: theme("colors.ink.700");
+        border-radius: 0.25rem;
+        color: theme("colors.ink.600");
         cursor: pointer;
-        transition: all 0.2s ease;
-        min-width: 120px;
+        transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        min-width: 140px;
         justify-content: space-between;
     }
 
     :global(.dark) .select-trigger {
-        background-color: theme("colors.ink.700");
-        border-color: theme("colors.ink.600");
-        color: theme("colors.cream.300");
+        border-color: theme("colors.ink.700");
+        color: theme("colors.cream.400");
     }
 
     .select-trigger:hover {
-        border-color: theme("colors.accent.DEFAULT");
+        border-color: theme("colors.ink.400");
+        color: theme("colors.ink.900");
+    }
+
+    :global(.dark) .select-trigger:hover {
+        border-color: theme("colors.ink.500");
+        color: theme("colors.cream.100");
     }
 
     .select-trigger.open {
         border-color: theme("colors.accent.DEFAULT");
-        box-shadow: 0 0 0 2px theme("colors.accent.DEFAULT" / 20%);
+        color: theme("colors.accent.DEFAULT");
+    }
+
+    :global(.dark) .select-trigger.open {
+        color: theme("colors.accent.light");
     }
 
     .select-chevron {
-        transition: transform 0.2s ease;
-        opacity: 0.6;
+        display: inline-flex;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        opacity: 0.7;
     }
 
     .select-chevron.rotate {
@@ -118,30 +140,43 @@
 
     .select-dropdown {
         position: absolute;
-        top: calc(100% + 4px);
+        top: calc(100% + 6px);
         left: 0;
-        right: 0;
-        background-color: theme("colors.cream.100");
+        min-width: 100%;
+        background-color: theme("colors.cream.50");
         border: 1px solid theme("colors.ink.200");
-        border-radius: 0.5rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-radius: 0.25rem;
+        box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
         z-index: 50;
-        overflow: hidden;
-        animation: dropdown-enter 0.15s ease-out;
+        max-height: 19rem;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
     }
 
     :global(.dark) .select-dropdown {
-        background-color: theme("colors.ink.700");
-        border-color: theme("colors.ink.600");
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        background-color: theme("colors.ink.800");
+        border-color: theme("colors.ink.700");
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
     }
 
-    @keyframes dropdown-enter {
-        from {
-            opacity: 0;
-            transform: translateY(-4px);
-        }
+    .select-option.cascade-in {
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        opacity: 0;
+        transform: translateY(-6px);
+        overflow: hidden;
+        animation: select-cascade 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation-delay: var(--cascade-delay, 0ms);
+    }
+
+    @keyframes select-cascade {
         to {
+            max-height: 3rem;
+            padding-top: 0.45rem;
+            padding-bottom: 0.45rem;
             opacity: 1;
             transform: translateY(0);
         }
@@ -150,37 +185,46 @@
     .select-option {
         display: block;
         width: 100%;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.875rem;
+        padding: 0.45rem 0.75rem;
+        font-family: "neue-haas-grotesk-text", sans-serif;
+        font-size: 0.82rem;
+        font-weight: 400;
         text-align: left;
-        color: theme("colors.ink.600");
+        color: theme("colors.ink.700");
         background: none;
         border: none;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                    color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        white-space: nowrap;
     }
 
     :global(.dark) .select-option {
-        color: theme("colors.cream.400");
+        color: theme("colors.cream.300");
     }
 
     .select-option:hover {
-        background-color: theme("colors.cream.200");
+        background-color: theme("colors.blush.100");
         color: theme("colors.ink.900");
     }
 
     :global(.dark) .select-option:hover {
-        background-color: theme("colors.ink.600");
+        background-color: theme("colors.ink.700");
         color: theme("colors.cream.100");
     }
 
     .select-option.selected {
-        background-color: theme("colors.accent.DEFAULT" / 10%);
-        color: theme("colors.accent.DEFAULT");
+        color: theme("colors.accent.dark");
+        font-weight: 500;
     }
 
     :global(.dark) .select-option.selected {
-        background-color: theme("colors.accent.DEFAULT" / 20%);
         color: theme("colors.accent.light");
+    }
+
+    .select-option.selected::before {
+        content: "·";
+        margin-right: 0.4rem;
+        color: theme("colors.accent.DEFAULT");
     }
 </style>

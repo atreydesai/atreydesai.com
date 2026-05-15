@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
-    import { Sun, CloudMoon } from "@jis3r/icons";
+    import { Sun } from "@jis3r/icons";
 
     let isDark = false;
 
@@ -31,12 +31,8 @@
 <button
     type="button"
     on:click={toggleTheme}
-    class="p-2 rounded-lg text-ink-600 dark:text-cream-300 hover:bg-cream-200 dark:hover:bg-ink-700 transition-colors"
+    class="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 dark:text-cream-300 hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
     aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
 >
-    {#if isDark}
-        <Sun size={18} />
-    {:else}
-        <CloudMoon size={18} />
-    {/if}
+    <Sun size={16} />
 </button>

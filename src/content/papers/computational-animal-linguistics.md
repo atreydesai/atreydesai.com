@@ -19,7 +19,7 @@ twitter: null
 blog: null
 tags:
   - NLP
-  - Animal Communication
+  - Linguistics
 tldr: null
 awards: []
 preprint: true

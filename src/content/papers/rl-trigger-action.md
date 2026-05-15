@@ -16,8 +16,8 @@ demo: null
 twitter: null
 blog: null
 tags:
-  - Reinforcement Learning
-  - Human-AI Interaction
+  - RL
+  - HCI
 tldr: null
 awards: []
 preprint: false

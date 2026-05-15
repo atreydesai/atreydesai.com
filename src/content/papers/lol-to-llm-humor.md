@@ -16,7 +16,6 @@ twitter: null
 blog: null
 tags:
   - NLP
-  - Humor
   - Multilingual
 tldr: "We introduce a multilingual benchmark to evaluate how Large Language Models (LLMs) understand multi-turn humor in English and Spanish through joke classification and line-purpose identification tasks. We find that while larger open-source models (32B) significantly outperform smaller ones, all models struggle with nuanced humor comprehension and are highly sensitive to adversarial perturbations and cross-cultural linguistic differences."
 awards: []

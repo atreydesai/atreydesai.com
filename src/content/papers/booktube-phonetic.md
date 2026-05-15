@@ -13,7 +13,6 @@ twitter: null
 blog: null
 tags:
   - Linguistics
-  - Phonetics
 tldr: "We analyze how YouTube \"BookTube\" creators adapt their phonetic features over time, finding that they significantly reduce vocal fry and increase pitch range as they gain experience. These changes correlate with higher audience engagement, suggesting that long-form content creators professionalize their speech to signal competence and credibility."
 awards: []
 preprint: false

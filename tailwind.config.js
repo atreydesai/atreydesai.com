@@ -44,18 +44,44 @@ export default {
           800: "#383838",
           900: "#1A1A1A",
         },
-        // Adobe-ish accent for links
+        // Bright orange — primary accent (keep)
         accent: {
           DEFAULT: "#E85D4C",
           light: "#F07563",
           dark: "#C94B3D",
           muted: "#D4847A",
         },
+        // Earth-tone label palette — cohesive with orange + cream
+        sage: {
+          DEFAULT: "#3D7A55",
+          light: "#7BAE8C",
+          dark: "#1F5234",
+        },
+        ochre: {
+          DEFAULT: "#A87014",
+          light: "#DBA84D",
+          dark: "#704A05",
+        },
+        wine: {
+          DEFAULT: "#8A3251",
+          light: "#B96481",
+          dark: "#5E1F37",
+        },
+        steel: {
+          DEFAULT: "#3A6A91",
+          light: "#779BBE",
+          dark: "#1F4567",
+        },
+        plum: {
+          DEFAULT: "#6F4476",
+          light: "#A07CA8",
+          dark: "#4A2A50",
+        },
         // Purple-gray for code blocks & secondary surfaces (future use)
         mist: {
           50: "#F5F5F7",
           100: "#EDEDF0",
-          200: "#E7E7EB",  // Main - Murasakisuishiyou (Purple Water)
+          200: "#E7E7EB",
           300: "#DCDCE2",
           400: "#C5C5CD",
         },
@@ -63,7 +89,7 @@ export default {
       fontFamily: {
         display: ['"neue-haas-grotesk-display"', ...defaultTheme.fontFamily.sans],
         text: ['"neue-haas-grotesk-text"', ...defaultTheme.fontFamily.sans],
-        serif: ['"Source Serif 4"', ...defaultTheme.fontFamily.serif],
+        serif: ['"Source Serif 4"', '"source-serif-fallback"', ...defaultTheme.fontFamily.serif],
       },
       spacing: {
         // 1:3:1 layout ratio helpers
