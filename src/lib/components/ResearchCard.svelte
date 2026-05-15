@@ -90,6 +90,27 @@
         return out;
     })();
 
+    $: authorGroups = (() => {
+        const groups: { kind: "name" | "sep"; chars: { c: string; bold: boolean; i: number }[] }[] = [];
+        let i = 0;
+        paper.authors.forEach((author, idx) => {
+            const bold = author.includes("Atrey Desai");
+            const chars: { c: string; bold: boolean; i: number }[] = [];
+            for (const ch of author) chars.push({ c: ch, bold, i: i++ });
+            groups.push({ kind: "name", chars });
+            if (idx < paper.authors.length - 1) {
+                groups.push({
+                    kind: "sep",
+                    chars: [
+                        { c: ",", bold: false, i: i++ },
+                        { c: " ", bold: false, i: i++ },
+                    ],
+                });
+            }
+        });
+        return groups;
+    })();
+
     // Per-link hover states for icon animation triggering
     let hoveredLink: string | null = null;
 
@@ -252,13 +273,26 @@
                 <div class="mt-2 min-w-0">
                     {#if authorsExpanded && hasHiddenAuthors}
                         <p
-                            class={`leading-snug text-ink-600 dark:text-cream-300 break-words ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+                            class={`leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
                         >
-                            {#each authorChars as item, i}
-                                <span
-                                    class="{i < visibleCharCount ? '' : 'char-reveal'} {item.bold ? 'font-semibold text-ink-900 dark:text-cream-100' : ''}"
-                                    style="animation-delay: {(i - visibleCharCount) * 8}ms"
-                                >{item.c === " " ? " " : item.c}</span>
+                            {#each authorGroups as group}
+                                {#if group.kind === "name"}
+                                    <span class="inline-block whitespace-nowrap align-baseline">
+                                        {#each group.chars as item}
+                                            <span
+                                                class="{item.i < visibleCharCount ? '' : 'char-reveal'} {item.bold ? 'font-semibold text-ink-900 dark:text-cream-100' : ''}"
+                                                style="animation-delay: {(item.i - visibleCharCount) * 8}ms"
+                                            >{item.c}</span>
+                                        {/each}
+                                    </span>
+                                {:else}
+                                    {#each group.chars as item}
+                                        <span
+                                            class={item.i < visibleCharCount ? '' : 'char-reveal'}
+                                            style="animation-delay: {(item.i - visibleCharCount) * 8}ms"
+                                        >{item.c === " " ? " " : item.c}</span>
+                                    {/each}
+                                {/if}
                             {/each}
                         </p>
                     {:else if hasHiddenAuthors}
