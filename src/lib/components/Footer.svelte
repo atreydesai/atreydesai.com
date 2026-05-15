@@ -88,7 +88,7 @@
             class="inline-flex items-center transition-transform duration-300 group-hover:scale-110"
             class:animate-pulse={isPlaying}
           >
-            <Disc3 size={14} isHovered={hoveredMusic} />
+            <Disc3 size={14} animate={hoveredMusic} />
           </span>
           <span>let's get groovy</span>
           <span class="inline-flex items-center transition-all duration-300">

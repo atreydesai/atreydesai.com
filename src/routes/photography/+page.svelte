@@ -204,6 +204,7 @@
 
         <!-- Photo container -->
         <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
             class="max-w-5xl max-h-[85vh] flex flex-col items-center px-4"
             on:click|stopPropagation={() => {}}

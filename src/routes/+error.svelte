@@ -36,7 +36,7 @@
         on:mouseenter={() => (hoveredHome = true)}
         on:mouseleave={() => (hoveredHome = false)}
       >
-        <House size={16} isHovered={hoveredHome} />
+        <House size={16} animate={hoveredHome} />
         Back to Home
       </a>
 
@@ -47,7 +47,7 @@
         on:mouseenter={() => (hoveredBack = true)}
         on:mouseleave={() => (hoveredBack = false)}
       >
-        <ArrowLeft size={16} isHovered={hoveredBack} />
+        <ArrowLeft size={16} animate={hoveredBack} />
         Go Back
       </button>
     </div>

@@ -302,7 +302,7 @@
                                 on:mouseenter={() => (hoveredLink = `award-${i}`)}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <Award size={12} isHovered={hoveredLink === `award-${i}`} />
+                                <Award size={12} animate={hoveredLink === `award-${i}`} />
                                 {award}
                             </span>
                         {/each}
@@ -323,9 +323,9 @@
                                 aria-expanded={tldrOpen}
                             >
                                 {#if tldrOpen}
-                                    <ChevronsDownUp size={14} isHovered={hoveredLink === 'tldr'} />
+                                    <ChevronsDownUp size={14} animate={hoveredLink === 'tldr'} />
                                 {:else}
-                                    <ChevronsUpDown size={14} isHovered={hoveredLink === 'tldr'} />
+                                    <ChevronsUpDown size={14} animate={hoveredLink === 'tldr'} />
                                 {/if}
                                 tldr
                             </button>
@@ -339,7 +339,7 @@
                                 on:mouseenter={() => (hoveredLink = 'arxiv')}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <CircleArrowOutUpRight size={14} isHovered={hoveredLink === 'arxiv'} />
+                                <CircleArrowOutUpRight size={14} animate={hoveredLink === 'arxiv'} />
                                 arxiv
                             </a>
                         {/if}
@@ -367,7 +367,7 @@
                                 on:mouseenter={() => (hoveredLink = 'code')}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <Binary size={14} isHovered={hoveredLink === 'code'} />
+                                <Binary size={14} animate={hoveredLink === 'code'} />
                                 code
                             </a>
                         {/if}
@@ -381,7 +381,7 @@
                                 on:mouseenter={() => (hoveredLink = 'demo')}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <CircleArrowOutUpRight size={14} isHovered={hoveredLink === 'demo'} />
+                                <CircleArrowOutUpRight size={14} animate={hoveredLink === 'demo'} />
                                 demo
                             </a>
                         {/if}
@@ -409,7 +409,7 @@
                                 on:mouseenter={() => (hoveredLink = 'blog')}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
-                                <PenLine size={14} isHovered={hoveredLink === 'blog'} />
+                                <PenLine size={14} animate={hoveredLink === 'blog'} />
                                 blog
                             </a>
                         {/if}

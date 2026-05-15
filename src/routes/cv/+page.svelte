@@ -27,7 +27,7 @@
             on:mouseenter={() => (hoveredDownload = true)}
             on:mouseleave={() => (hoveredDownload = false)}
         >
-            <Download size={16} isHovered={hoveredDownload} />
+            <Download size={16} animate={hoveredDownload} />
             Download PDF
         </a>
     </div>

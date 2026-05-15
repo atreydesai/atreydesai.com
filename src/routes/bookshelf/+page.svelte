@@ -277,9 +277,9 @@
             {#if sortField === "title"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} isHovered={hoveredSortCol === "title"} />
+                        <ArrowUp size={12} animate={hoveredSortCol === "title"} />
                     {:else}
-                        <ArrowDown size={12} isHovered={hoveredSortCol === "title"} />
+                        <ArrowDown size={12} animate={hoveredSortCol === "title"} />
                     {/if}
                 </div>
             {/if}
@@ -294,9 +294,9 @@
             {#if sortField === "category"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} isHovered={hoveredSortCol === "category"} />
+                        <ArrowUp size={12} animate={hoveredSortCol === "category"} />
                     {:else}
-                        <ArrowDown size={12} isHovered={hoveredSortCol === "category"} />
+                        <ArrowDown size={12} animate={hoveredSortCol === "category"} />
                     {/if}
                 </div>
             {/if}
@@ -311,9 +311,9 @@
             {#if sortField === "medium"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} isHovered={hoveredSortCol === "medium"} />
+                        <ArrowUp size={12} animate={hoveredSortCol === "medium"} />
                     {:else}
-                        <ArrowDown size={12} isHovered={hoveredSortCol === "medium"} />
+                        <ArrowDown size={12} animate={hoveredSortCol === "medium"} />
                     {/if}
                 </div>
             {/if}
@@ -328,9 +328,9 @@
             {#if sortField === "enjoyment"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} isHovered={hoveredSortCol === "enjoyment"} />
+                        <ArrowUp size={12} animate={hoveredSortCol === "enjoyment"} />
                     {:else}
-                        <ArrowDown size={12} isHovered={hoveredSortCol === "enjoyment"} />
+                        <ArrowDown size={12} animate={hoveredSortCol === "enjoyment"} />
                     {/if}
                 </div>
             {/if}
@@ -345,9 +345,9 @@
             {#if sortField === "importance"}
                 <div in:fade={{ duration: 200 }}>
                     {#if sortDirection === "asc"}
-                        <ArrowUp size={12} isHovered={hoveredSortCol === "importance"} />
+                        <ArrowUp size={12} animate={hoveredSortCol === "importance"} />
                     {:else}
-                        <ArrowDown size={12} isHovered={hoveredSortCol === "importance"} />
+                        <ArrowDown size={12} animate={hoveredSortCol === "importance"} />
                     {/if}
                 </div>
             {/if}
@@ -579,7 +579,7 @@
                                         on:mouseenter={() => (hoveredSourceId = book.id)}
                                         on:mouseleave={() => (hoveredSourceId = null)}
                                     >
-                                        <CircleArrowOutUpRight size={14} isHovered={hoveredSourceId === book.id} />
+                                        <CircleArrowOutUpRight size={14} animate={hoveredSourceId === book.id} />
                                         View Source
                                     </a>
                                 {/if}

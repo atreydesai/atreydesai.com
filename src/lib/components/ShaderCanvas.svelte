@@ -8,7 +8,7 @@
   export let showFps: boolean = true;
 
   let canvas: HTMLCanvasElement;
-  let container: HTMLDivElement;
+  let container: HTMLElement;
   let raf: number;
   let gl: WebGLRenderingContext | null = null;
   let cleanup: (() => void) | null = null;
