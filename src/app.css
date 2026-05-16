@@ -33,7 +33,8 @@
   body {
     @apply bg-cream-100 text-ink-700;
     font-family: "neue-haas-grotesk-text", "neue-haas-grotesk-fallback", sans-serif;
-    line-height: 1.5;
+    font-size: 1.0625rem;
+    line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -109,29 +110,26 @@
   }
 
   .layout-main {
-    @apply max-w-[700px] mx-auto px-4 sm:px-6;
+    @apply max-w-[820px] mx-auto px-4 sm:px-6;
   }
 
   /* Links - Adobe-ish accent color */
   .link {
-    @apply text-accent-dark decoration-accent-dark/60 underline underline-offset-[3px];
+    @apply decoration-accent underline underline-offset-[3px];
     @apply transition-all duration-300 ease-out;
     @apply rounded-sm px-0.5 -mx-0.5;
   }
 
   .link:hover {
-    @apply text-accent-dark decoration-accent-dark;
-    @apply bg-cream-300/60;
-    transform: translateY(-1px);
+    @apply decoration-accent-light;
   }
 
   .dark .link {
-    @apply text-accent-light decoration-accent-light/50;
+    @apply decoration-accent-light/50;
   }
 
   .dark .link:hover {
-    @apply text-accent-light decoration-accent-light;
-    @apply bg-ink-700/60;
+    @apply decoration-accent-light;
   }
 
   .link-subtle {

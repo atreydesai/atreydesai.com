@@ -96,7 +96,7 @@
 
         <div class="space-y-4 text-ink-700 dark:text-cream-300">
           {#each homepageData.intro as paragraph}
-            <p class="max-w-[38rem]">
+            <p>
               {@html parseLinks(paragraph)}
             </p>
           {/each}
@@ -210,7 +210,7 @@
         <div class="section-rule-line"></div>
       </div>
 
-      <div class="space-y-4 text-ink-700 dark:text-cream-300 max-w-[38rem]">
+      <div class="space-y-4 text-ink-700 dark:text-cream-300">
         <p>
           {@html parseLinks(homepageData.researchInterests.intro)}
         </p>
