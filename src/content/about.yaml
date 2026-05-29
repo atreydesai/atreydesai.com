@@ -14,6 +14,9 @@ footnotes:
     content: "A relic of high school newspaper and my wonderful journalism teacher, Mr. Tyler. I had also been an editor for STYLUS, Maryland's literary arts and photography magazine my freshman year."
   - id: 6
     content: "This had started out as a fun thing with my roommate, but we both discovered we were really good at predictions. It became a nightly tradition to come back to the apartment and talk about the progress of our trades for the day (much to the chagrin of our friends)."
+  - id: 7
+    # Fallback only — the about page replaces this with live data from /api/now.
+    content: "I run a monthly AI model releases market on Manifold."
     
 
 # Professional section - your academic/research bio
@@ -37,7 +40,7 @@ personal:
   descriptions:
     - "I would describe myself as curious, bubbly, and passionate. I love exploring new ideas and enjoy working at the boundary between disciplines, especially when they reveal unexpected connections. Naturally, this led me to NLP, where I found computer science meets reading and journalism, my favorite pastimes growing up."
     - "On the day to day, you'll probably find me at the lab, or at the gym, or at [a boba shop](https://share.google/uG66fHdt79TEs0HtE), or wandering about aimlessly looking through my camera viewfinder!"
-  interests: "photography, reading[^4], graphic design[^5], learning languages, punching the air, music (especially indie pop, edm, and baroque classical), [manifold](https://manifold.markets)[^6], and cultures of the world"
+  interests: "photography, reading[^4], graphic design[^5], learning languages, punching the air, music (especially indie pop, edm, and baroque classical), [manifold](https://manifold.markets)[^6][^7], and cultures of the world"
   blogs: []
 
 # Location section  

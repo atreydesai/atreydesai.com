@@ -9,8 +9,71 @@
     let visibleFootnotes: Set<number> = new Set();
     let observer: IntersectionObserver | null = null;
 
+    // Live "now" data (Manifold + Goodreads) from the /api/now endpoint.
+    interface ReadingBook {
+        title: string;
+        author: string | null;
+        url: string | null;
+    }
+    interface Manifold {
+        netWorth: number;
+        rank: number | null;
+        market: { question: string; url: string } | null;
+        profileUrl: string;
+    }
+    let manifoldNow: Manifold | null = null;
+    let readingNow: ReadingBook[] | null = null;
+
+    // 302847 -> "Ṁ303k", 840 -> "Ṁ840"
+    function mana(n: number): string {
+        const a = Math.abs(Math.round(n));
+        return a >= 1000 ? `Ṁ${Math.round(a / 1000)}k` : `Ṁ${a}`;
+    }
+    function escapeHtml(s: string): string {
+        return s
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    async function loadNow() {
+        try {
+            const res = await fetch("/api/now");
+            if (res.ok) {
+                const data = await res.json();
+                manifoldNow = data.manifold ?? null;
+                readingNow = data.reading ?? null;
+            }
+        } catch {
+            // Network/API hiccup — footnote 7 keeps its static fallback and
+            // the "currently reading" line simply doesn't render.
+        }
+    }
+
+    // Footnote 7's HTML: live Manifold standing when available, else the
+    // static YAML fallback. Built as a string so both footnote render sites
+    // (sidebar + mobile) can share it via {@html}.
+    $: fn7Html = (() => {
+        const m = manifoldNow;
+        if (!m) {
+            const f = aboutData.footnotes.find((x) => x.id === 7);
+            return f ? escapeHtml(f.content) : "";
+        }
+        const market = m.market
+            ? `<a href="${escapeHtml(m.market.url)}" target="_blank" rel="noopener noreferrer" class="link">${escapeHtml(m.market.question)}</a>`
+            : "AI model releases";
+        const standing =
+            m.rank != null
+                ? `currently <span class="fn-stat">#${m.rank}</span> in the world with a <span class="fn-stat">${mana(m.netWorth)}</span> net worth`
+                : `a <span class="fn-stat">${mana(m.netWorth)}</span> net worth`;
+        return `I run a monthly ${market} market on Manifold — ${standing}.`;
+    })();
+
     onMount(() => {
         if (!browser) return;
+
+        loadNow();
 
         // Small delay to ensure all dynamic content is rendered (including from parseLinks)
         setTimeout(() => {
@@ -82,24 +145,21 @@
     <aside
         class="hidden xl:block fixed right-8 top-24 w-56 z-10"
     >
-        <div class="space-y-4">
-            {#each aboutData.footnotes as footnote}
+        <div>
+            {#each aboutData.footnotes as footnote (footnote.id)}
                 <div
-                    class="footnote-item text-xs text-ink-500 dark:text-ink-400 leading-relaxed transition-all duration-300"
-                    class:opacity-100={visibleFootnotes.has(footnote.id)}
-                    class:opacity-0={!visibleFootnotes.has(footnote.id)}
-                    class:translate-y-0={visibleFootnotes.has(footnote.id)}
-                    class:translate-y-2={!visibleFootnotes.has(footnote.id)}
-                    class:pointer-events-auto={visibleFootnotes.has(
-                        footnote.id,
-                    )}
-                    class:pointer-events-none={!visibleFootnotes.has(
-                        footnote.id,
-                    )}
+                    class="fn-collapse"
+                    class:fn-open={visibleFootnotes.has(footnote.id)}
                     id="fn-{footnote.id}"
                 >
-                    <span class="font-medium text-accent">{footnote.id}.</span>
-                    {footnote.content}
+                    <div
+                        class="fn-inner footnote-item text-xs text-ink-500 dark:text-ink-400 leading-relaxed"
+                    >
+                        <span class="font-medium text-accent"
+                            >{footnote.id}.</span
+                        >
+                        {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
+                    </div>
                 </div>
             {/each}
         </div>
@@ -152,6 +212,19 @@
                     </p>
                 {/each}
 
+                <!-- Live "currently reading" from Goodreads (via /api/now),
+                     rendered as a normal full-size paragraph. -->
+                {#if readingNow && readingNow.length > 0}
+                    <p>
+                        Currently reading {#each readingNow as b, i}{#if i > 0}{i === readingNow.length - 1 ? " and " : ", "}{/if}{#if b.url}<a
+                                    href={b.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="link">{b.title}</a
+                                >{:else}{b.title}{/if}{/each}.
+                    </p>
+                {/if}
+
                 <p>
                     <span class="text-ink-500 dark:text-ink-400"
                         >other interests:</span
@@ -175,6 +248,11 @@
                         {/each}
                     </p>
                 {/if}
+
+                <p class="text-ink-500 dark:text-ink-400">
+                    p.s. take a peek at your devtools console — you may find
+                    some fun hidden games. :)
+                </p>
             </div>
         </section>
 
@@ -261,7 +339,7 @@
                         <span class="font-medium text-accent"
                             >{footnote.id}.</span
                         >
-                        {footnote.content}
+                        {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
                     </div>
                 {/each}
             </div>
@@ -285,7 +363,88 @@
         color: theme("colors.accent.dark");
     }
 
+    /* Live figures inside footnote 7 (injected via @html). */
+    :global(.fn-stat) {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+            "Liberation Mono", "Courier New", monospace;
+        letter-spacing: -0.01em;
+        color: theme("colors.accent.DEFAULT");
+    }
+
+    /* Smoothly collapse/expand footnotes as their markers scroll in and out,
+       so the visible ones reflow to fill the gap. Animating grid-template-rows
+       (0fr -> 1fr) keeps every item — and its #fn-N anchor id — in the DOM,
+       unlike add/remove transitions. */
+    .fn-collapse {
+        display: grid;
+        grid-template-rows: 0fr;
+        opacity: 0;
+        margin-bottom: 0;
+        pointer-events: none;
+        transition:
+            grid-template-rows 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 0.3s ease,
+            margin-bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .fn-collapse.fn-open {
+        grid-template-rows: 1fr;
+        opacity: 1;
+        margin-bottom: 1rem;
+        pointer-events: auto;
+    }
+    .fn-inner {
+        overflow: hidden;
+        min-height: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .fn-collapse {
+            transition: opacity 0.2s ease;
+        }
+    }
+
     .footnote-item {
         padding-left: 0;
+    }
+
+    /* The Manifold footnote pair [6][7]: hovering either one makes them
+       see-saw — one rises while the other dips, then they swap. */
+    :global(.footnote-ref[data-footnote="6"]),
+    :global(.footnote-ref[data-footnote="7"]) {
+        display: inline-block;
+    }
+    :global(.footnote-ref[data-footnote="6"]:hover),
+    :global(
+            .footnote-ref[data-footnote="6"]:has(
+                    + .footnote-ref[data-footnote="7"]:hover
+                )
+        ) {
+        animation: fn-seesaw 0.65s ease-in-out infinite;
+    }
+    :global(.footnote-ref[data-footnote="7"]:hover),
+    :global(
+            .footnote-ref[data-footnote="6"]:hover
+                + .footnote-ref[data-footnote="7"]
+        ) {
+        animation: fn-seesaw 0.65s ease-in-out infinite reverse;
+    }
+    /* -global- so the name survives Svelte's keyframe hashing — the
+       animation is referenced from :global() selectors above. */
+    @keyframes -global-fn-seesaw {
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+        25% {
+            transform: translateY(-3px);
+        }
+        75% {
+            transform: translateY(3px);
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        :global(.footnote-ref[data-footnote="6"]),
+        :global(.footnote-ref[data-footnote="7"]) {
+            animation: none !important;
+        }
     }
 </style>
