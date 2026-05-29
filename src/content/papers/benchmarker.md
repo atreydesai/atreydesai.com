@@ -24,7 +24,7 @@ awards: []
 preprint: false
 featured: true
 highlight: false
-priority: 2
+priority: 4
 image: /images/papers/benchmarker.png
 imageAnimated: null
 imageDescription: "BenchMarker scores MCQA benchmark items on three axes with LLM judges: 1) contamination—whether the item appears online; 2) shortcuts—whether models can use shallow shortcuts in choices to solve the item; and 3) writing errors— grammar/structure issues based on a 19-rule education rubric. We aggregate scores and show feedback from judges on items"

@@ -1,0 +1,28 @@
+---
+id: llm-distractors
+title: "Quick, Create a Distractor! Evaluating LLM Distractors for Multiple-Choice Benchmarks"
+authors:
+  - Atrey Desai
+  - Nishant Balepur
+  - Rachel Rudinger
+year: 2026
+venue: Under ACL ARR Review
+arxiv: null
+pdf: /papers/mcqa_generation.pdf
+code: null
+demo: null
+twitter: null
+blog: null
+tags:
+  - NLP
+  - Evaluation
+tldr: "Researchers use LLMs to create wrong answers (i.e., distractors) for multiple-choice question answering (MCQA) datasets, but whether LLM distractors can replace human-guided ones is unclear. We test this in three strong LLMs and three MCQA benchmarks under two tasks: distractor generation from question-answer pairs and distractor extension from MCQs. We score MCQs via metrics in education research, showing: 1) LLM distractors have trade-offs in how well they challenge test-taker models, discern model ranks, and adhere to writing quality; 2) LLM distractors rarely match the original MCQA benchmark items, so benefits are unlikely from contamination alone; and 3) LLMs struggle to balance plausibility, option length, and simulated mistakes, which humans can help monitor. From these analyses, we outline steps for rigorously using LLMs to scale MCQA benchmarks."
+awards: []
+preprint: false
+featured: true
+highlight: false
+priority: 1
+image: /images/papers/llm-distractors.png
+imageAnimated: null
+imageDescription: "We compare MCQA distractors generated with human guidance versus LLMs alone in two tasks: 1) distractor generation from a question-answer pair and 2) distractor extension from an existing MCQ. We assess ensuing MCQs via metrics in education research: difficulty for test-taker models, discriminability of model ranks, and writing quality."
+---

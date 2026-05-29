@@ -21,7 +21,7 @@ awards:
 preprint: false
 featured: true
 highlight: false
-priority: 99
+priority: 3
 image: /images/papers/dasfigure.png
 imageAnimated: null
 imageDescription: "To create a DAS vector, we learn a direction 'a' to align neural representations with the binary variable FILLER_PRESENT. We intervene by projecting the difference between the source and base representations onto 'a' and injecting it into the base sentence."
