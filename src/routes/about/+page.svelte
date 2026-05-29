@@ -3,7 +3,7 @@
     import { browser } from "$app/environment";
     import Seo from "$lib/components/Seo.svelte";
     import { aboutData } from "$lib/content";
-    import Markdown from "$lib/components/Markdown.svelte";
+    import { parseInline, escapeHtml } from "$lib/utils/text";
 
     // Track which footnotes should be visible based on their markers
     let visibleFootnotes: Set<number> = new Set();
@@ -29,14 +29,6 @@
         const a = Math.abs(Math.round(n));
         return a >= 1000 ? `Ṁ${Math.round(a / 1000)}k` : `Ṁ${a}`;
     }
-    function escapeHtml(s: string): string {
-        return s
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
-    }
-
     async function loadNow() {
         try {
             const res = await fetch("/api/now");
@@ -107,30 +99,13 @@
         return () => observer?.disconnect();
     });
 
-    // Helper to parse markdown-style links and footnotes in text
-    function parseLinks(text: string): string {
-        // Convert **text** to <strong>text</strong>
-        text = text.replace(
-            /\*\*([^*]+)\*\*/g,
-            '<strong class="text-ink-900 dark:text-cream-100">$1</strong>',
-        );
-        // Convert *text* to <span class="emphasized">text</span>
-        text = text.replace(
-            /\*([^*]+)\*/g,
-            '<span class="text-ink-900 dark:text-cream-100">$1</span>',
-        );
-        // Convert [text](url) to <a href="url" class="link">text</a>
-        text = text.replace(
-            /\[([^\]]+)\]\(([^)]+)\)/g,
-            '<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$1</a>',
-        );
-        // Convert [^N] to footnote markers
-        text = text.replace(
-            /\[\^(\d+)\]/g,
-            '<a href="#fn-$1" class="footnote-ref" data-footnote="$1">[$1]</a>',
-        );
-        return text;
-    }
+    // Parse markdown-style links, emphasis, and footnote markers in about-page text.
+    const parseLinks = (text: string) =>
+        parseInline(text, {
+            italic: true,
+            footnotes: true,
+            strongClass: "text-ink-900 dark:text-cream-100",
+        });
 </script>
 
 <Seo

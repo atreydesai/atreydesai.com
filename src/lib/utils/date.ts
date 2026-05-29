@@ -28,6 +28,16 @@ export function formatDate(
     return new Intl.DateTimeFormat(locale, options).format(parseDateInput(input));
 }
 
+// Common presets so call sites don't repeat the same options object.
+export const formatMonthYear = (input: string) =>
+    formatDate(input, { month: "short", year: "numeric" });
+
+export const formatShortDate = (input: string) =>
+    formatDate(input, { month: "short", day: "numeric", year: "numeric" });
+
+export const formatLongDate = (input: string) =>
+    formatDate(input, { month: "long", day: "numeric", year: "numeric" });
+
 export function formatUtcDate(input: string): string {
     return parseDateInputUtc(input).toUTCString();
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fly, fade } from "svelte/transition";
+  import { fade } from "svelte/transition";
   import { Disc3, VolumeOff } from "@jis3r/icons";
   import { Volume2 } from "lucide-svelte";
 

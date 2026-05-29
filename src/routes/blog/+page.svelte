@@ -1,24 +1,15 @@
 <script lang="ts">
-    import Seo from "$lib/components/Seo.svelte";
+    import PageShell from "$lib/components/PageShell.svelte";
     import { posts } from "$lib/content";
-    import { formatDate } from "$lib/utils/date";
+    import { formatShortDate } from "$lib/utils/date";
 </script>
 
-<Seo
+<PageShell
     title="Blog | Atrey Desai"
     description="Blog posts and writings by Atrey Desai on AI, research, and more."
     url="https://atreydesai.com/blog"
-/>
-
-<div class="layout-main py-8 md:py-12">
-    <section class="mb-6">
-        <h1
-            class="heading-display mb-4 text-3xl text-ink-900 dark:text-cream-100"
-        >
-            blog
-        </h1>
-    </section>
-
+    heading="blog"
+>
     <!-- Blog posts -->
     <ul class="divide-y divide-ink-200/60 dark:divide-ink-700/60 stagger-children">
         {#each posts as post (post.id)}
@@ -31,14 +22,10 @@
                         {post.title}
                     </h2>
                     <p class="text-sm text-ink-500 dark:text-cream-500">
-                        {formatDate(post.date, {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                        })}
+                        {formatShortDate(post.date)}
                     </p>
                 </a>
             </li>
         {/each}
     </ul>
-</div>
+</PageShell>

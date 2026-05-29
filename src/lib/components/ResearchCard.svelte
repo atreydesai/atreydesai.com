@@ -37,6 +37,15 @@
     let isHovered = false;
     let lightboxOpen = false;
     let showAnimated = false;
+    let imageOrientation: "landscape" | "portrait" = "landscape";
+
+    function handleImageLoad(e: Event) {
+        const img = e.currentTarget as HTMLImageElement;
+        if (img.naturalWidth && img.naturalHeight) {
+            imageOrientation =
+                img.naturalWidth >= img.naturalHeight ? "landscape" : "portrait";
+        }
+    }
     let tldrOpen = false;
     let authorsExpanded = false;
     let authorsEl: HTMLElement | null = null;
@@ -489,7 +498,12 @@
                                 alt={`${paper.title} preview`}
                                 width="800"
                                 height="600"
-                                class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+                                on:load={handleImageLoad}
+                                class="preview-shake absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
+                                class:shake-x={isHovered &&
+                                    imageOrientation === "landscape"}
+                                class:shake-y={isHovered &&
+                                    imageOrientation === "portrait"}
                                 class:opacity-0={isHovered &&
                                     Boolean(paper.imageAnimated)}
                                 loading="lazy"
@@ -627,5 +641,33 @@
     @keyframes charReveal {
         from { opacity: 0; }
         to { opacity: 1; }
+    }
+
+    /* Subtle pan of the preview within its fixed frame, only while hovered. The
+       image overflows the square in its long dimension (object-cover), so panning
+       object-position in that direction reveals hidden content without exposing
+       the frame edges. Keyframes start/end at center so there's no jump on
+       hover in/out. */
+    .preview-shake.shake-x {
+        animation: previewShakeX 2.4s ease-in-out infinite;
+    }
+    .preview-shake.shake-y {
+        animation: previewShakeY 2.4s ease-in-out infinite;
+    }
+    @keyframes previewShakeX {
+        0%, 100% { object-position: 50% center; }
+        25%      { object-position: 35% center; }
+        75%      { object-position: 65% center; }
+    }
+    @keyframes previewShakeY {
+        0%, 100% { object-position: center 50%; }
+        25%      { object-position: center 35%; }
+        75%      { object-position: center 65%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .preview-shake.shake-x,
+        .preview-shake.shake-y {
+            animation: none;
+        }
     }
 </style>

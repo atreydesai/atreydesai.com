@@ -28,9 +28,6 @@ export function setMuted(m: boolean) {
 	muted = m;
 	if (master) master.gain.value = m ? 0 : 0.5;
 }
-export function isMuted() {
-	return muted;
-}
 
 // One staccato note with a click-free attack/decay envelope.
 function note(

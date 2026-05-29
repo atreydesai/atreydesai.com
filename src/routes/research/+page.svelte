@@ -1,11 +1,11 @@
 <script lang="ts">
     import { afterNavigate } from "$app/navigation";
-    import Seo from "$lib/components/Seo.svelte";
+    import PageShell from "$lib/components/PageShell.svelte";
     import { tick } from "svelte";
     import ResearchCard from "$lib/components/ResearchCard.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
-    import { papersData } from "$lib/content";
-    import { formatDate } from "$lib/utils/date";
+    import { papers, talks } from "$lib/content";
+    import { formatMonthYear } from "$lib/utils/date";
 
     let selectedYear: string = "all";
     let selectedTag: string = "all";
@@ -39,10 +39,10 @@
         }, 3000);
     });
 
-    $: years = [...new Set(papersData.papers.map((p) => p.year))].sort(
+    $: years = [...new Set(papers.map((p) => p.year))].sort(
         (a, b) => b - a,
     );
-    $: tags = [...new Set(papersData.papers.flatMap((p) => p.tags))].sort();
+    $: tags = [...new Set(papers.flatMap((p) => p.tags))].sort();
 
     $: yearOptions = [
         { value: "all", label: "All Years" },
@@ -54,7 +54,7 @@
         ...tags.map((t) => ({ value: t, label: t })),
     ];
 
-    $: filteredPapers = papersData.papers.filter((paper) => {
+    $: filteredPapers = papers.filter((paper) => {
         if (selectedYear !== "all" && paper.year !== parseInt(selectedYear))
             return false;
         if (selectedTag !== "all" && !paper.tags.includes(selectedTag))
@@ -69,7 +69,7 @@
             acc[paper.year].push(paper);
             return acc;
         },
-        {} as Record<number, typeof papersData.papers>,
+        {} as Record<number, typeof papers>,
     );
 
     $: sortedYears = Object.keys(papersByYear)
@@ -80,7 +80,7 @@
     $: published = filteredPapers.filter((p) => !p.preprint && !p.classProject);
     $: classProjects = filteredPapers.filter((p) => p.classProject);
     $: groupedTalks = Object.values(
-        papersData.talks.reduce(
+        talks.reduce(
             (acc, talk) => {
                 const title = canonicalizeTalkTitle(talk.title);
                 const existing = acc[title];
@@ -102,7 +102,7 @@
                 {
                     title: string;
                     type: string;
-                    appearances: typeof papersData.talks;
+                    appearances: typeof talks;
                 }
             >,
         ),
@@ -124,21 +124,12 @@
     $: presentationGroups = groupedTalks.filter((g) => g.type === "poster");
 </script>
 
-<Seo
+<PageShell
     title="Research | Atrey Desai"
     description="Publications and preprints by Atrey Desai on NLP benchmarks, multimodal reasoning, and computational animal linguistics. Research from UMD CLIP Lab, UT Arlington ACL2 Lab, and Brown University."
     url="https://atreydesai.com/research"
-/>
-
-<div class="layout-main py-8 md:py-12">
-    <section class="mb-6">
-        <h1
-            class="heading-display mb-4 text-3xl text-ink-900 dark:text-cream-100"
-        >
-            research
-        </h1>
-    </section>
-
+    heading="research"
+>
     <div class="mb-8 flex flex-wrap items-center gap-3">
         <CustomSelect
             options={yearOptions}
@@ -241,10 +232,7 @@
                             {#each talkGroup.appearances as appearance}
                                 <div class="text-sm text-ink-600 dark:text-cream-300">
                                     <p>
-                                        {appearance.venue}, {formatDate(appearance.date, {
-                                            month: "short",
-                                            year: "numeric",
-                                        })}
+                                        {appearance.venue}, {formatMonthYear(appearance.date)}
                                     </p>
 
                                     {#if appearance.slides || appearance.video}
@@ -303,10 +291,7 @@
                             {#each talkGroup.appearances as appearance}
                                 <div class="text-sm text-ink-600 dark:text-cream-300">
                                     <p>
-                                        {appearance.venue}, {formatDate(appearance.date, {
-                                            month: "short",
-                                            year: "numeric",
-                                        })}
+                                        {appearance.venue}, {formatMonthYear(appearance.date)}
                                     </p>
 
                                     {#if appearance.slides || appearance.video}
@@ -364,4 +349,4 @@
             </button>
         </div>
     {/if}
-</div>
+</PageShell>

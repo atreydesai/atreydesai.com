@@ -1,5 +1,5 @@
 <script lang="ts">
-    import Seo from "$lib/components/Seo.svelte";
+    import PageShell from "$lib/components/PageShell.svelte";
     import { Download } from "@jis3r/icons";
 
     import type { PageData } from './$types';
@@ -8,14 +8,12 @@
     let hoveredDownload = false;
 </script>
 
-<Seo
+<PageShell
     title="CV | Atrey Desai"
     description="Curriculum Vitae of Atrey Desai - undergraduate researcher at UMD with experience at Learn Prompting, CLIP Lab, Brown University, and UT Arlington."
     url="https://atreydesai.com/cv"
-/>
-
-<div class="layout-main py-8 md:py-12">
-    <div class="flex items-center justify-between mb-8">
+>
+    <div slot="header" class="flex items-center justify-between mb-8">
         <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
             curriculum vitae
         </h1>
@@ -594,4 +592,4 @@
             </div>
         </section>
     </div>
-</div>
+</PageShell>

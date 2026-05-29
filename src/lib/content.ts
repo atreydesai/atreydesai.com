@@ -133,25 +133,15 @@ export const papers: Paper[] = Object.values(paperModules)
 
 // Import all book markdown files
 const bookModules = import.meta.glob<Book>('/src/content/books/*.md', { eager: true });
-export const books: Book[] = Object.values(bookModules)
-    .map((mod) => {
-        const data = mod as unknown as Book;
-        // Spread to create a mutable copy, use content as notes if notes not set
-        // Normalize subcategory to array of strings
-        let subcategories: string[] = [];
-        if (Array.isArray(data.subcategory)) {
-            subcategories = data.subcategory;
-        } else if (typeof data.subcategory === "string") {
-            // Split by comma and trim whitespace from each subcategory
-            subcategories = data.subcategory.split(',').map(s => s.trim()).filter(s => s.length > 0);
-        }
-
-        return {
-            ...data,
-            subcategory: subcategories,
-            notes: data.notes || data.content || undefined
-        };
-    });
+export const books: Book[] = Object.values(bookModules).map((mod) => {
+    const data = mod as unknown as Book;
+    // Normalize subcategory to string[] (accepts an array or comma-separated string);
+    // fall back to markdown content for notes when notes aren't set.
+    const subcategory = Array.isArray(data.subcategory)
+        ? data.subcategory
+        : (data.subcategory ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    return { ...data, subcategory, notes: data.notes || data.content || undefined };
+});
 
 // Import all post markdown files
 const postModules = import.meta.glob<Post>('/src/content/posts/*.md', { eager: true });
@@ -170,15 +160,3 @@ export const talks: Talk[] = talksYaml as unknown as Talk[];
 export const categories: Category[] = categoriesYaml as unknown as Category[];
 export const aboutData: AboutData = aboutYaml as unknown as AboutData;
 export const homepageData: HomepageData = homepageYaml as unknown as HomepageData;
-
-// Helper to get papers data in the old format (for compatibility)
-export const papersData = {
-    papers,
-    talks
-};
-
-// Helper to get books data in the old format (for compatibility)
-export const booksData = {
-    books,
-    categories
-};

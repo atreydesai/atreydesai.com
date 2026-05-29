@@ -2,8 +2,8 @@
     import Seo from "$lib/components/Seo.svelte";
     import RatingCircle from "$lib/components/RatingCircle.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
-    import { booksData } from "$lib/content";
-    import { formatDate } from "$lib/utils/date";
+    import { books, categories } from "$lib/content";
+    import { formatMonthYear } from "$lib/utils/date";
     import {
         Star,
         BookOpenText,
@@ -58,12 +58,12 @@
     // Get all unique tags and subcategories across books
     $: allTags = [
         ...new Set([
-            ...booksData.books.flatMap((book) => book.tags || []),
-            ...booksData.books.flatMap((book) => book.subcategory || []),
+            ...books.flatMap((book) => book.tags || []),
+            ...books.flatMap((book) => book.subcategory || []),
         ]),
     ].sort();
 
-    $: categoryOptions = booksData.categories.map((c) => ({
+    $: categoryOptions = categories.map((c) => ({
         value: c.id,
         label: c.name,
     }));
@@ -74,11 +74,11 @@
 
     // Get all unique mediums
     $: allMediums = [
-        ...new Set(booksData.books.map((book) => book.medium).filter(Boolean)),
+        ...new Set(books.map((book) => book.medium).filter(Boolean)),
     ].sort();
 
     // Filter books based on category, tag, and search
-    $: filteredBooks = booksData.books.filter((book) => {
+    $: filteredBooks = books.filter((book) => {
         // Category filter
         if (selectedCategory !== "all") {
             if (selectedCategory === "favorites" && !book.favorite)
@@ -598,10 +598,7 @@
                                 <span
                                     class="text-xs text-ink-400 dark:text-ink-500"
                                 >
-                                    Added {formatDate(book.dateAdded, {
-                                        month: "short",
-                                        year: "numeric",
-                                    })}
+                                    Added {formatMonthYear(book.dateAdded)}
                                 </span>
                             </div>
                         </div>

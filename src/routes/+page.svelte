@@ -3,7 +3,8 @@
   import ResearchCard from "$lib/components/ResearchCard.svelte";
   import LegoImage from "$lib/components/LegoImage.svelte";
   import { Github, Twitter, GraduationCap, Mail } from "lucide-svelte";
-  import { papersData, homepageData } from "$lib/content";
+  import { papers, homepageData } from "$lib/content";
+  import { parseInline } from "$lib/utils/text";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
   import HyperText from "$lib/components/HyperText.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
@@ -54,36 +55,14 @@
     return () => window.removeEventListener("pointerdown", unlock);
   });
 
-  function parseBanner(text: string): string {
-    text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    text = text.replace(
-      /\[([^\]]+)\]\(\)/g,
-      '<button type="button" data-banner-copy class="link banner-copy-btn">$1</button>',
-    );
-    text = text.replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$1</a>',
-    );
-    return text;
-  }
+  const parseBanner = (text: string) => parseInline(text, { copyButton: true });
 
-  $: featuredPapers = papersData.papers
+  $: featuredPapers = papers
     .filter((p) => p.featured)
     .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
     .slice(0, 3);
 
-  function parseLinks(text: string): string {
-    text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    text = text.replace(
-      /\*([^*]+)\*/g,
-      '<span class="text-ink-900 dark:text-cream-100">$1</span>',
-    );
-    text = text.replace(
-      /\[([^\]]+)\]\(([^)]+)\)/g,
-      '<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$1</a>',
-    );
-    return text;
-  }
+  const parseLinks = (text: string) => parseInline(text, { italic: true });
 
   let emailCopied = false;
   let copyTimeout: ReturnType<typeof setTimeout>;

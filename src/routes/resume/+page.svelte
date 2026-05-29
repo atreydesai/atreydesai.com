@@ -1,18 +1,16 @@
 <script lang="ts">
-    import Seo from "$lib/components/Seo.svelte";
+    import PageShell from "$lib/components/PageShell.svelte";
     import { Download } from "@jis3r/icons";
 
     let hoveredDownload = false;
 </script>
 
-<Seo
+<PageShell
     title="Resume | Atrey Desai"
     description="Resume of Atrey Desai - CS & Linguistics student at University of Maryland, researching NLP and AI safety."
     url="https://atreydesai.com/resume"
-/>
-
-<div class="layout-main py-8 md:py-12">
-    <div class="flex items-center justify-between mb-8">
+>
+    <div slot="header" class="flex items-center justify-between mb-8">
         <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
             resume
         </h1>
@@ -44,4 +42,4 @@
             title="Atrey Desai Resume"
         ></iframe>
     </div>
-</div>
+</PageShell>
