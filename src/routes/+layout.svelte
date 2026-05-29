@@ -12,6 +12,8 @@
   import Header from "$lib/components/Header.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import CustomCursor from "$lib/components/CustomCursor.svelte";
+  import BobaGame from "$lib/components/BobaGame.svelte";
+  import { bobaMode } from "$lib/boba";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
@@ -20,6 +22,9 @@
   const reducedMotion =
     browser && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // Konami easter egg: launches the persistent "boba mode" minigame.
+  // (`bobaMode` lives in $lib/boba so the homepage boba can launch it too.)
+
   onMount(() => {
     // Vercel Analytics + Speed Insights use buffered PerformanceObservers,
     // so deferring their injection still captures paint/LCP events that
@@ -27,23 +32,61 @@
     inject({ mode: dev ? "development" : "production" });
     injectSpeedInsights();
 
-    if (dev) return;
-    const loadGa = () => {
-      const w = window as any;
-      w.dataLayer = w.dataLayer || [];
-      function gtag(...args: any[]) { w.dataLayer.push(args); }
-      gtag("js", new Date());
-      gtag("config", "G-4NTR1HXBLW");
-      const s = document.createElement("script");
-      s.async = true;
-      s.src = "https://www.googletagmanager.com/gtag/js?id=G-4NTR1HXBLW";
-      document.head.appendChild(s);
+    // Easter egg #1: a greeting for anyone who cracks open the console.
+    console.log(
+      "%c👋 hey, you found the console.",
+      "color:#E85D4C;font-size:14px;font-weight:700",
+    );
+    console.log(
+      "%cI'm Atrey — applying to Ph.D. programs (2026–27). If you're a curious dev or a potential advisor, say hi: adesai10@umd.edu\n%cpsst… there's a hidden game. enter the konami code →  ↑ ↑ ↓ ↓ ← → ← → b a",
+      "color:#8a7d70;font-size:12px;line-height:1.6",
+      "color:#b0a498;font-size:11px;font-style:italic",
+    );
+
+    // Easter egg #2: the konami code launches boba mode.
+    const KONAMI = [
+      "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+      "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a",
+    ];
+    let pos = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (key === KONAMI[pos]) {
+        pos += 1;
+        if (pos === KONAMI.length) {
+          pos = 0;
+          bobaMode.set(true);
+        }
+      } else {
+        // Restart, but treat this key as a possible first step.
+        pos = key === KONAMI[0] ? 1 : 0;
+      }
     };
-    if ("requestIdleCallback" in window) {
-      (window as any).requestIdleCallback(loadGa, { timeout: 3000 });
-    } else {
-      setTimeout(loadGa, 1500);
+    window.addEventListener("keydown", onKey);
+
+    // Google Analytics — production only, deferred to idle time.
+    if (!dev) {
+      const loadGa = () => {
+        const w = window as any;
+        w.dataLayer = w.dataLayer || [];
+        function gtag(...args: any[]) { w.dataLayer.push(args); }
+        gtag("js", new Date());
+        gtag("config", "G-4NTR1HXBLW");
+        const s = document.createElement("script");
+        s.async = true;
+        s.src = "https://www.googletagmanager.com/gtag/js?id=G-4NTR1HXBLW";
+        document.head.appendChild(s);
+      };
+      if ("requestIdleCallback" in window) {
+        (window as any).requestIdleCallback(loadGa, { timeout: 3000 });
+      } else {
+        setTimeout(loadGa, 1500);
+      }
     }
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+    };
   });
 </script>
 
@@ -80,6 +123,11 @@
 
   <Footer />
 </div>
+
+<!-- Konami easter egg: the persistent boba-catching minigame. -->
+{#if $bobaMode}
+  <BobaGame on:close={() => bobaMode.set(false)} />
+{/if}
 
 <style>
   /* CSS smooth scrolling - much simpler and more reliable */

@@ -6,6 +6,53 @@
   import { papersData, homepageData } from "$lib/content";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
   import HyperText from "$lib/components/HyperText.svelte";
+  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  import { onMount } from "svelte";
+  import { bobaMode } from "$lib/boba";
+  import { sfxBoba, unlockAudio } from "$lib/sfx";
+
+  // Little pixel boba tucked in the photo corner — a random drink + straw
+  // orientation on each page load. Click to play the minigame.
+  const CUP_BODY = [
+    "OOOOOOO",
+    ".OLLLO.",
+    ".OLLLO.",
+    ".ObLbO.",
+    ".OLbLO.",
+    "..OOO..",
+  ];
+  const STRAWS = [
+    ["...S...", "...S..."], // straight
+    ["....S..", "...S..."], // lean right
+    [".....S.", "....S.."], // lean right (more)
+    ["..S....", "...S..."], // lean left
+    [".S.....", "..S...."], // lean left (more)
+  ];
+  const DRINKS = [
+    "#b388e0", "#8bbf5a", "#c79a6b", "#f47ba0",
+    "#f4b942", "#6aa6e0", "#9fd17a", "#e76f8e",
+  ];
+  // Deterministic default for SSR / first paint; randomized in onMount so each
+  // load varies without a hydration mismatch.
+  let bobaGrid = [...STRAWS[0], ...CUP_BODY];
+  let bobaPal: Record<string, string> = {
+    O: "#2b2320",
+    L: "#c79a6b",
+    b: "#2b1a12",
+    S: "#ff5277",
+  };
+
+  onMount(() => {
+    // Random straw + drink colour each load.
+    const straw = STRAWS[Math.floor(Math.random() * STRAWS.length)];
+    bobaGrid = [...straw, ...CUP_BODY];
+    bobaPal = { ...bobaPal, L: DRINKS[Math.floor(Math.random() * DRINKS.length)] };
+
+    // Resume audio on the first click anywhere, so the boba's hover jingle plays.
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock, { once: true });
+    return () => window.removeEventListener("pointerdown", unlock);
+  });
 
   function parseBanner(text: string): string {
     text = text.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -46,6 +93,15 @@
     emailCopied = true;
     clearTimeout(copyTimeout);
     copyTimeout = setTimeout(() => (emailCopied = false), 1000);
+  }
+
+  let cookKey: string | null = null;
+  let cookTimeout: ReturnType<typeof setTimeout>;
+
+  function showCook(key: string) {
+    cookKey = key;
+    clearTimeout(cookTimeout);
+    cookTimeout = setTimeout(() => (cookKey = null), 1000);
   }
 
   let bannerCopied = false;
@@ -105,14 +161,28 @@
 
       <!-- Image: col 2, spans both rows -->
       <div class="md:col-start-2 md:row-start-1 md:row-span-2">
-        <div
-          class="aspect-square w-full max-w-[250px] mx-auto md:mx-0 rounded-lg overflow-hidden"
-        >
-          <LegoImage
-            src="/images/profile.webp"
-            alt="Atrey Desai"
-            blockSize={48}
-          />
+        <div class="relative w-full max-w-[250px] mx-auto md:mx-0">
+          <div class="aspect-square w-full rounded-lg overflow-hidden">
+            <LegoImage
+              src="/images/profile.webp"
+              alt="Atrey Desai"
+              blockSize={48}
+            />
+          </div>
+          <!-- Pixel boba peeking out of the corner — shakes + jingles on hover,
+               launches the minigame on click. Hidden while the game is open. -->
+          {#if !$bobaMode}
+            <button
+              type="button"
+              class="boba-launcher"
+              on:click={() => bobaMode.set(true)}
+              on:mouseenter={sfxBoba}
+              aria-label="Play the boba minigame"
+              title="boba?"
+            >
+              <PixelIcon grid={bobaGrid} palette={bobaPal} px={6} />
+            </button>
+          {/if}
         </div>
       </div>
 
@@ -215,20 +285,32 @@
           {@html parseLinks(homepageData.researchInterests.intro)}
         </p>
         <div class="space-y-3">
-          {#each homepageData.researchInterests.items as item}
+          {#each homepageData.researchInterests.items as item, i}
             <div>
               <p>{@html parseLinks(item.text)}</p>
               {#if item.citations && item.citations.length > 0}
                 <div class="mt-0.5 ml-6 flex gap-1.5 text-xs font-mono text-ink-400 dark:text-cream-500 leading-none">
                   <span class="text-ink-300 dark:text-cream-600">↳</span>
-                  {#each item.citations as citation}
+                  {#each item.citations as citation, ci}
                     {#if citation.url}
                       <a
                         href={citation.url}
                         class="hover:text-accent dark:hover:text-accent-light transition-colors duration-150"
                       >[{citation.label}]</a>
                     {:else}
-                      <span>[{citation.label}]</span>
+                      <span class="relative inline-flex">
+                        <button
+                          type="button"
+                          on:click={() => showCook(`${i}-${ci}`)}
+                          class="cursor-pointer font-[inherit] text-[length:inherit] leading-none hover:text-accent dark:hover:text-accent-light transition-colors duration-150"
+                        >[{citation.label}]</button>
+                        {#if cookKey === `${i}-${ci}`}
+                          <span class="copied-tooltip cook-tooltip">
+                            <span class="copied-triangle"></span>
+                            let me cook :)
+                          </span>
+                        {/if}
+                      </span>
                     {/if}
                   {/each}
                 </div>
@@ -247,7 +329,7 @@
     <section class="mb-8">
       <div class="section-rule mb-6">
         <h2 class="section-heading mb-0">
-          <a href="/research" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">research highlights</a>
+          <a href="/research" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">selected works</a>
         </h2>
         <div class="section-rule-line"></div>
       </div>
@@ -262,6 +344,49 @@
 </div>
 
 <style>
+  /* Pixel boba sitting diagonally in the photo's bottom-right corner. */
+  .boba-launcher {
+    position: absolute;
+    right: -14px;
+    bottom: -14px;
+    z-index: 5;
+    padding: 0;
+    border: 0;
+    background: none;
+    line-height: 0;
+    cursor: pointer;
+    transform: rotate(16deg);
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.28));
+  }
+  .boba-launcher:hover {
+    animation: boba-shake 0.4s ease-in-out infinite;
+  }
+  @keyframes boba-shake {
+    0%,
+    100% {
+      transform: rotate(16deg) scale(1.08);
+    }
+    25% {
+      transform: rotate(7deg) translateY(-1px) scale(1.08);
+    }
+    75% {
+      transform: rotate(25deg) translateY(-1px) scale(1.08);
+    }
+  }
+  /* Mouse/desktop only — the game needs a pointer to play. */
+  @media (hover: none), (pointer: coarse) {
+    .boba-launcher {
+      display: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .boba-launcher:hover {
+      animation: none;
+      transform: rotate(16deg) scale(1.08);
+    }
+  }
+
   .letter-drop {
     display: inline-block;
     opacity: 0;
@@ -284,7 +409,8 @@
     left: 50%;
     transform: translateX(-50%);
     top: calc(100% + 3px);
-    font-family: "neue-haas-grotesk-text", sans-serif;
+    z-index: 30;
+    font-family: "neue-haas-grotesk-text", "neue-haas-grotesk-fallback", sans-serif;
     font-size: 0.75rem;
     white-space: nowrap;
     pointer-events: none;
@@ -292,7 +418,13 @@
     color: #fdf8f3;
     padding: 4px 11px;
     border-radius: 8px;
-    animation: tooltip-pop 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: tooltip-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  /* Cook tooltip lives among the mono citation labels — match that font. */
+  .cook-tooltip {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
   }
 
   .copied-triangle {
@@ -393,7 +525,8 @@
   .banner-copied-tooltip {
     position: absolute;
     transform: translateX(-50%);
-    font-family: "neue-haas-grotesk-text", sans-serif;
+    z-index: 30;
+    font-family: "neue-haas-grotesk-text", "neue-haas-grotesk-fallback", sans-serif;
     font-size: 0.75rem;
     white-space: nowrap;
     pointer-events: none;
@@ -401,7 +534,7 @@
     color: #fdf8f3;
     padding: 4px 11px;
     border-radius: 8px;
-    animation: tooltip-pop 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: tooltip-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 
   /* Darker selection inside the banner so it stands out from the blush bg.
@@ -421,7 +554,7 @@
   @keyframes tooltip-pop {
     from {
       opacity: 0;
-      transform: translateX(-50%) translateY(-4px);
+      transform: translateX(-50%) translateY(-8px);
     }
     to {
       opacity: 1;
