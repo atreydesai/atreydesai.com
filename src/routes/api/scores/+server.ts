@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { list, put } from '@vercel/blob';
+import { get, list, put } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { cleanName } from '$lib/profanity';
 import type { RequestHandler } from './$types';
@@ -35,22 +35,27 @@ async function resolveUrl(): Promise<string | null> {
 	return cachedUrl;
 }
 
-async function readBoard(fresh: boolean): Promise<Entry[]> {
+async function readBoard(): Promise<Entry[]> {
 	if (!token) return [];
 	const url = await resolveUrl();
 	if (!url) return [];
-	// GET allows CDN cache HITs (free — no Simple Operation / Fast Origin
-	// Transfer); POST bypasses the cache so a submit never reads stale data and
-	// clobbers a recent entry.
-	const res = await fetch(url, fresh ? { cache: 'no-store' } : {});
-	if (!res.ok) return [];
-	const data = await res.json();
-	return Array.isArray(data) ? data : [];
+	// Authenticated download via the SDK — works for blobs in a PRIVATE store
+	// (a plain fetch of the URL is rejected for private blobs). get() returns a
+	// stream + metadata, not a Response.
+	const result = await get(url, { access: 'private', token });
+	if (!result || result.statusCode !== 200) return [];
+	try {
+		const data = await new Response(result.stream).json();
+		return Array.isArray(data) ? data : [];
+	} catch {
+		return [];
+	}
 }
 
 async function writeBoard(board: Entry[]): Promise<void> {
+	// `access` is omitted so it defaults to the store's type — 'private' for
+	// the boba-game store (passing 'public' is rejected on a private store).
 	const { url } = await put(PATH, JSON.stringify(board), {
-		access: 'public',
 		contentType: 'application/json',
 		addRandomSuffix: false,
 		allowOverwrite: true,
@@ -62,7 +67,7 @@ async function writeBoard(board: Entry[]): Promise<void> {
 export const GET: RequestHandler = async () => {
 	if (!token) return json({ available: false, scores: [] });
 	try {
-		const board = await readBoard(false);
+		const board = await readBoard();
 		board.sort((a, b) => b.score - a.score);
 		return json(
 			{ available: true, scores: board.slice(0, TOP) },
@@ -101,7 +106,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const name = checked.value;
 
 	try {
-		const board = await readBoard(true);
+		const board = await readBoard();
 		const entry: Entry = { name, score, t: Date.now() };
 		board.push(entry);
 		board.sort((a, b) => b.score - a.score || a.t - b.t);
