@@ -53,9 +53,10 @@ async function readBoard(): Promise<Entry[]> {
 }
 
 async function writeBoard(board: Entry[]): Promise<void> {
-	// `access` is omitted so it defaults to the store's type — 'private' for
-	// the boba-game store (passing 'public' is rejected on a private store).
+	// access MUST be 'private' — the boba-game store is private, and put()
+	// otherwise defaults to 'public', which a private store rejects.
 	const { url } = await put(PATH, JSON.stringify(board), {
+		access: 'private',
 		contentType: 'application/json',
 		addRandomSuffix: false,
 		allowOverwrite: true,
