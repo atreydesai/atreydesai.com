@@ -114,7 +114,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			rank: rank > 0 ? rank : null,
 			scores: trimmed.slice(0, TOP),
 		});
-	} catch {
-		return json({ ok: false, reason: "couldn't save, try again" }, { status: 500 });
+	} catch (err) {
+		console.error('[api/scores] POST failed:', err);
+		const reason = err instanceof Error ? `${err.name}: ${err.message}` : "couldn't save, try again";
+		return json({ ok: false, reason }, { status: 500 });
 	}
 };
