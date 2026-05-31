@@ -4,7 +4,7 @@
 // term — profanity, slurs, hate/violence, and crypto-scam bait. For 10-char
 // game tags we intentionally err toward blocking; the UI just asks for another.
 
-export const MAX_NAME = 10;
+export const MAX_NAME = 20;
 
 const LEET: Record<string, string> = {
 	"0": "o", "1": "i", "2": "z", "3": "e", "4": "a", "5": "s",
