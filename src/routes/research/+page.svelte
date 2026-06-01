@@ -135,12 +135,14 @@
             options={yearOptions}
             bind:value={selectedYear}
             placeholder="All Years"
+            ariaLabel="Filter by year"
         />
 
         <CustomSelect
             options={tagOptions}
             bind:value={selectedTag}
             placeholder="All Topics"
+            ariaLabel="Filter by topic"
         />
     </div>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import { browser } from "$app/environment";
     import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
@@ -8,20 +8,100 @@
     export let options: Array<{ value: string; label: string }>;
     export let value: string = options[0]?.value || "";
     export let placeholder: string = "Select...";
+    // Accessible name for the control — without it screen readers only announce
+    // the current value (e.g. "All Years") with no hint of what it filters.
+    export let ariaLabel: string = "";
 
     let isOpen = false;
     let containerRef: HTMLDivElement;
+    let triggerRef: HTMLButtonElement;
+    let optionRefs: HTMLButtonElement[] = [];
+    let activeIndex = -1;
 
     $: selectedOption = options.find((opt) => opt.value === value);
     $: displayLabel = selectedOption?.label || placeholder;
 
+    async function open(focusIndex?: number) {
+        isOpen = true;
+        const selectedIdx = options.findIndex((o) => o.value === value);
+        activeIndex = focusIndex ?? (selectedIdx >= 0 ? selectedIdx : 0);
+        await tick(); // wait for the dropdown to render before focusing
+        optionRefs[activeIndex]?.focus();
+    }
+
+    function close(refocusTrigger = true) {
+        isOpen = false;
+        if (refocusTrigger) triggerRef?.focus();
+    }
+
     function toggle() {
-        isOpen = !isOpen;
+        isOpen ? close(false) : open();
     }
 
     function select(optionValue: string) {
         value = optionValue;
-        isOpen = false;
+        close();
+    }
+
+    function focusOption(index: number) {
+        const n = options.length;
+        if (n === 0) return;
+        activeIndex = ((index % n) + n) % n; // wrap around top/bottom
+        optionRefs[activeIndex]?.focus();
+    }
+
+    // Open the listbox from the trigger with the keyboard.
+    function onTriggerKeydown(e: KeyboardEvent) {
+        switch (e.key) {
+            case "ArrowDown":
+            case "Enter":
+            case " ":
+                e.preventDefault();
+                open();
+                break;
+            case "ArrowUp":
+                e.preventDefault();
+                open(options.length - 1);
+                break;
+        }
+    }
+
+    // Roving-focus navigation within the open listbox.
+    function onOptionKeydown(e: KeyboardEvent, index: number) {
+        switch (e.key) {
+            case "ArrowDown":
+                e.preventDefault();
+                focusOption(index + 1);
+                break;
+            case "ArrowUp":
+                e.preventDefault();
+                focusOption(index - 1);
+                break;
+            case "Home":
+                e.preventDefault();
+                focusOption(0);
+                break;
+            case "End":
+                e.preventDefault();
+                focusOption(options.length - 1);
+                break;
+            case "Enter":
+            case " ":
+                e.preventDefault();
+                select(options[index].value);
+                break;
+            case "Escape":
+                e.preventDefault();
+                close();
+                break;
+        }
+    }
+
+    // Close when focus leaves the widget entirely (e.g. Tab out).
+    function onFocusOut(e: FocusEvent) {
+        if (containerRef && !containerRef.contains(e.relatedTarget as Node)) {
+            isOpen = false;
+        }
     }
 
     function handleClickOutside(event: MouseEvent) {
@@ -39,14 +119,17 @@
     });
 </script>
 
-<div class="custom-select" bind:this={containerRef}>
+<div class="custom-select" bind:this={containerRef} on:focusout={onFocusOut}>
     <button
         type="button"
         class="select-trigger"
         class:open={isOpen}
+        bind:this={triggerRef}
         on:click={toggle}
+        on:keydown={onTriggerKeydown}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-label={ariaLabel || undefined}
     >
         <span class="select-value">{displayLabel}</span>
         <span class="select-chevron" class:rotate={isOpen}>
@@ -58,6 +141,7 @@
         <div
             class="select-dropdown"
             role="listbox"
+            aria-label={ariaLabel || undefined}
             out:fly={{ y: -6, duration: 140, easing: cubicOut }}
         >
             {#each options as option, i}
@@ -65,9 +149,12 @@
                     type="button"
                     class="select-option cascade-in"
                     class:selected={option.value === value}
+                    bind:this={optionRefs[i]}
                     on:click={() => select(option.value)}
+                    on:keydown={(e) => onOptionKeydown(e, i)}
                     role="option"
                     aria-selected={option.value === value}
+                    tabindex={activeIndex === i ? 0 : -1}
                     style="--cascade-delay: {i * 55}ms"
                 >
                     {option.label}
@@ -109,12 +196,15 @@
         color: theme("colors.cream.400");
     }
 
-    .select-trigger:hover {
+    .select-trigger:hover,
+    .select-trigger:focus-visible {
         border-color: theme("colors.ink.400");
         color: theme("colors.ink.900");
+        outline: none;
     }
 
-    :global(.dark) .select-trigger:hover {
+    :global(.dark) .select-trigger:hover,
+    :global(.dark) .select-trigger:focus-visible {
         border-color: theme("colors.ink.500");
         color: theme("colors.cream.100");
     }
@@ -203,12 +293,15 @@
         color: theme("colors.cream.300");
     }
 
-    .select-option:hover {
+    .select-option:hover,
+    .select-option:focus-visible {
         background-color: theme("colors.blush.100");
         color: theme("colors.ink.900");
+        outline: none;
     }
 
-    :global(.dark) .select-option:hover {
+    :global(.dark) .select-option:hover,
+    :global(.dark) .select-option:focus-visible {
         background-color: theme("colors.ink.700");
         color: theme("colors.cream.100");
     }

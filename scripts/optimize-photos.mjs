@@ -13,8 +13,10 @@ const PHOTOS_DIR = 'static/images/photography';
 const THUMBS_DIR = 'static/images/photography/thumbs';
 
 // Thumbnail settings
-const THUMB_WIDTH = 800;  // Width for grid thumbnails
+const THUMB_WIDTH = 800;  // Default grid thumbnail width (keeps the bare name)
 const THUMB_QUALITY = 80; // WebP quality (0-100)
+// Extra widths emitted for the responsive srcset (named `${name}-${w}.webp`).
+const SRCSET_WIDTHS = [400, 1200];
 
 async function ensureDir(dir) {
     try {
@@ -39,26 +41,32 @@ async function needsUpdate(srcPath, destPath) {
 async function optimizePhoto(filename) {
     const srcPath = join(PHOTOS_DIR, filename);
     const { name } = parse(filename);
-    const destPath = join(THUMBS_DIR, `${name}.webp`);
 
-    // Check if thumbnail exists and is up-to-date
-    if (!(await needsUpdate(srcPath, destPath))) {
-        return { filename, status: 'skipped' };
+    // The 800px default keeps its bare name (used as the <img> src); the other
+    // widths get a `-${w}` suffix and feed the responsive srcset.
+    const targets = [
+        { dest: join(THUMBS_DIR, `${name}.webp`), width: THUMB_WIDTH },
+        ...SRCSET_WIDTHS.map((w) => ({
+            dest: join(THUMBS_DIR, `${name}-${w}.webp`),
+            width: w,
+        })),
+    ];
+
+    let optimized = 0;
+    for (const { dest, width } of targets) {
+        if (!(await needsUpdate(srcPath, dest))) continue;
+        try {
+            await sharp(srcPath)
+                .resize(width, null, { withoutEnlargement: true, fit: 'inside' })
+                .webp({ quality: THUMB_QUALITY })
+                .toFile(dest);
+            optimized++;
+        } catch (err) {
+            return { filename, status: 'error', error: err.message };
+        }
     }
 
-    try {
-        await sharp(srcPath)
-            .resize(THUMB_WIDTH, null, {
-                withoutEnlargement: true,
-                fit: 'inside'
-            })
-            .webp({ quality: THUMB_QUALITY })
-            .toFile(destPath);
-
-        return { filename, status: 'optimized' };
-    } catch (err) {
-        return { filename, status: 'error', error: err.message };
-    }
+    return { filename, status: optimized > 0 ? 'optimized' : 'skipped' };
 }
 
 // Resize + webp conversion for a single source file.

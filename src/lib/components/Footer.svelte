@@ -82,6 +82,8 @@
           on:click={toggleMusic}
           on:mouseenter={() => (hoveredMusic = true)}
           on:mouseleave={() => (hoveredMusic = false)}
+          aria-pressed={isPlaying}
+          aria-label={isPlaying ? "Pause music" : "Play music"}
           class="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-ink-500 dark:text-ink-400 hover:text-ink-700 dark:hover:text-cream-300 transition-all duration-300 group"
         >
           <span

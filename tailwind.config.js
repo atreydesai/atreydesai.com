@@ -14,6 +14,11 @@ export default {
         xl: ["1.25rem", { lineHeight: "1.75rem" }],
         "2xl": ["1.5rem", { lineHeight: "2rem" }],
         "3xl": ["1.875rem", { lineHeight: "2.25rem" }],
+        // Hero sizes — the homepage h1 uses text-3xl md:text-4xl. Declared
+        // explicitly so it's part of the documented scale rather than falling
+        // back to a Tailwind default that's outside the system.
+        "4xl": ["2.25rem", { lineHeight: "2.5rem" }],
+        "5xl": ["3rem", { lineHeight: "1" }],
       },
       colors: {
         // Off-pink/tan palette
@@ -48,7 +53,7 @@ export default {
         accent: {
           DEFAULT: "#E85D4C",
           light: "#F07563",
-          dark: "#C94B3D",
+          dark: "#C9462F",
           muted: "#D4847A",
         },
         // Earth-tone label palette — cohesive with orange + cream
@@ -58,7 +63,7 @@ export default {
           dark: "#1F5234",
         },
         ochre: {
-          DEFAULT: "#A87014",
+          DEFAULT: "#946410",
           light: "#DBA84D",
           dark: "#704A05",
         },

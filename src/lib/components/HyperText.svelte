@@ -13,6 +13,7 @@
     let displayText = text;
     let interval: ReturnType<typeof setInterval>;
     let isAnimating = false;
+    let prefersReducedMotion = false;
 
     function triggerAnimation() {
         if (isAnimating) return;
@@ -49,7 +50,10 @@
     }
 
     onMount(() => {
-        if (animateOnLoad) {
+        // displayText already holds the final text, so skipping the scramble
+        // simply shows it statically for reduced-motion users.
+        prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (animateOnLoad && !prefersReducedMotion) {
             setTimeout(() => triggerAnimation(), delay);
         }
     });
@@ -61,7 +65,7 @@
 
 <span
     class="inline-block whitespace-pre cursor-default {className}"
-    on:mouseenter={() => hoverTrigger && triggerAnimation()}
+    on:mouseenter={() => hoverTrigger && !prefersReducedMotion && triggerAnimation()}
     role="presentation"
 >
     {displayText}

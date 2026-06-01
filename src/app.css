@@ -28,6 +28,9 @@
   html {
     @apply motion-safe:scroll-smooth;
     scroll-behavior: smooth;
+    /* Reserve space for the scrollbar so layout doesn't jump between pages
+       that scroll and pages that don't (replaces the old 100vw-100% hack). */
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -37,12 +40,20 @@
     line-height: 1.45;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Subtle dot-grid texture (à la gravity7.com): a 1px ink dot fading to
+       transparent at 1.2px, tiled on a 5px grid at very low opacity so it
+       reads as paper texture rather than a visible pattern. */
+    background-image: radial-gradient(rgba(26, 26, 26, 0.028) 1px, transparent 1.2px);
+    background-size: 5px 5px;
+    background-position: 0 0;
   }
 
   /* Dark mode base styles */
   .dark body,
   body.dark {
     @apply bg-ink-900 text-cream-200;
+    /* Warm-cream dots over the near-black background; size/position inherit. */
+    background-image: radial-gradient(rgba(250, 240, 230, 0.032) 1px, transparent 1.2px);
   }
 
   .dark strong,
@@ -137,7 +148,7 @@
   }
 
   .link-subtle:hover {
-    @apply text-accent;
+    @apply text-accent-dark;
     transform: translateY(-1px);
   }
 
@@ -188,13 +199,15 @@
     @apply text-cream-400;
   }
 
+  /* Opaque so the body dot-grid texture does not bleed through the card
+     (matches gravity7's opaque-content-over-dotted-page approach). */
   .surface-card {
-    @apply rounded-xl border border-ink-200/70 bg-blush-100/25;
+    @apply rounded-xl border border-ink-200/70 bg-blush-50;
     box-shadow: 0 8px 32px rgba(26, 26, 26, 0.05);
   }
 
   .dark .surface-card {
-    @apply border-ink-700/80 bg-ink-800/80;
+    @apply border-ink-700/80 bg-ink-800;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
   }
 
@@ -403,10 +416,3 @@ img {
   -ms-user-select: none;
 }
 
-/* Fix horizontal scrollbar on wide screens */
-@media screen and (min-width: 960px) {
-  html {
-    margin-left: calc(100vw - 100%);
-    margin-right: 0;
-  }
-}

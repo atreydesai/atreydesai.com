@@ -30,6 +30,11 @@
     }
     gl = ctx;
 
+    // Reduced-motion: draw one static frame and never start the RAF loop.
+    const prefersReducedMotion = matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
     function compile(type: number, src: string) {
       const sh = gl!.createShader(type)!;
       gl!.shaderSource(sh, src);
@@ -138,7 +143,7 @@
 
     function render(now: number) {
       if (!gl) return;
-      if (!visible) {
+      if (!visible && !prefersReducedMotion) {
         raf = requestAnimationFrame(render);
         return;
       }
@@ -171,7 +176,7 @@
         lastFpsT = now;
       }
 
-      raf = requestAnimationFrame(render);
+      if (!prefersReducedMotion) raf = requestAnimationFrame(render);
     }
     raf = requestAnimationFrame(render);
 

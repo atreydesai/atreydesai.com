@@ -13,11 +13,14 @@
     let animationFrame: number;
     let image: HTMLImageElement;
     let imageLoaded = false;
+    let prefersReducedMotion = false;
 
     const animationDuration = 400; // ms
 
     onMount(() => {
         if (!browser) return;
+
+        prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
         image = new Image();
         image.crossOrigin = "anonymous";
@@ -124,6 +127,8 @@
     }
 
     function handleMouseEnter() {
+        // Respect reduced-motion: leave the plain <img> visible, skip pixelation.
+        if (prefersReducedMotion) return;
         isHovering = true;
         if (animationFrame) cancelAnimationFrame(animationFrame);
         animate(1, animationProgress, Date.now());
@@ -136,13 +141,14 @@
     }
 </script>
 
+<!-- The inner <img alt> is the accessible image; the wrapper only drives the
+     decorative hover pixelation, so it carries no role/label of its own. -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="lego-image-container"
     bind:this={container}
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
-    role="img"
-    aria-label={alt}
 >
     <!-- Plain <img> is the LCP element — renders from the <link rel=preload>
          in app.html immediately, no JS needed. The canvas sits on top and

@@ -209,11 +209,13 @@
                 options={categoryOptions}
                 bind:value={selectedCategory}
                 placeholder="All Categories"
+                ariaLabel="Filter by category"
             />
             <CustomSelect
                 options={tagOptions}
                 bind:value={selectedTag}
                 placeholder="All Tags"
+                ariaLabel="Filter by tag"
             />
         </div>
     </div>
@@ -366,7 +368,7 @@
                 <!-- Clickable header -->
                 <button
                     type="button"
-                    class="w-full py-3 text-left group transition-all duration-200 hover:bg-cream-50 dark:hover:bg-ink-800/50 -mx-2 px-2 rounded"
+                    class="w-full py-4 text-left group transition-all duration-200 hover:bg-cream-50 dark:hover:bg-ink-800/50 -mx-2 px-2 rounded"
                     on:click={() => toggleNotes(book.id)}
                 >
                     <!-- Desktop: Table row layout -->
@@ -399,7 +401,7 @@
                         <!-- Category -->
                         <div class="col-span-2 pl-1">
                             <span
-                                class="inline-block px-2 py-0.5 text-xs rounded border border-current bg-transparent {getCategoryColor(
+                                class="pill !font-normal {getCategoryColor(
                                     book.category,
                                 )}"
                             >
@@ -474,7 +476,7 @@
                                 <!-- Pills row -->
                                 <div class="flex flex-wrap gap-2">
                                     <span
-                                        class="inline-block px-2 py-0.5 text-xs rounded {getCategoryColor(
+                                        class="pill !font-normal {getCategoryColor(
                                             book.category,
                                         )}"
                                     >

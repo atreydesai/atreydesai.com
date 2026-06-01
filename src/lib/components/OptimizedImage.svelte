@@ -7,6 +7,9 @@
     export let priority: boolean = false; // For above-the-fold images
     export let class_: string = "";
     export { class_ as class };
+    // Responsive candidate set (e.g. "img-400.webp 400w, img-800.webp 800w").
+    // Without it `sizes` is inert and the browser always loads the single src.
+    export let srcset: string = "";
 
     let loaded = false;
     let imgElement: HTMLImageElement;
@@ -49,6 +52,7 @@
         {src}
         {alt}
         {sizes}
+        srcset={srcset || undefined}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         fetchpriority={priority ? "high" : "auto"}

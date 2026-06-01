@@ -130,7 +130,7 @@
                     <div
                         class="fn-inner footnote-item text-xs text-ink-500 dark:text-ink-400 leading-relaxed"
                     >
-                        <span class="font-medium text-accent"
+                        <span class="font-medium text-accent-dark dark:text-accent-light"
                             >{footnote.id}.</span
                         >
                         {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
@@ -311,7 +311,7 @@
                     <div
                         class="text-xs text-ink-500 dark:text-ink-400 leading-relaxed"
                     >
-                        <span class="font-medium text-accent"
+                        <span class="font-medium text-accent-dark dark:text-accent-light"
                             >{footnote.id}.</span
                         >
                         {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}

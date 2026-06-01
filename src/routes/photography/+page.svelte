@@ -137,6 +137,7 @@
                     >
                         <OptimizedImage
                             src={photo.thumbSrc}
+                            srcset={photo.thumbSrcset}
                             alt={photo.alt}
                             aspectRatio={photo.orientation}
                             class="h-full w-full"

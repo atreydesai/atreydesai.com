@@ -113,7 +113,7 @@
       <main
         id="main-content"
         class="flex-1"
-        in:fly={{ x: -10, duration: 350, delay: 350 }}
+        in:fly={{ x: -10, duration: 350, delay: 150 }}
         out:fly={{ y: 5, duration: 350 }}
       >
         <slot />

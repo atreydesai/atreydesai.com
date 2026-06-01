@@ -145,8 +145,11 @@
 </div>
 
 <style>
+    /* Italic serif headings to match the site-wide `section-heading` voice
+       (every other page uses italic Source Serif for in-content headings). */
     .prose-custom :global(h2) {
-        font-family: "neue-haas-grotesk-display", sans-serif;
+        font-family: "Source Serif 4", "source-serif-fallback", serif;
+        font-style: italic;
         font-size: 1.5rem;
         font-weight: 600;
         margin-top: 2rem;
@@ -154,7 +157,8 @@
     }
 
     .prose-custom :global(h3) {
-        font-family: "neue-haas-grotesk-display", sans-serif;
+        font-family: "Source Serif 4", "source-serif-fallback", serif;
+        font-style: italic;
         font-size: 1.25rem;
         font-weight: 600;
         margin-top: 1.5rem;
