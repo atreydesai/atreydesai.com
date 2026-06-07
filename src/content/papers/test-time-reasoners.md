@@ -23,7 +23,7 @@ featured: true
 highlight: false
 priority: 2
 image: /images/papers/ttr-accuracy.png
-imageAnimated: null
+imageAnimated: /images/papers/test-time-reasoners.mp4
 imageDescription: "LLM accuracy with/without reasoning in full/choices-only MCQA settings. * are significant differences (paired t-test p < 0.05, 0.001, 0.0001). TTR boosts Full accuracy in most cases, and for Choices-Only in 15/36 cases."
 ---
 

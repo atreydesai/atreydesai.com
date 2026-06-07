@@ -313,7 +313,7 @@
         <div class="section-rule-line"></div>
       </div>
 
-      <div class="space-y-2 stagger-children">
+      <div class="space-y-1 stagger-children">
         {#each featuredPapers as paper (paper.id)}
           <ResearchCard {paper} variant="preview" />
         {/each}

@@ -223,7 +223,7 @@
 
             <div class="space-y-4">
                 {#each talkGroups as talkGroup}
-                    <article class="surface-card !rounded surface-card-hover border-transparent p-4 md:p-5">
+                    <article class="surface-card !rounded surface-card-hover p-4 md:p-5">
                         <h3
                             class="text-lg font-semibold text-ink-900 dark:text-cream-100"
                         >
@@ -282,7 +282,7 @@
 
             <div class="space-y-4">
                 {#each presentationGroups as talkGroup}
-                    <article class="surface-card !rounded surface-card-hover border-transparent p-4 md:p-5">
+                    <article class="surface-card !rounded surface-card-hover p-4 md:p-5">
                         <h3
                             class="text-lg font-semibold text-ink-900 dark:text-cream-100"
                         >

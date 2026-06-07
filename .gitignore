@@ -16,6 +16,10 @@ src/projects
 static/images/photography/thumbs/
 build_*.txt
 
+# Manim render artifacts (scenes live in scripts/manim/explainers.py)
+/media/
+__pycache__/
+
 # Local Codex skills
 .agents/
 skills-lock.json

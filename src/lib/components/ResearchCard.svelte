@@ -1,8 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
-    import { Twitter, Pause } from "lucide-svelte";
-    import { Binary, Award, PenLine, X, Play, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight } from "@jis3r/icons";
+    import { Twitter } from "lucide-svelte";
+    import { Binary, Award, PenLine, X, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight } from "@jis3r/icons";
     import FileText from "$lib/components/icons/FileText.svelte";
 
     export let paper: {
@@ -36,8 +36,8 @@
 
     let isHovered = false;
     let lightboxOpen = false;
-    let showAnimated = false;
     let imageOrientation: "landscape" | "portrait" = "landscape";
+    let videoEl: HTMLVideoElement | null = null;
 
     function handleImageLoad(e: Event) {
         const img = e.currentTarget as HTMLImageElement;
@@ -45,6 +45,21 @@
             imageOrientation =
                 img.naturalWidth >= img.naturalHeight ? "landscape" : "portrait";
         }
+    }
+
+    // The explainer animation plays only while the card is hovered/focused.
+    // Start it from the top each time so it reads as a fresh loop.
+    function startPreview() {
+        isHovered = true;
+        if (videoEl) {
+            videoEl.currentTime = 0;
+            videoEl.play().catch(() => {});
+        }
+    }
+
+    function stopPreview() {
+        isHovered = false;
+        videoEl?.pause();
     }
     let tldrOpen = false;
     let authorsExpanded = false;
@@ -138,7 +153,6 @@
         if (!paper.image) return;
 
         lightboxOpen = true;
-        showAnimated = false;
         triggerElement = trigger;
 
         if (typeof document !== "undefined") {
@@ -150,7 +164,6 @@
 
     function closeLightbox() {
         lightboxOpen = false;
-        showAnimated = false;
 
         if (typeof document !== "undefined") {
             document.body.style.overflow = "";
@@ -177,10 +190,6 @@
                 if (document.activeElement === last) { e.preventDefault(); first.focus(); }
             }
         }
-    }
-
-    function toggleAnimated() {
-        showAnimated = !showAnimated;
     }
 
     function formatAuthors(authors: string[]): string {
@@ -223,8 +232,6 @@
         "p-4",
         "md:p-5",
         "surface-card-hover",
-        "border-transparent",
-        paper.highlight ? "border-transparent" : "",
         highlighted
             ? "ring-2 ring-accent/35 ring-offset-2 ring-offset-cream-100 dark:ring-offset-ink-900"
             : "",
@@ -478,13 +485,15 @@
 
             {#if paper.image}
                 <div
-                    class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-24" : "md:w-32"}`}
+                    class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-40 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-48"}`}
                 >
                     <button
                         type="button"
                         on:click={(e) => openLightbox(e.currentTarget)}
-                        on:mouseenter={() => (isHovered = true)}
-                        on:mouseleave={() => (isHovered = false)}
+                        on:mouseenter={startPreview}
+                        on:mouseleave={stopPreview}
+                        on:focus={startPreview}
+                        on:blur={stopPreview}
                         class={`relative block aspect-square w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
                         aria-label={`Open image for ${paper.title}`}
                     >
@@ -512,16 +521,21 @@
                         </picture>
 
                         {#if paper.imageAnimated}
+                            <!-- Plays only while the card is hovered/focused:
+                                 the static figure shows by default and the
+                                 animation fades in (starting from the top) on
+                                 hover, then pauses on leave. -->
                             {#if isVideo}
                                 <!-- svelte-ignore a11y-media-has-caption -->
                                 <video
+                                    bind:this={videoEl}
                                     src={paper.imageAnimated}
                                     class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
                                     class:opacity-0={!isHovered}
-                                    autoplay
                                     loop
                                     muted
                                     playsinline
+                                    preload="metadata"
                                 ></video>
                             {:else}
                                 <img
@@ -532,15 +546,6 @@
                                     loading="lazy"
                                 />
                             {/if}
-                        {/if}
-
-                        {#if paper.imageAnimated}
-                            <div
-                                class="absolute bottom-3 right-3 rounded-full bg-ink-900/75 p-1.5 text-cream-100 transition-opacity duration-300"
-                                class:opacity-0={isHovered}
-                            >
-                                <Play size={12} />
-                            </div>
                         {/if}
                     </button>
                 </div>
@@ -578,48 +583,11 @@
                 on:click|stopPropagation={() => {}}
                 on:keydown|stopPropagation={() => {}}
             >
-                {#if showAnimated && paper.imageAnimated}
-                    {#if isVideo}
-                        <!-- svelte-ignore a11y-media-has-caption -->
-                        <video
-                            src={paper.imageAnimated}
-                            class="max-h-[70vh] max-w-full rounded-2xl object-contain"
-                            autoplay
-                            loop
-                            muted
-                            playsinline
-                            controls
-                        ></video>
-                    {:else}
-                        <img
-                            src={paper.imageAnimated}
-                            alt={`${paper.title} animated diagram`}
-                            class="max-h-[70vh] max-w-full rounded-2xl object-contain"
-                        />
-                    {/if}
-                {:else}
-                    <img
-                        src={paper.image}
-                        alt={`${paper.title} diagram`}
-                        class="max-h-[70vh] max-w-full rounded-2xl object-contain"
-                    />
-                {/if}
-
-                {#if paper.imageAnimated}
-                    <button
-                        type="button"
-                        class="mt-4 inline-flex items-center gap-2 rounded-full bg-ink-700 px-4 py-2 text-sm font-medium text-cream-100 transition-colors hover:bg-ink-600"
-                        on:click|stopPropagation={toggleAnimated}
-                    >
-                        {#if showAnimated}
-                            <Pause size={16} />
-                            Show Static
-                        {:else}
-                            <Play size={16} />
-                            Show Animated
-                        {/if}
-                    </button>
-                {/if}
+                <img
+                    src={paper.image}
+                    alt={`${paper.title} diagram`}
+                    class="max-h-[70vh] max-w-full rounded-2xl object-contain"
+                />
 
                 <div class="mt-4 max-w-xl text-center text-sm text-cream-300">
                     <p class="mb-1 font-medium text-cream-100">{paper.title}</p>

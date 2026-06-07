@@ -43,7 +43,7 @@
     /* Subtle dot-grid texture (à la gravity7.com): a 1px ink dot fading to
        transparent at 1.2px, tiled on a 5px grid at very low opacity so it
        reads as paper texture rather than a visible pattern. */
-    background-image: radial-gradient(rgba(26, 26, 26, 0.028) 1px, transparent 1.2px);
+    background-image: radial-gradient(rgba(26, 26, 26, 0.016) 1px, transparent 1.2px);
     background-size: 5px 5px;
     background-position: 0 0;
   }
@@ -53,7 +53,7 @@
   body.dark {
     @apply bg-ink-900 text-cream-200;
     /* Warm-cream dots over the near-black background; size/position inherit. */
-    background-image: radial-gradient(rgba(250, 240, 230, 0.032) 1px, transparent 1.2px);
+    background-image: radial-gradient(rgba(250, 240, 230, 0.018) 1px, transparent 1.2px);
   }
 
   .dark strong,
@@ -199,31 +199,28 @@
     @apply text-cream-400;
   }
 
-  /* Opaque so the body dot-grid texture does not bleed through the card
-     (matches gravity7's opaque-content-over-dotted-page approach). */
+  /* ===== Card treatment — VARIANT D: ledger rows =====
+     No box at all — each work is a bibliography row on the bare paper,
+     divided by a faded hairline (same fade as the section rules). Hover
+     washes the row with a faint warm tint; nothing floats or lifts. */
   .surface-card {
-    @apply rounded-xl border border-ink-200/70 bg-blush-50;
-    box-shadow: 0 8px 32px rgba(26, 26, 26, 0.05);
-  }
-
-  .dark .surface-card {
-    @apply border-ink-700/80 bg-ink-800;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    position: relative;
   }
 
   .surface-card-hover {
-    @apply transition-all duration-300 ease-out;
+    @apply transition-colors duration-200 ease-out;
   }
 
   .surface-card-hover:hover {
-    border-color: theme("colors.blush.300");
-    box-shadow: 0 16px 48px rgba(26, 26, 26, 0.08);
-    transform: translateY(-3px);
+    background: rgba(232, 93, 76, 0.06);
   }
 
   .dark .surface-card-hover:hover {
-    border-color: theme("colors.ink.700");
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+    background: rgba(245, 230, 211, 0.05);
   }
 
   .highlight-glow {
