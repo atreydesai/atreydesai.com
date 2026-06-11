@@ -1,0 +1,10 @@
+---
+id: "the-lunchbox"
+title: "The Lunchbox"
+author: ""
+category: fiction
+dateAdded: "2026-04-16"
+favorite: false
+medium: movie
+status: shelved
+---

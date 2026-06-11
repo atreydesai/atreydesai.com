@@ -18,9 +18,14 @@ build_*.txt
 
 # Manim render artifacts (scenes live in scripts/manim/explainers.py)
 /media/
+scripts/manim/media/
 __pycache__/
 
 # Local Codex skills
 .agents/
 skills-lock.json
 .vercel
+.mdl-curl
+.mdl-cookie
+.mdl-timeline-curl
+.mdl-console.js

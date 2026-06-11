@@ -1,0 +1,167 @@
+# CV page content - edit this file to update /cv
+# Strings ending in _html (and the publications/mentorship items) contain raw
+# HTML and are rendered with {@html} in src/routes/cv/+page.svelte.
+
+education:
+  school: University of Maryland, College Park
+  degree: B.S. in Computer Science (Honors) & B.A. in Linguistics (Minor in Korean Studies) · Expected May 2027
+  advisors_html: 'Advisors: <a href="https://www.cs.umd.edu/people/rudinger" class="link">Prof. Rachel Rudinger</a> & <a href="https://www.cs.umd.edu/~jbg/" class="link">Prof. Jordan Boyd-Graber</a>'
+  coursework_html: '<strong>Coursework:</strong> Natural Language Processing (Grad), Commonsense Reasoning (Grad), Mechanistic Interpretability (Grad)*, Machine Learning, Data Science, Parallel Computing*, Computer Systems, Syntax, Semantics*, Phonetics, Psycholinguistics.'
+
+experience:
+  - organization: University of Maryland, College Park
+    dates: May 2024 – present
+    role: Undergrad Researcher, CLIP Lab
+    advisors: 'Advisors: Prof. Rachel Rudinger & Prof. Jordan Boyd-Graber'
+    bullets:
+      - >-
+        Quantified differential LLM susceptibility to human-written vs.
+        LLM-generated MCQs to assess if questions contain unintended artifacts
+        and are solvable without full context; created tools to isolate
+        distractor-choice provenance effects and improve the reliability of
+        human synthetic data for model evaluation and distillation.
+      - >-
+        Constructed an adversarial benchmark to test VLM capabilities in
+        detecting out-of-context (OOC) video-based misinformation on social
+        media based on multimodal clues and user interactions to probe
+        reasoning under deceptive framing.
+      - >-
+        Applied causal interpretability techniques to demonstrate that LMs
+        require significantly more data than humans to acquire general
+        syntactic representations, revealing heightened sensitivity to
+        item-level and construction-level variation.
+      - >-
+        Developed an oracle-free framework for estimating process reward
+        annotation quality without ground truth using behavioral signals,
+        inducing better step-by-step reasoning in Process Reward Models (PRMs)
+        for RL in non-verifiable tasks.
+
+  - organization: The University of Texas at Arlington
+    dates: Feb 2024 – present
+    role: Visiting Researcher, ACL2 Lab & NSF
+    advisors: 'Advisor: Prof. Kenny Zhu'
+    bullets:
+      - >-
+        Designed AniVoice-cat, a dataset of 26,000+ annotated cat vocalizations
+        from 250+ hours of video and identified 57 unique cat phones,
+        establishing a foundational resource for computational research in
+        non-human communication.
+      - >-
+        Improved transcription pipeline using PANNs and HuBERT models to 96%
+        accuracy with 93% top-5 accuracy in action recognition, setting a new
+        state-of-the-art for automated animal vocalization analysis.
+
+  - organization: Learn Prompting
+    dates: May 2025 – Jan 2026
+    role: Member of Technical Staff (San Francisco, CA)
+    bullets:
+      - >-
+        Ran Hackaprompt, the world's largest red-teaming hackathon, overseeing
+        user engagement and technical challenges.
+      - >-
+        Researched the robustness of AI safety judges against CBRNE-related
+        adversarial content.
+
+  - organization: University of Maryland, College Park
+    dates: Dec 2023 – Aug 2024
+    role: Researcher, FIRE Sustainability Analytics Lab
+    advisors: 'Advisor: Prof. Thanicha Ruangmas'
+    bullets:
+      - >-
+        Developed Python pipeline for environmental impact assessments of U.S.
+        emissions, enabling more efficient policy.
+      - >-
+        Drafted a framework to guide evidence-based policymaking on climate
+        restoration strategies.
+
+  - organization: Brown University
+    dates: Dec 2020 – June 2023
+    role: Researcher, Reinforcement Learning at Brown Group
+    advisors: 'Advisor: Prof. Michael Littman'
+    bullets:
+      - >-
+        Developed a custom RL environment that empowered non-technical users to
+        programmatically solve complex tasks by defining reward functions and
+        specifying agent behavior, reducing task setup time.
+      - >-
+        Published and presented research at two top-tier workshops (AAAI,
+        RLDM), demonstrating how human-readable interfaces enable fine-grained
+        control during inference and improve AI-human interaction in robotics.
+
+publications:
+  groups:
+    - heading: Preprints
+      items:
+        - '<strong>A Preview of Computational Animal Linguistics</strong>.<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Tirza Panunto, Lindsay Pike, Theron S. Wang, Tuan M. Dang, Hridayesh Lekhak and Kenny Q. Zhu.<br /><em>Under Review (ACM Computing Surveys)</em>.'
+    - heading: Publications
+      items:
+        - '<strong>Filling in the Mechanisms: How do LMs Learn Filler-Gap Dependencies under Developmental Constraints?</strong><br />ACL 2026 (Findings) · <em>Oral at TLS 2026</em><br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span> and Sathvik Nair.'
+        - '<a href="https://arxiv.org/abs/2602.06221" class="link"><strong>BenchMarker: An Education-Inspired Toolkit for Highlighting Flaws in Multiple-Choice Benchmarks</strong></a>.<br />ACL 2026<br />Nishant Balepur, Bhavya Rajasekaran, Jane Oh, Michael Xie, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, …, Jordan Boyd-Graber.'
+        - '<a href="https://arxiv.org/abs/2510.07761" class="link"><strong>Test-Time Reasoners Are Strategic Multiple-Choice Test-Takers</strong></a>.<br />ACL 2026 (Oral)<br />Nishant Balepur, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span> and Rachel Rudinger.'
+        - '<a href="https://scholar.google.com/citations?view_op=view_citation&hl=en&user=hTDzj6cAAAAJ&citation_for_view=hTDzj6cAAAAJ:d1gkVwhDpl0C" class="link"><strong>Language Models Generate Multiple-Choice Questions with Artifacts</strong></a>.<br />MASC-SLL 2025<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Nishant Balepur and Rachel Rudinger.'
+        - '<a href="https://scholar.google.com/citations?view_op=view_citation&hl=en&user=hTDzj6cAAAAJ&citation_for_view=hTDzj6cAAAAJ:u5HHmVD_uO8C" class="link"><strong>Reinforcement Learning As End-User Trigger-Action Programming</strong></a>.<br />IML Workshop @ AAAI 2022 · RLDM 2022<br />Chace Hayhurst, Hyojae Park, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Suheidy De Los Santos and Michael Littman.'
+  note_html: 'See the full list on my <a href="/research" class="link">research page</a>.'
+
+awards:
+  - name: SPIRE Research Grant
+    amount: "$3,000"
+    year: "2025"
+  - name: Omicron Delta Kappa Top 10 Freshman
+    year: "2024"
+  - name: CMSC & ARHU Dean's List
+    year: "2023 – 2026"
+  - name: UMD President's Scholarship
+    amount: "$50,000"
+    year: "2023"
+  - name: NMSC National Merit Scholarship
+    amount: "$4,000"
+    year: "2023"
+  - name: Catherine Yang Scholarship
+    amount: "$1,000"
+    year: "2023"
+
+talks:
+  - title: Filler-Gap Dependencies under Developmental Constraints in LMs
+    venues:
+      - name: Texas Linguistics Society
+        date: Feb 2026
+      - name: UMD Computational Cognitive Science Reading Group
+        date: Feb 2026
+  - title: Adaptor Grammars and Neural Networks for Feline Lexical Discovery
+    venues:
+      - name: University of Maryland, College Park
+        date: Nov 2024
+      - name: UT Arlington, Department of Computer Science
+        date: July 2024
+
+responsibilities:
+  positions:
+    - role_html: '<strong>Subreviewer</strong>, ACL Rolling Review (ARR)'
+      dates: 2025 – present
+    - role_html: '<strong>Member</strong>, University Research Advisory Board'
+      dates: 2025 – present
+    - role_html: '<strong>Vice Chair</strong>, Computer Science Department Council'
+      dates: 2025 – present
+      note: Appointed by faculty and student body; represent 4,200+ CS undergraduates.
+    - role_html: '<strong>Senior Member</strong>, FIRE Student Leadership Council'
+      dates: 2024 – present
+      note: Represented 1000+ peers, ran events & workshops, and reformed class curricula.
+    - role_html: '<strong>University Ambassador</strong>'
+      dates: 2024 – present
+      note: Represented the CS Dept. & CMNS College at admissions events and to official guests.
+  mentorship:
+    title: Mentorship
+    items:
+      - '<strong>Office of Undergraduate Research:</strong> Juan Cortés, Kemisola Benson, Vivian Akpala <span class="text-ink-500 dark:text-ink-400">— 2025</span>'
+      - '<strong>Technica Mentoring:</strong> Savya Miriyala, Tanya Grover, Jessica Ononye, Nakshatra Hiray <span class="text-ink-500 dark:text-ink-400">— 2024</span>'
+      - '<strong>MSET Robotics:</strong> Workshop organizer and curriculum designer <span class="text-ink-500 dark:text-ink-400">— 2020 – 2022</span>'
+
+skills:
+  - label: Languages
+    items: Python, Java, JavaScript/HTML/CSS, R, MATLAB.
+  - label: Libraries/Frameworks
+    items: Huggingface (Datasets, Transformers), NLTK, PyTorch, Selenium, BeautifulSoup.
+  - label: Tools
+    items: Git, Docker, GCP, Google Vertex AI, VS Code.
+  - label: Natural Languages
+    items: English (Native), Gujarati (Native), Spanish (Intermediate), Korean (Beginner).

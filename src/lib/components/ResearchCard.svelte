@@ -1,16 +1,15 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { browser } from "$app/environment";
-    import { Twitter } from "lucide-svelte";
-    import { Binary, Award, PenLine, X, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight } from "@jis3r/icons";
-    import FileText from "$lib/components/icons/FileText.svelte";
+    import { Award } from "@jis3r/icons";
+    import AuthorList from "$lib/components/research/AuthorList.svelte";
+    import PaperLinks from "$lib/components/research/PaperLinks.svelte";
+    import PaperMedia from "$lib/components/research/PaperMedia.svelte";
 
     export let paper: {
         id: string;
         title: string;
         authors: string[];
         year: number;
-        venue: string;
+        venue: string | null;
         arxiv: string | null;
         pdf: string | null;
         code: string | null;
@@ -34,197 +33,15 @@
     export let highlighted = false;
     export let variant: "preview" | "full" = "full";
 
-    let isHovered = false;
-    let lightboxOpen = false;
-    let imageOrientation: "landscape" | "portrait" = "landscape";
-    let videoEl: HTMLVideoElement | null = null;
-
-    function handleImageLoad(e: Event) {
-        const img = e.currentTarget as HTMLImageElement;
-        if (img.naturalWidth && img.naturalHeight) {
-            imageOrientation =
-                img.naturalWidth >= img.naturalHeight ? "landscape" : "portrait";
-        }
-    }
-
-    // The explainer animation plays only while the card is hovered/focused.
-    // Start it from the top each time so it reads as a fresh loop.
-    function startPreview() {
-        isHovered = true;
-        if (videoEl) {
-            videoEl.currentTime = 0;
-            videoEl.play().catch(() => {});
-        }
-    }
-
-    function stopPreview() {
-        isHovered = false;
-        videoEl?.pause();
-    }
     let tldrOpen = false;
-    let authorsExpanded = false;
-    let authorsEl: HTMLElement | null = null;
-    let isAuthorsOverflowing = false;
-    let visibleCharCount = 0;
 
-    function expandAuthors() {
-        if (customCollapse) {
-            visibleCharCount =
-                paper.authors[0].length + 2 + paper.authors[1].length;
-        } else if (authorsEl && authorsEl.scrollWidth > 0) {
-            const ratio = authorsEl.clientWidth / authorsEl.scrollWidth;
-            visibleCharCount = Math.max(0, Math.floor(authorChars.length * ratio) - 2);
-        } else {
-            visibleCharCount = 0;
-        }
-        authorsExpanded = true;
-    }
-
-    $: atreyIdx = paper.authors.findIndex((a) => a.includes("Atrey Desai"));
-    $: customCollapse = atreyIdx > 1;
-    $: collapsedAuthorList = customCollapse
-        ? [
-              paper.authors[0],
-              paper.authors[1],
-              "...",
-              paper.authors[atreyIdx],
-              ...(atreyIdx < paper.authors.length - 1 ? ["..."] : []),
-          ]
-        : paper.authors;
-    $: hasHiddenAuthors = customCollapse || isAuthorsOverflowing;
-    let triggerElement: HTMLElement | null = null;
-    let dialogElement: HTMLElement | null = null;
-
-    function checkAuthorsOverflow() {
-        if (authorsEl) {
-            isAuthorsOverflowing = authorsEl.scrollWidth > authorsEl.clientWidth + 1;
-        }
-    }
-
-    $: authorChars = (() => {
-        const out: { c: string; bold: boolean }[] = [];
-        paper.authors.forEach((author, idx) => {
-            const bold = author.includes("Atrey Desai");
-            for (const ch of author) out.push({ c: ch, bold });
-            if (idx < paper.authors.length - 1) {
-                out.push({ c: ",", bold: false });
-                out.push({ c: " ", bold: false });
-            }
-        });
-        return out;
-    })();
-
-    $: authorGroups = (() => {
-        const groups: { kind: "name" | "sep"; chars: { c: string; bold: boolean; i: number }[] }[] = [];
-        let i = 0;
-        paper.authors.forEach((author, idx) => {
-            const bold = author.includes("Atrey Desai");
-            const chars: { c: string; bold: boolean; i: number }[] = [];
-            for (const ch of author) chars.push({ c: ch, bold, i: i++ });
-            groups.push({ kind: "name", chars });
-            if (idx < paper.authors.length - 1) {
-                groups.push({
-                    kind: "sep",
-                    chars: [
-                        { c: ",", bold: false, i: i++ },
-                        { c: " ", bold: false, i: i++ },
-                    ],
-                });
-            }
-        });
-        return groups;
-    })();
-
-    // Per-link hover states for icon animation triggering
+    // Per-pill hover states for award icon animation triggering
     let hoveredLink: string | null = null;
 
-    onMount(() => {
-        checkAuthorsOverflow();
-        window.addEventListener("resize", checkAuthorsOverflow);
-        return () => {
-            window.removeEventListener("resize", checkAuthorsOverflow);
-            if (typeof document !== "undefined") {
-                document.body.style.overflow = "";
-            }
-        };
-    });
-
-    function openLightbox(trigger: HTMLElement) {
-        if (!paper.image) return;
-
-        lightboxOpen = true;
-        triggerElement = trigger;
-
-        if (typeof document !== "undefined") {
-            document.body.style.overflow = "hidden";
-        }
-
-        setTimeout(() => dialogElement?.focus(), 0);
-    }
-
-    function closeLightbox() {
-        lightboxOpen = false;
-
-        if (typeof document !== "undefined") {
-            document.body.style.overflow = "";
-        }
-
-        triggerElement?.focus();
-        triggerElement = null;
-    }
-
-    function trapFocus(e: KeyboardEvent) {
-        if (!dialogElement) return;
-        const focusable = Array.from(
-            dialogElement.querySelectorAll<HTMLElement>(
-                'button, [href], input, [tabindex]:not([tabindex="-1"])'
-            )
-        ).filter(el => !el.hasAttribute('disabled'));
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.key === "Tab") {
-            if (e.shiftKey) {
-                if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-            } else {
-                if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-            }
-        }
-    }
-
-    function formatAuthors(authors: string[]): string {
-        return authors
-            .map((author) => {
-                if (author === "...") return "…";
-                return author.includes("Atrey Desai")
-                    ? `<strong class="text-ink-900 dark:text-cream-100">${author}</strong>`
-                    : author;
-            })
-            .join(", ");
-    }
-
-    function portal(node: HTMLElement) {
-        document.body.appendChild(node);
-
-        return {
-            destroy() {
-                node.remove();
-            },
-        };
-    }
+    // Hovering anywhere on the card plays the explainer animation.
+    let cardHovered = false;
 
     $: isPreview = variant === "preview" || compact;
-    $: isVideo =
-        paper.imageAnimated?.endsWith(".mp4") ||
-        paper.imageAnimated?.endsWith(".webm");
-    $: hasLinks = Boolean(
-        paper.arxiv ||
-            paper.pdf ||
-            paper.code ||
-            paper.demo ||
-            paper.twitter ||
-            paper.blog,
-    );
     $: surfaceClasses = [
         "surface-card",
         "!rounded",
@@ -240,9 +57,14 @@
         .join(" ");
 </script>
 
-<svelte:window on:keydown={(e) => e.key === "Escape" && closeLightbox()} />
-
-<article id={paper.id} class="group relative" style="scroll-margin-top: 80px">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<article
+    id={paper.id}
+    class="group relative"
+    style="scroll-margin-top: 80px"
+    on:mouseenter={() => (cardHovered = true)}
+    on:mouseleave={() => (cardHovered = false)}
+>
     <div class={surfaceClasses}>
         {#if paper.highlight}
             <!-- Bottom-left corner accent: SVG with rounded ends + matching arc -->
@@ -286,54 +108,7 @@
                     {/if}
                 </h3>
 
-                <div class="mt-2 min-w-0">
-                    {#if authorsExpanded && hasHiddenAuthors}
-                        <p
-                            class={`leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
-                        >
-                            {#each authorGroups as group}
-                                {#if group.kind === "name"}
-                                    <span class="inline-block whitespace-nowrap align-baseline">
-                                        {#each group.chars as item}
-                                            <span
-                                                class="{item.i < visibleCharCount ? '' : 'char-reveal'} {item.bold ? 'font-semibold text-ink-900 dark:text-cream-100' : ''}"
-                                                style="animation-delay: {(item.i - visibleCharCount) * 8}ms"
-                                            >{item.c}</span>
-                                        {/each}
-                                    </span>
-                                {:else}
-                                    {#each group.chars as item}
-                                        <span
-                                            class={item.i < visibleCharCount ? '' : 'char-reveal'}
-                                            style="animation-delay: {(item.i - visibleCharCount) * 8}ms"
-                                        >{item.c === " " ? " " : item.c}</span>
-                                    {/each}
-                                {/if}
-                            {/each}
-                        </p>
-                    {:else if hasHiddenAuthors}
-                        <button
-                            type="button"
-                            on:click={expandAuthors}
-                            class="block w-full overflow-hidden text-left"
-                            aria-expanded={authorsExpanded}
-                        >
-                            <p
-                                bind:this={authorsEl}
-                                class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
-                            >
-                                {@html formatAuthors(collapsedAuthorList)}
-                            </p>
-                        </button>
-                    {:else}
-                        <p
-                            bind:this={authorsEl}
-                            class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
-                        >
-                            {@html formatAuthors(paper.authors)}
-                        </p>
-                    {/if}
-                </div>
+                <AuthorList authors={paper.authors} {isPreview} />
 
                 {#if paper.venue || paper.awards.length > 0 || paper.preprint}
                     <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -343,12 +118,14 @@
                             </span>
                         {/if}
                         {#if paper.preprint}
-                            <span class="pill text-accent dark:text-accent-light">preprint</span>
+                            <span class="pill bg-accent/10 text-accent-dark dark:bg-accent/15 dark:text-accent-light">preprint</span>
                         {/if}
                         {#each paper.awards as award, i}
+                            <!-- Status pills get a tinted fill so they read
+                                 louder than the neutral tag pills. -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <span
-                                class="pill text-ochre-dark dark:text-ochre-light"
+                                class="pill bg-ochre/15 font-medium text-ochre-dark dark:bg-ochre-dark/30 dark:text-ochre-light"
                                 on:mouseenter={() => (hoveredLink = `award-${i}`)}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >
@@ -359,112 +136,7 @@
                     </div>
                 {/if}
 
-                {#if hasLinks || paper.tldr}
-                    <div
-                        class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs"
-                    >
-                        {#if paper.tldr}
-                            <button
-                                type="button"
-                                on:click={() => (tldrOpen = !tldrOpen)}
-                                on:mouseenter={() => (hoveredLink = 'tldr')}
-                                on:mouseleave={() => (hoveredLink = null)}
-                                class="link-subtle inline-flex items-center gap-1.5"
-                                aria-expanded={tldrOpen}
-                            >
-                                {#if tldrOpen}
-                                    <ChevronsDownUp size={14} animate={hoveredLink === 'tldr'} />
-                                {:else}
-                                    <ChevronsUpDown size={14} animate={hoveredLink === 'tldr'} />
-                                {/if}
-                                tldr
-                            </button>
-                        {/if}
-                        {#if paper.arxiv}
-                            <a
-                                href={paper.arxiv}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="link-subtle inline-flex items-center gap-1.5"
-                                on:mouseenter={() => (hoveredLink = 'arxiv')}
-                                on:mouseleave={() => (hoveredLink = null)}
-                            >
-                                <CircleArrowOutUpRight size={14} animate={hoveredLink === 'arxiv'} />
-                                arxiv
-                            </a>
-                        {/if}
-
-                        {#if paper.pdf}
-                            <a
-                                href={paper.pdf}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="link-subtle inline-flex items-center gap-1.5"
-                                on:mouseenter={() => (hoveredLink = 'pdf')}
-                                on:mouseleave={() => (hoveredLink = null)}
-                            >
-                                <FileText size={14} animate={hoveredLink === 'pdf'} />
-                                pdf
-                            </a>
-                        {/if}
-
-                        {#if paper.code}
-                            <a
-                                href={paper.code}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="link-subtle inline-flex items-center gap-1.5"
-                                on:mouseenter={() => (hoveredLink = 'code')}
-                                on:mouseleave={() => (hoveredLink = null)}
-                            >
-                                <Binary size={14} animate={hoveredLink === 'code'} />
-                                code
-                            </a>
-                        {/if}
-
-                        {#if paper.demo}
-                            <a
-                                href={paper.demo}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="link-subtle inline-flex items-center gap-1.5"
-                                on:mouseenter={() => (hoveredLink = 'demo')}
-                                on:mouseleave={() => (hoveredLink = null)}
-                            >
-                                <CircleArrowOutUpRight size={14} animate={hoveredLink === 'demo'} />
-                                demo
-                            </a>
-                        {/if}
-
-                        {#if paper.twitter}
-                            <a
-                                href={paper.twitter}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="link-subtle inline-flex items-center gap-1.5"
-                                on:mouseenter={() => (hoveredLink = 'twitter')}
-                                on:mouseleave={() => (hoveredLink = null)}
-                            >
-                                <Twitter size={14} />
-                                twitter
-                            </a>
-                        {/if}
-
-                        {#if paper.blog}
-                            <a
-                                href={paper.blog}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="link-subtle inline-flex items-center gap-1.5"
-                                on:mouseenter={() => (hoveredLink = 'blog')}
-                                on:mouseleave={() => (hoveredLink = null)}
-                            >
-                                <PenLine size={14} animate={hoveredLink === 'blog'} />
-                                blog
-                            </a>
-                        {/if}
-                    </div>
-                {/if}
+                <PaperLinks {paper} bind:tldrOpen />
 
                 {#if paper.tldr && tldrOpen}
                     <p
@@ -483,159 +155,8 @@
                 {/if}
             </div>
 
-            {#if paper.image}
-                <div
-                    class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-40 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-48"}`}
-                >
-                    <button
-                        type="button"
-                        on:click={(e) => openLightbox(e.currentTarget)}
-                        on:mouseenter={startPreview}
-                        on:mouseleave={stopPreview}
-                        on:focus={startPreview}
-                        on:blur={stopPreview}
-                        class={`relative block aspect-square w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
-                        aria-label={`Open image for ${paper.title}`}
-                    >
-                        <picture>
-                            <source
-                                srcset={paper.image.replace(/\.(png|jpe?g)$/i, ".webp")}
-                                type="image/webp"
-                            />
-                            <img
-                                src={paper.image}
-                                alt={`${paper.title} preview`}
-                                width="800"
-                                height="600"
-                                on:load={handleImageLoad}
-                                class="preview-shake absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-                                class:shake-x={isHovered &&
-                                    imageOrientation === "landscape"}
-                                class:shake-y={isHovered &&
-                                    imageOrientation === "portrait"}
-                                class:opacity-0={isHovered &&
-                                    Boolean(paper.imageAnimated)}
-                                loading="lazy"
-                                decoding="async"
-                            />
-                        </picture>
-
-                        {#if paper.imageAnimated}
-                            <!-- Plays only while the card is hovered/focused:
-                                 the static figure shows by default and the
-                                 animation fades in (starting from the top) on
-                                 hover, then pauses on leave. -->
-                            {#if isVideo}
-                                <!-- svelte-ignore a11y-media-has-caption -->
-                                <video
-                                    bind:this={videoEl}
-                                    src={paper.imageAnimated}
-                                    class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-                                    class:opacity-0={!isHovered}
-                                    loop
-                                    muted
-                                    playsinline
-                                    preload="metadata"
-                                ></video>
-                            {:else}
-                                <img
-                                    src={paper.imageAnimated}
-                                    alt={`${paper.title} animated preview`}
-                                    class="absolute inset-0 h-full w-full object-cover transition-opacity duration-300"
-                                    class:opacity-0={!isHovered}
-                                    loading="lazy"
-                                />
-                            {/if}
-                        {/if}
-                    </button>
-                </div>
-            {/if}
+            <PaperMedia {paper} {isPreview} active={cardHovered} />
         </div>
     </div>
 
 </article>
-
-{#if lightboxOpen && paper.image && browser}
-    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-    <div class="lightbox-portal" use:portal>
-        <div
-            bind:this={dialogElement}
-            class="fixed inset-0 z-[9999] flex items-center justify-center bg-ink-900/95 p-4"
-            on:click={closeLightbox}
-            on:keydown={(e) => { trapFocus(e); if (e.key === "Escape") closeLightbox(); }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Image lightbox"
-            tabindex="-1"
-        >
-            <button
-                type="button"
-                class="absolute right-4 top-4 z-10 text-cream-100 transition-colors hover:text-cream-300"
-                on:click|stopPropagation={closeLightbox}
-                aria-label="Close lightbox"
-            >
-                <X size={32} />
-            </button>
-
-            <!-- svelte-ignore a11y-no-static-element-interactions -->
-            <div
-                class="flex max-h-[80vh] max-w-3xl flex-col items-center"
-                on:click|stopPropagation={() => {}}
-                on:keydown|stopPropagation={() => {}}
-            >
-                <img
-                    src={paper.image}
-                    alt={`${paper.title} diagram`}
-                    class="max-h-[70vh] max-w-full rounded-2xl object-contain"
-                />
-
-                <div class="mt-4 max-w-xl text-center text-sm text-cream-300">
-                    <p class="mb-1 font-medium text-cream-100">{paper.title}</p>
-                    {#if paper.imageDescription}
-                        <p>{paper.imageDescription}</p>
-                    {/if}
-                </div>
-            </div>
-        </div>
-    </div>
-{/if}
-
-<style>
-    .char-reveal {
-        display: inline;
-        opacity: 0;
-        animation: charReveal 110ms ease-out forwards;
-    }
-    @keyframes charReveal {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    /* Subtle pan of the preview within its fixed frame, only while hovered. The
-       image overflows the square in its long dimension (object-cover), so panning
-       object-position in that direction reveals hidden content without exposing
-       the frame edges. Keyframes start/end at center so there's no jump on
-       hover in/out. */
-    .preview-shake.shake-x {
-        animation: previewShakeX 2.4s ease-in-out infinite;
-    }
-    .preview-shake.shake-y {
-        animation: previewShakeY 2.4s ease-in-out infinite;
-    }
-    @keyframes previewShakeX {
-        0%, 100% { object-position: 50% center; }
-        25%      { object-position: 35% center; }
-        75%      { object-position: 65% center; }
-    }
-    @keyframes previewShakeY {
-        0%, 100% { object-position: center 50%; }
-        25%      { object-position: center 35%; }
-        75%      { object-position: center 65%; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .preview-shake.shake-x,
-        .preview-shake.shake-y {
-            animation: none;
-        }
-    }
-</style>

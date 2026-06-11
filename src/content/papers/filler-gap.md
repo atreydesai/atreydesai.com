@@ -22,8 +22,8 @@ preprint: false
 featured: true
 highlight: false
 priority: 3
-image: /images/papers/dasfigure.png
+image: /images/papers/filler-gap-poster.png
 imageAnimated: /images/papers/filler-gap.mp4
-imageDescription: "To create a DAS vector, we learn a direction 'a' to align neural representations with the binary variable FILLER_PRESENT. We intervene by projecting the difference between the source and base representations onto 'a' and injecting it into the base sentence."
+imageDescription: "Animated explainer: in 'Who did the teacher like __?', the filler 'Who' links to a gap later in the sentence. Injecting a learned filler signal into a child-scale LM's activations (DAS) flips its prediction from a pronoun to a gap, and this causal effect grows steadily with training data, emerging far later than in children, who show it by age 3."
 ---
 

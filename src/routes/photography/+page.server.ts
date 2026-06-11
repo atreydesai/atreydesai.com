@@ -1,7 +1,8 @@
 import type { PageServerLoad } from "./$types";
 import { readdir, readFile, access } from "fs/promises";
 import { join, parse } from "path";
-import ExifReader from "exifreader";
+import { extractPhotoMeta } from "../../../scripts/photo-exif.mjs";
+import type { PhotoMeta } from "../../../scripts/photo-exif.mjs";
 
 interface PhotoData {
     src: string;           // Original full-size path for lightbox
@@ -32,94 +33,27 @@ export const load: PageServerLoad = async () => {
             /\.(jpg|jpeg|png|webp)$/i.test(file)
         );
 
+        // EXIF/dimension cache written by scripts/optimize-photos.mjs (which
+        // `npm run build` runs first), so prerendering doesn't re-read every
+        // full-size photo. Missing or stale-in-dev cache just means we fall
+        // back to extracting from the file below.
+        let metaCache: Record<string, PhotoMeta> = {};
+        try {
+            metaCache = JSON.parse(
+                await readFile(join(photosDir, "thumbs", "photo-meta.json"), "utf-8")
+            );
+        } catch {
+            // no cache yet (fresh checkout / dev server)
+        }
+
         const photos: PhotoData[] = await Promise.all(
             imageFiles.map(async (filename) => {
                 const filePath = join(photosDir, filename);
-                const fileBuffer = await readFile(filePath);
 
-                let exif: PhotoData["exif"] = {};
-                let orientation: PhotoData["orientation"] = "landscape";
-                let width: number | undefined;
-                let height: number | undefined;
-
-                try {
-                    const tags = ExifReader.load(fileBuffer);
-
-                    // Extract camera info
-                    const make = tags.Make?.description || "";
-                    const model = tags.Model?.description || "";
-                    exif.camera = [make, model].filter(Boolean).join(" ").trim() || undefined;
-
-                    // Extract lens
-                    exif.lens = tags.LensModel?.description || tags.Lens?.description || undefined;
-
-                    // Extract aperture - avoid double f/ prefix
-                    if (tags.FNumber?.description) {
-                        const fNum = String(tags.FNumber.description);
-                        exif.aperture = fNum.startsWith("f/") ? fNum : `f/${fNum}`;
-                    } else if (tags.ApertureValue?.description) {
-                        const aperture = String(tags.ApertureValue.description);
-                        exif.aperture = aperture.startsWith("f/") ? aperture : `f/${aperture}`;
-                    }
-
-                    // Extract shutter speed
-                    if (tags.ExposureTime?.description) {
-                        const exposure = tags.ExposureTime.description;
-                        exif.shutter = typeof exposure === "string" ? exposure : `${exposure}s`;
-                    }
-
-                    // Extract ISO
-                    if (tags.ISOSpeedRatings?.description) {
-                        exif.iso = `ISO ${tags.ISOSpeedRatings.description}`;
-                    } else if (tags.PhotographicSensitivity?.description) {
-                        exif.iso = `ISO ${tags.PhotographicSensitivity.description}`;
-                    }
-
-                    // Extract focal length
-                    if (tags.FocalLength?.description) {
-                        exif.focalLength = tags.FocalLength.description;
-                    }
-
-                    // Extract date
-                    if (tags.DateTimeOriginal?.description) {
-                        // Format: "2024:06:15 14:30:00" -> "2024-06-15"
-                        const dateStr = tags.DateTimeOriginal.description;
-                        const match = dateStr.match(/(\d{4}):(\d{2}):(\d{2})/);
-                        if (match) {
-                            exif.date = `${match[1]}-${match[2]}-${match[3]}`;
-                        }
-                    }
-
-                    // Determine orientation from image dimensions
-                    const imgWidth = tags["Image Width"]?.value || tags.ImageWidth?.value || tags.PixelXDimension?.value;
-                    const imgHeight = tags["Image Height"]?.value || tags.ImageHeight?.value || tags.PixelYDimension?.value;
-                    const orientationTag = tags.Orientation?.value;  // EXIF Orientation tag
-
-                    if (imgWidth && imgHeight) {
-                        let w = Array.isArray(imgWidth) ? imgWidth[0] : imgWidth;
-                        let h = Array.isArray(imgHeight) ? imgHeight[0] : imgHeight;
-
-                        // Swap dimensions for 90° rotations (Orientation 6 = Rotate 90° CW, 8 = Rotate 270° CW)
-                        if (orientationTag === 6 || orientationTag === 8) {
-                            [w, h] = [h, w];
-                        }
-
-                        if (typeof w === "number" && typeof h === "number") {
-                            width = w;
-                            height = h;
-                            const ratio = w / h;
-                            if (ratio > 1.1) {
-                                orientation = "landscape";
-                            } else if (ratio < 0.9) {
-                                orientation = "portrait";
-                            } else {
-                                orientation = "square";
-                            }
-                        }
-                    }
-                } catch (exifError) {
-                    console.warn(`Could not read EXIF from ${filename}:`, exifError);
-                }
+                const meta: PhotoMeta =
+                    metaCache[filename] ??
+                    extractPhotoMeta(await readFile(filePath), filename);
+                const { exif, orientation, width, height } = meta;
 
                 // Generate alt text from filename
                 const alt = filename

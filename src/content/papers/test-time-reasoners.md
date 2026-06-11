@@ -22,8 +22,8 @@ preprint: false
 featured: true
 highlight: false
 priority: 2
-image: /images/papers/ttr-accuracy.png
+image: /images/papers/test-time-reasoners-poster.png
 imageAnimated: /images/papers/test-time-reasoners.mp4
-imageDescription: "LLM accuracy with/without reasoning in full/choices-only MCQA settings. * are significant differences (paired t-test p < 0.05, 0.001, 0.0001). TTR boosts Full accuracy in most cases, and for Choices-Only in 15/36 cases."
+imageDescription: "Animated explainer: hide the question and show a reasoning model only the answer choices. It infers what the question probably asked (something that makes heat), picks the right answer, and scores 56% on ARC versus 25% random guessing. Reasoning traces reveal these strategies, so choices-only success is not always a flaw."
 ---
 

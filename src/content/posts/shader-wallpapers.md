@@ -1,6 +1,6 @@
 ---
 id: shader-wallpapers
-title: "wallpapers with whimsy"
+title: "Wallpapers"
 date: "2026-04-18"
 tags: [graphics, experiments]
 excerpt: "Playing around with shaders"

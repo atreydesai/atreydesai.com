@@ -28,6 +28,9 @@ interface Entry {
 // the URL directly afterward.
 let cachedUrl: string | null = null;
 
+// Resolves to the blob URL, null if the blob doesn't exist yet, or throws if
+// the store can't be reached — callers must not mistake "can't reach the
+// store" for "board is empty", or a subsequent write would clobber the board.
 async function resolveUrl(): Promise<string | null> {
 	if (cachedUrl) return cachedUrl;
 	const { blobs } = await list({ prefix: PATH, token });
@@ -35,20 +38,28 @@ async function resolveUrl(): Promise<string | null> {
 	return cachedUrl;
 }
 
-async function readBoard(): Promise<Entry[]> {
+// [] = board genuinely empty (no blob yet); null = read failed, state unknown.
+async function readBoard(): Promise<Entry[] | null> {
 	if (!token) return [];
-	const url = await resolveUrl();
-	if (!url) return [];
-	// Authenticated download via the SDK — works for blobs in a PRIVATE store
-	// (a plain fetch of the URL is rejected for private blobs). get() returns a
-	// stream + metadata, not a Response.
-	const result = await get(url, { access: 'private', token });
-	if (!result || result.statusCode !== 200) return [];
 	try {
+		const url = await resolveUrl();
+		if (!url) return [];
+		// Authenticated download via the SDK — works for blobs in a PRIVATE store
+		// (a plain fetch of the URL is rejected for private blobs). get() returns a
+		// stream + metadata, not a Response.
+		const result = await get(url, { access: 'private', token });
+		// get() resolves null when the blob doesn't exist — that's a legitimately
+		// empty board, not a failure.
+		if (!result) return [];
+		if (result.statusCode !== 200) {
+			console.warn(`[api/scores] blob read returned ${result.statusCode}`);
+			return null;
+		}
 		const data = await new Response(result.stream).json();
 		return Array.isArray(data) ? data : [];
-	} catch {
-		return [];
+	} catch (err) {
+		console.warn('[api/scores] blob read failed:', err);
+		return null;
 	}
 }
 
@@ -65,25 +76,70 @@ async function writeBoard(board: Entry[]): Promise<void> {
 	cachedUrl = url;
 }
 
+// Serialize read-modify-write cycles so concurrent submissions handled by the
+// same instance can't lose each other's entry. Fluid Compute routes concurrent
+// requests to a shared instance, so this covers the common case; simultaneous
+// writes from *separate* instances can still race, which this store can't
+// prevent (Blob has no conditional writes) — acceptable for a toy leaderboard.
+let writeLock: Promise<unknown> = Promise.resolve();
+
+function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
+	const run = writeLock.then(fn, fn);
+	writeLock = run.then(
+		() => undefined,
+		() => undefined,
+	);
+	return run;
+}
+
+// Per-IP fixed-window rate limit, in-memory (per instance — a determined
+// attacker can still spread across instances, but this stops casual loops).
+const RATE_LIMIT = 5; // submissions
+const RATE_WINDOW_MS = 60_000; // per minute
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function rateLimited(ip: string, now: number): boolean {
+	if (rateBuckets.size > 1000) {
+		for (const [key, bucket] of rateBuckets) {
+			if (bucket.resetAt <= now) rateBuckets.delete(key);
+		}
+	}
+	const bucket = rateBuckets.get(ip);
+	if (!bucket || bucket.resetAt <= now) {
+		rateBuckets.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+		return false;
+	}
+	bucket.count += 1;
+	return bucket.count > RATE_LIMIT;
+}
+
 export const GET: RequestHandler = async () => {
 	if (!token) return json({ available: false, scores: [] });
-	try {
-		const board = await readBoard();
-		board.sort((a, b) => b.score - a.score);
-		return json(
-			{ available: true, scores: board.slice(0, TOP) },
-			// CDN-cache the leaderboard response so repeat views don't re-run the
-			// function (and its blob ops). Submitters get fresh data from POST.
-			{ headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=300' } },
-		);
-	} catch {
-		return json({ available: false, scores: [] });
-	}
+	const board = await readBoard();
+	if (board === null) return json({ available: false, scores: [] });
+	board.sort((a, b) => b.score - a.score);
+	return json(
+		{ available: true, scores: board.slice(0, TOP) },
+		// CDN-cache the leaderboard response so repeat views don't re-run the
+		// function (and its blob ops). Submitters get fresh data from POST.
+		{ headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=300' } },
+	);
 };
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	if (!token) {
 		return json({ ok: false, reason: 'global leaderboard is offline' }, { status: 503 });
+	}
+
+	let ip = 'unknown';
+	try {
+		ip = getClientAddress();
+	} catch {
+		// no address available (e.g. prerender-adjacent contexts); rate-limit
+		// these under one shared bucket rather than rejecting
+	}
+	if (rateLimited(ip, Date.now())) {
+		return json({ ok: false, reason: 'too many submissions, slow down' }, { status: 429 });
 	}
 
 	let body: { name?: unknown; score?: unknown };
@@ -107,18 +163,25 @@ export const POST: RequestHandler = async ({ request }) => {
 	const name = checked.value;
 
 	try {
-		const board = await readBoard();
-		const entry: Entry = { name, score, t: Date.now() };
-		board.push(entry);
-		board.sort((a, b) => b.score - a.score || a.t - b.t);
-		const trimmed = board.slice(0, MAX_ENTRIES);
-		await writeBoard(trimmed);
+		return await withWriteLock(async () => {
+			const board = await readBoard();
+			if (board === null) {
+				// Unknown board state — refuse to write rather than risk replacing
+				// the real leaderboard with just this entry.
+				return json({ ok: false, reason: "couldn't save, try again" }, { status: 500 });
+			}
+			const entry: Entry = { name, score, t: Date.now() };
+			board.push(entry);
+			board.sort((a, b) => b.score - a.score || a.t - b.t);
+			const trimmed = board.slice(0, MAX_ENTRIES);
+			await writeBoard(trimmed);
 
-		const rank = trimmed.findIndex((e) => e === entry) + 1;
-		return json({
-			ok: true,
-			rank: rank > 0 ? rank : null,
-			scores: trimmed.slice(0, TOP),
+			const rank = trimmed.findIndex((e) => e === entry) + 1;
+			return json({
+				ok: true,
+				rank: rank > 0 ? rank : null,
+				scores: trimmed.slice(0, TOP),
+			});
 		});
 	} catch (err) {
 		console.error('[api/scores] POST failed:', err);

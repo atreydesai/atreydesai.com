@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/blog/media-list",
+      "destination": "/bookshelf",
+      "permanent": true
+    }
+  ]
+}

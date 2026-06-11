@@ -1,5 +1,4 @@
 import { sveltekit } from "@sveltejs/kit/vite";
-import { imagetools } from "vite-imagetools";
 import pluginYaml from "@rollup/plugin-yaml";
 import yaml from "js-yaml";
 import { dataToEsm } from "@rollup/pluginutils";
@@ -42,7 +41,7 @@ function markdown() {
 }
 
 const config: UserConfig = {
-  plugins: [sveltekit(), imagetools(), pluginYaml() as any, markdown()],
+  plugins: [sveltekit(), pluginYaml() as any, markdown()],
   define: {
     __BUILD_DATE__: JSON.stringify(gitDate),
   },

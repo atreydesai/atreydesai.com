@@ -1,9 +1,41 @@
 <script lang="ts">
     import PageShell from "$lib/components/PageShell.svelte";
     import { Download } from "@jis3r/icons";
+    import cvYaml from "../../content/cv.yaml";
 
     import type { PageData } from './$types';
     export let data: PageData;
+
+    interface CvExperience {
+        organization: string;
+        dates: string;
+        role: string;
+        advisors?: string;
+        bullets: string[];
+    }
+
+    interface Cv {
+        education: {
+            school: string;
+            degree: string;
+            advisors_html: string;
+            coursework_html: string;
+        };
+        experience: CvExperience[];
+        publications: {
+            groups: { heading: string; items: string[] }[];
+            note_html: string;
+        };
+        awards: { name: string; amount?: string; year: string }[];
+        talks: { title: string; venues: { name: string; date: string }[] }[];
+        responsibilities: {
+            positions: { role_html: string; dates: string; note?: string }[];
+            mentorship: { title: string; items: string[] };
+        };
+        skills: { label: string; items: string }[];
+    }
+
+    const cv = cvYaml as unknown as Cv;
 
     let hoveredDownload = false;
 </script>
@@ -58,27 +90,14 @@
             <h2 class="section-heading">education</h2>
             <div class="text-ink-700 dark:text-cream-300">
                 <p class="font-medium text-ink-900 dark:text-cream-100">
-                    University of Maryland, College Park
+                    {cv.education.school}
                 </p>
-                <p>
-                    B.S. in Computer Science (Honors) & B.A. in Linguistics
-                    (Minor in Korean Studies) · Expected May 2027
+                <p>{cv.education.degree}</p>
+                <p class="text-sm text-ink-500 dark:text-ink-400 mt-1">
+                    {@html cv.education.advisors_html}
                 </p>
                 <p class="text-sm text-ink-500 dark:text-ink-400 mt-1">
-                    Advisors: <a
-                        href="https://www.cs.umd.edu/people/rudinger"
-                        class="link">Prof. Rachel Rudinger</a
-                    >
-                    &
-                    <a href="https://www.cs.umd.edu/~jbg/" class="link"
-                        >Prof. Jordan Boyd-Graber</a
-                    >
-                </p>
-                <p class="text-sm text-ink-500 dark:text-ink-400 mt-1">
-                    <strong>Coursework:</strong> Natural Language Processing (Grad),
-                    Commonsense Reasoning (Grad), Mechanistic Interpretability (Grad)*,
-                    Machine Learning, Data Science, Parallel Computing*, Computer
-                    Systems, Syntax, Semantics*, Phonetics, Psycholinguistics.
+                    {@html cv.education.coursework_html}
                 </p>
             </div>
         </section>
@@ -87,184 +106,35 @@
         <section>
             <h2 class="section-heading">experience</h2>
             <div class="space-y-6 text-ink-700 dark:text-cream-300">
-                <!-- UMD CLIP Lab -->
-                <div>
-                    <div
-                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
-                    >
-                        <p class="font-medium text-ink-900 dark:text-cream-100">
-                            University of Maryland, College Park
-                        </p>
-                        <p class="text-sm text-ink-500 dark:text-ink-400">
-                            May 2024 – present
-                        </p>
+                {#each cv.experience as job}
+                    <div>
+                        <div
+                            class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
+                        >
+                            <p
+                                class="font-medium text-ink-900 dark:text-cream-100"
+                            >
+                                {job.organization}
+                            </p>
+                            <p class="text-sm text-ink-500 dark:text-ink-400">
+                                {job.dates}
+                            </p>
+                        </div>
+                        <p class="italic">{job.role}</p>
+                        {#if job.advisors}
+                            <p class="text-sm text-ink-500 dark:text-ink-400">
+                                {job.advisors}
+                            </p>
+                        {/if}
+                        <ul
+                            class="list-disc list-inside text-sm mt-2 space-y-1"
+                        >
+                            {#each job.bullets as bullet}
+                                <li>{bullet}</li>
+                            {/each}
+                        </ul>
                     </div>
-                    <p class="italic">Undergrad Researcher, CLIP Lab</p>
-                    <p class="text-sm text-ink-500 dark:text-ink-400">
-                        Advisors: Prof. Rachel Rudinger & Prof. Jordan
-                        Boyd-Graber
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            Quantified differential LLM susceptibility to
-                            human-written vs. LLM-generated MCQs to assess if
-                            questions contain unintended artifacts and are
-                            solvable without full context; created tools to
-                            isolate distractor-choice provenance effects and
-                            improve the reliability of human synthetic data for
-                            model evaluation and distillation.
-                        </li>
-                        <li>
-                            Constructed an adversarial benchmark to test VLM
-                            capabilities in detecting out-of-context (OOC)
-                            video-based misinformation on social media based on
-                            multimodal clues and user interactions to probe
-                            reasoning under deceptive framing.
-                        </li>
-                        <li>
-                            Applied causal interpretability techniques to
-                            demonstrate that LMs require significantly more data
-                            than humans to acquire general syntactic
-                            representations, revealing heightened sensitivity to
-                            item-level and construction-level variation.
-                        </li>
-                        <li>
-                            Developed an oracle-free framework for estimating
-                            process reward annotation quality without ground
-                            truth using behavioral signals, inducing better
-                            step-by-step reasoning in Process Reward Models
-                            (PRMs) for RL in non-verifiable tasks.
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- UT Arlington -->
-                <div>
-                    <div
-                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
-                    >
-                        <p class="font-medium text-ink-900 dark:text-cream-100">
-                            The University of Texas at Arlington
-                        </p>
-                        <p class="text-sm text-ink-500 dark:text-ink-400">
-                            Feb 2024 – present
-                        </p>
-                    </div>
-                    <p class="italic">Visiting Researcher, ACL2 Lab & NSF</p>
-                    <p class="text-sm text-ink-500 dark:text-ink-400">
-                        Advisor: Prof. Kenny Zhu
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            Designed AniVoice-cat, a dataset of 26,000+
-                            annotated cat vocalizations from 250+ hours of video
-                            and identified 57 unique cat phones, establishing a
-                            foundational resource for computational research in
-                            non-human communication.
-                        </li>
-                        <li>
-                            Improved transcription pipeline using PANNs and
-                            HuBERT models to 96% accuracy with 93% top-5
-                            accuracy in action recognition, setting a new
-                            state-of-the-art for automated animal vocalization
-                            analysis.
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Learn Prompting -->
-                <div>
-                    <div
-                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
-                    >
-                        <p class="font-medium text-ink-900 dark:text-cream-100">
-                            Learn Prompting
-                        </p>
-                        <p class="text-sm text-ink-500 dark:text-ink-400">
-                            May 2025 – Jan 2026
-                        </p>
-                    </div>
-                    <p class="italic">
-                        Member of Technical Staff (San Francisco, CA)
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            Ran Hackaprompt, the world's largest red-teaming
-                            hackathon, overseeing user engagement and technical
-                            challenges.
-                        </li>
-                        <li>
-                            Researched the robustness of AI safety judges
-                            against CBRNE-related adversarial content.
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- UMD FIRE -->
-                <div>
-                    <div
-                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
-                    >
-                        <p class="font-medium text-ink-900 dark:text-cream-100">
-                            University of Maryland, College Park
-                        </p>
-                        <p class="text-sm text-ink-500 dark:text-ink-400">
-                            Dec 2023 – Aug 2024
-                        </p>
-                    </div>
-                    <p class="italic">
-                        Researcher, FIRE Sustainability Analytics Lab
-                    </p>
-                    <p class="text-sm text-ink-500 dark:text-ink-400">
-                        Advisor: Prof. Thanicha Ruangmas
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            Developed Python pipeline for environmental impact
-                            assessments of U.S. emissions, enabling more
-                            efficient policy.
-                        </li>
-                        <li>
-                            Drafted a framework to guide evidence-based
-                            policymaking on climate restoration strategies.
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Brown -->
-                <div>
-                    <div
-                        class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1"
-                    >
-                        <p class="font-medium text-ink-900 dark:text-cream-100">
-                            Brown University
-                        </p>
-                        <p class="text-sm text-ink-500 dark:text-ink-400">
-                            Dec 2020 – June 2023
-                        </p>
-                    </div>
-                    <p class="italic">
-                        Researcher, Reinforcement Learning at Brown Group
-                    </p>
-                    <p class="text-sm text-ink-500 dark:text-ink-400">
-                        Advisor: Prof. Michael Littman
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            Developed a custom RL environment that empowered
-                            non-technical users to programmatically solve
-                            complex tasks by defining reward functions and
-                            specifying agent behavior, reducing task setup time.
-                        </li>
-                        <li>
-                            Published and presented research at two top-tier
-                            workshops (AAAI, RLDM), demonstrating how
-                            human-readable interfaces enable fine-grained
-                            control during inference and improve AI-human
-                            interaction in robotics.
-                        </li>
-                    </ul>
-                </div>
+                {/each}
             </div>
         </section>
 
@@ -272,111 +142,23 @@
         <section>
             <h2 class="section-heading">publications</h2>
             <div class="space-y-6 text-ink-700 dark:text-cream-300">
-                <!-- Preprints -->
-                <div>
-                    <h3
-                        class="font-medium text-ink-900 dark:text-cream-100 mb-3"
-                    >
-                        Preprints
-                    </h3>
-                    <ol class="list-decimal list-inside space-y-3 text-sm">
-                        <li>
-                            <strong
-                                >A Preview of Computational Animal
-                                Linguistics</strong
-                            >.<br /><span
-                                class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            >, Tirza Panunto, Lindsay Pike, Theron S. Wang, Tuan
-                            M. Dang, Hridayesh Lekhak and Kenny Q. Zhu.<br /><em
-                                >Under Review (ACM Computing Surveys)</em
-                            >.
-                        </li>
-                    </ol>
-                </div>
-
-                <!-- Publications -->
-                <div>
-                    <h3
-                        class="font-medium text-ink-900 dark:text-cream-100 mb-3"
-                    >
-                        Publications
-                    </h3>
-                    <ol class="list-decimal list-inside space-y-3 text-sm">
-                        <li>
-                            <strong
-                                >Filling in the Mechanisms: How do LMs Learn
-                                Filler-Gap Dependencies under Developmental
-                                Constraints?</strong
-                            ><br />ACL 2026 (Findings) · <em
-                                >Oral at TLS 2026</em
-                            ><br /><span
-                                class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            > and Sathvik Nair.
-                        </li>
-                        <li>
-                            <a
-                                href="https://arxiv.org/abs/2602.06221"
-                                class="link"
-                                ><strong
-                                    >BenchMarker: An Education-Inspired Toolkit
-                                    for Highlighting Flaws in Multiple-Choice
-                                    Benchmarks</strong
-                                ></a
-                            >.<br />ACL 2026<br />Nishant Balepur, Bhavya
-                            Rajasekaran, Jane Oh, Michael Xie,
-                            <span class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            >, …, Jordan Boyd-Graber.
-                        </li>
-                        <li>
-                            <a
-                                href="https://arxiv.org/abs/2510.07761"
-                                class="link"
-                                ><strong
-                                    >Test-Time Reasoners Are Strategic
-                                    Multiple-Choice Test-Takers</strong
-                                ></a
-                            >.<br />ACL 2026 (Oral)<br />Nishant Balepur,
-                            <span class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            > and Rachel Rudinger.
-                        </li>
-                        <li>
-                            <a
-                                href="https://scholar.google.com/citations?view_op=view_citation&hl=en&user=hTDzj6cAAAAJ&citation_for_view=hTDzj6cAAAAJ:d1gkVwhDpl0C"
-                                class="link"
-                                ><strong
-                                    >Language Models Generate Multiple-Choice
-                                    Questions with Artifacts</strong
-                                ></a
-                            >.<br />MASC-SLL 2025<br /><span
-                                class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            >, Nishant Balepur and Rachel Rudinger.
-                        </li>
-                        <li>
-                            <a
-                                href="https://scholar.google.com/citations?view_op=view_citation&hl=en&user=hTDzj6cAAAAJ&citation_for_view=hTDzj6cAAAAJ:u5HHmVD_uO8C"
-                                class="link"
-                                ><strong
-                                    >Reinforcement Learning As End-User
-                                    Trigger-Action Programming</strong
-                                ></a
-                            >.<br />IML Workshop @ AAAI 2022 · RLDM
-                            2022<br />Chace Hayhurst, Hyojae Park,
-                            <span class="text-ink-900 dark:text-cream-100"
-                                >Atrey Desai</span
-                            >, Suheidy De Los Santos and Michael Littman.
-                        </li>
-                    </ol>
-                </div>
+                {#each cv.publications.groups as group}
+                    <div>
+                        <h3
+                            class="font-medium text-ink-900 dark:text-cream-100 mb-3"
+                        >
+                            {group.heading}
+                        </h3>
+                        <ol class="list-decimal list-inside space-y-3 text-sm">
+                            {#each group.items as item}
+                                <li>{@html item}</li>
+                            {/each}
+                        </ol>
+                    </div>
+                {/each}
             </div>
             <p class="text-ink-600 dark:text-cream-400 mt-4">
-                See the full list on my <a href="/research" class="link"
-                    >research page</a
-                >.
+                {@html cv.publications.note_html}
             </p>
         </section>
 
@@ -384,41 +166,18 @@
         <section>
             <h2 class="section-heading">honors & awards</h2>
             <div class="space-y-2 text-ink-700 dark:text-cream-300">
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span><strong>SPIRE Research Grant</strong> ($3,000)</span>
-                    <span class="text-ink-500 dark:text-ink-400">2025</span>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span
-                        ><strong>Omicron Delta Kappa Top 10 Freshman</strong
-                        ></span
-                    >
-                    <span class="text-ink-500 dark:text-ink-400">2024</span>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span><strong>CMSC & ARHU Dean's List</strong></span>
-                    <span class="text-ink-500 dark:text-ink-400"
-                        >2023 – 2026</span
-                    >
-                </div>
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span
-                        ><strong>UMD President's Scholarship</strong> ($50,000)</span
-                    >
-                    <span class="text-ink-500 dark:text-ink-400">2023</span>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span
-                        ><strong>NMSC National Merit Scholarship</strong> ($4,000)</span
-                    >
-                    <span class="text-ink-500 dark:text-ink-400">2023</span>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span
-                        ><strong>Catherine Yang Scholarship</strong> ($1,000)</span
-                    >
-                    <span class="text-ink-500 dark:text-ink-400">2023</span>
-                </div>
+                {#each cv.awards as award}
+                    <div class="flex flex-col sm:flex-row sm:justify-between">
+                        <span
+                            ><strong>{award.name}</strong>{award.amount
+                                ? ` (${award.amount})`
+                                : ""}</span
+                        >
+                        <span class="text-ink-500 dark:text-ink-400"
+                            >{award.year}</span
+                        >
+                    </div>
+                {/each}
             </div>
         </section>
 
@@ -426,46 +185,27 @@
         <section>
             <h2 class="section-heading">talks</h2>
             <div class="space-y-4 text-ink-700 dark:text-cream-300">
-                <div>
-                    <p class="font-medium text-ink-900 dark:text-cream-100">
-                        Filler-Gap Dependencies under Developmental Constraints
-                        in LMs
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            Texas Linguistics Society <span
-                                class="text-ink-500 dark:text-ink-400"
-                                >— Feb 2026</span
-                            >
-                        </li>
-                        <li>
-                            UMD Computational Cognitive Science Reading Group <span
-                                class="text-ink-500 dark:text-ink-400"
-                                >— Feb 2026</span
-                            >
-                        </li>
-                    </ul>
-                </div>
-                <div>
-                    <p class="font-medium text-ink-900 dark:text-cream-100">
-                        Adaptor Grammars and Neural Networks for Feline Lexical
-                        Discovery
-                    </p>
-                    <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            University of Maryland, College Park <span
-                                class="text-ink-500 dark:text-ink-400"
-                                >— Nov 2024</span
-                            >
-                        </li>
-                        <li>
-                            UT Arlington, Department of Computer Science <span
-                                class="text-ink-500 dark:text-ink-400"
-                                >— July 2024</span
-                            >
-                        </li>
-                    </ul>
-                </div>
+                {#each cv.talks as talk}
+                    <div>
+                        <p
+                            class="font-medium text-ink-900 dark:text-cream-100"
+                        >
+                            {talk.title}
+                        </p>
+                        <ul
+                            class="list-disc list-inside text-sm mt-2 space-y-1"
+                        >
+                            {#each talk.venues as venue}
+                                <li>
+                                    {venue.name} <span
+                                        class="text-ink-500 dark:text-ink-400"
+                                        >— {venue.date}</span
+                                    >
+                                </li>
+                            {/each}
+                        </ul>
+                    </div>
+                {/each}
             </div>
         </section>
 
@@ -473,97 +213,42 @@
         <section>
             <h2 class="section-heading">professional responsibilities</h2>
             <div class="space-y-4 text-ink-700 dark:text-cream-300">
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span
-                        ><strong>Subreviewer</strong>, ACL Rolling Review (ARR)</span
-                    >
-                    <span class="text-ink-500 dark:text-ink-400"
-                        >2025 – present</span
-                    >
-                </div>
-                <div class="flex flex-col sm:flex-row sm:justify-between">
-                    <span
-                        ><strong>Member</strong>, University Research Advisory
-                        Board</span
-                    >
-                    <span class="text-ink-500 dark:text-ink-400"
-                        >2025 – present</span
-                    >
-                </div>
-                <div>
-                    <div class="flex flex-col sm:flex-row sm:justify-between">
-                        <span
-                            ><strong>Vice Chair</strong>, Computer Science
-                            Department Council</span
+                {#each cv.responsibilities.positions as position}
+                    {#if position.note}
+                        <div>
+                            <div
+                                class="flex flex-col sm:flex-row sm:justify-between"
+                            >
+                                <span>{@html position.role_html}</span>
+                                <span class="text-ink-500 dark:text-ink-400"
+                                    >{position.dates}</span
+                                >
+                            </div>
+                            <p
+                                class="text-sm text-ink-500 dark:text-ink-400 italic ml-4"
+                            >
+                                {position.note}
+                            </p>
+                        </div>
+                    {:else}
+                        <div
+                            class="flex flex-col sm:flex-row sm:justify-between"
                         >
-                        <span class="text-ink-500 dark:text-ink-400"
-                            >2025 – present</span
-                        >
-                    </div>
-                    <p
-                        class="text-sm text-ink-500 dark:text-ink-400 italic ml-4"
-                    >
-                        Appointed by faculty and student body; represent 4,200+
-                        CS undergraduates.
-                    </p>
-                </div>
-                <div>
-                    <div class="flex flex-col sm:flex-row sm:justify-between">
-                        <span
-                            ><strong>Senior Member</strong>, FIRE Student
-                            Leadership Council</span
-                        >
-                        <span class="text-ink-500 dark:text-ink-400"
-                            >2024 – present</span
-                        >
-                    </div>
-                    <p
-                        class="text-sm text-ink-500 dark:text-ink-400 italic ml-4"
-                    >
-                        Represented 1000+ peers, ran events & workshops, and
-                        reformed class curricula.
-                    </p>
-                </div>
-                <div>
-                    <div class="flex flex-col sm:flex-row sm:justify-between">
-                        <span><strong>University Ambassador</strong></span>
-                        <span class="text-ink-500 dark:text-ink-400"
-                            >2024 – present</span
-                        >
-                    </div>
-                    <p
-                        class="text-sm text-ink-500 dark:text-ink-400 italic ml-4"
-                    >
-                        Represented the CS Dept. & CMNS College at admissions
-                        events and to official guests.
-                    </p>
-                </div>
+                            <span>{@html position.role_html}</span>
+                            <span class="text-ink-500 dark:text-ink-400"
+                                >{position.dates}</span
+                            >
+                        </div>
+                    {/if}
+                {/each}
                 <div>
                     <p class="font-medium text-ink-900 dark:text-cream-100">
-                        Mentorship
+                        {cv.responsibilities.mentorship.title}
                     </p>
                     <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-                        <li>
-                            <strong>Office of Undergraduate Research:</strong>
-                            Juan Cortés, Kemisola Benson, Vivian Akpala
-                            <span class="text-ink-500 dark:text-ink-400"
-                                >— 2025</span
-                            >
-                        </li>
-                        <li>
-                            <strong>Technica Mentoring:</strong> Savya Miriyala,
-                            Tanya Grover, Jessica Ononye, Nakshatra Hiray
-                            <span class="text-ink-500 dark:text-ink-400"
-                                >— 2024</span
-                            >
-                        </li>
-                        <li>
-                            <strong>MSET Robotics:</strong> Workshop organizer and
-                            curriculum designer
-                            <span class="text-ink-500 dark:text-ink-400"
-                                >— 2020 – 2022</span
-                            >
-                        </li>
+                        {#each cv.responsibilities.mentorship.items as item}
+                            <li>{@html item}</li>
+                        {/each}
                     </ul>
                 </div>
             </div>
@@ -573,22 +258,9 @@
         <section>
             <h2 class="section-heading">skills</h2>
             <div class="space-y-2 text-ink-700 dark:text-cream-300 text-sm">
-                <p>
-                    <strong>Languages:</strong> Python, Java, JavaScript/HTML/CSS,
-                    R, MATLAB.
-                </p>
-                <p>
-                    <strong>Libraries/Frameworks:</strong> Huggingface (Datasets,
-                    Transformers), NLTK, PyTorch, Selenium, BeautifulSoup.
-                </p>
-                <p>
-                    <strong>Tools:</strong> Git, Docker, GCP, Google Vertex AI, VS
-                    Code.
-                </p>
-                <p>
-                    <strong>Natural Languages:</strong> English (Native), Gujarati
-                    (Native), Spanish (Intermediate), Korean (Beginner).
-                </p>
+                {#each cv.skills as skill}
+                    <p><strong>{skill.label}:</strong> {skill.items}</p>
+                {/each}
             </div>
         </section>
     </div>

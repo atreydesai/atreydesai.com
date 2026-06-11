@@ -1,164 +1,396 @@
 <script lang="ts">
+    import { browser } from "$app/environment";
+    import { onMount } from "svelte";
+    import { fly } from "svelte/transition";
+    import { cubicOut } from "svelte/easing";
     import Seo from "$lib/components/Seo.svelte";
-    import RatingCircle from "$lib/components/RatingCircle.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
+    import MediumIcon from "$lib/components/MediumIcon.svelte";
+    import RatingGlyph from "$lib/components/RatingGlyph.svelte";
     import { books, categories } from "$lib/content";
+    import type { Book } from "$lib/content";
     import { formatMonthYear } from "$lib/utils/date";
+    import { parseInline } from "$lib/utils/text";
     import {
-        Star,
+        ArrowDown,
+        ArrowUp,
+        BadgeInfo,
+        Bookmark,
         BookOpenText,
-        ChevronDown,
+        CalendarDays,
+        ChevronLeft,
+        ChevronRight,
+        ChevronsLeft,
+        ChevronsRight,
+        ExternalLink,
+        FileText,
+        Heart,
+        Library,
+        PanelRightClose,
         Search,
+        Star,
+        Tags,
+        X,
     } from "lucide-svelte";
-    import { ArrowUp, ArrowDown, X, CircleArrowOutUpRight } from "@jis3r/icons";
-    import { fade, slide } from "svelte/transition";
-    import { flip } from "svelte/animate";
+    import { CirclePlus } from "@jis3r/icons";
 
-    // Filter state
+    const PAGE_SIZE = 30;
+    const sortableFields = [
+        "title",
+        "category",
+        "medium",
+        "enjoyment",
+        "importance",
+        "dateAdded",
+    ] as const;
+
+    type SortField = (typeof sortableFields)[number];
+    type SortDirection = "asc" | "desc";
+
+    const categoryIds = new Set(categories.map((category) => category.id));
+
     let selectedCategory = "all";
-    let selectedTag: string = "all";
+    let selectedTag = "all";
+    let selectedMedium = "all";
+    let showShelved = false;
     let searchQuery = "";
+    let sortField: SortField = "dateAdded";
+    let sortDirection: SortDirection = "desc";
+    let selectedBookId: string | null = null;
+    let currentPage = 1;
+    let pendingBookPageId: string | null = null;
+    let hoveredBookId: string | null = null;
+    let urlReady = false;
 
-    // Sort state
-    let sortField:
-        | "title"
-        | "category"
-        | "medium"
-        | "enjoyment"
-        | "importance"
-        | "dateAdded" = "dateAdded";
-    let sortDirection: "asc" | "desc" = "desc";
-
-    function handleSort(field: typeof sortField) {
-        if (sortField === field) {
-            sortDirection = sortDirection === "asc" ? "desc" : "asc";
-        } else {
-            sortField = field;
-            sortDirection =
-                field === "enjoyment" ||
-                field === "importance" ||
-                field === "dateAdded"
-                    ? "desc"
-                    : "asc";
-        }
-    }
-
-    // Track which books have notes revealed
-    let revealedNotes: Set<string> = new Set();
-
-    function toggleNotes(bookId: string) {
-        if (revealedNotes.has(bookId)) {
-            revealedNotes.delete(bookId);
-        } else {
-            revealedNotes.add(bookId);
-        }
-        revealedNotes = revealedNotes; // Trigger reactivity
-    }
-
-    // Get all unique tags and subcategories across books
     $: allTags = [
-        ...new Set([
-            ...books.flatMap((book) => book.tags || []),
-            ...books.flatMap((book) => book.subcategory || []),
-        ]),
-    ].sort();
+        ...new Set(
+            books.flatMap((book) => [
+                ...(book.tags || []),
+                ...toList(book.subcategory),
+            ]),
+        ),
+    ].sort((a, b) => a.localeCompare(b));
 
-    $: categoryOptions = categories.map((c) => ({
-        value: c.id,
-        label: c.name,
-    }));
     $: tagOptions = [
-        { value: "all", label: "All Tags" },
-        ...allTags.map((t) => ({ value: t, label: t })),
+        { value: "all", label: "All tags" },
+        ...allTags.map((tag) => ({ value: tag, label: tag })),
     ];
 
-    // Get all unique mediums
     $: allMediums = [
         ...new Set(books.map((book) => book.medium).filter(Boolean)),
-    ].sort();
+    ].sort((a, b) => a!.localeCompare(b!)) as string[];
 
-    // Filter books based on category, tag, and search
+    $: mediumOptions = [
+        { value: "all", label: "All mediums" },
+        ...allMediums.map((medium) => ({ value: medium, label: medium })),
+    ];
+
     $: filteredBooks = books.filter((book) => {
-        // Category filter
-        if (selectedCategory !== "all") {
-            if (selectedCategory === "favorites" && !book.favorite)
-                return false;
-            if (
-                selectedCategory !== "favorites" &&
-                book.category !== selectedCategory
-            )
-                return false;
+        if ((book.status === "shelved") !== showShelved) return false;
+        if (selectedMedium !== "all" && book.medium !== selectedMedium) {
+            return false;
+        }
+        if (selectedCategory === "favorites" && !book.favorite) return false;
+        if (
+            selectedCategory !== "all" &&
+            selectedCategory !== "favorites" &&
+            book.category !== selectedCategory
+        ) {
+            return false;
         }
 
-        // Tag filter (checks tags AND subcategories)
-        if (selectedTag && selectedTag !== "all") {
-            const hasTag = book.tags && book.tags.includes(selectedTag);
-            const hasSubcategory =
-                book.subcategory && book.subcategory.includes(selectedTag);
-            if (!hasTag && !hasSubcategory) {
-                return false;
-            }
+        if (selectedTag !== "all" && !bookTags(book).includes(selectedTag)) {
+            return false;
         }
 
-        // Search filter (search in notes/content)
         if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            const searchableText =
-                `${book.title} ${book.author} ${book.notes || ""} ${book.content || ""}`.toLowerCase();
+            const query = searchQuery.toLowerCase().trim();
+            const searchableText = [
+                book.title,
+                book.author,
+                book.category,
+                book.medium,
+                book.notes,
+                book.content,
+                ...(book.tags || []),
+                ...toList(book.subcategory),
+            ]
+                .filter(Boolean)
+                .join(" ")
+                .toLowerCase();
+
             if (!searchableText.includes(query)) return false;
         }
 
         return true;
     });
 
-    // Sort books
     $: sortedBooks = [...filteredBooks].sort((a, b) => {
         const modifier = sortDirection === "asc" ? 1 : -1;
 
         if (sortField === "title") {
             return modifier * a.title.localeCompare(b.title);
-        } else if (sortField === "category") {
-            return modifier * a.category.localeCompare(b.category);
-        } else if (sortField === "medium") {
-            return modifier * (a.medium || "").localeCompare(b.medium || "");
-        } else if (sortField === "enjoyment") {
-            return modifier * ((a.enjoyment || 0) - (b.enjoyment || 0));
-        } else if (sortField === "importance") {
-            return modifier * ((a.importance || 0) - (b.importance || 0));
-        } else {
-            // dateAdded
-            return (
-                modifier *
-                (new Date(a.dateAdded).getTime() -
-                    new Date(b.dateAdded).getTime())
-            );
         }
+        if (sortField === "category") {
+            return modifier * a.category.localeCompare(b.category);
+        }
+        if (sortField === "medium") {
+            return modifier * (a.medium || "").localeCompare(b.medium || "");
+        }
+        if (sortField === "enjoyment") {
+            return modifier * ((a.enjoyment || 0) - (b.enjoyment || 0));
+        }
+        if (sortField === "importance") {
+            return modifier * ((a.importance || 0) - (b.importance || 0));
+        }
+
+        // Undated entries always sort after dated ones, regardless of direction.
+        const aTime = new Date(a.dateAdded).getTime();
+        const bTime = new Date(b.dateAdded).getTime();
+        if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+        if (Number.isNaN(aTime)) return 1;
+        if (Number.isNaN(bTime)) return -1;
+        return modifier * (aTime - bTime);
     });
+
+    $: totalPages = Math.max(1, Math.ceil(sortedBooks.length / PAGE_SIZE));
+    $: if (currentPage > totalPages) currentPage = totalPages;
+    $: pageStart = (currentPage - 1) * PAGE_SIZE;
+    $: pageEnd = Math.min(pageStart + PAGE_SIZE, sortedBooks.length);
+    $: paginatedBooks = sortedBooks.slice(pageStart, pageEnd);
+    $: entryStart = sortedBooks.length === 0 ? 0 : pageStart + 1;
+    $: selectedBook = selectedBookId
+        ? books.find((book) => book.id === selectedBookId) || null
+        : null;
+    $: selectedNoteParagraphs = selectedBook
+        ? getNoteParagraphs(selectedBook)
+        : [];
+    $: selectedTags = selectedBook ? bookTags(selectedBook) : [];
+    $: activeFilters =
+        selectedCategory !== "all" ||
+        selectedTag !== "all" ||
+        selectedMedium !== "all" ||
+        searchQuery.trim().length > 0;
+
+    $: if (pendingBookPageId && sortedBooks.length > 0) {
+        const selectedIndex = sortedBooks.findIndex(
+            (book) => book.id === pendingBookPageId,
+        );
+        if (selectedIndex >= 0) {
+            currentPage = Math.floor(selectedIndex / PAGE_SIZE) + 1;
+        }
+        pendingBookPageId = null;
+    }
+
+    $: if (browser && urlReady) {
+        syncUrl();
+    }
+
+    onMount(() => {
+        readStateFromUrl();
+        urlReady = true;
+
+        const handlePopState = () => readStateFromUrl();
+        window.addEventListener("popstate", handlePopState);
+        return () => window.removeEventListener("popstate", handlePopState);
+    });
+
+    function toList(value: string | string[] | undefined): string[] {
+        if (!value) return [];
+        if (Array.isArray(value)) return value;
+        return value
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    function bookTags(book: Book): string[] {
+        return [
+            ...new Set([...(book.tags || []), ...toList(book.subcategory)]),
+        ];
+    }
+
+    function previewTags(book: Book): string[] {
+        return bookTags(book).slice(0, 2);
+    }
+
+    function tagOverflow(book: Book): number {
+        return Math.max(0, bookTags(book).length - 2);
+    }
+
+    function getNoteParagraphs(book: Book): string[] {
+        return (book.notes || book.content || "")
+            .split(/\n{2,}/)
+            .map((paragraph) => paragraph.trim())
+            .filter(Boolean);
+    }
+
+    function isSortField(value: string | null): value is SortField {
+        return sortableFields.includes(value as SortField);
+    }
+
+    function defaultDirection(field: SortField): SortDirection {
+        return field === "title" || field === "category" || field === "medium"
+            ? "asc"
+            : "desc";
+    }
+
+    function sortLabel(field: SortField): string {
+        const labels: Record<SortField, string> = {
+            title: "title",
+            category: "category",
+            medium: "medium",
+            enjoyment: "appreciation",
+            importance: "importance",
+            dateAdded: "date added",
+        };
+        return labels[field];
+    }
+
+    function ariaSort(field: SortField): "ascending" | "descending" | undefined {
+        if (sortField !== field) return undefined;
+        return sortDirection === "asc" ? "ascending" : "descending";
+    }
+
+    function handleSort(field: SortField) {
+        if (sortField === field) {
+            sortDirection = sortDirection === "asc" ? "desc" : "asc";
+        } else {
+            sortField = field;
+            sortDirection = defaultDirection(field);
+        }
+        currentPage = 1;
+    }
+
+    function setCategory(category: string) {
+        selectedCategory = category;
+        currentPage = 1;
+    }
+
+    function setTag(tag: string) {
+        selectedTag = selectedTag === tag ? "all" : tag;
+        currentPage = 1;
+    }
+
+    function selectBook(bookId: string) {
+        selectedBookId = bookId;
+    }
+
+    function closeDrawer() {
+        selectedBookId = null;
+    }
+
+    function setPage(page: number) {
+        currentPage = Math.max(1, Math.min(totalPages, page));
+    }
 
     function clearFilters() {
         selectedCategory = "all";
         selectedTag = "all";
+        selectedMedium = "all";
         searchQuery = "";
+        currentPage = 1;
     }
 
-    function selectTag(tag: string) {
-        selectedTag = selectedTag === tag ? "all" : tag;
+    function toggleShelved() {
+        showShelved = !showShelved;
+        currentPage = 1;
     }
 
-    // Helper to get category display color (text/border only — transparent bg)
+    function onRowKeydown(event: KeyboardEvent, bookId: string) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            selectBook(bookId);
+        }
+    }
+
+    function readStateFromUrl() {
+        if (!browser) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const category = params.get("c");
+        const tag = params.get("tag");
+        const sort = params.get("sort");
+        const direction = params.get("dir");
+        const bookId = params.get("book");
+        const page = Number(params.get("p"));
+        const hasExplicitPage = params.has("p");
+
+        selectedCategory =
+            category && categoryIds.has(category) ? category : "all";
+        selectedTag = tag && allTags.includes(tag) ? tag : "all";
+        const medium = params.get("m");
+        selectedMedium =
+            medium && allMediums.includes(medium) ? medium : "all";
+        showShelved = params.get("view") === "shelved";
+        searchQuery = params.get("q") || "";
+        sortField = isSortField(sort) ? sort : "dateAdded";
+        sortDirection =
+            direction === "asc" || direction === "desc"
+                ? direction
+                : defaultDirection(sortField);
+        selectedBookId =
+            bookId && books.some((book) => book.id === bookId) ? bookId : null;
+        currentPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+        pendingBookPageId =
+            selectedBookId && !hasExplicitPage ? selectedBookId : null;
+    }
+
+    function syncUrl() {
+        const params = new URLSearchParams();
+
+        if (selectedCategory !== "all") params.set("c", selectedCategory);
+        if (selectedTag !== "all") params.set("tag", selectedTag);
+        if (selectedMedium !== "all") params.set("m", selectedMedium);
+        if (showShelved) params.set("view", "shelved");
+        if (searchQuery.trim()) params.set("q", searchQuery.trim());
+        if (!(sortField === "dateAdded" && sortDirection === "desc")) {
+            params.set("sort", sortField);
+            params.set("dir", sortDirection);
+        }
+        if (selectedBookId) params.set("book", selectedBookId);
+        if (currentPage > 1) params.set("p", String(currentPage));
+
+        const query = params.toString();
+        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+        const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+        if (nextUrl !== currentUrl) {
+            window.history.replaceState(null, "", nextUrl);
+        }
+    }
+
+    function shortDate(date: string): string {
+        const parsed = new Date(date);
+        if (Number.isNaN(parsed.getTime())) return "--";
+
+        return `${parsed.getMonth() + 1}.${parsed.getDate()}.${String(
+            parsed.getFullYear(),
+        ).slice(-2)}`;
+    }
+
+    function categoryLabel(categoryId: string): string {
+        return (
+            categories.find((category) => category.id === categoryId)?.name ||
+            categoryId
+        );
+    }
+
     function getCategoryColor(category: string): string {
         const colors: Record<string, string> = {
-            science: "text-sage-dark dark:text-sage-light",
-            advice: "text-ochre-dark dark:text-ochre-light",
-            fiction: "text-wine-dark dark:text-wine-light",
-            nonfiction: "text-steel-dark dark:text-steel-light",
-            "blog post": "text-plum-dark dark:text-plum-light",
+            science:
+                "text-accent-dark dark:text-accent-light bg-accent/10 dark:bg-accent/15",
+            advice:
+                "text-ochre-dark dark:text-ochre-light bg-ochre/10 dark:bg-ochre-dark/20",
+            fiction:
+                "text-wine-dark dark:text-wine-light bg-wine/10 dark:bg-wine-dark/20",
+            nonfiction:
+                "text-steel-dark dark:text-steel-light bg-steel/10 dark:bg-steel-dark/20",
+            "blog post":
+                "text-plum-dark dark:text-plum-light bg-plum/10 dark:bg-plum-dark/20",
         };
         return colors[category] || "text-ink-600 dark:text-cream-300";
     }
-
-    let hoveredSortCol: string | null = null;
-    let hoveredSourceId: string | null = null;
 </script>
 
 <Seo
@@ -168,464 +400,612 @@
 />
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">
-    <div class="mb-6">
-        <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100 mb-4">
+    <header class="mb-6 max-w-3xl">
+        <h1 class="heading-display mb-4 text-3xl text-ink-900 dark:text-cream-100">
             bookshelf
         </h1>
-
-        <p class="deck text-ink-600 dark:text-cream-400 mb-4">
-            A collection of books, essays, papers, and articles I've found valuable.
+        <p class="deck mb-3 text-ink-600 dark:text-cream-400">
+            {#if showShelved}
+                What I want to read and watch, but haven't gotten to yet.
+            {:else}
+                A collection of books, essays, papers, movies, and shows.
+            {/if}
         </p>
+    </header>
 
-    </div>
+    <section class="mb-5 flex flex-wrap items-center gap-2" aria-label="Bookshelf categories">
+        {#each categories as category}
+            <button
+                type="button"
+                class="inline-flex h-8 items-center gap-1.5 border px-3 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {selectedCategory === category.id ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
+                on:click={() => setCategory(category.id)}
+                aria-pressed={selectedCategory === category.id}
+            >
+                {#if category.id === "favorites"}
+                    <Star size={13} class={selectedCategory === category.id ? "fill-current" : ""} />
+                {/if}
+                {category.name}
+            </button>
+        {/each}
+        <button
+            type="button"
+            class="ml-auto inline-flex h-8 items-center gap-1.5 border px-3 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {showShelved ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
+            on:click={toggleShelved}
+            aria-pressed={showShelved}
+            title="Things I want to read or watch but haven't yet"
+        >
+            <Bookmark size={13} class={showShelved ? "fill-current" : ""} />
+            Shelved
+        </button>
+    </section>
 
-    <!-- Filters bar -->
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <!-- Search Input -->
-        <div class="relative flex-1">
+    <section
+        class="mb-5 flex flex-col gap-3 border-y border-ink-200/80 bg-cream-200/40 py-3 dark:border-ink-800 dark:bg-ink-900/35 md:flex-row md:items-center"
+        aria-label="Bookshelf controls"
+    >
+        <div class="relative min-w-0 flex-1">
             <Search
-                size={14}
-                class="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400"
+                size={15}
+                class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
             />
             <input
                 type="text"
                 placeholder="Search reading notes..."
                 bind:value={searchQuery}
-                class="w-full pl-8 pr-8 py-1.5 text-[0.78rem] font-medium tracking-[0.01em] bg-transparent border border-ink-200 dark:border-ink-700 rounded text-ink-700 dark:text-cream-300 placeholder:text-ink-400 placeholder:font-normal focus:outline-none focus:border-accent dark:focus:border-accent-light transition-colors duration-300"
+                on:input={() => (currentPage = 1)}
+                class="h-9 w-full border border-ink-200 bg-cream-50/70 pl-9 pr-9 text-sm text-ink-700 placeholder:text-ink-400 focus:border-ink-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900/70 dark:text-cream-300 dark:focus:border-cream-400"
             />
             {#if searchQuery}
                 <button
                     type="button"
-                    class="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600 dark:hover:text-cream-300"
-                    on:click={() => { searchQuery = ""; }}
+                    aria-label="Clear search"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 transition-colors hover:text-ink-700 dark:hover:text-cream-200"
+                    on:click={() => {
+                        searchQuery = "";
+                        currentPage = 1;
+                    }}
                 >
-                    <X size={12} />
+                    <X size={14} />
                 </button>
             {/if}
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
             <CustomSelect
-                options={categoryOptions}
-                bind:value={selectedCategory}
-                placeholder="All Categories"
-                ariaLabel="Filter by category"
+                options={mediumOptions}
+                bind:value={selectedMedium}
+                placeholder="All mediums"
+                ariaLabel="Filter by medium"
             />
             <CustomSelect
                 options={tagOptions}
                 bind:value={selectedTag}
-                placeholder="All Tags"
+                placeholder="All tags"
                 ariaLabel="Filter by tag"
             />
-        </div>
-    </div>
-
-    <!-- Active filters indicator -->
-    {#if (selectedTag && selectedTag !== "all") || searchQuery}
-        <div
-            class="flex items-center gap-2 mb-4"
-            transition:fade={{ duration: 150 }}
-        >
-            <span class="text-sm text-ink-500 dark:text-ink-400">Filters:</span>
-            {#if selectedTag && selectedTag !== "all"}
-                <span
-                    class="pill text-accent dark:text-accent-light"
-                >
-                    {selectedTag}
-                    <button
-                        type="button"
-                        on:click={() => (selectedTag = "all")}
-                        class="hover:text-accent-dark"
-                    >
-                        <X size={12} />
-                    </button>
-                </span>
-            {/if}
-            {#if searchQuery}
-                <span
-                    class="pill text-steel-dark dark:text-steel-light"
-                >
-                    "{searchQuery}"
-                    <button
-                        type="button"
-                        on:click={() => { searchQuery = ""; }}
-                        class="hover:text-steel dark:hover:text-steel-light"
-                    >
-                        <X size={12} />
-                    </button>
-                </span>
-            {/if}
-            <button
-                type="button"
-                class="text-xs text-ink-500 hover:text-ink-700 dark:hover:text-cream-300 underline"
-                on:click={clearFilters}
-            >
-                Clear all
-            </button>
-        </div>
-    {/if}
-
-    <!-- Table Header (desktop only) -->
-    <div
-        class="hidden md:grid grid-cols-12 gap-4 py-2 text-xs font-medium text-ink-500 dark:text-ink-400 border-b border-ink-200 dark:border-ink-700 mb-2"
-    >
-        <button
-            on:click={() => handleSort("title")}
-            on:mouseenter={() => (hoveredSortCol = "title")}
-            on:mouseleave={() => (hoveredSortCol = null)}
-            class="col-span-6 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
-        >
-            Title
-            {#if sortField === "title"}
-                <div in:fade={{ duration: 200 }}>
-                    {#if sortDirection === "asc"}
-                        <ArrowUp size={12} animate={hoveredSortCol === "title"} />
-                    {:else}
-                        <ArrowDown size={12} animate={hoveredSortCol === "title"} />
-                    {/if}
-                </div>
-            {/if}
-        </button>
-        <button
-            on:click={() => handleSort("category")}
-            on:mouseenter={() => (hoveredSortCol = "category")}
-            on:mouseleave={() => (hoveredSortCol = null)}
-            class="col-span-2 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
-        >
-            Category
-            {#if sortField === "category"}
-                <div in:fade={{ duration: 200 }}>
-                    {#if sortDirection === "asc"}
-                        <ArrowUp size={12} animate={hoveredSortCol === "category"} />
-                    {:else}
-                        <ArrowDown size={12} animate={hoveredSortCol === "category"} />
-                    {/if}
-                </div>
-            {/if}
-        </button>
-        <button
-            on:click={() => handleSort("medium")}
-            on:mouseenter={() => (hoveredSortCol = "medium")}
-            on:mouseleave={() => (hoveredSortCol = null)}
-            class="col-span-2 flex items-center gap-1 hover:text-ink-900 dark:hover:text-cream-100 transition-colors text-left"
-        >
-            Medium
-            {#if sortField === "medium"}
-                <div in:fade={{ duration: 200 }}>
-                    {#if sortDirection === "asc"}
-                        <ArrowUp size={12} animate={hoveredSortCol === "medium"} />
-                    {:else}
-                        <ArrowDown size={12} animate={hoveredSortCol === "medium"} />
-                    {/if}
-                </div>
-            {/if}
-        </button>
-        <button
-            on:click={() => handleSort("enjoyment")}
-            on:mouseenter={() => (hoveredSortCol = "enjoyment")}
-            on:mouseleave={() => (hoveredSortCol = null)}
-            class="col-span-1 flex items-center justify-center gap-1 text-center hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
-        >
-            Enjoyment
-            {#if sortField === "enjoyment"}
-                <div in:fade={{ duration: 200 }}>
-                    {#if sortDirection === "asc"}
-                        <ArrowUp size={12} animate={hoveredSortCol === "enjoyment"} />
-                    {:else}
-                        <ArrowDown size={12} animate={hoveredSortCol === "enjoyment"} />
-                    {/if}
-                </div>
-            {/if}
-        </button>
-        <button
-            on:click={() => handleSort("importance")}
-            on:mouseenter={() => (hoveredSortCol = "importance")}
-            on:mouseleave={() => (hoveredSortCol = null)}
-            class="col-span-1 flex items-center justify-center gap-1 text-center hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
-        >
-            Importance
-            {#if sortField === "importance"}
-                <div in:fade={{ duration: 200 }}>
-                    {#if sortDirection === "asc"}
-                        <ArrowUp size={12} animate={hoveredSortCol === "importance"} />
-                    {:else}
-                        <ArrowDown size={12} animate={hoveredSortCol === "importance"} />
-                    {/if}
-                </div>
-            {/if}
-        </button>
-    </div>
-
-    <!-- Books list -->
-    <div class="space-y-0">
-        {#each sortedBooks as book, i (book.id)}
-            <div
-                class="border-b border-ink-100 dark:border-ink-800"
-                in:fade|local={{ duration: 220, delay: Math.min(i, 9) * 25 }}
-                out:fade|local={{ duration: 140 }}
-                animate:flip={{ duration: 280 }}
-            >
-                <!-- Clickable header -->
+            {#if activeFilters}
                 <button
                     type="button"
-                    class="w-full py-4 text-left group transition-all duration-200 hover:bg-cream-50 dark:hover:bg-ink-800/50 -mx-2 px-2 rounded"
-                    on:click={() => toggleNotes(book.id)}
-                >
-                    <!-- Desktop: Table row layout -->
-                    <div class="hidden md:grid grid-cols-12 gap-4 items-center">
-                        <!-- Title -->
-                        <div class="col-span-6 flex items-center gap-2">
-                            {#if book.favorite}
-                                <Star
-                                    size={14}
-                                    class="text-amber-500 fill-amber-500 flex-shrink-0"
-                                />
-                            {/if}
-                            <span
-                                class="font-medium text-ink-900 dark:text-cream-100 group-hover:text-accent dark:group-hover:text-accent-light transition-colors truncate"
-                            >
-                                {book.title}
-                            </span>
-                            {#if book.notes || book.content}
-                                <span
-                                    class="text-ink-400 transition-transform duration-300 flex-shrink-0"
-                                    class:rotate-180={revealedNotes.has(
-                                        book.id,
-                                    )}
-                                >
-                                    <ChevronDown size={14} />
-                                </span>
-                            {/if}
-                        </div>
-
-                        <!-- Category -->
-                        <div class="col-span-2 pl-1">
-                            <span
-                                class="pill !font-normal {getCategoryColor(
-                                    book.category,
-                                )}"
-                            >
-                                {book.category}
-                            </span>
-                        </div>
-
-                        <!-- Medium -->
-                        <div class="col-span-2 pl-1">
-                            {#if book.medium}
-                                <span
-                                    class="pill !font-normal"
-                                >
-                                    {book.medium}
-                                </span>
-                            {:else}
-                                <span class="text-xs text-ink-400">--</span>
-                            {/if}
-                        </div>
-
-                        <!-- Enjoyment -->
-                        <div class="col-span-1 flex justify-center">
-                            <RatingCircle
-                                value={book.enjoyment}
-                                type="enjoyment"
-                                size={28}
-                            />
-                        </div>
-
-                        <!-- Importance -->
-                        <div class="col-span-1 flex justify-center">
-                            <RatingCircle
-                                value={book.importance}
-                                type="importance"
-                                size={28}
-                            />
-                        </div>
-                    </div>
-
-                    <!-- Mobile: Stack layout -->
-                    <div class="md:hidden">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-2 mb-1">
-                                    {#if book.favorite}
-                                        <Star
-                                            size={14}
-                                            class="text-amber-500 fill-amber-500"
-                                        />
-                                    {/if}
-                                    <h3
-                                        class="font-medium text-ink-900 dark:text-cream-100 group-hover:text-accent dark:group-hover:text-accent-light transition-colors"
-                                    >
-                                        {book.title}
-                                    </h3>
-                                    {#if book.notes || book.content}
-                                        <span
-                                            class="text-ink-400 transition-transform duration-300"
-                                            class:rotate-180={revealedNotes.has(
-                                                book.id,
-                                            )}
-                                        >
-                                            <ChevronDown size={14} />
-                                        </span>
-                                    {/if}
-                                </div>
-                                <p
-                                    class="text-sm text-ink-500 dark:text-ink-400 mb-2"
-                                >
-                                    {book.author}
-                                </p>
-                                <!-- Pills row -->
-                                <div class="flex flex-wrap gap-2">
-                                    <span
-                                        class="pill !font-normal {getCategoryColor(
-                                            book.category,
-                                        )}"
-                                    >
-                                        {book.category}
-                                    </span>
-                                    {#if book.medium}
-                                        <span
-                                            class="pill"
-                                        >
-                                            {book.medium}
-                                        </span>
-                                    {/if}
-                                </div>
-                            </div>
-                            <!-- Ratings on right -->
-                            <div class="flex gap-2">
-                                <RatingCircle
-                                    value={book.enjoyment}
-                                    type="enjoyment"
-                                    size={28}
-                                />
-                                <RatingCircle
-                                    value={book.importance}
-                                    type="importance"
-                                    size={28}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </button>
-
-                <!-- Animated notes reveal -->
-                {#if revealedNotes.has(book.id) && (book.notes || book.content)}
-                    <div
-                        class="pb-4 px-2 -mx-2"
-                        transition:slide={{ duration: 300 }}
-                    >
-                        <div
-                            class="pl-6 border-l-2 border-accent/30 dark:border-accent-light/30 space-y-4"
-                        >
-                            <!-- Author (desktop) -->
-                            <p
-                                class="hidden md:block text-sm text-ink-500 dark:text-ink-400"
-                            >
-                                by {book.author}
-                            </p>
-
-                            <!-- Notes -->
-                            <div>
-                                <p
-                                    class="text-sm text-ink-600 dark:text-cream-400"
-                                >
-                                    {book.notes || book.content}
-                                </p>
-                            </div>
-
-                            <!-- Quotes -->
-                            {#if book.quotes && book.quotes.length > 0}
-                                <div class="mt-4">
-                                    <h4
-                                        class="text-xs font-medium text-ink-500 dark:text-ink-400 mb-2 uppercase tracking-wide"
-                                    >
-                                        Quotes
-                                    </h4>
-                                    <div class="space-y-2">
-                                        {#each book.quotes as quote}
-                                            <blockquote
-                                                class="text-sm italic text-ink-600 dark:text-cream-400 pl-4 border-l-2 border-ink-200 dark:border-ink-700"
-                                            >
-                                                "{quote}"
-                                            </blockquote>
-                                        {/each}
-                                    </div>
-                                </div>
-                            {/if}
-
-                            <!-- Tags (full list) -->
-                            {#if book.tags && book.tags.length > 0}
-                                <div class="flex flex-wrap gap-2 mt-3">
-                                    {#each book.tags as tag}
-                                        <button
-                                            type="button"
-                                            class="pill hover:bg-cream-200/40 dark:hover:bg-ink-700/40 transition-colors"
-                                            on:click|stopPropagation={() =>
-                                                selectTag(tag)}
-                                        >
-                                            {tag}
-                                        </button>
-                                    {/each}
-                                </div>
-                            {/if}
-
-                            <!-- Footer: URL link, subcategory, date -->
-                            <div class="mt-3 flex flex-wrap items-center gap-3">
-                                {#if book.url}
-                                    <a
-                                        href={book.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="inline-flex items-center gap-1.5 text-sm text-accent dark:text-accent-light hover:underline"
-                                        on:click|stopPropagation
-                                        on:mouseenter={() => (hoveredSourceId = book.id)}
-                                        on:mouseleave={() => (hoveredSourceId = null)}
-                                    >
-                                        <CircleArrowOutUpRight size={14} animate={hoveredSourceId === book.id} />
-                                        View Source
-                                    </a>
-                                {/if}
-                                {#if book.subcategory && book.subcategory.length > 0}
-                                    {#each book.subcategory as sub}
-                                        <button
-                                            type="button"
-                                            class="pill hover:bg-cream-200/40 dark:hover:bg-ink-700/40 transition-colors cursor-pointer"
-                                            on:click|stopPropagation={() =>
-                                                selectTag(sub)}
-                                        >
-                                            {sub}
-                                        </button>
-                                    {/each}
-                                {/if}
-                                <span
-                                    class="text-xs text-ink-400 dark:text-ink-500"
-                                >
-                                    Added {formatMonthYear(book.dateAdded)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                {/if}
-            </div>
-        {/each}
-    </div>
-
-    <!-- Empty state -->
-    {#if sortedBooks.length === 0}
-        <div class="text-center py-12 text-ink-500 dark:text-ink-400">
-            <BookOpenText size={48} class="mx-auto mb-4 opacity-50" />
-            {#if searchQuery || (selectedTag && selectedTag !== "all")}
-                <p>No books match your filters.</p>
-                <button
-                    type="button"
-                    class="mt-2 text-accent dark:text-accent-light hover:underline"
+                    class="text-xs font-medium text-ink-500 underline decoration-ink-300 underline-offset-[3px] transition-colors hover:text-ink-800 dark:text-cream-400 dark:decoration-ink-600 dark:hover:text-cream-100"
                     on:click={clearFilters}
                 >
                     Clear filters
                 </button>
-            {:else}
-                <p>No books in this category yet.</p>
             {/if}
         </div>
-    {/if}
+    </section>
+
+    <div
+        class="grid min-w-0 gap-5 {selectedBook ? 'xl:grid-cols-[minmax(0,1fr)_minmax(370px,0.42fr)]' : ''}"
+    >
+        <section class="min-w-0 max-w-full overflow-hidden" aria-label="Bookshelf entries">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-cream-400">
+                <button
+                    type="button"
+                    class="transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                    on:click={clearFilters}
+                    title="Clear filters"
+                >
+                    {sortedBooks.length} {sortedBooks.length === 1 ? "entry" : "entries"}
+                </button>
+                <span>
+                    sorted by {sortLabel(sortField)} {sortDirection === "asc" ? "ascending" : "descending"}
+                </span>
+            </div>
+
+            <div class="max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 shadow-[0_1px_0_rgba(26,26,26,0.03)] dark:border-ink-800 dark:bg-ink-900/45">
+                <div class="w-full max-w-full overflow-x-auto">
+                    <table class="w-full min-w-[1080px] table-fixed text-sm">
+                        <thead class="border-b border-ink-200/90 bg-cream-200/60 text-xs font-normal text-ink-500 dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
+                            <tr>
+                                <th class="w-[35%] px-3 py-2 text-left" aria-sort={ariaSort("title")}>
+                                    <button
+                                        type="button"
+                                        class="flex w-full items-center justify-between gap-2 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                        on:click={() => handleSort("title")}
+                                    >
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <FileText size={14} />
+                                            Title
+                                        </span>
+                                        {#if sortField === "title"}
+                                            {#if sortDirection === "asc"}
+                                                <ArrowUp size={13} />
+                                            {:else}
+                                                <ArrowDown size={13} />
+                                            {/if}
+                                        {/if}
+                                    </button>
+                                </th>
+                                <th class="w-[12%] px-3 py-2 text-left" aria-sort={ariaSort("category")}>
+                                    <button
+                                        type="button"
+                                        class="flex w-full items-center justify-between gap-2 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                        on:click={() => handleSort("category")}
+                                    >
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <Library size={14} />
+                                            Category
+                                        </span>
+                                        {#if sortField === "category"}
+                                            {#if sortDirection === "asc"}
+                                                <ArrowUp size={13} />
+                                            {:else}
+                                                <ArrowDown size={13} />
+                                            {/if}
+                                        {/if}
+                                    </button>
+                                </th>
+                                <th class="w-[12%] px-3 py-2 text-left" aria-sort={ariaSort("medium")}>
+                                    <button
+                                        type="button"
+                                        class="flex w-full items-center justify-between gap-2 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                        on:click={() => handleSort("medium")}
+                                    >
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <BookOpenText size={14} />
+                                            Medium
+                                        </span>
+                                        {#if sortField === "medium"}
+                                            {#if sortDirection === "asc"}
+                                                <ArrowUp size={13} />
+                                            {:else}
+                                                <ArrowDown size={13} />
+                                            {/if}
+                                        {/if}
+                                    </button>
+                                </th>
+                                <th class="w-[7%] px-3 py-2 text-center" aria-sort={ariaSort("enjoyment")}>
+                                    <button
+                                        type="button"
+                                        class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                        on:click={() => handleSort("enjoyment")}
+                                        aria-label="Sort by appreciation"
+                                        title="Appreciation"
+                                    >
+                                        <Heart size={14} />
+                                        {#if sortField === "enjoyment"}
+                                            {#if sortDirection === "asc"}
+                                                <ArrowUp size={13} />
+                                            {:else}
+                                                <ArrowDown size={13} />
+                                            {/if}
+                                        {/if}
+                                    </button>
+                                </th>
+                                <th class="w-[7%] px-3 py-2 text-center" aria-sort={ariaSort("importance")}>
+                                    <button
+                                        type="button"
+                                        class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                        on:click={() => handleSort("importance")}
+                                        aria-label="Sort by importance"
+                                        title="Importance"
+                                    >
+                                        <BadgeInfo size={14} />
+                                        {#if sortField === "importance"}
+                                            {#if sortDirection === "asc"}
+                                                <ArrowUp size={13} />
+                                            {:else}
+                                                <ArrowDown size={13} />
+                                            {/if}
+                                        {/if}
+                                    </button>
+                                </th>
+                                <th class="w-[9%] px-3 py-2 text-left" aria-sort={ariaSort("dateAdded")}>
+                                    <button
+                                        type="button"
+                                        class="flex w-full items-center justify-between gap-2 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                        on:click={() => handleSort("dateAdded")}
+                                    >
+                                        <span class="inline-flex items-center gap-1.5">
+                                            <CalendarDays size={14} />
+                                            Added
+                                        </span>
+                                        {#if sortField === "dateAdded"}
+                                            {#if sortDirection === "asc"}
+                                                <ArrowUp size={13} />
+                                            {:else}
+                                                <ArrowDown size={13} />
+                                            {/if}
+                                        {/if}
+                                    </button>
+                                </th>
+                                <th class="w-[18%] px-3 py-2 text-left">
+                                    <span class="inline-flex items-center gap-1.5">
+                                        <Tags size={14} />
+                                        Tags
+                                    </span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <!-- Keyed on page/sort/filter (not search — re-animating
+                             every keystroke would flicker) so rows stagger in
+                             on each view change. -->
+                        <tbody class="stagger-children divide-y divide-ink-200/70 dark:divide-ink-800">
+                            {#key `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}`}
+                            {#each paginatedBooks as book (book.id)}
+                                <tr
+                                    class="cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-ink-800 dark:outline-accent-light/30' : ''}"
+                                    role="button"
+                                    tabindex="0"
+                                    aria-current={selectedBookId === book.id ? "true" : undefined}
+                                    on:click={() => selectBook(book.id)}
+                                    on:keydown={(event) => onRowKeydown(event, book.id)}
+                                    on:mouseenter={() => (hoveredBookId = book.id)}
+                                    on:mouseleave={() => (hoveredBookId = null)}
+                                >
+                                    <td class="px-3 py-2.5 align-middle">
+                                        <div class="flex min-w-0 items-center gap-2">
+                                            <MediumIcon
+                                                medium={book.medium}
+                                                size={15}
+                                                animate={hoveredBookId === book.id || selectedBookId === book.id}
+                                                className="shrink-0 text-ink-400 dark:text-ink-500"
+                                            />
+                                            {#if book.favorite}
+                                                <Star
+                                                    size={13}
+                                                    class="shrink-0 fill-accent text-accent dark:fill-accent-light dark:text-accent-light"
+                                                    aria-label="Favorite"
+                                                />
+                                            {/if}
+                                            <span class="min-w-0 truncate text-ink-900 dark:text-cream-100" title={book.author ? `${book.title} | ${book.author}` : book.title}>
+                                                {book.title}
+                                                {#if book.author}
+                                                    <span class="text-ink-400 dark:text-ink-500">
+                                                        | {book.author}
+                                                    </span>
+                                                {/if}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-2.5 align-middle">
+                                        <button
+                                            type="button"
+                                            class="pill {getCategoryColor(book.category)}"
+                                            on:click|stopPropagation={() => setCategory(book.category)}
+                                        >
+                                            {book.category}
+                                        </button>
+                                    </td>
+                                    <td class="px-3 py-2.5 align-middle">
+                                        {#if book.medium}
+                                            <span class="pill text-ink-600 dark:text-cream-300">
+                                                {book.medium}
+                                            </span>
+                                        {:else}
+                                            <span class="font-mono text-xs text-ink-400 dark:text-ink-500">--</span>
+                                        {/if}
+                                    </td>
+                                    <td class="px-3 py-2.5 text-center align-middle">
+                                        <RatingGlyph
+                                            value={book.enjoyment}
+                                            type="enjoyment"
+                                            compact
+                                        />
+                                    </td>
+                                    <td class="px-3 py-2.5 text-center align-middle">
+                                        <RatingGlyph
+                                            value={book.importance}
+                                            type="importance"
+                                            compact
+                                        />
+                                    </td>
+                                    <td class="px-3 py-2.5 align-middle font-mono text-xs text-ink-500 dark:text-cream-400">
+                                        {shortDate(book.dateAdded)}
+                                    </td>
+                                    <td class="px-3 py-2.5 align-middle">
+                                        <div class="flex flex-nowrap items-center gap-1 overflow-hidden">
+                                            {#each previewTags(book) as tag}
+                                                <button
+                                                    type="button"
+                                                    class="pill max-w-[9rem] truncate"
+                                                    title={tag}
+                                                    on:click|stopPropagation={() => setTag(tag)}
+                                                >
+                                                    {tag}
+                                                </button>
+                                            {/each}
+                                            {#if tagOverflow(book) > 0}
+                                                <button
+                                                    type="button"
+                                                    class="pill shrink-0 text-ink-500 dark:text-cream-400"
+                                                    title="Open details to show all tags"
+                                                    aria-label="Open details and show {tagOverflow(book)} more tags"
+                                                    on:click|stopPropagation={() => selectBook(book.id)}
+                                                >
+                                                    <CirclePlus
+                                                        size={12}
+                                                        animate={hoveredBookId === book.id || selectedBookId === book.id}
+                                                    />
+                                                    +{tagOverflow(book)}
+                                                </button>
+                                            {/if}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {/each}
+                            {/key}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {#if sortedBooks.length === 0}
+                <div class="border-x border-b border-ink-200/90 bg-cream-50/60 py-12 text-center text-ink-500 dark:border-ink-800 dark:bg-ink-900/45 dark:text-cream-400">
+                    <BookOpenText size={42} class="mx-auto mb-4 opacity-50" />
+                    <p>No books match your filters.</p>
+                    <button
+                        type="button"
+                        class="mt-2 text-sm text-accent underline underline-offset-[3px] dark:text-accent-light"
+                        on:click={clearFilters}
+                    >
+                        Clear filters
+                    </button>
+                </div>
+            {/if}
+
+            <nav
+                class="mt-4 flex flex-col gap-3 text-sm text-ink-500 dark:text-cream-400 sm:flex-row sm:items-center sm:justify-between"
+                aria-label="Bookshelf pagination"
+            >
+                <span>
+                    Showing {entryStart} to {pageEnd} of {sortedBooks.length} entries
+                </span>
+                <div class="flex items-center gap-1">
+                    <button
+                        type="button"
+                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
+                        on:click={() => setPage(1)}
+                        disabled={currentPage === 1}
+                        aria-label="First page"
+                    >
+                        <ChevronsLeft size={15} />
+                    </button>
+                    <button
+                        type="button"
+                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
+                        on:click={() => setPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        aria-label="Previous page"
+                    >
+                        <ChevronLeft size={15} />
+                    </button>
+                    <span class="px-3 font-mono text-xs tabular-nums">
+                        {currentPage} / {totalPages}
+                    </span>
+                    <button
+                        type="button"
+                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
+                        on:click={() => setPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        aria-label="Next page"
+                    >
+                        <ChevronRight size={15} />
+                    </button>
+                    <button
+                        type="button"
+                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
+                        on:click={() => setPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        aria-label="Last page"
+                    >
+                        <ChevronsRight size={15} />
+                    </button>
+                </div>
+            </nav>
+        </section>
+
+        {#if selectedBook}
+            <aside
+                class="max-h-[calc(100dvh-6rem)] overflow-hidden border border-ink-200/90 bg-cream-100 shadow-[0_12px_36px_rgba(26,26,26,0.08)] dark:border-ink-800 dark:bg-ink-900/95 xl:sticky xl:top-24"
+                aria-label="Selected reading note"
+                in:fly={{ x: 28, duration: 260, easing: cubicOut }}
+            >
+                <div class="flex items-start justify-between gap-4 border-b border-ink-200/90 p-4 dark:border-ink-800">
+                    <div class="min-w-0">
+                        <h2 class="flex items-start gap-2 text-balance text-xl font-medium leading-snug text-ink-900 dark:text-cream-100">
+                            <MediumIcon
+                                medium={selectedBook.medium}
+                                size={20}
+                                animate
+                                className="mt-1 shrink-0 text-ink-500 dark:text-cream-400"
+                            />
+                            <span>{selectedBook.title}</span>
+                        </h2>
+                        {#if selectedBook.author}
+                            <p class="mt-1 text-sm text-ink-500 dark:text-cream-400">
+                                by {selectedBook.author}
+                            </p>
+                        {/if}
+                    </div>
+                    <button
+                        type="button"
+                        class="shrink-0 p-1.5 text-ink-500 transition-colors hover:text-ink-900 dark:text-cream-400 dark:hover:text-cream-100"
+                        on:click={closeDrawer}
+                        aria-label="Close details"
+                    >
+                        <PanelRightClose size={18} />
+                    </button>
+                </div>
+
+                <!-- Keyed by book so switching entries re-runs the staggered
+                     section fade-in. -->
+                {#key selectedBook.id}
+                <div class="stagger-children max-h-[calc(100dvh-14rem)] space-y-5 overflow-y-auto p-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            class="pill {getCategoryColor(selectedBook.category)}"
+                            on:click={() => setCategory(selectedBook.category)}
+                        >
+                            {selectedBook.category}
+                        </button>
+                        {#if selectedBook.medium}
+                            <span class="pill text-ink-600 dark:text-cream-300">
+                                {selectedBook.medium}
+                            </span>
+                        {/if}
+                        {#if selectedBook.favorite}
+                            <button
+                                type="button"
+                                class="pill text-accent dark:text-accent-light"
+                                on:click={() => setCategory("favorites")}
+                            >
+                                <Star size={12} class="fill-current" />
+                                favorite
+                            </button>
+                        {/if}
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3 border-y border-ink-200/80 py-3 dark:border-ink-800">
+                        <div>
+                            <p class="meta-label mb-1.5">Appreciation</p>
+                            <RatingGlyph
+                                value={selectedBook.enjoyment}
+                                type="enjoyment"
+                            />
+                        </div>
+                        <div>
+                            <p class="meta-label mb-1.5">Importance</p>
+                            <RatingGlyph
+                                value={selectedBook.importance}
+                                type="importance"
+                            />
+                        </div>
+                        <div>
+                            <p class="meta-label mb-1.5">Date added</p>
+                            <p class="font-mono text-sm text-ink-700 dark:text-cream-300">
+                                {shortDate(selectedBook.dateAdded)}
+                            </p>
+                        </div>
+                    </div>
+
+                    {#if selectedNoteParagraphs.length > 0}
+                        <section>
+                            <div class="section-rule mb-2 gap-3">
+                                <h3 class="meta-label">TLDR</h3>
+                                <div class="section-rule-line"></div>
+                            </div>
+                            <p class="text-sm leading-6 text-ink-700 dark:text-cream-300">
+                                {@html parseInline(selectedNoteParagraphs[0])}
+                            </p>
+                        </section>
+
+                        {#if selectedNoteParagraphs.length > 1}
+                            <section>
+                                <div class="section-rule mb-2 gap-3">
+                                    <h3 class="meta-label">Notes</h3>
+                                    <div class="section-rule-line"></div>
+                                </div>
+                                <div class="space-y-3 border-l-2 border-ink-200 pl-4 dark:border-ink-700">
+                                    {#each selectedNoteParagraphs.slice(1) as paragraph}
+                                        <p class="text-sm leading-6 text-ink-700 dark:text-cream-300">
+                                            {@html parseInline(paragraph)}
+                                        </p>
+                                    {/each}
+                                </div>
+                            </section>
+                        {/if}
+                    {:else}
+                        <section>
+                            <div class="section-rule mb-2 gap-3">
+                                <h3 class="meta-label">Notes</h3>
+                                <div class="section-rule-line"></div>
+                            </div>
+                            <p class="text-sm text-ink-500 dark:text-cream-400">
+                                No notes added yet.
+                            </p>
+                        </section>
+                    {/if}
+
+                    {#if selectedBook.quotes && selectedBook.quotes.length > 0}
+                        <section>
+                            <div class="section-rule mb-2 gap-3">
+                                <h3 class="meta-label">Quotes</h3>
+                                <div class="section-rule-line"></div>
+                            </div>
+                            <div class="space-y-3">
+                                {#each selectedBook.quotes as quote}
+                                    <blockquote class="border-l-2 border-accent/35 pl-4 text-sm italic leading-6 text-ink-600 dark:border-accent-light/35 dark:text-cream-300">
+                                        {@html parseInline(quote)}
+                                    </blockquote>
+                                {/each}
+                            </div>
+                        </section>
+                    {/if}
+
+                    {#if selectedTags.length > 0}
+                        <section>
+                            <div class="section-rule mb-2 gap-3">
+                                <h3 class="meta-label">Tags</h3>
+                                <div class="section-rule-line"></div>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5">
+                                {#each selectedTags as tag}
+                                    <button
+                                        type="button"
+                                        class="pill"
+                                        on:click={() => setTag(tag)}
+                                    >
+                                        {tag}
+                                    </button>
+                                {/each}
+                            </div>
+                        </section>
+                    {/if}
+
+                    <section>
+                        <div class="section-rule mb-2 gap-3">
+                            <h3 class="meta-label">Source</h3>
+                            <div class="section-rule-line"></div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3">
+                            {#if selectedBook.url}
+                                <a
+                                    href={selectedBook.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-1.5 border border-ink-900 bg-ink-900 px-2.5 py-1.5 text-sm text-cream-100 transition-colors hover:bg-ink-700 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900 dark:hover:bg-cream-200"
+                                >
+                                    View source
+                                    <ExternalLink size={14} />
+                                </a>
+                            {:else}
+                                <span class="text-sm text-ink-500 dark:text-cream-400">
+                                    No source link.
+                                </span>
+                            {/if}
+                            {#if !Number.isNaN(new Date(selectedBook.dateAdded).getTime())}
+                                <span class="text-xs text-ink-400 dark:text-ink-500">
+                                    Added {formatMonthYear(selectedBook.dateAdded)}
+                                </span>
+                            {/if}
+                        </div>
+                    </section>
+                </div>
+                {/key}
+            </aside>
+        {/if}
+    </div>
 </div>

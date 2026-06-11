@@ -6,7 +6,7 @@ export interface Paper {
     title: string;
     authors: string[];
     year: number;
-    venue: string;
+    venue: string | null;
     arxiv: string | null;
     pdf: string | null;
     code: string | null;
@@ -42,6 +42,7 @@ export interface Book {
     url?: string;               // Source link
     dateAdded: string;
     favorite: boolean;
+    status?: 'shelved' | 'done'; // shelved = want to read/watch; absent = done
     notes?: string;
     content?: string;
 }
@@ -122,10 +123,34 @@ export interface AboutData {
     thoughts: string[];
 }
 
+// Frontmatter validation: malformed content files should fail the build
+// (these modules are imported by prerendered routes, so throwing here aborts
+// `vite build` with the offending file named) instead of rendering broken.
+type FieldType = 'string' | 'number' | 'array' | 'string|null';
+
+function validateFrontmatter(path: string, mod: unknown, required: Record<string, FieldType>): void {
+    const data = mod as Record<string, unknown>;
+    for (const [field, type] of Object.entries(required)) {
+        const value = data[field];
+        const ok =
+            type === 'array' ? Array.isArray(value)
+            : type === 'string|null' ? value === null || typeof value === 'string'
+            : typeof value === type;
+        if (!ok) {
+            throw new Error(`Invalid frontmatter in ${path}: "${field}" missing or not a ${type}`);
+        }
+    }
+}
+
 // Import all paper markdown files
 const paperModules = import.meta.glob<Paper>('/src/content/papers/*.md', { eager: true });
-export const papers: Paper[] = Object.values(paperModules)
-    .map((mod) => mod as unknown as Paper)
+export const papers: Paper[] = Object.entries(paperModules)
+    .map(([path, mod]) => {
+        validateFrontmatter(path, mod, {
+            id: 'string', title: 'string', authors: 'array', year: 'number', venue: 'string|null',
+        });
+        return mod as unknown as Paper;
+    })
     .sort((a, b) => {
         if (a.year !== b.year) return b.year - a.year;
         return (a.priority ?? 99) - (b.priority ?? 99);  // Secondary sort by priority (lower = higher priority)
@@ -133,20 +158,33 @@ export const papers: Paper[] = Object.values(paperModules)
 
 // Import all book markdown files
 const bookModules = import.meta.glob<Book>('/src/content/books/*.md', { eager: true });
-export const books: Book[] = Object.values(bookModules).map((mod) => {
+export const books: Book[] = Object.entries(bookModules).map(([path, mod]) => {
+    validateFrontmatter(path, mod, {
+        id: 'string', title: 'string', author: 'string', category: 'string', dateAdded: 'string',
+    });
     const data = mod as unknown as Book;
     // Normalize subcategory to string[] (accepts an array or comma-separated string);
     // fall back to markdown content for notes when notes aren't set.
     const subcategory = Array.isArray(data.subcategory)
         ? data.subcategory
         : (data.subcategory ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-    return { ...data, subcategory, notes: data.notes || data.content || undefined };
+    return {
+        ...data,
+        subcategory,
+        status: data.status === 'shelved' ? 'shelved' : 'done',
+        notes: data.notes || data.content || undefined,
+    };
 });
 
 // Import all post markdown files
 const postModules = import.meta.glob<Post>('/src/content/posts/*.md', { eager: true });
-export const posts: Post[] = Object.values(postModules)
-    .map((mod) => mod as unknown as Post)
+export const posts: Post[] = Object.entries(postModules)
+    .map(([path, mod]) => {
+        validateFrontmatter(path, mod, {
+            id: 'string', title: 'string', date: 'string', excerpt: 'string', tags: 'array',
+        });
+        return mod as unknown as Post;
+    })
     .filter((p) => p.published !== false)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 

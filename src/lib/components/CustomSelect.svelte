@@ -181,7 +181,7 @@
         letter-spacing: 0.01em;
         background-color: transparent;
         border: 1px solid theme("colors.ink.200");
-        border-radius: 0.25rem;
+        border-radius: 2px;
         color: theme("colors.ink.600");
         cursor: pointer;
         transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
@@ -235,7 +235,7 @@
         min-width: 100%;
         background-color: theme("colors.cream.50");
         border: 1px solid theme("colors.ink.200");
-        border-radius: 0.25rem;
+        border-radius: 2px;
         box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
         z-index: 50;
         max-height: 19rem;

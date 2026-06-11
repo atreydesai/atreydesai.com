@@ -6,11 +6,15 @@
  */
 
 import sharp from 'sharp';
-import { readdir, mkdir, stat } from 'fs/promises';
+import { readdir, mkdir, stat, readFile, writeFile } from 'fs/promises';
 import { join, parse } from 'path';
+import { extractPhotoMeta } from './photo-exif.mjs';
 
 const PHOTOS_DIR = 'static/images/photography';
 const THUMBS_DIR = 'static/images/photography/thumbs';
+// EXIF/dimension cache consumed by src/routes/photography/+page.server.ts at
+// prerender time, so the build doesn't re-read every full-size JPG.
+const META_PATH = join(THUMBS_DIR, 'photo-meta.json');
 
 // Thumbnail settings
 const THUMB_WIDTH = 800;  // Default grid thumbnail width (keeps the bare name)
@@ -122,6 +126,41 @@ async function optimizePapers() {
     summarize(results);
 }
 
+async function extractMetadata() {
+    console.log('\n🏷️  Extracting photo metadata...');
+    const files = await readdir(PHOTOS_DIR);
+    const imageFiles = files.filter(f =>
+        /\.(jpg|jpeg|png|webp)$/i.test(f) && !f.startsWith('.')
+    );
+
+    /** @type {Record<string, import('./photo-exif.mjs').PhotoMeta & { mtimeMs: number }>} */
+    let cache = {};
+    try {
+        cache = JSON.parse(await readFile(META_PATH, 'utf-8'));
+    } catch {
+        // no cache yet — extract everything
+    }
+
+    /** @type {typeof cache} */
+    const meta = {};
+    let extracted = 0;
+    for (const filename of imageFiles) {
+        const srcPath = join(PHOTOS_DIR, filename);
+        const { mtimeMs } = await stat(srcPath);
+        const cached = cache[filename];
+        if (cached && cached.mtimeMs === mtimeMs) {
+            meta[filename] = cached;
+            continue;
+        }
+        const buffer = await readFile(srcPath);
+        meta[filename] = { mtimeMs, ...extractPhotoMeta(buffer, filename) };
+        extracted++;
+    }
+
+    await writeFile(META_PATH, JSON.stringify(meta));
+    console.log(`   ✅ Extracted: ${extracted}   ⏭️  Cached: ${imageFiles.length - extracted}`);
+}
+
 function summarize(results) {
     const optimized = results.filter(r => r.status === 'optimized');
     const skipped = results.filter(r => r.status === 'skipped');
@@ -134,6 +173,7 @@ function summarize(results) {
 
 async function main() {
     await optimizePhotography();
+    await extractMetadata();
     await optimizeProfile();
     await optimizePapers();
     console.log('\n✨ Done!');

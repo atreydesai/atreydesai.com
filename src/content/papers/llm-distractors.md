@@ -22,7 +22,7 @@ preprint: false
 featured: true
 highlight: false
 priority: 1
-image: /images/papers/llm-distractors.png
+image: /images/papers/llm-distractors-poster.png
 imageAnimated: /images/papers/llm-distractors.mp4
-imageDescription: "We compare MCQA distractors generated with human guidance versus LLMs alone in two tasks: 1) distractor generation from a question-answer pair and 2) distractor extension from an existing MCQ. We assess ensuing MCQs via metrics in education research: difficulty for test-taker models, discriminability of model ranks, and writing quality."
+imageDescription: "Animated explainer: a benchmark question needs wrong answers (distractors). People write them carefully; LLMs write them instantly. Grading both with metrics from education research, LLM distractors often make harder questions, but human-guided ones better separate models and follow MCQ writing guidelines."
 ---
