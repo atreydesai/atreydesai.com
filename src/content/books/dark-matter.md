@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/27833670"
 goodreadsId: "27833670"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "thriller"
+  - "book club"
+  - "mystery"
 enjoyment: 10
 ---

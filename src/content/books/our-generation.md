@@ -3,8 +3,12 @@ id: "our-generation"
 title: "Our Generation"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-07-16"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "youth"
+  - "drama"
 status: shelved
 ---

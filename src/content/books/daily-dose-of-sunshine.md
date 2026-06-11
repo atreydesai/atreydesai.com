@@ -3,8 +3,12 @@ id: "daily-dose-of-sunshine"
 title: "Daily Dose of Sunshine"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-04-22"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "life"
+  - "drama"
+  - "medical"
 status: shelved
 ---

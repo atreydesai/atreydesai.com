@@ -7,6 +7,7 @@
     "optimize-photos": "node scripts/optimize-photos.mjs",
     "sync:goodreads": "node scripts/sync-goodreads.mjs",
     "sync:mdl": "node scripts/sync-mdl.mjs",
+    "tags:backfill": "node scripts/backfill-tags.mjs",
     "build": "npm run optimize-photos && npm run sync:goodreads && npm run sync:mdl && vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./jsconfig.json",

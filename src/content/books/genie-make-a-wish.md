@@ -3,8 +3,12 @@ id: "genie-make-a-wish"
 title: "Genie, Make a Wish"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-03-13"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "romance"
+  - "fantasy"
 status: shelved
 ---

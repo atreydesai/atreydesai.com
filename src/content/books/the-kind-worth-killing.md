@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/21936809"
 goodreadsId: "21936809"
+tags:
+  - "thriller"
+  - "mystery"
+  - "fiction"
+  - "mystery thriller"
+  - "audiobook"
 status: shelved
 ---

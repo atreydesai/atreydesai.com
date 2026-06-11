@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/13079982"
 goodreadsId: "13079982"
+tags:
+  - "classics"
+  - "fiction"
+  - "science fiction"
+  - "dystopia"
+  - "school"
 ---

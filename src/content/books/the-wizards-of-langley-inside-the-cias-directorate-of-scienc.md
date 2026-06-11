@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/625730"
 goodreadsId: "625730"
+tags:
+  - "history"
+  - "nonfiction"
+  - "espionage"
+  - "science"
+  - "military fiction"
 ---

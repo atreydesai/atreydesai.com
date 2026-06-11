@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: article
 url: "https://www.theatlantic.com/technology/2026/05/pangram-ai-detection-accuracy/687381/"
-tags:
-  - relevant
 enjoyment: 3
 importance: 5
 ---

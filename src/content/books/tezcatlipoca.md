@@ -8,4 +8,9 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/44417935"
 goodreadsId: "44417935"
+tags:
+  - "fiction"
+  - "mystery"
+  - "crime"
+  - "suspense"
 ---

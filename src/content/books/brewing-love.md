@@ -5,8 +5,12 @@ author: ""
 category: fiction
 dateAdded: "2025-01-02"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/766237-in-the-name-of-alcohol"
 mdlId: "766237-in-the-name-of-alcohol"
+tags:
+  - "comedy"
+  - "romance"
+  - "drama"
 enjoyment: 5.5
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/58939924"
 goodreadsId: "58939924"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "audiobook"
+  - "fiction"
 enjoyment: 6
 ---

@@ -3,8 +3,13 @@ id: "you-and-everything-else"
 title: "You and Everything Else"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-05-12"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "life"
+  - "drama"
+  - "melodrama"
 status: shelved
 ---

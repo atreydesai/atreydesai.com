@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: article
 url: "https://www.linuxfoundation.org/blog/the-open-source-legacy-and-ais-licensing-challenge"
-tags:
-  - relevant
 enjoyment: 6
 importance: 10
 ---

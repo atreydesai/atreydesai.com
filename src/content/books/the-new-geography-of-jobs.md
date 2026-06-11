@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/13429580"
 goodreadsId: "13429580"
+tags:
+  - "economics"
+  - "nonfiction"
+  - "business"
+  - "politics"
+  - "sociology"
 enjoyment: 8
 ---

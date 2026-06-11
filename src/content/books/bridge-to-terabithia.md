@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/40940121"
 goodreadsId: "40940121"
+tags:
+  - "fiction"
+  - "young adult"
+  - "classics"
+  - "fantasy"
+  - "childrens"
 ---

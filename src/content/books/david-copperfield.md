@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/10080974"
 goodreadsId: "10080974"
+tags:
+  - "classics"
+  - "fiction"
+  - "literature"
+  - "historical fiction"
+  - "audiobook"
 ---

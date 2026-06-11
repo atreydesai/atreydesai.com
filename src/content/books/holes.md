@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/38709"
 goodreadsId: "38709"
+tags:
+  - "young adult"
+  - "fiction"
+  - "middle grade"
+  - "childrens"
+  - "classics"
 ---

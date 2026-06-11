@@ -3,8 +3,14 @@ id: "kikis-delivery-service"
 title: "Kiki's Delivery Service"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "fantasy"
+  - "adventure"
+  - "coming-of-age"
+  - "family"
+  - "anime"
 status: shelved
 ---

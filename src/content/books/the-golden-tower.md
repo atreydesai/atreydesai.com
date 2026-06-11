@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/13612970"
 goodreadsId: "13612970"
+tags:
+  - "fantasy"
+  - "middle grade"
+  - "young adult"
+  - "magic"
+  - "audiobook"
 ---

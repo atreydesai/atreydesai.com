@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/63310838"
 goodreadsId: "63310838"
+tags:
+  - "short stories"
+  - "fiction"
+  - "contemporary"
+  - "literary fiction"
+  - "audiobook"
 status: shelved
 ---

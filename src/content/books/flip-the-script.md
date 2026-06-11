@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/43785625"
 goodreadsId: "43785625"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "lgbt"
+  - "lesbian"
 enjoyment: 4
 ---

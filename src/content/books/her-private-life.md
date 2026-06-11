@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2022-12-06"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/32293-her-private-life"
 mdlId: "32293-her-private-life"
+tags:
+  - "business"
+  - "comedy"
+  - "romance"
+  - "drama"
 enjoyment: 7
 ---

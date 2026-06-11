@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/190165394"
 goodreadsId: "190165394"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "novella"
+  - "fantasy"
 enjoyment: 8
 ---

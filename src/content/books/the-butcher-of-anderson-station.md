@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/11570653"
 goodreadsId: "11570653"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "short stories"
+  - "space opera"
+  - "audiobook"
 ---

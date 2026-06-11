@@ -3,8 +3,12 @@ id: "extraordinary-attorney-woo-season-2"
 title: "Extraordinary Attorney Woo Season 2"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2022-12-06"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "law"
+  - "life"
+  - "drama"
 status: shelved
 ---

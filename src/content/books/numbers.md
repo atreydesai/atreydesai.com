@@ -3,8 +3,13 @@ id: "numbers"
 title: "Numbers"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-08-07"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "thriller"
+  - "mystery"
+  - "drama"
 status: shelved
 ---

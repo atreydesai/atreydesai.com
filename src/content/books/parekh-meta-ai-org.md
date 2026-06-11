@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: blog post
 url: "https://michaelparekh.substack.com/p/ai-metas-new-ai-org-coming-into-focus"
-tags:
-  - relevant
 enjoyment: 7
 importance: 5
 ---

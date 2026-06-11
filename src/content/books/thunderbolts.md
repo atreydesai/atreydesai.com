@@ -3,8 +3,12 @@ id: "thunderbolts"
 title: "Thunderbolts"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "action"
+  - "superhero"
+  - "adventure"
 status: shelved
 ---

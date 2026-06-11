@@ -3,8 +3,13 @@ id: "be-yourself"
 title: "Be Yourself"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-05-25"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "food"
+  - "comedy"
+  - "romance"
+  - "drama"
 status: shelved
 ---

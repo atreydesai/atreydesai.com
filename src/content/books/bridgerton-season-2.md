@@ -6,4 +6,8 @@ category: fiction
 dateAdded: "2024-05-16"
 favorite: false
 medium: show
+tags:
+  - "historical drama"
+  - "romance"
+  - "period drama"
 ---

@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: blog post
 url: "https://kaitchup.substack.com/p/qwen35-quantization-similar-accuracy"
-tags:
-  - relevant
 enjoyment: 10
 importance: 10
 ---

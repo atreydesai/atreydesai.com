@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/4671"
 goodreadsId: "4671"
+tags:
+  - "classics"
+  - "fiction"
+  - "school"
+  - "historical fiction"
+  - "romance"
 enjoyment: 10
 ---

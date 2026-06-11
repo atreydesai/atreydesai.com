@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/46041465"
 goodreadsId: "46041465"
+tags:
+  - "nonfiction"
+  - "memoir"
+  - "audiobook"
+  - "romance"
+  - "self help"
 status: shelved
 ---

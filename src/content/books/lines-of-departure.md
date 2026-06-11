@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18476102"
 goodreadsId: "18476102"
+tags:
+  - "science fiction"
+  - "military fiction"
+  - "fiction"
+  - "space opera"
+  - "audiobook"
 ---

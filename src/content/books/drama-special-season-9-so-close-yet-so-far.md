@@ -8,5 +8,8 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/30772-drama-special-season-9-almost-touching"
 mdlId: "30772-drama-special-season-9-almost-touching"
+tags:
+  - "drama"
+  - "sports"
 enjoyment: 7
 ---

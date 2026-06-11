@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/43822024"
 goodreadsId: "43822024"
+tags:
+  - "young adult"
+  - "fantasy"
+  - "dystopia"
+  - "science fiction"
+  - "fiction"
 enjoyment: 10
 ---

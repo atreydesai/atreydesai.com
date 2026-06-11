@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/15752280"
 goodreadsId: "15752280"
+tags:
+  - "classics"
+  - "mystery"
+  - "fiction"
+  - "short stories"
+  - "crime"
 ---

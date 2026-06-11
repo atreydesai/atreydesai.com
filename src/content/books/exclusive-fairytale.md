@@ -3,8 +3,12 @@ id: "exclusive-fairytale"
 title: "Exclusive Fairytale"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-08-20"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "youth"
+  - "family"
 status: shelved
 ---

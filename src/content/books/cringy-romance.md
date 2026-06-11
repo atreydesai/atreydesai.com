@@ -3,8 +3,13 @@ id: "cringy-romance"
 title: "Cringy Romance"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-03-17"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "romance"
+  - "youth"
+  - "drama"
 status: shelved
 ---

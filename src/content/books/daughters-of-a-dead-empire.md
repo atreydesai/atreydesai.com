@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/55780553"
 goodreadsId: "55780553"
+tags:
+  - "historical fiction"
+  - "young adult"
+  - "historical"
+  - "fantasy"
+  - "retellings"
 enjoyment: 10
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/33574273"
 goodreadsId: "33574273"
+tags:
+  - "fantasy"
+  - "fiction"
+  - "classics"
+  - "young adult"
+  - "science fiction"
 ---

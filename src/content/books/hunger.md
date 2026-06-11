@@ -8,5 +8,9 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/740793-hunger"
 mdlId: "740793-hunger"
+tags:
+  - "food"
+  - "thriller"
+  - "drama"
 enjoyment: 8
 ---

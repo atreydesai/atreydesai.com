@@ -3,8 +3,13 @@ id: "red-swan"
 title: "Red Swan"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2024-07-17"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "romance"
+  - "drama"
+  - "melodrama"
 status: shelved
 ---

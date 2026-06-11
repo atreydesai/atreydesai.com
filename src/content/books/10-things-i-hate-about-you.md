@@ -6,4 +6,9 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "comedy drama"
+  - "teen"
+  - "coming-of-age"
+  - "romantic comedy"
 ---

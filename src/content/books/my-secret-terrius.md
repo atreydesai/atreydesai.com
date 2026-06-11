@@ -3,8 +3,13 @@ id: "my-secret-terrius"
 title: "My Secret Terrius"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-10-31"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "mystery"
+  - "comedy"
+  - "romance"
 status: shelved
 ---

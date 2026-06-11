@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/37781"
 goodreadsId: "37781"
+tags:
+  - "fiction"
+  - "classics"
+  - "historical fiction"
+  - "africa"
+  - "school"
 enjoyment: 8
 ---

@@ -3,8 +3,11 @@ id: "city-of-romance"
 title: "City of Romance"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-04-19"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "youth"
 status: shelved
 ---

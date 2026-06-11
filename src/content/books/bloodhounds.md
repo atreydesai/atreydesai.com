@@ -3,8 +3,13 @@ id: "bloodhounds"
 title: "Bloodhounds"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-11-20"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "thriller"
+  - "crime"
+  - "drama"
 status: shelved
 ---

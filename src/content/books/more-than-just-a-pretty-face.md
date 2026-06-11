@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/42655335"
 goodreadsId: "42655335"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "fiction"
+  - "realistic fiction"
 enjoyment: 8
 ---

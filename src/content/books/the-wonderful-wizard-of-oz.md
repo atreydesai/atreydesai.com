@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/15803417"
 goodreadsId: "15803417"
+tags:
+  - "classics"
+  - "fantasy"
+  - "fiction"
+  - "childrens"
+  - "young adult"
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/31375784"
 goodreadsId: "31375784"
+tags:
+  - "young adult"
+  - "romance"
+  - "contemporary"
+  - "mental health"
+  - "fiction"
 enjoyment: 8
 ---

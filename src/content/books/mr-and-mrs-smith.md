@@ -6,4 +6,8 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: show
+tags:
+  - "action"
+  - "comedy drama"
+  - "spy"
 ---

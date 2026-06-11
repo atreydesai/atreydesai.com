@@ -6,4 +6,10 @@ category: fiction
 dateAdded: "2023-06-18"
 favorite: false
 medium: show
+tags:
+  - "cyberpunk"
+  - "science fiction"
+  - "action"
+  - "crime"
+  - "drama"
 ---

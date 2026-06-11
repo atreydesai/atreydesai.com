@@ -3,8 +3,13 @@ id: "blue-birthday"
 title: "Blue Birthday"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-05-01"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "thriller"
+  - "mystery"
+  - "romance"
+  - "fantasy"
 status: shelved
 ---

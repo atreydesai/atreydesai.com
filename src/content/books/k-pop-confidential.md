@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/49090423"
 goodreadsId: "49090423"
+tags:
+  - "young adult"
+  - "contemporary"
+  - "romance"
+  - "fiction"
+  - "music"
 enjoyment: 8
 ---

@@ -8,5 +8,9 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/47057-dream"
 mdlId: "47057-dream"
+tags:
+  - "comedy"
+  - "drama"
+  - "sports"
 enjoyment: 6
 ---

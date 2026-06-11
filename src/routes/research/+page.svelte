@@ -79,6 +79,8 @@
     $: preprints = filteredPapers.filter((p) => p.preprint && !p.classProject);
     $: published = filteredPapers.filter((p) => !p.preprint && !p.classProject);
     $: classProjects = filteredPapers.filter((p) => p.classProject);
+    $: activeFilters =
+        selectedYear !== "all" || selectedTag !== "all" || !showPreprints;
     $: groupedTalks = Object.values(
         talks.reduce(
             (acc, talk) => {
@@ -122,6 +124,12 @@
 
     $: talkGroups = groupedTalks.filter((g) => g.type === "research talk");
     $: presentationGroups = groupedTalks.filter((g) => g.type === "poster");
+
+    function clearFilters() {
+        selectedYear = "all";
+        selectedTag = "all";
+        showPreprints = true;
+    }
 </script>
 
 <PageShell
@@ -144,6 +152,28 @@
             placeholder="All Topics"
             ariaLabel="Filter by topic"
         />
+
+        {#if activeFilters}
+            <button
+                type="button"
+                class="text-xs font-medium text-ink-500 underline decoration-ink-300 underline-offset-[3px] transition-colors hover:text-ink-800 dark:text-cream-400 dark:decoration-ink-600 dark:hover:text-cream-100"
+                on:click={clearFilters}
+            >
+                Clear filters
+            </button>
+        {/if}
+    </div>
+
+    <div class="-mt-3 mb-6 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-cream-400">
+        <button
+            type="button"
+            class="transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+            on:click={clearFilters}
+            title="Clear filters"
+        >
+            {filteredPapers.length} {filteredPapers.length === 1 ? "entry" : "entries"}
+        </button>
+        <span>sorted by year descending</span>
     </div>
 
     {#if published.length > 0}
@@ -341,11 +371,7 @@
             <button
                 type="button"
                 class="link mt-3"
-                on:click={() => {
-                    selectedYear = "all";
-                    selectedTag = "all";
-                    showPreprints = true;
-                }}
+                on:click={clearFilters}
             >
                 Clear filters
             </button>

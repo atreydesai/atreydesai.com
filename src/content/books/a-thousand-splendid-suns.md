@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/128029"
 goodreadsId: "128029"
+tags:
+  - "fiction"
+  - "historical fiction"
+  - "book club"
+  - "contemporary"
+  - "historical"
 status: shelved
 ---

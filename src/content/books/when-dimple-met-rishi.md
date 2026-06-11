@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/28458598"
 goodreadsId: "28458598"
+tags:
+  - "young adult"
+  - "romance"
+  - "contemporary"
+  - "fiction"
+  - "audiobook"
 enjoyment: 8
 ---

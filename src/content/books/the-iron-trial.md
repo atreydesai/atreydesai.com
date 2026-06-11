@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/20578940"
 goodreadsId: "20578940"
+tags:
+  - "fantasy"
+  - "middle grade"
+  - "young adult"
+  - "magic"
+  - "fiction"
 ---

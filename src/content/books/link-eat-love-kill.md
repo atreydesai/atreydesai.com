@@ -3,8 +3,13 @@ id: "link-eat-love-kill"
 title: "Link: Eat, Love, Kill"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-03-07"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "mystery"
+  - "romance"
+  - "drama"
+  - "fantasy"
 status: shelved
 ---

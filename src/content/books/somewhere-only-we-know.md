@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/36992163"
 goodreadsId: "36992163"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "fiction"
+  - "young adult contemporary"
 enjoyment: 10
 ---

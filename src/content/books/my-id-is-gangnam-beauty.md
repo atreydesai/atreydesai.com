@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2023-06-16"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/29185-my-id-is-gangnam-beauty"
 mdlId: "29185-my-id-is-gangnam-beauty"
+tags:
+  - "psychological"
+  - "romance"
+  - "youth"
+  - "drama"
 enjoyment: 8.5
 ---

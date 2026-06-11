@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/220458608"
 goodreadsId: "220458608"
+tags:
+  - "nonfiction"
+  - "linguistics"
+  - "audiobook"
+  - "language"
+  - "technology"
 status: shelved
 ---

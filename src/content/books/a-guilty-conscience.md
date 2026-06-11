@@ -8,5 +8,8 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/737801-a-guilty-conscience"
 mdlId: "737801-a-guilty-conscience"
+tags:
+  - "comedy"
+  - "law"
 enjoyment: 8.5
 ---

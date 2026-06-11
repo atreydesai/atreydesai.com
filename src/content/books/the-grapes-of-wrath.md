@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18114322"
 goodreadsId: "18114322"
+tags:
+  - "classics"
+  - "fiction"
+  - "historical fiction"
+  - "literature"
+  - "novels"
 enjoyment: 10
 ---

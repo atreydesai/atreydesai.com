@@ -3,8 +3,11 @@ id: "our-unwritten-seoul"
 title: "Our Unwritten Seoul"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-05-20"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "life"
 status: shelved
 ---

@@ -3,8 +3,13 @@ id: "s-line"
 title: "S Line"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-08-01"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "thriller"
+  - "mystery"
+  - "drama"
+  - "fantasy"
 status: shelved
 ---

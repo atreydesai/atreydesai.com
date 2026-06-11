@@ -3,8 +3,13 @@ id: "legally-romance"
 title: "Legally Romance"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-02-20"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "law"
+  - "romance"
+  - "fantasy"
 status: shelved
 ---

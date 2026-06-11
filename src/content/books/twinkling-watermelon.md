@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2024-08-19"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/739603-sparkling-watermelon"
 mdlId: "739603-sparkling-watermelon"
+tags:
+  - "romance"
+  - "youth"
+  - "drama"
+  - "fantasy"
 enjoyment: 10
 ---

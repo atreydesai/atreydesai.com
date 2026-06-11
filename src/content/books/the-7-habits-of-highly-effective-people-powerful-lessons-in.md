@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/36072"
 goodreadsId: "36072"
+tags:
+  - "self help"
+  - "nonfiction"
+  - "business"
+  - "personal development"
+  - "leadership"
 status: shelved
 ---

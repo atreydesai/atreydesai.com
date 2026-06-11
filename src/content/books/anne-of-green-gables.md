@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/8127"
 goodreadsId: "8127"
+tags:
+  - "classics"
+  - "fiction"
+  - "young adult"
+  - "historical fiction"
+  - "childrens"
 ---

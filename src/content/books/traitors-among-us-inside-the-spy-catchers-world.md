@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/113733"
 goodreadsId: "113733"
+tags:
+  - "history"
+  - "espionage"
+  - "military fiction"
+  - "nonfiction"
+  - "military history"
 ---

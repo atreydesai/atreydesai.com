@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/20981355"
 goodreadsId: "20981355"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "space opera"
+  - "short stories"
 ---

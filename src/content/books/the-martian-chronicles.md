@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/76778"
 goodreadsId: "76778"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "classics"
+  - "short stories"
+  - "fantasy"
 ---

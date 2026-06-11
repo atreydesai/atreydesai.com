@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/42771754"
 goodreadsId: "42771754"
+tags:
+  - "fantasy"
+  - "young adult"
+  - "science fiction"
+  - "dystopia"
+  - "romance"
 enjoyment: 8
 ---

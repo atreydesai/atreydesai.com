@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18373"
 goodreadsId: "18373"
+tags:
+  - "fiction"
+  - "classics"
+  - "science fiction"
+  - "young adult"
+  - "psychology"
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/60099660"
 goodreadsId: "60099660"
+tags:
+  - "romance"
+  - "fantasy"
+  - "young adult"
+  - "contemporary"
+  - "fiction"
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/38589832"
 goodreadsId: "38589832"
+tags:
+  - "science"
+  - "nonfiction"
+  - "history"
+  - "politics"
+  - "military fiction"
 ---

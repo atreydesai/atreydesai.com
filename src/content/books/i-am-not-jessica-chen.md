@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/61374793"
 goodreadsId: "61374793"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "fantasy"
+  - "fiction"
 enjoyment: 6
 ---

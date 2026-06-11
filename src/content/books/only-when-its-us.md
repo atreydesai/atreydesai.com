@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/52949964"
 goodreadsId: "52949964"
+tags:
+  - "romance"
+  - "contemporary"
+  - "sports romance"
+  - "sports"
+  - "enemies to lovers"
 enjoyment: 8
 ---

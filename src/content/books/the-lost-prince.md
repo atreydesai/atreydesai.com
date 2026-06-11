@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18904972"
 goodreadsId: "18904972"
+tags:
+  - "classics"
+  - "fiction"
+  - "childrens"
+  - "historical fiction"
+  - "young adult"
 ---

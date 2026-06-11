@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/55577204"
 goodreadsId: "55577204"
+tags:
+  - "romance"
+  - "contemporary"
+  - "young adult"
+  - "india"
+  - "fiction"
 status: shelved
 ---

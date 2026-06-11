@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/26170028"
 goodreadsId: "26170028"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "space opera"
+  - "audiobook"
+  - "novella"
 ---

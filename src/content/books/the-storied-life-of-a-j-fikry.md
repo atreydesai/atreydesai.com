@@ -6,4 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "comedy drama"
+  - "drama"
 ---

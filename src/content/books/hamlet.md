@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/1434"
 goodreadsId: "1434"
+tags:
+  - "classics"
+  - "plays"
+  - "fiction"
+  - "shakespeare"
+  - "drama"
 enjoyment: 8
 ---

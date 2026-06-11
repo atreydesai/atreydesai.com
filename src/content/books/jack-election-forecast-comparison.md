@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: blog post
 url: "https://firstsigma.substack.com/p/midterm-elections-forecast-comparison-analysis"
-tags:
-  - relevant
 enjoyment: 8
 importance: 4
 ---

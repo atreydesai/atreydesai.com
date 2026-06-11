@@ -37,7 +37,7 @@
     <Clapperboard {size} {animate} class={iconClass} />
 {:else if normalized === "movie"}
     <Film {size} class={iconClass} />
-{:else if normalized === "show" || normalized === "kdrama"}
+{:else if normalized === "show" || normalized === "drama"}
     <Tv {size} class={iconClass} />
 {:else if normalized === "essay"}
     <FileText {size} {animate} class={iconClass} />

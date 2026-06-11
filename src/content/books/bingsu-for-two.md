@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/196038712"
 goodreadsId: "196038712"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "fiction"
+  - "young adult romance"
 enjoyment: 2
 ---

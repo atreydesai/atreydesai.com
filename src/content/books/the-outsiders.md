@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/231804"
 goodreadsId: "231804"
+tags:
+  - "classics"
+  - "young adult"
+  - "fiction"
+  - "school"
+  - "read for school"
 ---

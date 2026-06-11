@@ -3,8 +3,13 @@ id: "missing-crown-prince"
 title: "Missing Crown Prince"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2024-04-08"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "historical"
+  - "comedy"
+  - "romance"
+  - "political"
 status: shelved
 ---

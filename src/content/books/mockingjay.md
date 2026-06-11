@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/7260188"
 goodreadsId: "7260188"
+tags:
+  - "young adult"
+  - "dystopia"
+  - "fiction"
+  - "fantasy"
+  - "science fiction"
 ---

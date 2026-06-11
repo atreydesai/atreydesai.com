@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/7957"
 goodreadsId: "7957"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "short stories"
+  - "young adult"
+  - "fantasy"
 ---

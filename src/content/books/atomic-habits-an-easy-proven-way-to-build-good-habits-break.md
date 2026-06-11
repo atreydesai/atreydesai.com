@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/40121378"
 goodreadsId: "40121378"
+tags:
+  - "self help"
+  - "nonfiction"
+  - "psychology"
+  - "audiobook"
+  - "personal development"
 status: shelved
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/40771027"
 goodreadsId: "40771027"
+tags:
+  - "classics"
+  - "horror"
+  - "fiction"
+  - "fantasy"
+  - "gothic"
 ---

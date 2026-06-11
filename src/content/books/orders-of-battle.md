@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/53528390"
 goodreadsId: "53528390"
+tags:
+  - "science fiction"
+  - "audiobook"
+  - "space opera"
+  - "fiction"
+  - "military fiction"
 ---

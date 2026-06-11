@@ -3,8 +3,10 @@ id: "better-late-than-single"
 title: "Better Late than Single"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-07-13"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
 status: shelved
 ---

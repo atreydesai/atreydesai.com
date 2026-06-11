@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/6607962"
 goodreadsId: "6607962"
+tags:
+  - "classics"
+  - "fiction"
+  - "adventure"
+  - "science fiction"
+  - "france"
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/6186357"
 goodreadsId: "6186357"
+tags:
+  - "young adult"
+  - "dystopia"
+  - "science fiction"
+  - "fiction"
+  - "fantasy"
 enjoyment: 8
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/4556058"
 goodreadsId: "4556058"
+tags:
+  - "fantasy"
+  - "young adult"
+  - "mythology"
+  - "fiction"
+  - "percy jackson"
 ---

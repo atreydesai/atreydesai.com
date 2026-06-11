@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2025-02-23"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/686405-ask-the-stars"
 mdlId: "686405-ask-the-stars"
+tags:
+  - "comedy"
+  - "romance"
+  - "drama"
+  - "sci-fi"
 enjoyment: 1
 ---

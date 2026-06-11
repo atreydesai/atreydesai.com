@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/8664353"
 goodreadsId: "8664353"
+tags:
+  - "nonfiction"
+  - "history"
+  - "biography"
+  - "book club"
+  - "world war ii"
 ---

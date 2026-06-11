@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/59344312"
 goodreadsId: "59344312"
+tags:
+  - "thriller"
+  - "romance"
+  - "fiction"
+  - "mystery"
+  - "colleen hoover"
 status: shelved
 ---

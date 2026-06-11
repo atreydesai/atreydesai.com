@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/33555224"
 goodreadsId: "33555224"
+tags:
+  - "young adult"
+  - "fantasy"
+  - "dystopia"
+  - "science fiction"
+  - "fiction"
 enjoyment: 10
 ---

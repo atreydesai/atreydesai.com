@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/34931621"
 goodreadsId: "34931621"
+tags:
+  - "young adult"
+  - "science fiction"
+  - "dystopia"
+  - "romance"
+  - "fantasy"
 enjoyment: 10
 ---

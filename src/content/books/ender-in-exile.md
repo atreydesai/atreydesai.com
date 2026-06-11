@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/3220405"
 goodreadsId: "3220405"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "fantasy"
+  - "science fiction fantasy"
+  - "audiobook"
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/58857822"
 goodreadsId: "58857822"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "fiction"
+  - "audiobook"
 enjoyment: 10
 ---

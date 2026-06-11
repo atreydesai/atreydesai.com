@@ -5,8 +5,11 @@ author: ""
 category: fiction
 dateAdded: "2023-02-20"
 favorite: true
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/713865-why-did-you-come-to-my-house"
 mdlId: "713865-why-did-you-come-to-my-house"
+tags:
+  - "music"
+  - "romance"
 enjoyment: 10
 ---

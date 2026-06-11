@@ -6,4 +6,8 @@ category: fiction
 dateAdded: "2023-06-15"
 favorite: false
 medium: movie
+tags:
+  - "romantic comedy"
+  - "comedy"
+  - "drama"
 ---

@@ -3,8 +3,11 @@ id: "would-you-marry-me"
 title: "Would You Marry Me?"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-02-04"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "drama"
 status: shelved
 ---

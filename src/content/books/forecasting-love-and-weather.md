@@ -5,8 +5,12 @@ author: ""
 category: fiction
 dateAdded: "2022-12-06"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/692969-office-romance-cruelty"
 mdlId: "692969-office-romance-cruelty"
+tags:
+  - "romance"
+  - "drama"
+  - "melodrama"
 enjoyment: 7.5
 ---

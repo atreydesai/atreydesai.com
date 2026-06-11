@@ -6,4 +6,10 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "superhero"
+  - "action"
+  - "adventure"
+  - "science fiction"
+  - "animation"
 ---

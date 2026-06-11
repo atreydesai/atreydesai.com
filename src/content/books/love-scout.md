@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2025-02-15"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/756733-greetings"
 mdlId: "756733-greetings"
+tags:
+  - "business"
+  - "romance"
+  - "life"
+  - "drama"
 enjoyment: 7.5
 ---

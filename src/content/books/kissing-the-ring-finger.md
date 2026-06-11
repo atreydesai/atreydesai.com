@@ -3,8 +3,11 @@ id: "kissing-the-ring-finger"
 title: "Kissing the Ring Finger"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-08-07"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "romance"
 status: shelved
 ---

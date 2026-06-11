@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/9969571"
 goodreadsId: "9969571"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "young adult"
+  - "fantasy"
+  - "dystopia"
 ---

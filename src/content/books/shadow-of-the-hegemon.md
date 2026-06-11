@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/9534"
 goodreadsId: "9534"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "fantasy"
+  - "science fiction fantasy"
+  - "young adult"
 ---

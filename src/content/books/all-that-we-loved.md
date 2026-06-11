@@ -3,8 +3,11 @@ id: "all-that-we-loved"
 title: "All That We Loved"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-08-07"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "youth"
 status: shelved
 ---

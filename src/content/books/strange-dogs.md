@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/30367030"
 goodreadsId: "30367030"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "space opera"
+  - "novella"
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/106085"
 goodreadsId: "106085"
+tags:
+  - "young adult"
+  - "vampires"
+  - "fantasy"
+  - "paranormal"
+  - "romance"
 enjoyment: 8
 ---

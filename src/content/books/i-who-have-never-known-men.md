@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/60811826"
 goodreadsId: "60811826"
+tags:
+  - "fiction"
+  - "dystopia"
+  - "science fiction"
+  - "book club"
+  - "audiobook"
 status: shelved
 ---

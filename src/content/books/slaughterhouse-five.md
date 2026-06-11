@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/4981"
 goodreadsId: "4981"
+tags:
+  - "classics"
+  - "fiction"
+  - "science fiction"
+  - "historical fiction"
+  - "war"
 enjoyment: 6
 ---

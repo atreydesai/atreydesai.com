@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/97412"
 goodreadsId: "97412"
+tags:
+  - "philosophy"
+  - "nonfiction"
+  - "classics"
+  - "self help"
+  - "essays"
 ---

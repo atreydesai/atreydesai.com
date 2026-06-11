@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/6437061"
 goodreadsId: "6437061"
+tags:
+  - "fantasy"
+  - "fiction"
+  - "romance"
+  - "high fantasy"
+  - "audiobook"
 enjoyment: 10
 ---

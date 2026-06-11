@@ -3,8 +3,13 @@ id: "the-whirlwind"
 title: "The Whirlwind"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2024-07-07"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "thriller"
+  - "mystery"
+  - "drama"
+  - "political"
 status: shelved
 ---

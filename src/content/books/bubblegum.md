@@ -3,8 +3,12 @@ id: "bubblegum"
 title: "Bubblegum"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-03-02"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "romance"
+  - "drama"
 status: shelved
 ---

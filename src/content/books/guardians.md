@@ -3,8 +3,11 @@ id: "guardians"
 title: "Guardians"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2024-04-24"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "thriller"
+  - "drama"
 status: shelved
 ---

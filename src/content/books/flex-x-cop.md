@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2024-03-23"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/746193-gold-spoon"
 mdlId: "746193-gold-spoon"
+tags:
+  - "action"
+  - "thriller"
+  - "mystery"
+  - "comedy"
 enjoyment: 10
 ---

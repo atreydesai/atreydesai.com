@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/15800957"
 goodreadsId: "15800957"
+tags:
+  - "classics"
+  - "fiction"
+  - "adventure"
+  - "young adult"
+  - "humor"
 ---

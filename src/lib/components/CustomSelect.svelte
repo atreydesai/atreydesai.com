@@ -11,10 +11,15 @@
     // Accessible name for the control — without it screen readers only announce
     // the current value (e.g. "All Years") with no hint of what it filters.
     export let ariaLabel: string = "";
+    export let fastScroll = false;
+    export let animateOptions = true;
+    export let cascadeDuration = 320;
+    export let cascadeDelayStep = 55;
 
     let isOpen = false;
     let containerRef: HTMLDivElement;
     let triggerRef: HTMLButtonElement;
+    let dropdownRef: HTMLDivElement;
     let optionRefs: HTMLButtonElement[] = [];
     let activeIndex = -1;
 
@@ -41,6 +46,12 @@
     function select(optionValue: string) {
         value = optionValue;
         close();
+    }
+
+    function onDropdownWheel(e: WheelEvent) {
+        if (!fastScroll || !dropdownRef) return;
+        e.preventDefault();
+        dropdownRef.scrollTop += e.deltaY * 2.1;
     }
 
     function focusOption(index: number) {
@@ -140,14 +151,18 @@
     {#if isOpen}
         <div
             class="select-dropdown"
+            class:fast-scroll={fastScroll}
+            bind:this={dropdownRef}
             role="listbox"
             aria-label={ariaLabel || undefined}
+            on:wheel={onDropdownWheel}
             out:fly={{ y: -6, duration: 140, easing: cubicOut }}
         >
             {#each options as option, i}
                 <button
                     type="button"
-                    class="select-option cascade-in"
+                    class="select-option"
+                    class:cascade-in={animateOptions}
                     class:selected={option.value === value}
                     bind:this={optionRefs[i]}
                     on:click={() => select(option.value)}
@@ -155,7 +170,7 @@
                     role="option"
                     aria-selected={option.value === value}
                     tabindex={activeIndex === i ? 0 : -1}
-                    style="--cascade-delay: {i * 55}ms"
+                    style="--cascade-delay: {i * cascadeDelayStep}ms; --cascade-duration: {cascadeDuration}ms"
                 >
                     {option.label}
                 </button>
@@ -245,6 +260,10 @@
         scrollbar-width: thin;
     }
 
+    .select-dropdown.fast-scroll {
+        max-height: 24rem;
+    }
+
     :global(.dark) .select-dropdown {
         background-color: theme("colors.ink.800");
         border-color: theme("colors.ink.700");
@@ -258,7 +277,7 @@
         opacity: 0;
         transform: translateY(-6px);
         overflow: hidden;
-        animation: select-cascade 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation: select-cascade var(--cascade-duration, 320ms) cubic-bezier(0.16, 1, 0.3, 1) forwards;
         animation-delay: var(--cascade-delay, 0ms);
     }
 

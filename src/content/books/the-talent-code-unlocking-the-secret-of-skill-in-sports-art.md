@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/5771014"
 goodreadsId: "5771014"
+tags:
+  - "nonfiction"
+  - "psychology"
+  - "self help"
+  - "business"
+  - "personal development"
 status: shelved
 ---

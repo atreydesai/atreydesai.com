@@ -3,8 +3,13 @@ id: "destined"
 title: "Destined"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-05-25"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "historical"
+  - "business"
+  - "comedy"
+  - "romance"
 status: shelved
 ---

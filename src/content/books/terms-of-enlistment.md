@@ -8,4 +8,10 @@ favorite: true
 medium: book
 url: "https://www.goodreads.com/book/show/18800655"
 goodreadsId: "18800655"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "military fiction"
+  - "space opera"
+  - "audiobook"
 ---

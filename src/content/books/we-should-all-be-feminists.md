@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/22738563"
 goodreadsId: "22738563"
+tags:
+  - "nonfiction"
+  - "feminism"
+  - "essays"
+  - "audiobook"
+  - "politics"
 enjoyment: 10
 ---

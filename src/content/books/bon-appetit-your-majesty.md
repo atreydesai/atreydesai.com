@@ -3,8 +3,13 @@ id: "bon-appetit-your-majesty"
 title: "Bon Appetit, Your Majesty"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-09-20"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "historical"
+  - "comedy"
+  - "romance"
+  - "fantasy"
 status: shelved
 ---

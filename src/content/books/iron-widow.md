@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/52459864"
 goodreadsId: "52459864"
+tags:
+  - "fantasy"
+  - "science fiction"
+  - "young adult"
+  - "lgbt"
+  - "romance"
 enjoyment: 8
 ---

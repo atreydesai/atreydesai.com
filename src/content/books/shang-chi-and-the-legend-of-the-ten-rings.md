@@ -6,4 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "martial arts"
+  - "superhero"
 ---

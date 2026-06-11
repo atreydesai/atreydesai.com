@@ -6,4 +6,8 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "sports"
+  - "drama"
+  - "biographical"
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/44421460"
 goodreadsId: "44421460"
+tags:
+  - "fiction"
+  - "fantasy"
+  - "magical realism"
+  - "contemporary"
+  - "time travel"
 status: shelved
 ---

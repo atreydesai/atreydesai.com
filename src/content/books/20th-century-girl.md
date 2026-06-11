@@ -8,5 +8,10 @@ favorite: true
 medium: movie
 url: "https://mydramalist.com/699543-the-twentieth-century-girl"
 mdlId: "699543-the-twentieth-century-girl"
+tags:
+  - "romance"
+  - "youth"
+  - "drama"
+  - "melodrama"
 enjoyment: 10
 ---

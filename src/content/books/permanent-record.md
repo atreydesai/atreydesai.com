@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/43562239"
 goodreadsId: "43562239"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "fiction"
+  - "new adult"
 enjoyment: 10
 ---

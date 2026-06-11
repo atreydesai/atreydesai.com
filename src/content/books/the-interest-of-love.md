@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2023-02-17"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/724275-understanding-love"
 mdlId: "724275-understanding-love"
+tags:
+  - "romance"
+  - "life"
+  - "drama"
+  - "melodrama"
 enjoyment: 9.5
 ---

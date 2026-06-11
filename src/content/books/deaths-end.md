@@ -8,5 +8,11 @@ favorite: true
 medium: book
 url: "https://www.goodreads.com/book/show/25451264"
 goodreadsId: "25451264"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "china"
+  - "fantasy"
 enjoyment: 10
 ---

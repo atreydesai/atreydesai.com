@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/56732449"
 goodreadsId: "56732449"
+tags:
+  - "romance"
+  - "contemporary"
+  - "fiction"
+  - "fake dating"
+  - "contemporary romance"
 enjoyment: 6
 ---

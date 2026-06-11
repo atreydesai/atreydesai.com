@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/6149"
 goodreadsId: "6149"
+tags:
+  - "fiction"
+  - "classics"
+  - "historical fiction"
+  - "magical realism"
+  - "historical"
 ---

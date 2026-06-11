@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18619526"
 goodreadsId: "18619526"
+tags:
+  - "classics"
+  - "fiction"
+  - "romance"
+  - "19th century"
+  - "gothic"
 ---

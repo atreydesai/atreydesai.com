@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/52260666"
 goodreadsId: "52260666"
+tags:
+  - "fiction"
+  - "historical fiction"
+  - "literary fiction"
+  - "asia"
+  - "historical"
 ---

@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2023-01-22"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/31385-put-your-head-on-my-shoulder"
 mdlId: "31385-put-your-head-on-my-shoulder"
+tags:
+  - "comedy"
+  - "romance"
+  - "life"
+  - "youth"
 enjoyment: 8.5
 ---

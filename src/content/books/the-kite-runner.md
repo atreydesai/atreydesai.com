@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/77203"
 goodreadsId: "77203"
+tags:
+  - "fiction"
+  - "historical fiction"
+  - "classics"
+  - "contemporary"
+  - "book club"
 enjoyment: 10
 ---

@@ -6,4 +6,8 @@ category: fiction
 dateAdded: ""
 favorite: true
 medium: movie
+tags:
+  - "drama"
+  - "romance"
+  - "coming-of-age"
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/30868"
 goodreadsId: "30868"
+tags:
+  - "fiction"
+  - "book club"
+  - "contemporary"
+  - "literary fiction"
+  - "classics"
 ---

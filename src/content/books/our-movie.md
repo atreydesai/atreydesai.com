@@ -3,8 +3,12 @@ id: "our-movie"
 title: "Our Movie"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-05-23"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "drama"
+  - "melodrama"
 status: shelved
 ---

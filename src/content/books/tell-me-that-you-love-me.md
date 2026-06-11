@@ -3,8 +3,13 @@ id: "tell-me-that-you-love-me"
 title: "Tell Me That You Love Me"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-12-15"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "life"
+  - "drama"
+  - "melodrama"
 status: shelved
 ---

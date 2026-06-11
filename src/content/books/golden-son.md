@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18966819"
 goodreadsId: "18966819"
+tags:
+  - "science fiction"
+  - "fantasy"
+  - "fiction"
+  - "dystopia"
+  - "audiobook"
 enjoyment: 10
 ---

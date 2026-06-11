@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/219876054"
 goodreadsId: "219876054"
+tags:
+  - "fiction"
+  - "book club"
+  - "historical fiction"
+  - "audiobook"
+  - "literary fiction"
 status: shelved
 ---

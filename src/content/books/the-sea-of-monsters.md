@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/28186"
 goodreadsId: "28186"
+tags:
+  - "fantasy"
+  - "young adult"
+  - "mythology"
+  - "fiction"
+  - "middle grade"
 ---

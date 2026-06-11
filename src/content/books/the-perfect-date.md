@@ -6,4 +6,6 @@ category: fiction
 dateAdded: "2022-06-15"
 favorite: false
 medium: movie
+tags:
+  - "comedy"
 ---

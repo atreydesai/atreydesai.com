@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/228646231"
 goodreadsId: "228646231"
+tags:
+  - "nonfiction"
+  - "science"
+  - "artificial intelligence"
+  - "technology"
+  - "audiobook"
 status: shelved
 ---

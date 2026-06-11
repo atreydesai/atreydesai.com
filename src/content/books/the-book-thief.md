@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/19063"
 goodreadsId: "19063"
+tags:
+  - "historical fiction"
+  - "fiction"
+  - "young adult"
+  - "classics"
+  - "historical"
 status: shelved
 ---

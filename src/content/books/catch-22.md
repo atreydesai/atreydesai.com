@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/168668"
 goodreadsId: "168668"
+tags:
+  - "classics"
+  - "fiction"
+  - "historical fiction"
+  - "war"
+  - "humor"
 enjoyment: 8
 ---

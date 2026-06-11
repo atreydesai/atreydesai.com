@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/41057294"
 goodreadsId: "41057294"
+tags:
+  - "fiction"
+  - "romance"
+  - "contemporary"
+  - "literary fiction"
+  - "audiobook"
 status: shelved
 ---

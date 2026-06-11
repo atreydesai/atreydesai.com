@@ -3,8 +3,13 @@ id: "rookie-historian-goo-hae-ryung"
 title: "Rookie Historian Goo Hae Ryung"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-06-16"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "historical"
+  - "comedy"
+  - "romance"
+  - "drama"
 status: shelved
 ---

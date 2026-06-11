@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/17375315"
 goodreadsId: "17375315"
+tags:
+  - "classics"
+  - "fiction"
+  - "adventure"
+  - "historical fiction"
+  - "young adult"
 ---

@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: blog post
 url: "https://neelguha.github.io/blog/2026/templates/#the-data-artifact-paper"
-tags:
-  - relevant
 enjoyment: 7
 importance: 2
 ---

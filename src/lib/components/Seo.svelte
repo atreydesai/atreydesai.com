@@ -8,6 +8,13 @@
   export let keywords =
     "Atrey Desai, NLP, natural language processing, AI safety, computational linguistics, University of Maryland, machine learning, research";
   export let noindex = false;
+
+  const siteUrl = "https://atreydesai.com";
+
+  $: canonicalUrl = url.startsWith("http") ? url : `${siteUrl}${url.startsWith("/") ? url : `/${url}`}`;
+  $: imageUrl = image.startsWith("http")
+    ? image
+    : `${siteUrl}${image.startsWith("/") ? image : `/${image}`}`;
 </script>
 
 <svelte:head>
@@ -27,25 +34,25 @@
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content={type} />
-  <meta property="og:url" content={url} />
+  <meta property="og:url" content={canonicalUrl} />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
-  <meta property="og:image" content={image} />
+  <meta property="og:image" content={imageUrl} />
   <meta property="og:site_name" content="Atrey Desai" />
   <meta property="og:locale" content="en_US" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:url" content={url} />
+  <meta name="twitter:url" content={canonicalUrl} />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
-  <meta name="twitter:image" content={image} />
+  <meta name="twitter:image" content={imageUrl} />
   <meta name="twitter:site" content="@atreydesai" />
   <meta name="twitter:creator" content="@atreydesai" />
 
   <!-- Additional SEO -->
   <meta name="author" content="Atrey Desai" />
-  <link rel="canonical" href={url} />
+  <link rel="canonical" href={canonicalUrl} />
 
   <!-- Structured Data for Google -->
   {@html `<script type="application/ld+json">
@@ -55,8 +62,8 @@
       "name": "Atrey Desai",
       "givenName": "Atrey",
       "familyName": "Desai",
-      "url": "${url}",
-      "image": "https://atreydesai.com/og-image.jpg",
+      "url": "${canonicalUrl}",
+      "image": "${imageUrl}",
       "sameAs": [
         "https://github.com/atreydesai",
         "https://x.com/atreydesai",

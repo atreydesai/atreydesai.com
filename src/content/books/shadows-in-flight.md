@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/12040447"
 goodreadsId: "12040447"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "fantasy"
+  - "science fiction fantasy"
 ---

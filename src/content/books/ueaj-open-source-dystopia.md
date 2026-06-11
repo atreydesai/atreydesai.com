@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: essay
 url: "https://publish.obsidian.md/ueaj/Philosophy/Aesthetics/Open+Source+Dystopia"
-tags:
-  - relevant
 enjoyment: 6
 importance: 10
 ---

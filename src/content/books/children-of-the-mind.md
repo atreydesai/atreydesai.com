@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/31360"
 goodreadsId: "31360"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "fantasy"
+  - "science fiction fantasy"
+  - "audiobook"
 ---

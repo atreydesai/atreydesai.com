@@ -3,8 +3,13 @@ id: "a-poem-a-day"
 title: "A Poem a Day"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-05-25"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "life"
+  - "drama"
+  - "medical"
 status: shelved
 ---

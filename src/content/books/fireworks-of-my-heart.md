@@ -3,8 +3,12 @@ id: "fireworks-of-my-heart"
 title: "Fireworks of My Heart"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-09-27"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "romance"
+  - "medical"
 status: shelved
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18007564"
 goodreadsId: "18007564"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "book club"
+  - "adventure"
 ---

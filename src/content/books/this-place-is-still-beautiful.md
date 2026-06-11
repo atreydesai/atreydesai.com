@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/58984692"
 goodreadsId: "58984692"
+tags:
+  - "contemporary"
+  - "young adult"
+  - "romance"
+  - "fiction"
+  - "realistic fiction"
 status: shelved
 ---

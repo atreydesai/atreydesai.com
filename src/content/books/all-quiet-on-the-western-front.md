@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/355697"
 goodreadsId: "355697"
+tags:
+  - "classics"
+  - "fiction"
+  - "historical fiction"
+  - "war"
+  - "historical"
 ---

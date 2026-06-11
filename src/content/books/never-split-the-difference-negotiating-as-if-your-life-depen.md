@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/26156469"
 goodreadsId: "26156469"
+tags:
+  - "business"
+  - "nonfiction"
+  - "self help"
+  - "psychology"
+  - "communication"
 status: shelved
 ---

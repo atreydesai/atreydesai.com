@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: article
 url: "https://www.pangram.com/blog/joe-stech-information-theory-why-ai-writing-sucks"
-tags:
-  - relevant
 enjoyment: 5
 importance: 6
 ---

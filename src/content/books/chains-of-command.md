@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/25648897"
 goodreadsId: "25648897"
+tags:
+  - "science fiction"
+  - "military fiction"
+  - "fiction"
+  - "audiobook"
+  - "space opera"
 ---

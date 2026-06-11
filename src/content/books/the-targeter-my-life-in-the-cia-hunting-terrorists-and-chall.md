@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/30361994"
 goodreadsId: "30361994"
+tags:
+  - "nonfiction"
+  - "memoir"
+  - "biography"
+  - "history"
+  - "military fiction"
 ---

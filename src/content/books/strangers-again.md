@@ -3,8 +3,12 @@ id: "strangers-again"
 title: "Strangers Again"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2022-12-27"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "law"
+  - "romance"
+  - "drama"
 status: shelved
 ---

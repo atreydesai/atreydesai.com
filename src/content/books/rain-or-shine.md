@@ -3,8 +3,12 @@ id: "rain-or-shine"
 title: "Rain or Shine"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2022-12-06"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "psychological"
+  - "romance"
+  - "melodrama"
 status: shelved
 ---

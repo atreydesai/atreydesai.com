@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/15756654"
 goodreadsId: "15756654"
+tags:
+  - "nonfiction"
+  - "history"
+  - "israel"
+  - "politics"
+  - "espionage"
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/60759266"
 goodreadsId: "60759266"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "fake dating"
+  - "fiction"
 enjoyment: 6
 ---

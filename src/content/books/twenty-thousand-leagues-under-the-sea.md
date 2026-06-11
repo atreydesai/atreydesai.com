@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/33507"
 goodreadsId: "33507"
+tags:
+  - "classics"
+  - "science fiction"
+  - "fiction"
+  - "adventure"
+  - "fantasy"
 ---

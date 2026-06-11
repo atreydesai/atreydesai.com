@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/17203352"
 goodreadsId: "17203352"
+tags:
+  - "classics"
+  - "fiction"
+  - "childrens"
+  - "fantasy"
+  - "adventure"
 ---

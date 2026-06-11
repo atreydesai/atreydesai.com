@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/35820656"
 goodreadsId: "35820656"
+tags:
+  - "science fiction"
+  - "audiobook"
+  - "fiction"
+  - "adult"
+  - "fantasy"
 enjoyment: 8
 ---

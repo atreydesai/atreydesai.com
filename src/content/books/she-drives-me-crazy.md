@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/52516406"
 goodreadsId: "52516406"
+tags:
+  - "romance"
+  - "lgbt"
+  - "lesbian"
+  - "young adult"
+  - "queer"
 enjoyment: 6
 ---

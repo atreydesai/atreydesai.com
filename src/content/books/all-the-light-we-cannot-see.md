@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18143977"
 goodreadsId: "18143977"
+tags:
+  - "historical fiction"
+  - "fiction"
+  - "book club"
+  - "historical"
+  - "war"
 ---

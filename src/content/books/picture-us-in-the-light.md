@@ -8,5 +8,11 @@ favorite: true
 medium: book
 url: "https://www.goodreads.com/book/show/35960060"
 goodreadsId: "35960060"
+tags:
+  - "young adult"
+  - "contemporary"
+  - "lgbt"
+  - "fiction"
+  - "queer"
 enjoyment: 10
 ---

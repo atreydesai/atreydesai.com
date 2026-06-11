@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/28335696"
 goodreadsId: "28335696"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "space opera"
+  - "space"
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/40864002"
 goodreadsId: "40864002"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "fantasy"
+  - "audiobook"
+  - "novella"
 status: shelved
 ---

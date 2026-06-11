@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/5729"
 goodreadsId: "5729"
+tags:
+  - "nonfiction"
+  - "memoir"
+  - "history"
+  - "asia"
+  - "war"
 ---

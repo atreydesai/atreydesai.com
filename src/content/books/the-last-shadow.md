@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/7108926"
 goodreadsId: "7108926"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "fantasy"
+  - "science fiction fantasy"
 ---

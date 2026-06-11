@@ -6,4 +6,9 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "action"
+  - "spy"
+  - "war"
+  - "adventure"
 ---

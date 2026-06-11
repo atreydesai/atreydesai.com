@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/31140332"
 goodreadsId: "31140332"
+tags:
+  - "star wars"
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "fantasy"
 enjoyment: 10
 ---

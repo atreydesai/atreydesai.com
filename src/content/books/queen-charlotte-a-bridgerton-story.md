@@ -6,4 +6,8 @@ category: fiction
 dateAdded: "2023-05-06"
 favorite: false
 medium: show
+tags:
+  - "historical drama"
+  - "romantic fiction"
+  - "alternate history"
 ---

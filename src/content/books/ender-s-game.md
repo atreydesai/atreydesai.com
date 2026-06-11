@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/375802"
 goodreadsId: "375802"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "young adult"
+  - "fantasy"
+  - "classics"
 ---

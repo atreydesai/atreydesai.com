@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/15994485"
 goodreadsId: "15994485"
+tags:
+  - "classics"
+  - "horror"
+  - "fiction"
+  - "science fiction"
+  - "gothic"
 ---

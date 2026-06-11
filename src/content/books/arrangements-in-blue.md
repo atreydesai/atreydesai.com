@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/211772088"
 goodreadsId: "211772088"
+tags:
+  - "nonfiction"
+  - "memoir"
+  - "poetry"
+  - "essays"
+  - "audiobook"
 status: shelved
 ---

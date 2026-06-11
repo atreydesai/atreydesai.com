@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/59571699"
 goodreadsId: "59571699"
+tags:
+  - "romance"
+  - "contemporary"
+  - "contemporary romance"
+  - "enemies to lovers"
+  - "fiction"
 enjoyment: 6
 ---

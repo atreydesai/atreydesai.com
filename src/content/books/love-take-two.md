@@ -3,8 +3,13 @@ id: "love-take-two"
 title: "Love, Take Two"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-10-16"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "romance"
+  - "life"
+  - "family"
 status: shelved
 ---

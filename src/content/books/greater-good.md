@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/55213748"
 goodreadsId: "55213748"
+tags:
+  - "star wars"
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "fantasy"
 enjoyment: 8
 ---

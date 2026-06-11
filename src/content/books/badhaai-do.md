@@ -3,8 +3,13 @@ id: "badhaai-do"
 title: "Badhaai Do"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "comedy"
+  - "drama"
+  - "romance"
+  - "lgbtq"
 status: shelved
 ---

@@ -3,8 +3,12 @@ id: "the-magic-of-ordinary-days"
 title: "The Magic of Ordinary Days"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "drama"
+  - "romance"
+  - "period drama"
 status: shelved
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/58999177"
 goodreadsId: "58999177"
+tags:
+  - "fiction"
+  - "science fiction"
+  - "historical fiction"
+  - "dystopia"
+  - "india"
 status: shelved
 ---

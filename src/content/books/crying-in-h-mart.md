@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/54814676"
 goodreadsId: "54814676"
+tags:
+  - "memoir"
+  - "nonfiction"
+  - "audiobook"
+  - "book club"
+  - "biography"
 status: shelved
 ---

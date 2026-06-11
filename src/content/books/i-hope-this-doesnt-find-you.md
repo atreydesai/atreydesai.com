@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/124932739"
 goodreadsId: "124932739"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "enemies to lovers"
+  - "fiction"
 enjoyment: 8
 ---

@@ -3,8 +3,12 @@ id: "saving-face"
 title: "Saving Face"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "romantic comedy"
+  - "drama"
+  - "lgbtq"
 status: shelved
 ---

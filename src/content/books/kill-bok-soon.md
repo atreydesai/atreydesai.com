@@ -8,5 +8,10 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/705863-kill-bok-soon"
 mdlId: "705863-kill-bok-soon"
+tags:
+  - "action"
+  - "thriller"
+  - "crime"
+  - "drama"
 enjoyment: 7.5
 ---

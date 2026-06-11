@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: blog post
 url: "https://universalprior.substack.com/p/on-slop"
-tags:
-  - relevant
 enjoyment: 5
 importance: 7
 ---

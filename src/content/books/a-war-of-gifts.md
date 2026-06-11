@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/552987"
 goodreadsId: "552987"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "young adult"
+  - "fantasy"
+  - "science fiction fantasy"
 ---

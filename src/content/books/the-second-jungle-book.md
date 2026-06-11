@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/17203356"
 goodreadsId: "17203356"
+tags:
+  - "classics"
+  - "fiction"
+  - "childrens"
+  - "short stories"
+  - "fantasy"
 ---

@@ -8,5 +8,11 @@ favorite: true
 medium: book
 url: "https://www.goodreads.com/book/show/44650326"
 goodreadsId: "44650326"
+tags:
+  - "fantasy"
+  - "lesbian"
+  - "lgbt"
+  - "queer"
+  - "young adult"
 enjoyment: 10
 ---

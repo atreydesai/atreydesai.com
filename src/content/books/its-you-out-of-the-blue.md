@@ -3,8 +3,11 @@ id: "its-you-out-of-the-blue"
 title: "It's You, Out of the Blue"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-08-07"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "romance"
 status: shelved
 ---

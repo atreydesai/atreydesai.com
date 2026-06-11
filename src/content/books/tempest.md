@@ -3,8 +3,13 @@ id: "tempest"
 title: "Tempest"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-10-16"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "thriller"
+  - "mystery"
+  - "romance"
 status: shelved
 ---

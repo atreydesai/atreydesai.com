@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/52696571"
 goodreadsId: "52696571"
+tags:
+  - "young adult"
+  - "contemporary"
+  - "fiction"
+  - "romance"
+  - "audiobook"
 status: shelved
 ---

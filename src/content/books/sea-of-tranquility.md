@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/58446227"
 goodreadsId: "58446227"
+tags:
+  - "fiction"
+  - "science fiction"
+  - "time travel"
+  - "audiobook"
+  - "book club"
 status: shelved
 ---

@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/50972164"
 goodreadsId: "50972164"
+tags:
+  - "politics"
+  - "nonfiction"
+  - "history"
+  - "audiobook"
+  - "american history"
 enjoyment: 8
 ---

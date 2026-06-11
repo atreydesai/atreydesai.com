@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/58784475"
 goodreadsId: "58784475"
+tags:
+  - "fiction"
+  - "book club"
+  - "contemporary"
+  - "romance"
+  - "audiobook"
 status: shelved
 ---

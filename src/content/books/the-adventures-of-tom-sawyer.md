@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/24583"
 goodreadsId: "24583"
+tags:
+  - "classics"
+  - "fiction"
+  - "adventure"
+  - "historical fiction"
+  - "young adult"
 ---

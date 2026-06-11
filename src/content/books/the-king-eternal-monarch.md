@@ -3,8 +3,13 @@ id: "the-king-eternal-monarch"
 title: "The King: Eternal Monarch"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2022-12-06"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "mystery"
+  - "romance"
+  - "drama"
+  - "sci-fi"
 status: shelved
 ---

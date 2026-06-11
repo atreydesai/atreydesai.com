@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/5711714"
 goodreadsId: "5711714"
+tags:
+  - "young adult"
+  - "science fiction"
+  - "romance"
+  - "fantasy"
+  - "fiction"
 enjoyment: 6
 ---

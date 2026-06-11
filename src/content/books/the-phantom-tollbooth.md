@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/378"
 goodreadsId: "378"
+tags:
+  - "fantasy"
+  - "fiction"
+  - "classics"
+  - "childrens"
+  - "young adult"
 ---

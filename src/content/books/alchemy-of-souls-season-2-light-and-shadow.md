@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2023-01-09"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/733261-alchemy-of-souls-part-2"
 mdlId: "733261-alchemy-of-souls-part-2"
+tags:
+  - "action"
+  - "historical"
+  - "romance"
+  - "fantasy"
 enjoyment: 9
 ---

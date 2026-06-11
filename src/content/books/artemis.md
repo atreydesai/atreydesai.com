@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/34928122"
 goodreadsId: "34928122"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "audiobook"
+  - "space"
+  - "fantasy"
 ---

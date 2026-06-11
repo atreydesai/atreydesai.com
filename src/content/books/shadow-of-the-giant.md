@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/8647"
 goodreadsId: "8647"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "fantasy"
+  - "science fiction fantasy"
+  - "young adult"
 ---

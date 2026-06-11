@@ -3,8 +3,12 @@ id: "soulmate"
 title: "Soulmate"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-04-24"
 favorite: false
 medium: movie
+tags:
+  - "drama"
+  - "romance"
+  - "youth"
 status: shelved
 ---

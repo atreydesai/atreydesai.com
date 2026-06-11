@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2025-01-16"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/779448-wakatte-ite-mo-the-shapes-of-love"
 mdlId: "779448-wakatte-ite-mo-the-shapes-of-love"
+tags:
+  - "romance"
+  - "life"
+  - "youth"
+  - "drama"
 enjoyment: 5
 ---

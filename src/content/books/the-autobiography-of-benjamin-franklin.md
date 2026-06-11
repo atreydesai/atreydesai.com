@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18623304"
 goodreadsId: "18623304"
+tags:
+  - "biography"
+  - "history"
+  - "nonfiction"
+  - "classics"
+  - "autobiography"
 ---

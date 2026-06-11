@@ -3,8 +3,11 @@ id: "lets-talk-about-chu"
 title: "Let's Talk about Chu"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2024-03-04"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "drama"
 status: shelved
 ---

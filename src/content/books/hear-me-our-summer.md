@@ -8,5 +8,9 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/753291-hear-me"
 mdlId: "753291-hear-me"
+tags:
+  - "comedy"
+  - "romance"
+  - "drama"
 enjoyment: 9.5
 ---

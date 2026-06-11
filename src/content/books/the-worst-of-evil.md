@@ -3,8 +3,13 @@ id: "the-worst-of-evil"
 title: "The Worst of Evil"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-03-05"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "thriller"
+  - "mystery"
+  - "crime"
 status: shelved
 ---

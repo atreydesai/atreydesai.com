@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/10534"
 goodreadsId: "10534"
+tags:
+  - "classics"
+  - "nonfiction"
+  - "philosophy"
+  - "history"
+  - "war"
 enjoyment: 4
 ---

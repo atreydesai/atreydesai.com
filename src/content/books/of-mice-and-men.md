@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/890"
 goodreadsId: "890"
+tags:
+  - "classics"
+  - "fiction"
+  - "school"
+  - "historical fiction"
+  - "literature"
 ---

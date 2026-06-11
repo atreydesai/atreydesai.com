@@ -8,5 +8,7 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/36627646"
 goodreadsId: "36627646"
+tags:
+  - "short stories"
 status: shelved
 ---

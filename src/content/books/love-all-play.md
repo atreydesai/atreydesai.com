@@ -3,8 +3,13 @@ id: "love-all-play"
 title: "Love All Play"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-01-15"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "drama"
+  - "sports"
+  - "melodrama"
 status: shelved
 ---

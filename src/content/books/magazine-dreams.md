@@ -3,8 +3,10 @@ id: "magazine-dreams"
 title: "Magazine Dreams"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "drama"
 status: shelved
 ---

@@ -3,8 +3,13 @@ id: "way-back-love"
 title: "Way Back Love"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-05-25"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "youth"
+  - "fantasy"
+  - "melodrama"
 status: shelved
 ---

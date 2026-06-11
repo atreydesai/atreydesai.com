@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/38799469"
 goodreadsId: "38799469"
+tags:
+  - "nonfiction"
+  - "business"
+  - "true crime"
+  - "audiobook"
+  - "science"
 enjoyment: 10
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/7090447"
 goodreadsId: "7090447"
+tags:
+  - "fantasy"
+  - "mythology"
+  - "young adult"
+  - "middle grade"
+  - "fiction"
 ---

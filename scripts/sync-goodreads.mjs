@@ -15,6 +15,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fetchGoodreadsGenreTags, yamlListLines } from './tag-sources.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BOOKS_DIR = join(ROOT, 'src/content/books');
@@ -151,7 +152,7 @@ for (const item of items) {
         continue;
     }
 
-    writeBook(item, bookId, rating, readAt ?? added, false);
+    await writeBook(item, bookId, rating, readAt ?? added, false);
     created++;
 }
 
@@ -162,11 +163,11 @@ for (const item of toReadItems) {
     seen.add(bookId);
     if (forceExclude.has(bookId) || known.has(bookId)) continue;
 
-    writeBook(item, bookId, 0, parseDate(tag(item, 'user_date_created')), true);
+    await writeBook(item, bookId, 0, parseDate(tag(item, 'user_date_created')), true);
     shelved++;
 }
 
-function writeBook(item, bookId, rating, date, isShelved) {
+async function writeBook(item, bookId, rating, date, isShelved) {
     // Strip trailing series markers like "(Legend, #3)"
     const title = tag(item, 'title').replace(/\s*\([^)]*#[\d.–-]+[^)]*\)\s*$/, '').trim();
     const author = tag(item, 'author_name');
@@ -177,6 +178,7 @@ function writeBook(item, bookId, rating, date, isShelved) {
     if (existingSlugs.has(slug)) return;
     existingSlugs.add(slug);
 
+    const tags = await fetchGoodreadsGenreTags(bookId);
     const lines = [
         '---',
         `id: ${yamlString(slug)}`,
@@ -189,6 +191,7 @@ function writeBook(item, bookId, rating, date, isShelved) {
         `url: "https://www.goodreads.com/book/show/${bookId}"`,
         `goodreadsId: "${bookId}"`,
     ];
+    lines.push(...yamlListLines('tags', tags));
     if (isShelved) lines.push('status: shelved');
     if (rating > 0) lines.push(`enjoyment: ${rating * 2}`);
     lines.push('---', '');

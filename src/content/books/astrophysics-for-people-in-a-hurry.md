@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/32191710"
 goodreadsId: "32191710"
+tags:
+  - "science"
+  - "nonfiction"
+  - "audiobook"
+  - "physics"
+  - "space"
 ---

@@ -3,8 +3,12 @@ id: "thirty-nine"
 title: "Thirty-Nine"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2022-12-10"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "life"
+  - "drama"
 status: shelved
 ---

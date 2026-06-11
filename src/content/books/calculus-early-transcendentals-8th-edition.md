@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/53812643"
 goodreadsId: "53812643"
+tags:
+  - "mathematics"
+  - "textbooks"
+  - "reference"
+  - "nonfiction"
+  - "science"
 ---

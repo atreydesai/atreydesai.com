@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/44286258"
 goodreadsId: "44286258"
+tags:
+  - "romance"
+  - "lgbt"
+  - "young adult"
+  - "contemporary"
+  - "queer"
 enjoyment: 10
 ---

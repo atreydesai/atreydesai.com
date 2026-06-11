@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/22886612"
 goodreadsId: "22886612"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "space opera"
+  - "audiobook"
+  - "space"
 ---

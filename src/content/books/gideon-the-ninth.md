@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/42036538"
 goodreadsId: "42036538"
+tags:
+  - "fantasy"
+  - "science fiction"
+  - "fiction"
+  - "queer"
+  - "lgbt"
 status: shelved
 ---

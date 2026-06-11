@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/41014903"
 goodreadsId: "41014903"
+tags:
+  - "young adult"
+  - "science fiction"
+  - "fantasy"
+  - "dystopia"
+  - "fiction"
 ---

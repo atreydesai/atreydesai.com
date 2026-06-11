@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/20886492"
 goodreadsId: "20886492"
+tags:
+  - "romance"
+  - "lesbian"
+  - "lgbt"
+  - "queer"
+  - "young adult"
 enjoyment: 10
 ---

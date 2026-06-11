@@ -3,8 +3,12 @@ id: "red-balloon"
 title: "Red Balloon"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2023-02-10"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "comedy"
+  - "life"
+  - "drama"
 status: shelved
 ---

@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2022-12-09"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/30817-touch-your-heart"
 mdlId: "30817-touch-your-heart"
+tags:
+  - "comedy"
+  - "law"
+  - "romance"
+  - "drama"
 enjoyment: 7.5
 ---

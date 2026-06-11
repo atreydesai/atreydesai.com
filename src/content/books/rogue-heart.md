@@ -8,5 +8,11 @@ favorite: true
 medium: book
 url: "https://www.goodreads.com/book/show/44676446"
 goodreadsId: "44676446"
+tags:
+  - "science fiction"
+  - "young adult"
+  - "romance"
+  - "fantasy"
+  - "dystopia"
 enjoyment: 10
 ---

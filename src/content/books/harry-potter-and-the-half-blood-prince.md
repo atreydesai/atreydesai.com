@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/1"
 goodreadsId: "1"
+tags:
+  - "fantasy"
+  - "fiction"
+  - "young adult"
+  - "harry potter"
+  - "magic"
 ---

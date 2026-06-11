@@ -3,8 +3,13 @@ id: "black-bag"
 title: "Black Bag"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "spy"
+  - "thriller"
+  - "drama"
+  - "mystery"
 status: shelved
 ---

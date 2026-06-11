@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/58935103"
 goodreadsId: "58935103"
+tags:
+  - "romance"
+  - "young adult"
+  - "contemporary"
+  - "realistic fiction"
+  - "audiobook"
 status: shelved
 ---

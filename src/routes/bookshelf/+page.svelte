@@ -24,7 +24,6 @@
         ChevronsRight,
         ExternalLink,
         FileText,
-        Heart,
         Library,
         PanelRightClose,
         Search,
@@ -32,7 +31,7 @@
         Tags,
         X,
     } from "lucide-svelte";
-    import { CirclePlus } from "@jis3r/icons";
+    import { CirclePlus, Heart } from "@jis3r/icons";
 
     const PAGE_SIZE = 30;
     const sortableFields = [
@@ -60,7 +59,19 @@
     let currentPage = 1;
     let pendingBookPageId: string | null = null;
     let hoveredBookId: string | null = null;
+    let hoveredRatingLegend: "enjoyment" | "importance" | null = null;
     let urlReady = false;
+
+    const ratingLegend = {
+        enjoyment: {
+            title: "Appreciation",
+            body: "How much I personally liked it, independent of usefulness.",
+        },
+        importance: {
+            title: "Importance",
+            body: "How useful, influential, or worth remembering I found it.",
+        },
+    };
 
     $: allTags = [
         ...new Set(
@@ -482,6 +493,9 @@
                 bind:value={selectedTag}
                 placeholder="All tags"
                 ariaLabel="Filter by tag"
+                fastScroll
+                cascadeDuration={220}
+                cascadeDelayStep={24}
             />
             {#if activeFilters}
                 <button
@@ -499,7 +513,7 @@
         class="grid min-w-0 gap-5 {selectedBook ? 'xl:grid-cols-[minmax(0,1fr)_minmax(370px,0.42fr)]' : ''}"
     >
         <section class="min-w-0 max-w-full overflow-hidden" aria-label="Bookshelf entries">
-            <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-cream-400">
+            <div class="relative mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-cream-400">
                 <button
                     type="button"
                     class="transition-colors hover:text-ink-900 dark:hover:text-cream-100"
@@ -576,40 +590,76 @@
                                     </button>
                                 </th>
                                 <th class="w-[7%] px-3 py-2 text-center" aria-sort={ariaSort("enjoyment")}>
-                                    <button
-                                        type="button"
-                                        class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
-                                        on:click={() => handleSort("enjoyment")}
-                                        aria-label="Sort by appreciation"
-                                        title="Appreciation"
-                                    >
-                                        <Heart size={14} />
-                                        {#if sortField === "enjoyment"}
-                                            {#if sortDirection === "asc"}
-                                                <ArrowUp size={13} />
-                                            {:else}
-                                                <ArrowDown size={13} />
+                                    <div class="relative inline-flex justify-center">
+                                        <button
+                                            type="button"
+                                            class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                            on:click={() => handleSort("enjoyment")}
+                                            on:mouseenter={() => (hoveredRatingLegend = "enjoyment")}
+                                            on:mouseleave={() => (hoveredRatingLegend = null)}
+                                            on:focus={() => (hoveredRatingLegend = "enjoyment")}
+                                            on:blur={() => (hoveredRatingLegend = null)}
+                                            aria-label="Sort by appreciation"
+                                        >
+                                            <Heart size={14} animate={hoveredRatingLegend === "enjoyment"} />
+                                            {#if sortField === "enjoyment"}
+                                                {#if sortDirection === "asc"}
+                                                    <ArrowUp size={13} />
+                                                {:else}
+                                                    <ArrowDown size={13} />
+                                                {/if}
                                             {/if}
+                                        </button>
+                                        {#if hoveredRatingLegend === "enjoyment"}
+                                            <div
+                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-[0.72rem] font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
+                                                role="tooltip"
+                                            >
+                                                <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">
+                                                    {ratingLegend.enjoyment.title}
+                                                </div>
+                                                <div class="mt-1 font-mono font-normal text-ink-600 dark:text-cream-400">
+                                                    {ratingLegend.enjoyment.body}
+                                                </div>
+                                            </div>
                                         {/if}
-                                    </button>
+                                    </div>
                                 </th>
                                 <th class="w-[7%] px-3 py-2 text-center" aria-sort={ariaSort("importance")}>
-                                    <button
-                                        type="button"
-                                        class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
-                                        on:click={() => handleSort("importance")}
-                                        aria-label="Sort by importance"
-                                        title="Importance"
-                                    >
-                                        <BadgeInfo size={14} />
-                                        {#if sortField === "importance"}
-                                            {#if sortDirection === "asc"}
-                                                <ArrowUp size={13} />
-                                            {:else}
-                                                <ArrowDown size={13} />
+                                    <div class="relative inline-flex justify-center">
+                                        <button
+                                            type="button"
+                                            class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
+                                            on:click={() => handleSort("importance")}
+                                            on:mouseenter={() => (hoveredRatingLegend = "importance")}
+                                            on:mouseleave={() => (hoveredRatingLegend = null)}
+                                            on:focus={() => (hoveredRatingLegend = "importance")}
+                                            on:blur={() => (hoveredRatingLegend = null)}
+                                            aria-label="Sort by importance"
+                                        >
+                                            <BadgeInfo size={14} />
+                                            {#if sortField === "importance"}
+                                                {#if sortDirection === "asc"}
+                                                    <ArrowUp size={13} />
+                                                {:else}
+                                                    <ArrowDown size={13} />
+                                                {/if}
                                             {/if}
+                                        </button>
+                                        {#if hoveredRatingLegend === "importance"}
+                                            <div
+                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-[0.72rem] font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
+                                                role="tooltip"
+                                            >
+                                                <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">
+                                                    {ratingLegend.importance.title}
+                                                </div>
+                                                <div class="mt-1 font-mono font-normal text-ink-600 dark:text-cream-400">
+                                                    {ratingLegend.importance.body}
+                                                </div>
+                                            </div>
                                         {/if}
-                                    </button>
+                                    </div>
                                 </th>
                                 <th class="w-[9%] px-3 py-2 text-left" aria-sort={ariaSort("dateAdded")}>
                                     <button

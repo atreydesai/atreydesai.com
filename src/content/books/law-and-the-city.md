@@ -3,8 +3,12 @@ id: "law-and-the-city"
 title: "Law and the City"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-07-06"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "law"
+  - "romance"
+  - "life"
 status: shelved
 ---

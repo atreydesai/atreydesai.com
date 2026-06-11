@@ -3,8 +3,11 @@ id: "ae-dil-hai-mushkil"
 title: "Ae Dil Hai Mushkil"
 author: ""
 category: fiction
-dateAdded: "2026-04-16"
+dateAdded: ""
 favorite: false
 medium: movie
+tags:
+  - "drama"
+  - "romance"
 status: shelved
 ---

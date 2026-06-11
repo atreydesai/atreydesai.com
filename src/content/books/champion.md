@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/14290364"
 goodreadsId: "14290364"
+tags:
+  - "dystopia"
+  - "young adult"
+  - "romance"
+  - "fantasy"
+  - "science fiction"
 enjoyment: 10
 ---

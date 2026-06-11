@@ -5,8 +5,11 @@ author: ""
 category: fiction
 dateAdded: "2023-01-15"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/28300-you-drive-me-crazy"
 mdlId: "28300-you-drive-me-crazy"
+tags:
+  - "romance"
+  - "drama"
 enjoyment: 7
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/18135"
 goodreadsId: "18135"
+tags:
+  - "classics"
+  - "plays"
+  - "fiction"
+  - "romance"
+  - "school"
 ---

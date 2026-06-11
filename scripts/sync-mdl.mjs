@@ -7,7 +7,7 @@
 //   - Completed -> done, score maps directly onto enjoyment (both 1-10)
 //   - Plan to Watch -> status: shelved
 //   - Watching / On-hold / Dropped are skipped (not finished, not a wishlist)
-//   - single-episode entries are movies; everything else is a kdrama
+//   - single-episode entries are movies; everything else is a drama
 //   - scripts/mdl-overrides.json: "favorites" marks entries favorite: true
 //     (MDL has no public favorites feed), "exclude" skips entries
 //
@@ -18,6 +18,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fetchMdlGenreTagsByUrl, yamlListLines } from './tag-sources.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BOOKS_DIR = join(ROOT, 'src/content/books');
@@ -60,10 +61,10 @@ function existingMdlFiles() {
         const text = readFileSync(join(BOOKS_DIR, file), 'utf8');
         const id = text.match(/^mdlId:\s*"(.+)"\s*$/m);
         if (id) byId.set(id[1], file);
-        // Track titles of all movie/show/kdrama entries so list items
+        // Track titles of all movie/show/drama entries so list items
         // imported without an mdlId (e.g. the plan-to-watch backfill) are
         // not duplicated if the API starts returning them.
-        const medium = text.match(/^medium:\s*(movie|show|kdrama)\s*$/m);
+        const medium = text.match(/^medium:\s*(movie|show|drama)\s*$/m);
         const title = text.match(/^title:\s*"(.*)"\s*$/m);
         if (medium && title) titles.add(normTitle(title[1]));
     }
@@ -96,7 +97,10 @@ for (const bucket of buckets) {
         if (knownTitles.has(normTitle(item.name))) continue;
 
         const score = parseFloat(item.score) || 0;
-        const medium = item.episode_total === '1' ? 'movie' : 'kdrama';
+        const medium = item.episode_total === '1' ? 'movie' : 'drama';
+        const url = `https://mydramalist.com/${item.id}`;
+        const tags = await fetchMdlGenreTagsByUrl(url);
+        const dateAdded = itemDateAdded(item) ?? (bucket.status === 'shelved' ? '' : today);
 
         let slug = slugify(item.name) || `mdl-${item.id}`;
         if (existingSlugs.has(slug)) slug = `${slug}-${medium}`;
@@ -109,12 +113,13 @@ for (const bucket of buckets) {
             `title: ${yamlString(item.name)}`,
             'author: ""',
             'category: fiction',
-            `dateAdded: "${today}"`,
+            `dateAdded: "${dateAdded}"`,
             `favorite: ${favoriteIds.has(item.id)}`,
             `medium: ${medium}`,
-            `url: "https://mydramalist.com/${item.id}"`,
+            `url: "${url}"`,
             `mdlId: "${item.id}"`,
         ];
+        lines.push(...yamlListLines('tags', tags));
         if (bucket.status === 'shelved') lines.push('status: shelved');
         if (score > 0) lines.push(`enjoyment: ${score}`);
         lines.push('---', '');
@@ -122,6 +127,27 @@ for (const bucket of buckets) {
         writeFileSync(join(BOOKS_DIR, `${slug}.md`), lines.join('\n'));
         created++;
     }
+}
+
+function itemDateAdded(item) {
+    for (const [key, value] of Object.entries(item)) {
+        if (!/(date.*added|added.*date|created)/i.test(key)) continue;
+        const parsed = parseFlexibleDate(value);
+        if (parsed) return parsed;
+    }
+    return null;
+}
+
+function parseFlexibleDate(value) {
+    if (!value) return null;
+    const text = String(value).trim();
+    const dmy = text.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (dmy) {
+        const [, day, month, year] = dmy;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 }
 
 // Flip favorite false -> true for already-imported entries (never the reverse).

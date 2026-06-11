@@ -6,4 +6,7 @@ category: fiction
 dateAdded: "2022-09-18"
 favorite: false
 medium: movie
+tags:
+  - "comedy"
+  - "lgbtq-related"
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/11084145"
 goodreadsId: "11084145"
+tags:
+  - "biography"
+  - "nonfiction"
+  - "business"
+  - "audiobook"
+  - "technology"
 ---

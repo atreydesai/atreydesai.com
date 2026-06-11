@@ -3,8 +3,12 @@ id: "twenty-twenty"
 title: "Twenty-Twenty"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-04-19"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "youth"
+  - "drama"
 status: shelved
 ---

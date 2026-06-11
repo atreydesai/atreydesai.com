@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/48855"
 goodreadsId: "48855"
+tags:
+  - "classics"
+  - "nonfiction"
+  - "history"
+  - "biography"
+  - "memoir"
 ---

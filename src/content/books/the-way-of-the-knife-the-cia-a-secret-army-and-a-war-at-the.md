@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/16158491"
 goodreadsId: "16158491"
+tags:
+  - "history"
+  - "nonfiction"
+  - "politics"
+  - "military fiction"
+  - "war"
 ---

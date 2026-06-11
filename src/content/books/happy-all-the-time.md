@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/164408"
 goodreadsId: "164408"
+tags:
+  - "fiction"
+  - "romance"
+  - "contemporary"
+  - "literary fiction"
+  - "classics"
 status: shelved
 ---

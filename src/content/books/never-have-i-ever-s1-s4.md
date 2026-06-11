@@ -6,4 +6,8 @@ category: fiction
 dateAdded: "2023-06-12"
 favorite: false
 medium: show
+tags:
+  - "teen drama"
+  - "comedy drama"
+  - "coming-of-age"
 ---

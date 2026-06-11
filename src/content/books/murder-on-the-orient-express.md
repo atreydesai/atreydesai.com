@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/853510"
 goodreadsId: "853510"
+tags:
+  - "mystery"
+  - "classics"
+  - "fiction"
+  - "agatha christie"
+  - "crime"
 ---

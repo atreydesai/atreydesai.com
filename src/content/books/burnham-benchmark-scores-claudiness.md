@@ -8,8 +8,6 @@ dateAdded: "2026-06-10"
 favorite: false
 medium: blog post
 url: "https://epochai.substack.com/p/benchmark-scores-general-capability"
-tags:
-  - relevant
 enjoyment: 7
 importance: 7
 ---

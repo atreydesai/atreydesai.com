@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/35391324"
 goodreadsId: "35391324"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "military fiction"
+  - "audiobook"
+  - "space opera"
 ---

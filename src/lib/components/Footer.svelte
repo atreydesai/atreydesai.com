@@ -28,15 +28,14 @@
   let hoveredMusic = false;
   let audioElement: HTMLAudioElement | null = null;
 
-  // Dynamically import all mp3 files from /static/audio using Vite's glob
-  const audioModules = import.meta.glob<string>("/static/audio/*.mp3", {
-    eager: true,
-    query: "?url",
-    import: "default",
-  });
-  const musicSamples = Object.values(audioModules).map((url) =>
-    url.replace(/^\/static/, ""),
-  );
+  const musicSamples = [
+    "/audio/CARLI%20-%20CARLI%20(offizielles%20Musikvideo)%20%5BnWhtnAyD7r8%5D.mp3",
+    "/audio/Diverseddie%20%E8%88%B5%20-%20Procrastination%20%E6%8B%96%E5%BB%B6%E7%97%87%20%5Bqx0f0KfA_90%5D.mp3",
+    "/audio/Everybody%20Talks%20-%20Neon%20Trees%20%5BswoVAisnOLo%5D.mp3",
+    "/audio/NewJeans%20-%20Zero%20%5BAudio%5D%20%5BzeOm8-t42aQ%5D.mp3",
+    "/audio/Seori%20(feat.%20eaJ)%20-%20Dive%20with%20you%20%5BColor%20Coded%20Lyrics%E2%A7%B8Han%E2%A7%B8Rom%E2%A7%B8Eng%5D%20%5BnoXlOoHEPXY%5D.mp3",
+    "/audio/Two%20Door%20Cinema%20Club%20-%20What%20You%20Know%20%5B_Ys8gLkfW6M%5D.mp3",
+  ];
 
   function toggleMusic() {
     if (!audioElement) {

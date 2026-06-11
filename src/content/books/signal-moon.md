@@ -8,5 +8,11 @@ favorite: true
 medium: book
 url: "https://www.goodreads.com/book/show/61045711"
 goodreadsId: "61045711"
+tags:
+  - "historical fiction"
+  - "short stories"
+  - "fiction"
+  - "science fiction"
+  - "time travel"
 enjoyment: 8
 ---

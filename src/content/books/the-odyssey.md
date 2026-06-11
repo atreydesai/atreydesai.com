@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/1381"
 goodreadsId: "1381"
+tags:
+  - "classics"
+  - "fiction"
+  - "poetry"
+  - "mythology"
+  - "fantasy"
 ---

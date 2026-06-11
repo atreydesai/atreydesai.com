@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/25899877"
 goodreadsId: "25899877"
+tags:
+  - "science fiction"
+  - "fiction"
+  - "short stories"
+  - "space opera"
+  - "audiobook"
 ---

@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2024-03-20"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/744311-doctor-slump"
 mdlId: "744311-doctor-slump"
+tags:
+  - "comedy"
+  - "romance"
+  - "drama"
+  - "medical"
 enjoyment: 7
 ---

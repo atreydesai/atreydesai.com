@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/43453704"
 goodreadsId: "43453704"
+tags:
+  - "fantasy"
+  - "lesbian"
+  - "lgbt"
+  - "queer"
+  - "young adult"
 enjoyment: 10
 ---

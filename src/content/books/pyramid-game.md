@@ -3,8 +3,13 @@ id: "pyramid-game"
 title: "Pyramid Game"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2024-08-24"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "thriller"
+  - "psychological"
+  - "drama"
 status: shelved
 ---

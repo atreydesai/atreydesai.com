@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/2767052"
 goodreadsId: "2767052"
+tags:
+  - "young adult"
+  - "dystopia"
+  - "fiction"
+  - "fantasy"
+  - "science fiction"
 enjoyment: 6
 ---

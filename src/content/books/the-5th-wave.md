@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/16101128"
 goodreadsId: "16101128"
+tags:
+  - "young adult"
+  - "science fiction"
+  - "dystopia"
+  - "fiction"
+  - "fantasy"
 enjoyment: 4
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/13006"
 goodreadsId: "13006"
+tags:
+  - "classics"
+  - "plays"
+  - "shakespeare"
+  - "fiction"
+  - "drama"
 ---

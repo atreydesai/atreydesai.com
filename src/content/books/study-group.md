@@ -3,8 +3,13 @@ id: "study-group"
 title: "Study Group"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-02-17"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "action"
+  - "thriller"
+  - "comedy"
+  - "youth"
 status: shelved
 ---

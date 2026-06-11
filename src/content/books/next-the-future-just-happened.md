@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/10656"
 goodreadsId: "10656"
+tags:
+  - "nonfiction"
+  - "business"
+  - "technology"
+  - "audiobook"
+  - "economics"
 ---

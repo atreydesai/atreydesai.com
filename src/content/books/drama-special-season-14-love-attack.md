@@ -8,5 +8,8 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/757353-drama-special-season-14-confession-attack"
 mdlId: "757353-drama-special-season-14-confession-attack"
+tags:
+  - "comedy"
+  - "romance"
 enjoyment: 10
 ---

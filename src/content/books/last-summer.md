@@ -3,8 +3,12 @@ id: "last-summer"
 title: "Last Summer"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-11-07"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "drama"
+  - "family"
 status: shelved
 ---

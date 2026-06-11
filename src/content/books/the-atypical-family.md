@@ -5,8 +5,13 @@ author: ""
 category: fiction
 dateAdded: "2024-09-12"
 favorite: false
-medium: kdrama
+medium: drama
 url: "https://mydramalist.com/748581-although-i-am-not-a-hero"
 mdlId: "748581-although-i-am-not-a-hero"
+tags:
+  - "comedy"
+  - "romance"
+  - "drama"
+  - "fantasy"
 enjoyment: 10
 ---

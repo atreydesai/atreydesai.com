@@ -8,5 +8,11 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/35702241"
 goodreadsId: "35702241"
+tags:
+  - "fantasy"
+  - "romance"
+  - "young adult"
+  - "enemies to lovers"
+  - "romantasy"
 enjoyment: 10
 ---

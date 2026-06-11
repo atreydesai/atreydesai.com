@@ -3,8 +3,12 @@ id: "one-spring-night"
 title: "One Spring Night"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2022-12-27"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "life"
+  - "drama"
 status: shelved
 ---

@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/29056083"
 goodreadsId: "29056083"
+tags:
+  - "fantasy"
+  - "fiction"
+  - "harry potter"
+  - "young adult"
+  - "plays"
 ---

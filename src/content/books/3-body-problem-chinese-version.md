@@ -6,5 +6,10 @@ category: fiction
 dateAdded: "2026-04-16"
 favorite: false
 medium: show
+tags:
+  - "science fiction"
+  - "drama"
+  - "thriller"
+  - "fantasy"
 status: shelved
 ---

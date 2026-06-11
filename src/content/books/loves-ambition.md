@@ -3,8 +3,13 @@ id: "loves-ambition"
 title: "Love's Ambition"
 author: ""
 category: fiction
-dateAdded: "2026-06-11"
+dateAdded: "2025-09-27"
 favorite: false
-medium: kdrama
+medium: drama
+tags:
+  - "romance"
+  - "life"
+  - "drama"
+  - "family"
 status: shelved
 ---

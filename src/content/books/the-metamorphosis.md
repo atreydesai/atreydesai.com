@@ -8,4 +8,10 @@ favorite: false
 medium: book
 url: "https://www.goodreads.com/book/show/485894"
 goodreadsId: "485894"
+tags:
+  - "classics"
+  - "fiction"
+  - "philosophy"
+  - "fantasy"
+  - "short stories"
 ---
