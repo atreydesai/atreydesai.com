@@ -5,9 +5,13 @@
     import { aboutData } from "$lib/content";
     import { parseInline, escapeHtml } from "$lib/utils/text";
 
-    // Track which footnotes should be visible based on their markers
-    let visibleFootnotes: Set<number> = new Set();
-    let observer: IntersectionObserver | null = null;
+    // Sidenote layout: each footnote floats in the right margin beside its
+    // marker, faint until you hover the note or the marker.
+    let containerEl: HTMLElement;
+    let noteTops: Record<number, number> = {};
+    let notesReady = false;
+    let hovered: number | null = null;
+    let layoutRaf = 0;
 
     // Live "now" data (Manifold + Goodreads) from the /api/now endpoint.
     interface ReadingBook {
@@ -62,42 +66,102 @@
         return `I run a monthly ${market} market on Manifold — ${standing}.`;
     })();
 
-    onMount(() => {
-        if (!browser) return;
+    // Place each sidenote level with its marker, then push notes down just
+    // enough that none overlap (classic Tufte-style margin note stacking).
+    function layoutNotes() {
+        if (!containerEl) return;
+        if (!window.matchMedia("(min-width: 1280px)").matches) return;
 
+        const containerTop =
+            containerEl.getBoundingClientRect().top + window.scrollY;
+        const entries = aboutData.footnotes
+            .map((fn) => {
+                const marker = document.querySelector(
+                    `[data-footnote="${fn.id}"]`,
+                );
+                const note = document.getElementById(`fn-${fn.id}`);
+                if (!marker || !note) return null;
+                return {
+                    id: fn.id,
+                    markerTop:
+                        marker.getBoundingClientRect().top +
+                        window.scrollY -
+                        containerTop,
+                    height: note.offsetHeight,
+                };
+            })
+            .filter((e): e is NonNullable<typeof e> => e !== null)
+            .sort((a, b) => a.markerTop - b.markerTop);
+
+        const tops: Record<number, number> = {};
+        let prevBottom = 0;
+        for (const e of entries) {
+            const top = Math.max(e.markerTop, prevBottom);
+            tops[e.id] = top;
+            prevBottom = top + e.height + 16;
+        }
+        noteTops = tops;
+        if (!notesReady) {
+            // Let the computed tops paint before fading the notes in, so the
+            // (transitioned) `top` doesn't animate from its initial 0.
+            requestAnimationFrame(() => (notesReady = true));
+        }
+    }
+
+    function scheduleLayout() {
+        if (!browser) return;
+        cancelAnimationFrame(layoutRaf);
+        layoutRaf = requestAnimationFrame(layoutNotes);
+    }
+
+    onMount(() => {
         loadNow();
 
-        // Small delay to ensure all dynamic content is rendered (including from parseLinks)
+        // Small delay to ensure all dynamic content is rendered (including
+        // from parseLinks), then position the sidenotes.
         setTimeout(() => {
-            // Find all footnote markers and observe them
-            const markers = document.querySelectorAll("[data-footnote]");
+            layoutNotes();
 
-            observer = new IntersectionObserver(
-                (entries) => {
-                    entries.forEach((entry) => {
-                        const id = parseInt(
-                            entry.target.getAttribute("data-footnote") || "0",
-                        );
-                        if (entry.isIntersecting) {
-                            visibleFootnotes.add(id);
-                        } else {
-                            // Hide when not intersecting (scrolled past or above)
-                            visibleFootnotes.delete(id);
-                        }
-                        visibleFootnotes = visibleFootnotes; // Trigger reactivity
-                    });
-                },
-                {
-                    threshold: 0,
-                    rootMargin: "-64px 0px -40% 0px", // Account for header, track middle of viewport
-                },
-            );
-
-            markers.forEach((marker) => observer?.observe(marker));
+            // Hovering a marker brightens its note (the note's own hover is
+            // handled in the template; markers come from @html, so listen here).
+            document.querySelectorAll("[data-footnote]").forEach((marker) => {
+                const id = parseInt(
+                    marker.getAttribute("data-footnote") || "0",
+                );
+                marker.addEventListener("mouseenter", () => (hovered = id));
+                marker.addEventListener("mouseleave", () => (hovered = null));
+            });
         }, 100);
 
-        return () => observer?.disconnect();
+        // Re-measure when fonts land or the column reflows.
+        document.fonts?.ready.then(scheduleLayout);
+        const ro = new ResizeObserver(scheduleLayout);
+        ro.observe(containerEl);
+        window.addEventListener("resize", scheduleLayout);
+
+        return () => {
+            ro.disconnect();
+            window.removeEventListener("resize", scheduleLayout);
+            cancelAnimationFrame(layoutRaf);
+        };
     });
+
+    // Hovering a sidenote highlights its marker in the text (markers are
+    // injected via @html, so toggle the class imperatively).
+    $: if (browser) {
+        document
+            .querySelectorAll(".footnote-ref.fn-hot")
+            .forEach((el) => el.classList.remove("fn-hot"));
+        if (hovered != null) {
+            document
+                .querySelectorAll(`[data-footnote="${hovered}"]`)
+                .forEach((el) => el.classList.add("fn-hot"));
+        }
+    }
+
+    // Footnote 7's content swaps in live data after load — re-stack since
+    // its height may change.
+    $: if (browser && fn7Html) tick().then(scheduleLayout);
 
     // Parse markdown-style links, emphasis, and footnote markers in about-page text.
     const parseLinks = (text: string) =>
@@ -115,26 +179,26 @@
 />
 
 <!-- Centered layout container with footnotes on the side -->
-<div class="relative">
-    <!-- Footnotes Sidebar (desktop only) - positioned absolutely on the right -->
-    <aside
-        class="hidden xl:block fixed right-8 top-24 w-56 z-10"
-    >
-        <div>
+<div class="relative" bind:this={containerEl}>
+    <!-- Sidenotes (desktop only) — each note sits in the right margin beside
+         its marker, faint until hovered. -->
+    <aside class="hidden xl:block absolute inset-y-0 right-8 w-56 z-10">
+        <div class="relative h-full">
             {#each aboutData.footnotes as footnote (footnote.id)}
+                <!-- svelte-ignore a11y-no-static-element-interactions -->
                 <div
-                    class="fn-collapse"
-                    class:fn-open={visibleFootnotes.has(footnote.id)}
+                    class="sidenote footnote-item text-xs text-ink-500 dark:text-ink-400 leading-relaxed"
+                    class:fn-ready={notesReady}
+                    class:fn-active={hovered === footnote.id}
+                    style="top: {noteTops[footnote.id] ?? 0}px"
                     id="fn-{footnote.id}"
+                    on:mouseenter={() => (hovered = footnote.id)}
+                    on:mouseleave={() => (hovered = null)}
                 >
-                    <div
-                        class="fn-inner footnote-item text-xs text-ink-500 dark:text-ink-400 leading-relaxed"
+                    <span class="font-medium text-accent-dark dark:text-accent-light"
+                        >{footnote.id}.</span
                     >
-                        <span class="font-medium text-accent-dark dark:text-accent-light"
-                            >{footnote.id}.</span
-                        >
-                        {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
-                    </div>
+                    {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
                 </div>
             {/each}
         </div>
@@ -303,8 +367,8 @@
             </div>
         </section>
 
-        <!-- Mobile footnotes (shown at bottom) -->
-        <div class="lg:hidden mt-12 pt-8">
+        <!-- Mobile footnotes (shown at bottom wherever the sidenotes aren't) -->
+        <div class="xl:hidden mt-12 pt-8">
             <h3 class="section-heading text-sm">footnotes</h3>
             <div class="space-y-4">
                 {#each aboutData.footnotes as footnote}
@@ -346,35 +410,31 @@
         color: theme("colors.accent.DEFAULT");
     }
 
-    /* Smoothly collapse/expand footnotes as their markers scroll in and out,
-       so the visible ones reflow to fill the gap. Animating grid-template-rows
-       (0fr -> 1fr) keeps every item — and its #fn-N anchor id — in the DOM,
-       unlike add/remove transitions. */
-    .fn-collapse {
-        display: grid;
-        grid-template-rows: 0fr;
+    /* Margin sidenotes: absolutely positioned level with their markers
+       (stacked apart when they'd overlap), faint until hovered — either the
+       note itself or its marker in the text. Hidden until first layout so
+       they don't flash at top: 0. */
+    .sidenote {
+        position: absolute;
+        left: 0;
+        right: 0;
         opacity: 0;
-        margin-bottom: 0;
-        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    .sidenote.fn-ready {
+        opacity: 0.45;
         transition:
-            grid-template-rows 0.3s cubic-bezier(0.22, 1, 0.36, 1),
             opacity 0.3s ease,
-            margin-bottom 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            top 0.3s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .fn-collapse.fn-open {
-        grid-template-rows: 1fr;
+    .sidenote.fn-ready:hover,
+    .sidenote.fn-ready.fn-active {
         opacity: 1;
-        margin-bottom: 1rem;
-        pointer-events: auto;
     }
-    .fn-inner {
-        overflow: hidden;
-        min-height: 0;
-    }
-    @media (prefers-reduced-motion: reduce) {
-        .fn-collapse {
-            transition: opacity 0.2s ease;
-        }
+
+    /* Marker echo: while its sidenote is hovered, the in-text marker warms. */
+    :global(.footnote-ref.fn-hot) {
+        color: theme("colors.accent.dark");
     }
 
     .footnote-item {
