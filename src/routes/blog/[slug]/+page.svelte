@@ -148,7 +148,7 @@
     /* Italic prose headings to match the site-wide `section-heading` voice
        (every other page uses the italic Optima prose face for in-content headings). */
     .prose-custom :global(h2) {
-        font-family: Optima, Candara, "URW Classico", sans-serif;
+        font-family: var(--font-prose);
         font-style: italic;
         font-size: 1.5rem;
         font-weight: 600;
@@ -157,7 +157,7 @@
     }
 
     .prose-custom :global(h3) {
-        font-family: Optima, Candara, "URW Classico", sans-serif;
+        font-family: var(--font-prose);
         font-style: italic;
         font-size: 1.25rem;
         font-weight: 600;

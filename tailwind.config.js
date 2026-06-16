@@ -8,6 +8,9 @@ export default {
   theme: {
     extend: {
       fontSize: {
+        // Smallest documented step — labels, footnotes, captions, and all the
+        // mono detail text standardize on this (replaces the old 0.7/0.72rem one-offs).
+        xs: ["0.75rem", { lineHeight: "1rem" }],
         sm: ["0.95rem", { lineHeight: "1.4rem" }],
         base: ["1rem", { lineHeight: "1.5rem" }],
         lg: ["1.1rem", { lineHeight: "1.7rem" }],
@@ -91,10 +94,15 @@ export default {
           400: "#C5C5CD",
         },
       },
+      // Three roles, defined once as CSS vars in app.css (:root). Keep these in
+      // sync with that block — both resolve to the same stacks.
+      //   display → Neue Haas Grotesk  (headlines / big headers)
+      //   serif   → Optima             (subheads + body / reading text)
+      //   mono    → system monospace   (nav, buttons, controls, labels, details)
       fontFamily: {
-        display: ['"neue-haas-grotesk-display"', ...defaultTheme.fontFamily.sans],
-        text: ['"neue-haas-grotesk-text"', ...defaultTheme.fontFamily.sans],
-        serif: ["Optima", "Candara", '"URW Classico"', "sans-serif"],
+        display: ["var(--font-display)"],
+        serif: ["var(--font-prose)"],
+        mono: ["var(--font-mono)"],
       },
       spacing: {
         // 1:3:1 layout ratio helpers

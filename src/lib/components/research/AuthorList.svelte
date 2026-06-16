@@ -98,7 +98,7 @@
 <div class="mt-2 min-w-0">
     {#if authorsExpanded && hasHiddenAuthors}
         <p
-            class={`leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+            class={`leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-sm"}`}
         >
             {#each authorGroups as group}
                 {#if group.kind === "name"}
@@ -129,7 +129,7 @@
         >
             <p
                 bind:this={authorsEl}
-                class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+                class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-sm"}`}
             >
                 {@html formatAuthors(collapsedAuthorList)}
             </p>
@@ -137,7 +137,7 @@
     {:else}
         <p
             bind:this={authorsEl}
-            class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-[0.95rem]"}`}
+            class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-sm"}`}
         >
             {@html formatAuthors(authors)}
         </p>

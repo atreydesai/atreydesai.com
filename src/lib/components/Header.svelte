@@ -72,7 +72,7 @@
       <!-- Logo / Name -->
       <a
         href="/"
-        class="text-xl font-bold text-ink-900 dark:text-cream-100 hover:text-ink-600 dark:hover:text-cream-300 transition-all duration-200"
+        class="font-display text-xl font-bold text-ink-900 dark:text-cream-100 hover:text-ink-600 dark:hover:text-cream-300 transition-all duration-200"
         on:click={closeMobileMenu}
       >
         atrey desai

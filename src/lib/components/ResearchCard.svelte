@@ -113,7 +113,7 @@
                 {#if paper.venue || paper.awards.length > 0 || paper.preprint}
                     <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                         {#if paper.venue}
-                            <span class="font-serif italic text-ink-500 dark:text-cream-400 {isPreview ? 'text-sm' : 'text-[0.95rem]'}">
+                            <span class="font-serif italic text-ink-500 dark:text-cream-400 {isPreview ? 'text-sm' : 'text-sm'}">
                                 {paper.venue}{paper.year ? `, ${paper.year}` : ""}
                             </span>
                         {/if}
@@ -140,7 +140,7 @@
 
                 {#if paper.tldr && tldrOpen}
                     <p
-                        class={`mt-2 text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm leading-6" : "text-[0.95rem] leading-6"}`}
+                        class={`mt-2 text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm leading-6" : "text-sm leading-6"}`}
                     >
                         {paper.tldr}
                     </p>

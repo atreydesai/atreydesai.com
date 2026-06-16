@@ -34,7 +34,7 @@
             {/each}
         </span>
         {#if !compact}
-            <span class="font-mono text-[0.7rem] leading-none tabular-nums text-ink-500 dark:text-cream-400">
+            <span class="font-mono text-xs leading-none tabular-nums text-ink-500 dark:text-cream-400">
                 {value}/{maxValue}
             </span>
         {/if}

@@ -404,8 +404,7 @@
 
     /* Live figures inside footnote 7 (injected via @html). */
     :global(.fn-stat) {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-            "Liberation Mono", "Courier New", monospace;
+        font-family: var(--font-mono);
         letter-spacing: -0.01em;
         color: theme("colors.accent.DEFAULT");
     }

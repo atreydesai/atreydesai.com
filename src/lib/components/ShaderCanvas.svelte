@@ -251,7 +251,7 @@
     right: 12px;
     padding: 4px 8px;
     border-radius: 6px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: 0.04em;
     color: rgba(20, 25, 35, 0.75);

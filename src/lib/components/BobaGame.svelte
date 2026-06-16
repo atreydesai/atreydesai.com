@@ -662,8 +662,7 @@
   /* All HUD chrome uses the site's mono stack + palette. */
   .boba-hud,
   .boba-over {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-      "Liberation Mono", "Courier New", monospace;
+    font-family: var(--font-mono);
   }
 
   .boba-hud {

@@ -190,8 +190,8 @@
         align-items: center;
         gap: 0.5rem;
         padding: 0.3rem 0.65rem;
-        font-family: "neue-haas-grotesk-text", sans-serif;
-        font-size: 0.78rem;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
         font-weight: 500;
         letter-spacing: 0.01em;
         background-color: transparent;
@@ -295,8 +295,8 @@
         display: block;
         width: 100%;
         padding: 0.45rem 0.75rem;
-        font-family: "neue-haas-grotesk-text", sans-serif;
-        font-size: 0.82rem;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
         font-weight: 400;
         text-align: left;
         color: theme("colors.ink.700");

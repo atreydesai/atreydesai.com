@@ -612,7 +612,7 @@
                                         </button>
                                         {#if hoveredRatingLegend === "enjoyment"}
                                             <div
-                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-[0.72rem] font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
+                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
                                                 role="tooltip"
                                             >
                                                 <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">
@@ -648,7 +648,7 @@
                                         </button>
                                         {#if hoveredRatingLegend === "importance"}
                                             <div
-                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-[0.72rem] font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
+                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
                                                 role="tooltip"
                                             >
                                                 <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">

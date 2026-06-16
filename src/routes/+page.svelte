@@ -232,7 +232,7 @@
           <p class="relative z-10 text-sm md:text-base leading-relaxed font-medium">
             {@html parseBanner(homepageData.banner.lead)}
           </p>
-          <p class="relative z-10 mt-2 text-sm leading-relaxed text-ink-700 dark:text-cream-200">
+          <p class="relative z-10 mt-2 text-sm md:text-base leading-relaxed text-ink-700 dark:text-cream-200">
             {@html parseBanner(homepageData.banner.body)}
           </p>
           {#if bannerCopied}
@@ -389,7 +389,7 @@
     transform: translateX(-50%);
     top: calc(100% + 3px);
     z-index: 30;
-    font-family: "neue-haas-grotesk-text", "neue-haas-grotesk-fallback", sans-serif;
+    font-family: var(--font-mono);
     font-size: 0.75rem;
     white-space: nowrap;
     pointer-events: none;
@@ -402,8 +402,7 @@
 
   /* Cook tooltip lives among the mono citation labels — match that font. */
   .cook-tooltip {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-      "Liberation Mono", "Courier New", monospace;
+    font-family: var(--font-mono);
   }
 
   .copied-triangle {
@@ -505,7 +504,7 @@
     position: absolute;
     transform: translateX(-50%);
     z-index: 30;
-    font-family: "neue-haas-grotesk-text", "neue-haas-grotesk-fallback", sans-serif;
+    font-family: var(--font-mono);
     font-size: 0.75rem;
     white-space: nowrap;
     pointer-events: none;
