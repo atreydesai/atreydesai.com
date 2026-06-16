@@ -94,7 +94,7 @@ export default {
       fontFamily: {
         display: ['"neue-haas-grotesk-display"', ...defaultTheme.fontFamily.sans],
         text: ['"neue-haas-grotesk-text"', ...defaultTheme.fontFamily.sans],
-        serif: ['"Source Serif 4"', '"source-serif-fallback"', ...defaultTheme.fontFamily.serif],
+        serif: ["Optima", "Candara", '"URW Classico"', "sans-serif"],
       },
       spacing: {
         // 1:3:1 layout ratio helpers

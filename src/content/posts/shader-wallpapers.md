@@ -13,12 +13,12 @@ I came across this [post](https://x.com/cifilter/status/2021206681560961444) on 
 
 [[shader:mound]]
 
-This was orginally in green, hence the name mound (like a grass mound). I tried my best to color match it to the website theme so its now a mound of adobe!
+This was originally in green, hence the name mound (like a grass mound). I tried my best to color match it to the website theme so it's now a mound of adobe!
 
 ## Nebula
 
 [[shader:nebula]]
 
-This is the better one haha. It nice to stare into over a longer period of time because the mixing is a little more gradual.
+This is the better one haha. It's nice to stare into over a longer period of time because the mixing is a little more gradual.
 
-[[image:/images/claudelimit.png|welp already hit my claude design limit an hour in, so maybe ill look at better usecases next week!]]
+[[image:/images/claudelimit.png|welp already hit my claude design limit an hour in, so maybe I'll look at better use cases next week!]]

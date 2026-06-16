@@ -145,10 +145,10 @@
 </div>
 
 <style>
-    /* Italic serif headings to match the site-wide `section-heading` voice
-       (every other page uses italic Source Serif for in-content headings). */
+    /* Italic prose headings to match the site-wide `section-heading` voice
+       (every other page uses the italic Optima prose face for in-content headings). */
     .prose-custom :global(h2) {
-        font-family: "Source Serif 4", "source-serif-fallback", serif;
+        font-family: Optima, Candara, "URW Classico", sans-serif;
         font-style: italic;
         font-size: 1.5rem;
         font-weight: 600;
@@ -157,7 +157,7 @@
     }
 
     .prose-custom :global(h3) {
-        font-family: "Source Serif 4", "source-serif-fallback", serif;
+        font-family: Optima, Candara, "URW Classico", sans-serif;
         font-style: italic;
         font-size: 1.25rem;
         font-weight: 600;
@@ -165,10 +165,11 @@
         margin-bottom: 0.5rem;
     }
 
-    /* 17px prose: Rello et al. (2016) found comprehension peaks at 18pt on screen;
-       1.4rem paragraph gap satisfies WCAG 1.4.12 (≥2× font-size at this scale) */
+    /* 18px prose (up from 17px since Optima reads smaller than the former serif):
+       Rello et al. (2016) put on-screen comprehension optimum near 18px. The
+       1.4rem inter-paragraph gap (~1.25×) keeps blocks distinct. */
     .prose-custom {
-        font-size: 1.0625rem;
+        font-size: 1.125rem;
     }
 
     .prose-custom :global(p) {
