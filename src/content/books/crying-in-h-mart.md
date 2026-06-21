@@ -2,7 +2,7 @@
 id: "crying-in-h-mart"
 title: "Crying in H Mart"
 author: "Michelle Zauner"
-category: fiction
+category: nonfiction
 dateAdded: "2021-10-02"
 favorite: false
 medium: book

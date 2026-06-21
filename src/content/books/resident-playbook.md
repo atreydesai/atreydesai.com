@@ -13,5 +13,6 @@ tags:
   - "life"
   - "youth"
   - "medical"
+  - "korean"
 enjoyment: 10
 ---

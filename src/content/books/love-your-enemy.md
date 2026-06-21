@@ -11,5 +11,6 @@ mdlId: "763553-love-on-a-single-log-bridge"
 tags:
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 8.5
 ---

@@ -6,6 +6,7 @@ category: fiction
 dateAdded: "2023-11-23"
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/To_All_the_Boys_I%27ve_Loved_Before_(film)"
 tags:
   - "romantic comedy"
 ---

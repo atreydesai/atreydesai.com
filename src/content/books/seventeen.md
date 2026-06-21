@@ -12,5 +12,6 @@ tags:
   - "comedy"
   - "romance"
   - "youth"
+  - "korean"
 enjoyment: 8
 ---

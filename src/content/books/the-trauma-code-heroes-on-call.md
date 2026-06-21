@@ -13,5 +13,6 @@ tags:
   - "comedy"
   - "drama"
   - "medical"
+  - "korean"
 enjoyment: 9.5
 ---

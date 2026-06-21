@@ -12,5 +12,6 @@ tags:
   - "comedy"
   - "romance"
   - "life"
+  - "korean"
 enjoyment: 8
 ---

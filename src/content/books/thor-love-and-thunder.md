@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/Thor:_Love_and_Thunder"
 tags:
   - "action"
   - "adventure"

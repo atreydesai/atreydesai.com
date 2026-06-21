@@ -13,5 +13,6 @@ tags:
   - "thriller"
   - "crime"
   - "drama"
+  - "korean"
 enjoyment: 7.5
 ---

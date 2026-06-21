@@ -13,5 +13,6 @@ tags:
   - "romance"
   - "drama"
   - "fantasy"
+  - "korean"
 enjoyment: 9.5
 ---

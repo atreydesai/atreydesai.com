@@ -11,5 +11,6 @@ mdlId: "767207-black-salt-dragon"
 tags:
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 6
 ---

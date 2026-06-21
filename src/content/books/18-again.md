@@ -13,5 +13,6 @@ tags:
   - "life"
   - "drama"
   - "fantasy"
+  - "korean"
 enjoyment: 10
 ---

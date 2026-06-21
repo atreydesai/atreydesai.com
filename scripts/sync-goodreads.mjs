@@ -15,7 +15,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fetchGoodreadsGenreTags, yamlListLines } from './tag-sources.mjs';
+import { categoryFromTags, fetchGoodreadsGenreTags, yamlListLines } from './tag-sources.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BOOKS_DIR = join(ROOT, 'src/content/books');
@@ -25,6 +25,7 @@ const GOODREADS_USER = '72859295';
 const SHELF = 'read';
 const FAVORITES_SHELF = 'favorites';
 const TO_READ_SHELF = 'to-read';
+const CURRENT_SHELF = 'currently-reading';
 const CUTOFF = new Date('2022-01-01T00:00:00Z');
 
 const overrides = existsSync(OVERRIDES_PATH)
@@ -100,10 +101,12 @@ function existingGoodreadsFiles() {
 
 let items;
 let toReadItems;
+let currentItems;
 let favoriteIds;
 try {
     items = await fetchShelf(SHELF);
     toReadItems = await fetchShelf(TO_READ_SHELF);
+    currentItems = await fetchShelf(CURRENT_SHELF);
     favoriteIds = new Set(
         (await fetchShelf(FAVORITES_SHELF)).map((it) => tag(it, 'book_id')).filter(Boolean)
     );
@@ -115,10 +118,13 @@ try {
 const seen = new Set();
 const knownFiles = existingGoodreadsFiles();
 const known = new Set(knownFiles.keys());
+const currentIds = new Set(currentItems.map((item) => tag(item, 'book_id')).filter(Boolean));
 const existingSlugs = new Set(readdirSync(BOOKS_DIR).map((f) => f.replace(/\.md$/, '')));
 let created = 0;
 let skippedKids = 0;
 let shelved = 0;
+let current = 0;
+let demotedCurrent = 0;
 let promoted = 0;
 
 for (const item of items) {
@@ -141,8 +147,8 @@ for (const item of items) {
         // pick up the rating it gained along the way.
         const path = join(BOOKS_DIR, knownFiles.get(bookId));
         let text = readFileSync(path, 'utf8');
-        if (/^status:\s*shelved\s*$/m.test(text)) {
-            text = text.replace(/^status:\s*shelved\s*\n/m, '');
+        if (/^status:\s*(shelved|current)\s*$/m.test(text)) {
+            text = text.replace(/^status:\s*(shelved|current)\s*\n/m, '');
             if (rating > 0 && !/^enjoyment:/m.test(text)) {
                 text = text.replace(/^---\s*$(?![\s\S]*^---)/m, `enjoyment: ${rating * 2}\n---`);
             }
@@ -156,6 +162,30 @@ for (const item of items) {
     created++;
 }
 
+// Currently-reading shelf -> current entries.
+for (const item of currentItems) {
+    const bookId = tag(item, 'book_id');
+    if (!bookId || seen.has(bookId)) continue;
+    seen.add(bookId);
+    if (forceExclude.has(bookId)) continue;
+
+    if (known.has(bookId)) {
+        const path = join(BOOKS_DIR, knownFiles.get(bookId));
+        let text = readFileSync(path, 'utf8');
+        if (/^status:\s*shelved\s*$/m.test(text)) {
+            text = text.replace(/^status:\s*shelved\s*$/m, 'status: current');
+        } else if (!/^status:\s*current\s*$/m.test(text)) {
+            text = text.replace(/^---\s*$(?![\s\S]*^---)/m, 'status: current\n---');
+        }
+        writeFileSync(path, text);
+        current++;
+        continue;
+    }
+
+    await writeBook(item, bookId, 0, parseDate(tag(item, 'user_date_created')), 'current');
+    current++;
+}
+
 // To-read shelf -> shelved entries (intentional adds, so no kids-era filter).
 for (const item of toReadItems) {
     const bookId = tag(item, 'book_id');
@@ -163,11 +193,22 @@ for (const item of toReadItems) {
     seen.add(bookId);
     if (forceExclude.has(bookId) || known.has(bookId)) continue;
 
-    await writeBook(item, bookId, 0, parseDate(tag(item, 'user_date_created')), true);
+    await writeBook(item, bookId, 0, parseDate(tag(item, 'user_date_created')), 'shelved');
     shelved++;
 }
 
-async function writeBook(item, bookId, rating, date, isShelved) {
+// Keep "currently reading" markers aligned with the live Goodreads shelf.
+for (const [bookId, file] of knownFiles) {
+    if (currentIds.has(bookId)) continue;
+    const path = join(BOOKS_DIR, file);
+    const text = readFileSync(path, 'utf8');
+    if (/^status:\s*current\s*$/m.test(text)) {
+        writeFileSync(path, text.replace(/^status:\s*current\s*$/m, 'status: shelved'));
+        demotedCurrent++;
+    }
+}
+
+async function writeBook(item, bookId, rating, date, status) {
     // Strip trailing series markers like "(Legend, #3)"
     const title = tag(item, 'title').replace(/\s*\([^)]*#[\d.–-]+[^)]*\)\s*$/, '').trim();
     const author = tag(item, 'author_name');
@@ -184,7 +225,7 @@ async function writeBook(item, bookId, rating, date, isShelved) {
         `id: ${yamlString(slug)}`,
         `title: ${yamlString(title)}`,
         `author: ${yamlString(author)}`,
-        'category: fiction',
+        `category: ${categoryFromTags(tags)}`,
         `dateAdded: "${dateAdded}"`,
         `favorite: ${favoriteIds.has(bookId)}`,
         'medium: book',
@@ -192,7 +233,7 @@ async function writeBook(item, bookId, rating, date, isShelved) {
         `goodreadsId: "${bookId}"`,
     ];
     lines.push(...yamlListLines('tags', tags));
-    if (isShelved) lines.push('status: shelved');
+    if (status === 'shelved' || status === 'current') lines.push(`status: ${status}`);
     if (rating > 0) lines.push(`enjoyment: ${rating * 2}`);
     lines.push('---', '');
 
@@ -214,8 +255,8 @@ for (const id of favoriteIds) {
 }
 
 console.log(
-    `[goodreads-sync] ${items.length} read + ${toReadItems.length} to-read shelf items, ` +
-        `${created} created, ${shelved} shelved, ${promoted} promoted to done, ` +
+    `[goodreads-sync] ${items.length} read + ${currentItems.length} currently-reading + ${toReadItems.length} to-read shelf items, ` +
+        `${created} created, ${current} current, ${shelved} shelved, ${demotedCurrent} no longer current, ${promoted} promoted to done, ` +
         `${known.size} already imported, ${skippedKids} skipped (unrated pre-2022), ` +
         `${favorited} marked favorite`
 );

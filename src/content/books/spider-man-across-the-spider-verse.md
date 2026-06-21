@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/Spider-Man:_Across_the_Spider-Verse"
 tags:
   - "superhero"
   - "action"

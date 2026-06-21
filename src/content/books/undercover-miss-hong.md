@@ -13,5 +13,6 @@ tags:
   - "business"
   - "comedy"
   - "crime"
+  - "korean"
 enjoyment: 9
 ---

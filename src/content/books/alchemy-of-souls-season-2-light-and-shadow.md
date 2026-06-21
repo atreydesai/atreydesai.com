@@ -13,5 +13,6 @@ tags:
   - "historical"
   - "romance"
   - "fantasy"
+  - "korean"
 enjoyment: 9
 ---

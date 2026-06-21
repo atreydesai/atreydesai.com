@@ -12,5 +12,6 @@ tags:
   - "music"
   - "romance"
   - "drama"
+  - "korean"
 enjoyment: 7
 ---

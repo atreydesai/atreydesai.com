@@ -13,5 +13,6 @@ tags:
   - "business"
   - "drama"
   - "political"
+  - "korean"
 enjoyment: 8
 ---

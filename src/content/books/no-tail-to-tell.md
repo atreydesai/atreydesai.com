@@ -13,5 +13,6 @@ tags:
   - "romance"
   - "sports"
   - "fantasy"
+  - "korean"
 enjoyment: 6.5
 ---

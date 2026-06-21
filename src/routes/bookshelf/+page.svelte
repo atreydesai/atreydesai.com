@@ -50,7 +50,9 @@
 
     let selectedCategory = "all";
     let selectedTag = "all";
+    let excludedTags: string[] = [];
     let selectedMedium = "all";
+    let excludedMediums: string[] = [];
     let showShelved = false;
     let searchQuery = "";
     let sortField: SortField = "dateAdded";
@@ -61,6 +63,7 @@
     let hoveredBookId: string | null = null;
     let hoveredRatingLegend: "enjoyment" | "importance" | null = null;
     let urlReady = false;
+    let lastFilterSignature = "";
 
     const ratingLegend = {
         enjoyment: {
@@ -101,6 +104,9 @@
         if (selectedMedium !== "all" && book.medium !== selectedMedium) {
             return false;
         }
+        if (book.medium && excludedMediums.includes(book.medium)) {
+            return false;
+        }
         if (selectedCategory === "favorites" && !book.favorite) return false;
         if (
             selectedCategory !== "all" &&
@@ -111,6 +117,12 @@
         }
 
         if (selectedTag !== "all" && !bookTags(book).includes(selectedTag)) {
+            return false;
+        }
+        if (
+            excludedTags.length > 0 &&
+            bookTags(book).some((tag) => excludedTags.includes(tag))
+        ) {
             return false;
         }
 
@@ -180,8 +192,30 @@
     $: activeFilters =
         selectedCategory !== "all" ||
         selectedTag !== "all" ||
+        excludedTags.length > 0 ||
         selectedMedium !== "all" ||
+        excludedMediums.length > 0 ||
         searchQuery.trim().length > 0;
+
+    // A value can't be both the active filter and an exclusion — drop the
+    // contradiction so the two pickers never cancel each other to empty.
+    $: if (selectedTag !== "all" && excludedTags.includes(selectedTag)) {
+        excludedTags = excludedTags.filter((tag) => tag !== selectedTag);
+    }
+
+    $: if (selectedMedium !== "all" && excludedMediums.includes(selectedMedium)) {
+        excludedMediums = excludedMediums.filter(
+            (medium) => medium !== selectedMedium,
+        );
+    }
+
+    $: if (urlReady) {
+        const nextFilterSignature = filterSignature();
+        if (nextFilterSignature !== lastFilterSignature) {
+            currentPage = 1;
+            lastFilterSignature = nextFilterSignature;
+        }
+    }
 
     $: if (pendingBookPageId && sortedBooks.length > 0) {
         const selectedIndex = sortedBooks.findIndex(
@@ -215,6 +249,31 @@
             .filter(Boolean);
     }
 
+    // Parse a comma-separated URL param into a deduped list of known values.
+    function parseListParam(raw: string | null, allowed: string[]): string[] {
+        if (!raw) return [];
+        return [
+            ...new Set(
+                raw
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter((item) => allowed.includes(item)),
+            ),
+        ];
+    }
+
+    function filterSignature(): string {
+        return [
+            selectedCategory,
+            selectedTag,
+            excludedTags.join(","),
+            selectedMedium,
+            excludedMediums.join(","),
+            showShelved ? "shelved" : "done",
+            searchQuery.trim(),
+        ].join("|");
+    }
+
     function bookTags(book: Book): string[] {
         return [
             ...new Set([...(book.tags || []), ...toList(book.subcategory)]),
@@ -227,6 +286,17 @@
 
     function tagOverflow(book: Book): number {
         return Math.max(0, bookTags(book).length - 2);
+    }
+
+    function isCurrent(book: Book): boolean {
+        return (
+            book.status === "current" &&
+            (book.medium === "book" || book.medium === "drama")
+        );
+    }
+
+    function currentStatusLabel(book: Book): string {
+        return book.medium === "drama" ? "currently watching" : "currently reading";
     }
 
     function getNoteParagraphs(book: Book): string[] {
@@ -280,6 +350,7 @@
 
     function setTag(tag: string) {
         selectedTag = selectedTag === tag ? "all" : tag;
+        // The contradiction guard reactively drops it from excludedTags.
         currentPage = 1;
     }
 
@@ -298,7 +369,9 @@
     function clearFilters() {
         selectedCategory = "all";
         selectedTag = "all";
+        excludedTags = [];
         selectedMedium = "all";
+        excludedMediums = [];
         searchQuery = "";
         currentPage = 1;
     }
@@ -330,9 +403,16 @@
         selectedCategory =
             category && categoryIds.has(category) ? category : "all";
         selectedTag = tag && allTags.includes(tag) ? tag : "all";
+        excludedTags = parseListParam(params.get("excludeTag"), allTags).filter(
+            (t) => t !== selectedTag,
+        );
         const medium = params.get("m");
         selectedMedium =
             medium && allMediums.includes(medium) ? medium : "all";
+        excludedMediums = parseListParam(
+            params.get("excludeM"),
+            allMediums,
+        ).filter((m) => m !== selectedMedium);
         showShelved = params.get("view") === "shelved";
         searchQuery = params.get("q") || "";
         sortField = isSortField(sort) ? sort : "dateAdded";
@@ -345,6 +425,7 @@
         currentPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
         pendingBookPageId =
             selectedBookId && !hasExplicitPage ? selectedBookId : null;
+        lastFilterSignature = filterSignature();
     }
 
     function syncUrl() {
@@ -352,7 +433,10 @@
 
         if (selectedCategory !== "all") params.set("c", selectedCategory);
         if (selectedTag !== "all") params.set("tag", selectedTag);
+        if (excludedTags.length) params.set("excludeTag", excludedTags.join(","));
         if (selectedMedium !== "all") params.set("m", selectedMedium);
+        if (excludedMediums.length)
+            params.set("excludeM", excludedMediums.join(","));
         if (showShelved) params.set("view", "shelved");
         if (searchQuery.trim()) params.set("q", searchQuery.trim());
         if (!(sortField === "dateAdded" && sortDirection === "desc")) {
@@ -451,7 +535,7 @@
     </section>
 
     <section
-        class="mb-5 flex flex-col gap-3 border-y border-ink-200/80 bg-cream-200/40 py-3 dark:border-ink-800 dark:bg-ink-900/35 md:flex-row md:items-center"
+        class="mb-5 flex flex-col gap-3 border-y border-ink-200/80 bg-cream-200/40 px-4 py-3 dark:border-ink-800 dark:bg-ink-900/35 md:flex-row md:items-center"
         aria-label="Bookshelf controls"
     >
         <div class="relative min-w-0 flex-1">
@@ -485,12 +569,16 @@
             <CustomSelect
                 options={mediumOptions}
                 bind:value={selectedMedium}
+                bind:excluded={excludedMediums}
+                excludable
                 placeholder="All mediums"
                 ariaLabel="Filter by medium"
             />
             <CustomSelect
                 options={tagOptions}
                 bind:value={selectedTag}
+                bind:excluded={excludedTags}
+                excludable
                 placeholder="All tags"
                 ariaLabel="Filter by tag"
                 fastScroll
@@ -692,7 +780,7 @@
                              every keystroke would flicker) so rows stagger in
                              on each view change. -->
                         <tbody class="stagger-children divide-y divide-ink-200/70 dark:divide-ink-800">
-                            {#key `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}`}
+                            {#key `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}-${excludedTags.join(",")}-${selectedMedium}-${excludedMediums.join(",")}-${showShelved}`}
                             {#each paginatedBooks as book (book.id)}
                                 <tr
                                     class="cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-ink-800 dark:outline-accent-light/30' : ''}"
@@ -717,6 +805,13 @@
                                                     size={13}
                                                     class="shrink-0 fill-accent text-accent dark:fill-accent-light dark:text-accent-light"
                                                     aria-label="Favorite"
+                                                />
+                                            {/if}
+                                            {#if isCurrent(book)}
+                                                <Bookmark
+                                                    size={13}
+                                                    class="shrink-0 fill-ochre text-ochre-dark dark:fill-ochre-light dark:text-ochre-light"
+                                                    aria-label={currentStatusLabel(book)}
                                                 />
                                             {/if}
                                             <span class="min-w-0 truncate text-ink-900 dark:text-cream-100" title={book.author ? `${book.title} | ${book.author}` : book.title}>
@@ -914,6 +1009,12 @@
                         {#if selectedBook.medium}
                             <span class="pill text-ink-600 dark:text-cream-300">
                                 {selectedBook.medium}
+                            </span>
+                        {/if}
+                        {#if isCurrent(selectedBook)}
+                            <span class="pill text-ochre-dark dark:text-ochre-light">
+                                <Bookmark size={12} class="fill-current" />
+                                {currentStatusLabel(selectedBook)}
                             </span>
                         {/if}
                         {#if selectedBook.favorite}

@@ -47,6 +47,51 @@ export function extractMdlId(url) {
     return match?.[1] ?? null;
 }
 
+// Goodreads genre buttons used as fiction/nonfiction signals. We only split
+// those two for imported books — `science`/`advice` stay reserved for the
+// site's own writing and are set by hand.
+const FICTION_GENRES = new Set([
+    'fiction', 'fantasy', 'science fiction', 'sci-fi', 'romance', 'mystery',
+    'thriller', 'horror', 'poetry', 'graphic novels', 'comics', 'manga',
+    'young adult', 'literary fiction', 'historical fiction', 'short stories',
+    'fairy tales', 'dystopia', 'paranormal', 'novels', 'adventure', 'crime',
+    'urban fantasy', 'magical realism', 'plays', 'drama',
+]);
+
+const NONFICTION_GENRES = new Set([
+    'nonfiction', 'non-fiction', 'non fiction', 'philosophy', 'history',
+    'biography', 'memoir', 'autobiography', 'psychology', 'politics',
+    'economics', 'religion', 'spirituality', 'essays', 'science', 'sociology',
+    'anthropology', 'reference', 'textbooks', 'logic', 'true crime',
+    'journalism', 'education', 'health', 'productivity', 'finance',
+    'leadership', 'self help', 'self-help', 'business', 'language',
+    'mathematics', 'medicine', 'physics', 'biology',
+]);
+
+/**
+ * Map a list of genre tags to one of the bookshelf's categories.
+ * An explicit Goodreads "Nonfiction"/"Fiction" shelf wins outright; otherwise
+ * the dominant genre signal decides, and ties fall back to `fallback`.
+ */
+export function categoryFromTags(tags, fallback = 'fiction') {
+    const set = new Set((tags ?? []).map((t) => String(t).toLowerCase().trim()));
+    const hasNonfiction = [...set].some((t) => /^non[\s-]?fiction$/.test(t));
+    const hasFiction = set.has('fiction');
+
+    if (hasNonfiction && !hasFiction) return 'nonfiction';
+    if (hasFiction && !hasNonfiction) return 'fiction';
+
+    let fic = 0;
+    let non = 0;
+    for (const t of set) {
+        if (FICTION_GENRES.has(t)) fic++;
+        if (NONFICTION_GENRES.has(t)) non++;
+    }
+    if (non > fic) return 'nonfiction';
+    if (fic > non) return 'fiction';
+    return fallback;
+}
+
 export async function fetchGoodreadsGenreTags(bookId) {
     if (!bookId) return [];
     try {

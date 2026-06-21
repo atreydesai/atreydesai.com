@@ -13,5 +13,6 @@ tags:
   - "life"
   - "youth"
   - "drama"
+  - "korean"
 enjoyment: 9.5
 ---

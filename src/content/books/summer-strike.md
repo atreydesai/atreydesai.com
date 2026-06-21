@@ -12,5 +12,6 @@ tags:
   - "life"
   - "drama"
   - "melodrama"
+  - "korean"
 enjoyment: 8.5
 ---

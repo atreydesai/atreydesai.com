@@ -6,7 +6,7 @@ category: fiction
 dateAdded: "2023-07-11"
 favorite: false
 medium: movie
-url: "https://mydramalist.com/737801-a-guilty-conscience"
+url: "https://en.wikipedia.org/wiki/A_Guilty_Conscience"
 mdlId: "737801-a-guilty-conscience"
 tags:
   - "comedy"

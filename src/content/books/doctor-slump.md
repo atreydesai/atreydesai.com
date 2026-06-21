@@ -13,5 +13,6 @@ tags:
   - "romance"
   - "drama"
   - "medical"
+  - "korean"
 enjoyment: 7
 ---

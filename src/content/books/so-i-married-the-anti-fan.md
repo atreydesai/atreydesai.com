@@ -12,5 +12,6 @@ tags:
   - "music"
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 6.5
 ---

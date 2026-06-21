@@ -13,5 +13,6 @@ tags:
   - "romance"
   - "crime"
   - "melodrama"
+  - "korean"
 enjoyment: 7.5
 ---

@@ -2,7 +2,7 @@
 id: "everything-i-know-about-love"
 title: "Everything I Know About Love"
 author: "Dolly Alderton"
-category: fiction
+category: nonfiction
 dateAdded: "2025-07-13"
 favorite: false
 medium: book

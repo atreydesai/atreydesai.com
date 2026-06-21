@@ -13,5 +13,6 @@ tags:
   - "comedy"
   - "romance"
   - "crime"
+  - "korean"
 enjoyment: 7
 ---

@@ -12,5 +12,6 @@ tags:
   - "romance"
   - "youth"
   - "drama"
+  - "korean"
 enjoyment: 8.5
 ---

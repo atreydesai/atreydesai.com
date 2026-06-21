@@ -6,8 +6,8 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/Gran_Torino"
 tags:
   - "drama"
   - "crime"
-  - "white savior"
 ---

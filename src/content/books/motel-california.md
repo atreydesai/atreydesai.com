@@ -11,5 +11,6 @@ mdlId: "769275-motel-california"
 tags:
   - "romance"
   - "drama"
+  - "korean"
 enjoyment: 3.5
 ---

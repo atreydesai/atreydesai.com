@@ -2,7 +2,7 @@
 id: "if-anyone-builds-it-everyone-dies-why-superhuman-ai-would-ki"
 title: "If Anyone Builds It, Everyone Dies: Why Superhuman AI Would Kill Us All"
 author: "Eliezer Yudkowsky"
-category: fiction
+category: nonfiction
 dateAdded: "2025-11-19"
 favorite: false
 medium: book

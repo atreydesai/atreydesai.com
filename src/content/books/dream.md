@@ -12,5 +12,6 @@ tags:
   - "comedy"
   - "drama"
   - "sports"
+  - "korean"
 enjoyment: 6
 ---

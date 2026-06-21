@@ -5,7 +5,9 @@
     import { cubicOut } from "svelte/easing";
     import { ChevronDown } from "@jis3r/icons";
 
-    export let options: Array<{ value: string; label: string }>;
+    type Option = { value: string; label: string };
+
+    export let options: Option[] = [];
     export let value: string = options[0]?.value || "";
     export let placeholder: string = "Select...";
     // Accessible name for the control — without it screen readers only announce
@@ -16,20 +18,85 @@
     export let cascadeDuration = 320;
     export let cascadeDelayStep = 55;
 
+    // When `excludable` is on, a toggle at the top of the menu flips clicks from
+    // single-select (set `value`) to multi-select exclusion (toggle membership
+    // in `excluded`). `value` and `excluded` stay independent so you can filter
+    // to one option while excluding several others.
+    export let excludable = false;
+    export let excluded: string[] = [];
+    export let excludeLabel = "Exclude";
+    export let excludeResetLabel = "Exclude none";
+
+    let excludeMode = false;
     let isOpen = false;
     let containerRef: HTMLDivElement;
     let triggerRef: HTMLButtonElement;
     let dropdownRef: HTMLDivElement;
+    let toggleRef: HTMLButtonElement;
     let optionRefs: HTMLButtonElement[] = [];
     let activeIndex = -1;
 
-    $: selectedOption = options.find((opt) => opt.value === value);
-    $: displayLabel = selectedOption?.label || placeholder;
+    // First option doubles as the "no filter" reset (e.g. "All tags").
+    $: resetValue = options[0]?.value ?? "";
+
+    $: displayLabel = buildLabel(options, value, excluded, placeholder, resetValue);
+
+    function buildLabel(
+        opts: Option[],
+        val: string,
+        excl: string[],
+        fallback: string,
+        reset: string,
+    ): string {
+        const parts: string[] = [];
+        if (val !== reset) {
+            const inc = opts.find((o) => o.value === val)?.label;
+            if (inc) parts.push(inc);
+        }
+        if (excl.length === 1) {
+            parts.push(`−${opts.find((o) => o.value === excl[0])?.label ?? excl[0]}`);
+        } else if (excl.length > 1) {
+            parts.push(`−${excl.length}`);
+        }
+        return parts.length ? parts.join(" · ") : fallback;
+    }
+
+    // "selected" = the chosen include value; "excluded" = an active exclusion.
+    // Only one applies at a time since it depends on the current mode. Derived
+    // as a reactive array (rather than a function called from markup) so the
+    // highlight tracks `excludeMode`/`excluded`/`value` changes.
+    $: optionStates = options.map((option) =>
+        statusFor(option, excludeMode, value, excluded, resetValue),
+    );
+
+    function statusFor(
+        option: Option,
+        mode: boolean,
+        val: string,
+        excl: string[],
+        reset: string,
+    ): "selected" | "excluded" | "none" {
+        if (mode) {
+            if (option.value === reset) {
+                return excl.length === 0 ? "selected" : "none";
+            }
+            return excl.includes(option.value) ? "excluded" : "none";
+        }
+        return option.value === val ? "selected" : "none";
+    }
+
+    function initialFocusIndex(): number {
+        if (excludeMode) {
+            const i = options.findIndex((o) => excluded.includes(o.value));
+            return i >= 0 ? i : 0;
+        }
+        const i = options.findIndex((o) => o.value === value);
+        return i >= 0 ? i : 0;
+    }
 
     async function open(focusIndex?: number) {
         isOpen = true;
-        const selectedIdx = options.findIndex((o) => o.value === value);
-        activeIndex = focusIndex ?? (selectedIdx >= 0 ? selectedIdx : 0);
+        activeIndex = focusIndex ?? initialFocusIndex();
         await tick(); // wait for the dropdown to render before focusing
         optionRefs[activeIndex]?.focus();
     }
@@ -43,9 +110,24 @@
         isOpen ? close(false) : open();
     }
 
-    function select(optionValue: string) {
-        value = optionValue;
-        close();
+    function toggleExcludeMode() {
+        excludeMode = !excludeMode;
+    }
+
+    function selectOption(option: Option) {
+        if (excludeMode) {
+            if (option.value === resetValue) {
+                excluded = [];
+            } else if (excluded.includes(option.value)) {
+                excluded = excluded.filter((v) => v !== option.value);
+            } else {
+                excluded = [...excluded, option.value];
+            }
+            // Stay open so several options can be toggled in one pass.
+        } else {
+            value = option.value;
+            close();
+        }
     }
 
     function onDropdownWheel(e: WheelEvent) {
@@ -77,6 +159,19 @@
         }
     }
 
+    function onToggleKeydown(e: KeyboardEvent) {
+        switch (e.key) {
+            case "ArrowDown":
+                e.preventDefault();
+                focusOption(0);
+                break;
+            case "Escape":
+                e.preventDefault();
+                close();
+                break;
+        }
+    }
+
     // Roving-focus navigation within the open listbox.
     function onOptionKeydown(e: KeyboardEvent, index: number) {
         switch (e.key) {
@@ -86,7 +181,11 @@
                 break;
             case "ArrowUp":
                 e.preventDefault();
-                focusOption(index - 1);
+                if (index === 0 && excludable) {
+                    toggleRef?.focus();
+                } else {
+                    focusOption(index - 1);
+                }
                 break;
             case "Home":
                 e.preventDefault();
@@ -99,7 +198,7 @@
             case "Enter":
             case " ":
                 e.preventDefault();
-                select(options[index].value);
+                selectOption(options[index]);
                 break;
             case "Escape":
                 e.preventDefault();
@@ -153,28 +252,46 @@
             class="select-dropdown"
             class:fast-scroll={fastScroll}
             bind:this={dropdownRef}
-            role="listbox"
-            aria-label={ariaLabel || undefined}
             on:wheel={onDropdownWheel}
             out:fly={{ y: -6, duration: 140, easing: cubicOut }}
         >
-            {#each options as option, i}
+            {#if excludable}
                 <button
                     type="button"
-                    class="select-option"
-                    class:cascade-in={animateOptions}
-                    class:selected={option.value === value}
-                    bind:this={optionRefs[i]}
-                    on:click={() => select(option.value)}
-                    on:keydown={(e) => onOptionKeydown(e, i)}
-                    role="option"
-                    aria-selected={option.value === value}
-                    tabindex={activeIndex === i ? 0 : -1}
-                    style="--cascade-delay: {i * cascadeDelayStep}ms; --cascade-duration: {cascadeDuration}ms"
+                    class="select-toggle"
+                    class:active={excludeMode}
+                    bind:this={toggleRef}
+                    on:click={toggleExcludeMode}
+                    on:keydown={onToggleKeydown}
+                    aria-pressed={excludeMode}
                 >
-                    {option.label}
+                    <span>{excludeLabel}</span>
+                    <span class="select-toggle-indicator" class:on={excludeMode}></span>
                 </button>
-            {/each}
+            {/if}
+
+            <div role="listbox" aria-label={ariaLabel || undefined} aria-multiselectable={excludeMode || undefined}>
+                {#each options as option, i}
+                    <button
+                        type="button"
+                        class="select-option"
+                        class:cascade-in={animateOptions}
+                        class:selected={optionStates[i] === "selected"}
+                        class:excluded={optionStates[i] === "excluded"}
+                        bind:this={optionRefs[i]}
+                        on:click={() => selectOption(option)}
+                        on:keydown={(e) => onOptionKeydown(e, i)}
+                        role="option"
+                        aria-selected={optionStates[i] !== "none"}
+                        tabindex={activeIndex === i ? 0 : -1}
+                        style="--cascade-delay: {i * cascadeDelayStep}ms; --cascade-duration: {cascadeDuration}ms"
+                    >
+                        {excludeMode && option.value === resetValue
+                            ? excludeResetLabel
+                            : option.label}
+                    </button>
+                {/each}
+            </div>
         </div>
     {/if}
 </div>
@@ -233,6 +350,13 @@
         color: theme("colors.accent.light");
     }
 
+    .select-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 14rem;
+    }
+
     .select-chevron {
         display: inline-flex;
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -268,6 +392,74 @@
         background-color: theme("colors.ink.800");
         border-color: theme("colors.ink.700");
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+    }
+
+    .select-toggle {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        font-family: var(--font-mono);
+        font-size: 0.6875rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        text-align: left;
+        color: theme("colors.ink.500");
+        background-color: theme("colors.cream.50");
+        border: none;
+        border-bottom: 1px solid theme("colors.ink.200");
+        cursor: pointer;
+        transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    :global(.dark) .select-toggle {
+        color: theme("colors.cream.400");
+        background-color: theme("colors.ink.800");
+        border-bottom-color: theme("colors.ink.700");
+    }
+
+    .select-toggle:hover,
+    .select-toggle:focus-visible {
+        color: theme("colors.ink.900");
+        outline: none;
+    }
+
+    :global(.dark) .select-toggle:hover,
+    :global(.dark) .select-toggle:focus-visible {
+        color: theme("colors.cream.100");
+    }
+
+    .select-toggle.active {
+        color: theme("colors.accent.dark");
+    }
+
+    :global(.dark) .select-toggle.active {
+        color: theme("colors.accent.light");
+    }
+
+    .select-toggle-indicator {
+        width: 0.7rem;
+        height: 0.7rem;
+        border: 1px solid theme("colors.ink.300");
+        border-radius: 2px;
+        transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    :global(.dark) .select-toggle-indicator {
+        border-color: theme("colors.ink.600");
+    }
+
+    .select-toggle-indicator.on {
+        background-color: theme("colors.accent.DEFAULT");
+        border-color: theme("colors.accent.DEFAULT");
     }
 
     .select-option.cascade-in {
@@ -336,6 +528,21 @@
 
     .select-option.selected::before {
         content: "·";
+        margin-right: 0.4rem;
+        color: theme("colors.accent.DEFAULT");
+    }
+
+    .select-option.excluded {
+        color: theme("colors.accent.dark");
+        font-weight: 500;
+    }
+
+    :global(.dark) .select-option.excluded {
+        color: theme("colors.accent.light");
+    }
+
+    .select-option.excluded::before {
+        content: "−";
         margin-right: 0.4rem;
         color: theme("colors.accent.DEFAULT");
     }

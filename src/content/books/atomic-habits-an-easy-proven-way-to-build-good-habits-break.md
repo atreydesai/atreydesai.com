@@ -2,7 +2,7 @@
 id: "atomic-habits-an-easy-proven-way-to-build-good-habits-break"
 title: "Atomic Habits: An Easy & Proven Way to Build Good Habits & Break Bad Ones"
 author: "James Clear"
-category: fiction
+category: nonfiction
 dateAdded: "2025-07-13"
 favorite: false
 medium: book

@@ -11,5 +11,6 @@ mdlId: "726273-king-the-lander"
 tags:
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 9.5
 ---

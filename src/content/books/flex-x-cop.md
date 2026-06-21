@@ -13,5 +13,6 @@ tags:
   - "thriller"
   - "mystery"
   - "comedy"
+  - "korean"
 enjoyment: 10
 ---

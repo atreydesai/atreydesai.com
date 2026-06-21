@@ -6,7 +6,8 @@
 // Import rules:
 //   - Completed -> done, score maps directly onto enjoyment (both 1-10)
 //   - Plan to Watch -> status: shelved
-//   - Watching / On-hold / Dropped are skipped (not finished, not a wishlist)
+//   - Watching -> status: current
+//   - On-hold / Dropped are skipped (not finished, not a wishlist)
 //   - single-episode entries are movies; everything else is a drama
 //   - scripts/mdl-overrides.json: "favorites" marks entries favorite: true
 //     (MDL has no public favorites feed), "exclude" skips entries
@@ -18,7 +19,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fetchMdlGenreTagsByUrl, yamlListLines } from './tag-sources.mjs';
+import { cleanTags, fetchMdlGenreTagsByUrl, yamlListLines } from './tag-sources.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BOOKS_DIR = join(ROOT, 'src/content/books');
@@ -83,23 +84,61 @@ try {
 
 const { byId: known, titles: knownTitles } = existingMdlFiles();
 const existingSlugs = new Set(readdirSync(BOOKS_DIR).map((f) => f.replace(/\.md$/, '')));
+const currentIds = new Set((list.Watching?.items ?? []).map((item) => item.id));
 const today = new Date().toISOString().slice(0, 10);
 let created = 0;
+let current = 0;
+let demotedCurrent = 0;
+let promoted = 0;
 
 const buckets = [
     { name: 'Completed', status: 'done' },
+    { name: 'Watching', status: 'current' },
     { name: 'Plan to Watch', status: 'shelved' },
 ];
 
 for (const bucket of buckets) {
     for (const item of list[bucket.name]?.items ?? []) {
-        if (excludeIds.has(item.id) || known.has(item.id)) continue;
+        if (excludeIds.has(item.id)) continue;
+
+        if (known.has(item.id)) {
+            const path = join(BOOKS_DIR, known.get(item.id));
+            let text = readFileSync(path, 'utf8');
+            const score = parseFloat(item.score) || 0;
+
+            if (bucket.status === 'done' && /^status:\s*(shelved|current)\s*$/m.test(text)) {
+                text = text.replace(/^status:\s*(shelved|current)\s*\n/m, '');
+                if (score > 0 && !/^enjoyment:/m.test(text)) {
+                    text = text.replace(/^---\s*$(?![\s\S]*^---)/m, `enjoyment: ${score}\n---`);
+                }
+                writeFileSync(path, text);
+                promoted++;
+            } else if (bucket.status === 'current') {
+                if (/^status:\s*shelved\s*$/m.test(text)) {
+                    text = text.replace(/^status:\s*shelved\s*$/m, 'status: current');
+                } else if (!/^status:\s*current\s*$/m.test(text)) {
+                    text = text.replace(/^---\s*$(?![\s\S]*^---)/m, 'status: current\n---');
+                }
+                writeFileSync(path, text);
+                current++;
+            }
+            continue;
+        }
+
         if (knownTitles.has(normTitle(item.name))) continue;
 
         const score = parseFloat(item.score) || 0;
         const medium = item.episode_total === '1' ? 'movie' : 'drama';
         const url = `https://mydramalist.com/${item.id}`;
-        const tags = await fetchMdlGenreTagsByUrl(url);
+        const metadata = await fetchMdlMetadata(item.id);
+        const sourceTags =
+            metadata.genres.length > 0
+                ? metadata.genres
+                : await fetchMdlGenreTagsByUrl(url);
+        const tags = cleanTags([
+            ...sourceTags,
+            metadata.country === 'South Korea' ? 'korean' : '',
+        ]);
         const dateAdded = itemDateAdded(item) ?? (bucket.status === 'shelved' ? '' : today);
 
         let slug = slugify(item.name) || `mdl-${item.id}`;
@@ -120,12 +159,43 @@ for (const bucket of buckets) {
             `mdlId: "${item.id}"`,
         ];
         lines.push(...yamlListLines('tags', tags));
-        if (bucket.status === 'shelved') lines.push('status: shelved');
+        if (bucket.status === 'shelved' || bucket.status === 'current') {
+            lines.push(`status: ${bucket.status}`);
+        }
         if (score > 0) lines.push(`enjoyment: ${score}`);
         lines.push('---', '');
 
         writeFileSync(join(BOOKS_DIR, `${slug}.md`), lines.join('\n'));
         created++;
+        if (bucket.status === 'current') current++;
+    }
+}
+
+// Keep "currently watching" markers aligned with the live MDL shelf.
+for (const [id, file] of known) {
+    if (currentIds.has(id)) continue;
+    const path = join(BOOKS_DIR, file);
+    const text = readFileSync(path, 'utf8');
+    if (/^status:\s*current\s*$/m.test(text)) {
+        writeFileSync(path, text.replace(/^status:\s*current\s*$/m, 'status: shelved'));
+        demotedCurrent++;
+    }
+}
+
+async function fetchMdlMetadata(id) {
+    try {
+        const res = await fetch(`https://kuryana.tbdh.app/id/${id}`, {
+            headers: { 'user-agent': 'atreydesai.com bookshelf sync' },
+        });
+        if (!res.ok) throw new Error(`Kuryana detail returned ${res.status}`);
+        const data = (await res.json()).data ?? {};
+        return {
+            country: data.details?.country ?? '',
+            genres: data.others?.genres ?? data.genres ?? [],
+        };
+    } catch (err) {
+        console.warn(`[mdl-sync] detail ${id}: ${err.message}`);
+        return { country: '', genres: [] };
     }
 }
 
@@ -164,5 +234,5 @@ for (const id of favoriteIds) {
 }
 
 console.log(
-    `[mdl-sync] ${created} new files created, ${known.size} already imported, ${favorited} marked favorite`
+    `[mdl-sync] ${created} new files created, ${current} current, ${demotedCurrent} no longer current, ${promoted} promoted to done, ${known.size} already imported, ${favorited} marked favorite`
 );

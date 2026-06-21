@@ -12,5 +12,6 @@ tags:
   - "comedy"
   - "romance"
   - "family"
+  - "korean"
 enjoyment: 8.5
 ---

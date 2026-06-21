@@ -2,7 +2,7 @@
 id: "never-split-the-difference-negotiating-as-if-your-life-depen"
 title: "Never Split the Difference: Negotiating As If Your Life Depended On It"
 author: "Chris Voss"
-category: fiction
+category: nonfiction
 dateAdded: "2023-03-28"
 favorite: false
 medium: book

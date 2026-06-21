@@ -42,7 +42,7 @@ export interface Book {
     url?: string;               // Source link
     dateAdded: string;
     favorite: boolean;
-    status?: 'shelved' | 'done'; // shelved = want to read/watch; absent = done
+    status?: 'shelved' | 'current' | 'done'; // shelved = planned; current = reading/watching; absent = done
     notes?: string;
     content?: string;
 }
@@ -171,7 +171,7 @@ export const books: Book[] = Object.entries(bookModules).map(([path, mod]) => {
     return {
         ...data,
         subcategory,
-        status: data.status === 'shelved' ? 'shelved' : 'done',
+        status: data.status === 'shelved' || data.status === 'current' ? data.status : 'done',
         notes: data.notes || data.content || undefined,
     };
 });

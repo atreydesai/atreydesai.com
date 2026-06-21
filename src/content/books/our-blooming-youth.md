@@ -6,10 +6,13 @@ category: fiction
 dateAdded: "2023-04-10"
 favorite: false
 medium: drama
+url: "https://mydramalist.com/694395-sleep-memo"
+mdlId: "694395-sleep-memo"
 tags:
   - "historical"
   - "mystery"
   - "romance"
   - "drama"
+  - "korean"
 status: shelved
 ---

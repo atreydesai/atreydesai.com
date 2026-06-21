@@ -6,7 +6,7 @@ category: fiction
 dateAdded: "2022-12-06"
 favorite: false
 medium: movie
-url: "https://mydramalist.com/27607-can-t-help-falling-in-love"
+url: "https://en.wikipedia.org/wiki/Can%27t_Help_Falling_in_Love_(film)"
 mdlId: "27607-can-t-help-falling-in-love"
 tags:
   - "comedy"

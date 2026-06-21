@@ -12,5 +12,6 @@ tags:
   - "romance"
   - "life"
   - "melodrama"
+  - "korean"
 enjoyment: 6
 ---

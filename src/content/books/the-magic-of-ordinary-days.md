@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/The_Magic_of_Ordinary_Days"
 tags:
   - "drama"
   - "romance"

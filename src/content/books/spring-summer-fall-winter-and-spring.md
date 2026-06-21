@@ -6,7 +6,10 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://mydramalist.com/2634-spring-summer-autumn-winter...-and-spring"
+mdlId: "2634-spring-summer-autumn-winter...-and-spring"
 tags:
   - "drama"
+  - "korean"
 status: shelved
 ---

@@ -13,5 +13,6 @@ tags:
   - "romance"
   - "drama"
   - "family"
+  - "korean"
 enjoyment: 7.5
 ---

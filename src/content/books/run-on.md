@@ -13,5 +13,6 @@ tags:
   - "life"
   - "drama"
   - "sports"
+  - "korean"
 enjoyment: 7
 ---

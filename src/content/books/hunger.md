@@ -6,7 +6,7 @@ category: fiction
 dateAdded: "2023-05-17"
 favorite: false
 medium: movie
-url: "https://mydramalist.com/740793-hunger"
+url: "https://en.wikipedia.org/wiki/Hunger_(2023_film)"
 mdlId: "740793-hunger"
 tags:
   - "food"

@@ -13,5 +13,6 @@ tags:
   - "mystery"
   - "crime"
   - "political"
+  - "korean"
 enjoyment: 8.5
 ---

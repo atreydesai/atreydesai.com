@@ -2,7 +2,7 @@
 id: "tractatus-logico-philosophicus"
 title: "Tractatus Logico-Philosophicus"
 author: "Ludwig Wittgenstein"
-category: fiction
+category: nonfiction
 dateAdded: "2025-11-19"
 favorite: false
 medium: book

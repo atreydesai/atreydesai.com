@@ -10,5 +10,6 @@ url: "https://mydramalist.com/785894-single-s-inferno-season-5"
 mdlId: "785894-single-s-inferno-season-5"
 tags:
   - "romance"
+  - "korean"
 enjoyment: 7.5
 ---

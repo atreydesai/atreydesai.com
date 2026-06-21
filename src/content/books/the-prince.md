@@ -2,7 +2,7 @@
 id: "the-prince"
 title: "The Prince"
 author: "Niccolò Machiavelli"
-category: fiction
+category: nonfiction
 dateAdded: "2022-01-06"
 favorite: false
 medium: book

@@ -2,7 +2,7 @@
 id: "accessory-to-war-the-unspoken-alliance-between-astrophysics"
 title: "Accessory to War: The Unspoken Alliance Between Astrophysics and the Military"
 author: "Neil deGrasse Tyson"
-category: fiction
+category: nonfiction
 dateAdded: "2018-09-06"
 favorite: false
 medium: book

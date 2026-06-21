@@ -6,7 +6,10 @@ category: fiction
 dateAdded: "2022-12-10"
 favorite: false
 medium: movie
+url: "https://mydramalist.com/6831-man-in-love"
+mdlId: "6831-man-in-love"
 tags:
   - "drama"
+  - "korean"
 status: shelved
 ---

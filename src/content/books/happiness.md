@@ -13,5 +13,6 @@ tags:
   - "thriller"
   - "drama"
   - "sci-fi"
+  - "korean"
 enjoyment: 10
 ---

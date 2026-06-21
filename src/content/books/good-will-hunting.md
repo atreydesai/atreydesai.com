@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: true
 medium: movie
+url: "https://en.wikipedia.org/wiki/Good_Will_Hunting"
 tags:
   - "drama"
   - "romance"

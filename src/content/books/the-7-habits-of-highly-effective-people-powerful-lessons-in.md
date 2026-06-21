@@ -2,7 +2,7 @@
 id: "the-7-habits-of-highly-effective-people-powerful-lessons-in"
 title: "The 7 Habits of Highly Effective People: Powerful Lessons in Personal Change"
 author: "Stephen R. Covey"
-category: fiction
+category: nonfiction
 dateAdded: "2025-07-13"
 favorite: false
 medium: book

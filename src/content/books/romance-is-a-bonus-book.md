@@ -13,5 +13,6 @@ tags:
   - "comedy"
   - "romance"
   - "melodrama"
+  - "korean"
 enjoyment: 8
 ---

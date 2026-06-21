@@ -13,5 +13,6 @@ tags:
   - "thriller"
   - "historical"
   - "sci-fi"
+  - "korean"
 enjoyment: 6.5
 ---

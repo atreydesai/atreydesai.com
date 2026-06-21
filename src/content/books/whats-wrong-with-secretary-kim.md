@@ -12,5 +12,6 @@ tags:
   - "business"
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 8
 ---

@@ -11,5 +11,6 @@ mdlId: "30772-drama-special-season-9-almost-touching"
 tags:
   - "drama"
   - "sports"
+  - "korean"
 enjoyment: 7
 ---

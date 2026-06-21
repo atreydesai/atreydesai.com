@@ -12,5 +12,6 @@ tags:
   - "comedy"
   - "law"
   - "romance"
+  - "korean"
 enjoyment: 6.5
 ---

@@ -2,7 +2,7 @@
 id: "arrangements-in-blue"
 title: "Arrangements in Blue"
 author: "Amy Key"
-category: fiction
+category: nonfiction
 dateAdded: "2025-07-13"
 favorite: false
 medium: book

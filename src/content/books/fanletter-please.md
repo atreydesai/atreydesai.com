@@ -11,5 +11,6 @@ mdlId: "722717-send-a-fan-letter"
 tags:
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 7
 ---

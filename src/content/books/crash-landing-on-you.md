@@ -13,5 +13,6 @@ tags:
   - "comedy"
   - "romance"
   - "political"
+  - "korean"
 enjoyment: 10
 ---

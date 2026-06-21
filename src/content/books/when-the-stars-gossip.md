@@ -13,5 +13,6 @@ tags:
   - "romance"
   - "drama"
   - "sci-fi"
+  - "korean"
 enjoyment: 1
 ---

@@ -13,5 +13,6 @@ tags:
   - "youth"
   - "drama"
   - "melodrama"
+  - "korean"
 enjoyment: 10
 ---

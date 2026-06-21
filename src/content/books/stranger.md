@@ -13,5 +13,6 @@ tags:
   - "mystery"
   - "law"
   - "drama"
+  - "korean"
 enjoyment: 9
 ---

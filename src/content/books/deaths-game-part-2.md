@@ -12,5 +12,6 @@ tags:
   - "thriller"
   - "drama"
   - "fantasy"
+  - "korean"
 enjoyment: 9
 ---

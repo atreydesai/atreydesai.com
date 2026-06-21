@@ -13,5 +13,6 @@ tags:
   - "mystery"
   - "romance"
   - "youth"
+  - "korean"
 enjoyment: 5.5
 ---

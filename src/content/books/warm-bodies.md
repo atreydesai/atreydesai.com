@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/Warm_Bodies_(film)"
 tags:
   - "comedy horror"
   - "teen"

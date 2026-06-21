@@ -13,5 +13,6 @@ tags:
   - "law"
   - "romance"
   - "melodrama"
+  - "korean"
 enjoyment: 10
 ---

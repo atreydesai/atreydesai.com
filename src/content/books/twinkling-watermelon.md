@@ -13,5 +13,6 @@ tags:
   - "youth"
   - "drama"
   - "fantasy"
+  - "korean"
 enjoyment: 10
 ---

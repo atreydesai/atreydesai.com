@@ -13,5 +13,6 @@ tags:
   - "law"
   - "romance"
   - "drama"
+  - "korean"
 enjoyment: 7.5
 ---

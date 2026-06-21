@@ -12,5 +12,6 @@ tags:
   - "comedy"
   - "romance"
   - "fantasy"
+  - "korean"
 enjoyment: 7
 ---

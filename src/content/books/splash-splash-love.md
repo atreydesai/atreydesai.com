@@ -13,5 +13,6 @@ tags:
   - "comedy"
   - "romance"
   - "supernatural"
+  - "korean"
 enjoyment: 7.5
 ---

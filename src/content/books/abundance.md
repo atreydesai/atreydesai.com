@@ -2,7 +2,7 @@
 id: "abundance"
 title: "Abundance"
 author: "Ezra Klein"
-category: fiction
+category: nonfiction
 dateAdded: "2025-06-01"
 favorite: false
 medium: book

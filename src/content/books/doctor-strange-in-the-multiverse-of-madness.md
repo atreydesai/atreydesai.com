@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/Doctor_Strange_in_the_Multiverse_of_Madness"
 tags:
   - "fantasy"
   - "action"

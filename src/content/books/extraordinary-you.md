@@ -13,5 +13,6 @@ tags:
   - "romance"
   - "youth"
   - "fantasy"
+  - "korean"
 enjoyment: 6
 ---

@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/A_Walk_to_Remember_(film)"
 tags:
   - "drama"
   - "romance"

@@ -11,5 +11,6 @@ mdlId: "28300-you-drive-me-crazy"
 tags:
   - "romance"
   - "drama"
+  - "korean"
 enjoyment: 7
 ---

@@ -6,7 +6,7 @@ category: fiction
 dateAdded: "2023-04-13"
 favorite: false
 medium: movie
-url: "https://mydramalist.com/682547-upcoming"
+url: "https://www.imdb.com/title/tt13575838/"
 mdlId: "682547-upcoming"
 tags:
   - "music"

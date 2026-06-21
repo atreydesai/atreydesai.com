@@ -13,5 +13,6 @@ tags:
   - "mystery"
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 8.5
 ---

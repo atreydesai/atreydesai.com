@@ -11,5 +11,6 @@ mdlId: "757353-drama-special-season-14-confession-attack"
 tags:
   - "comedy"
   - "romance"
+  - "korean"
 enjoyment: 10
 ---

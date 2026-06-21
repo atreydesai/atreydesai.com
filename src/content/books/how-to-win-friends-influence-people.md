@@ -2,7 +2,7 @@
 id: "how-to-win-friends-influence-people"
 title: "How to Win Friends & Influence People"
 author: "Dale Carnegie"
-category: fiction
+category: nonfiction
 dateAdded: "2025-07-13"
 favorite: false
 medium: book

@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/The_Storied_Life_of_A.J._Fikry"
 tags:
   - "comedy drama"
   - "drama"

@@ -6,6 +6,7 @@ category: fiction
 dateAdded: ""
 favorite: false
 medium: movie
+url: "https://en.wikipedia.org/wiki/10_Things_I_Hate_About_You"
 tags:
   - "comedy drama"
   - "teen"
