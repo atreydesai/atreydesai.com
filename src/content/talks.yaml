@@ -1,3 +1,11 @@
+- id: presentation-llm-distractors-umd
+  title: "Harder, but Are They Better? Measuring the Quality of LLM-Generated MCQ Distractors"
+  venue: "University of Maryland, College Park"
+  date: "2026-05-01"
+  type: poster
+  slides: null
+  video: null
+
 - id: talk-utexas-filler-gap
   title: "Filler-Gap Dependencies under Developmental Constraints in LMs"
   venue: "The University of Texas at Austin"
@@ -37,5 +45,4 @@
   type: research talk
   slides: null
   video: null
-
 

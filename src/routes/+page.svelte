@@ -63,6 +63,14 @@
     .slice(0, 3);
 
   const parseLinks = (text: string) => parseInline(text, { italic: true });
+  const parseInterestText = (text: string) =>
+    parseInline(
+      text.replace(
+        /\(([^)]+)\)/g,
+        '<span class="text-[0.94em] italic">($1)</span>',
+      ),
+      { italic: true },
+    );
 
   let emailCopied = false;
   let copyTimeout: ReturnType<typeof setTimeout>;
@@ -266,7 +274,7 @@
         <div class="space-y-3">
           {#each homepageData.researchInterests.items as item, i}
             <div>
-              <p>{@html parseLinks(item.text)}</p>
+              <p>{@html parseInterestText(item.text)}</p>
               {#if item.citations && item.citations.length > 0}
                 <div class="mt-0.5 ml-6 flex gap-1.5 text-xs font-mono text-ink-400 dark:text-cream-500 leading-none">
                   <span class="text-ink-300 dark:text-cream-600">↳</span>
@@ -297,9 +305,9 @@
             </div>
           {/each}
         </div>
-        <p class="mt-4 text-xs font-mono text-ink-400 dark:text-cream-500">
-          [IP] = in progress
-        </p>
+        <div class="mt-4 text-xs leading-tight text-ink-400 dark:text-cream-500">
+          <p class="font-mono">[IP] = in progress</p>
+        </div>
       </div>
     </section>
   </ScrollReveal>

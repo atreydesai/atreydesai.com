@@ -38,8 +38,10 @@
                 on:click={() => (tldrOpen = !tldrOpen)}
                 on:mouseenter={() => (hoveredLink = 'tldr')}
                 on:mouseleave={() => (hoveredLink = null)}
-                class="link-subtle inline-flex items-center gap-1.5"
+                class="link-subtle inline-flex items-center gap-1.5 font-[inherit]"
                 aria-expanded={tldrOpen}
+                aria-label={tldrOpen ? "Hide tldr" : "Show tldr"}
+                title={tldrOpen ? "Hide tldr" : "Show tldr"}
             >
                 {#if tldrOpen}
                     <ChevronsDownUp size={14} animate={hoveredLink === 'tldr'} />
@@ -58,7 +60,7 @@
                 on:mouseenter={() => (hoveredLink = 'arxiv')}
                 on:mouseleave={() => (hoveredLink = null)}
             >
-                <CircleArrowOutUpRight size={14} animate={hoveredLink === 'arxiv'} />
+                <CircleArrowOutUpRight size={12} animate={hoveredLink === 'arxiv'} />
                 arxiv
             </a>
         {/if}
@@ -72,7 +74,7 @@
                 on:mouseenter={() => (hoveredLink = 'pdf')}
                 on:mouseleave={() => (hoveredLink = null)}
             >
-                <FileText size={14} animate={hoveredLink === 'pdf'} />
+                <FileText size={12} animate={hoveredLink === 'pdf'} />
                 pdf
             </a>
         {/if}
