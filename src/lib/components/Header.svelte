@@ -1,180 +1,73 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { onMount } from "svelte";
   import DarkModeToggle from "./DarkModeToggle.svelte";
-  import { Menu } from "lucide-svelte";
-  import { X } from "@jis3r/icons";
 
   const links = [
-    { name: "About", href: "/about" },
-    { name: "Research", href: "/research" },
-    { name: "CV", href: "/cv" },
-    { name: "Photography", href: "/photography" },
-    { name: "Blog", href: "/blog" },
-    { name: "Bookshelf", href: "/bookshelf" },
+    { name: "about", href: "/about" },
+    { name: "research", href: "/research" },
+    { name: "cv", href: "/cv" },
+    { name: "blog", href: "/blog" },
+    { name: "photography", href: "/photography" },
+    { name: "bookshelf", href: "/bookshelf" },
   ];
 
-  let mobileMenuOpen = false;
-  let scrolled = false;
-  let hoveredLink: string | null = null;
+  const pageLabels: Record<string, string> = {
+    about: "about",
+    research: "research",
+    cv: "cv",
+    resume: "resume",
+    photography: "photography",
+    blog: "blog",
+    bookshelf: "bookshelf",
+  };
 
-  // Reactive current path - this will update on navigation
   $: currentPath = $page.url.pathname;
+  $: currentSegment = currentPath.split("/").filter(Boolean)[0] ?? "";
+  $: currentLabel = currentSegment ? pageLabels[currentSegment] ?? currentSegment : "";
 
-  onMount(() => {
-    let ticking = false;
-    const handleScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        scrolled = window.scrollY > 20;
-        ticking = false;
-      });
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  });
-
-  function closeMobileMenu() {
-    mobileMenuOpen = false;
-  }
-
-  // Close mobile menu on route change
-  $: if (currentPath) {
-    mobileMenuOpen = false;
-  }
-
-  // Determine if a link is active (current page)
   function isActive(href: string, pathname: string): boolean {
     return pathname === href || pathname.startsWith(href + "/");
   }
-
-  // Determine if a link should be raised (active or hovered)
-  function shouldRaise(
-    href: string,
-    pathname: string,
-    hovered: string | null,
-  ): boolean {
-    if (hovered) {
-      return hovered === href;
-    }
-    return isActive(href, pathname);
-  }
 </script>
 
-<header
-  class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-cream-100/70 dark:bg-ink-900/65 backdrop-blur-lg backdrop-saturate-150 supports-[backdrop-filter]:bg-cream-100/55 dark:supports-[backdrop-filter]:bg-ink-900/55"
-  class:shadow-sm={scrolled}
-  data-sveltekit-preload-code="eager"
->
-  <div class="layout-container">
-    <div class="flex items-center justify-between h-16">
-      <!-- Logo / Name -->
+<header class="layout-main w-full pt-7 md:pt-8" data-sveltekit-preload-code="eager">
+  <div class="flex flex-col gap-2 md:flex-row md:items-baseline md:justify-between md:gap-6">
+    <nav
+      aria-label="Breadcrumb"
+      class="flex min-w-0 shrink-0 items-center font-mono text-sm leading-none text-ink-700 dark:text-cream-300"
+    >
       <a
         href="/"
-        class="font-display text-xl font-bold text-ink-900 dark:text-cream-100 hover:text-ink-600 dark:hover:text-cream-300 transition-all duration-200"
-        on:click={closeMobileMenu}
+        class="font-display text-base font-bold leading-none text-ink-900 transition-colors duration-200 hover:text-accent-dark dark:text-cream-100 dark:hover:text-accent"
       >
         atrey desai
       </a>
+      {#if currentLabel}
+        <span class="mx-2 text-xs leading-none text-ink-400 dark:text-ink-600" aria-hidden="true">/</span>
+        <span class="text-xs leading-none text-ink-900 dark:text-cream-100">{currentLabel}</span>
+      {/if}
+    </nav>
 
-      <!-- Desktop Navigation -->
-      <nav class="hidden md:flex items-center space-x-6">
-        {#each links as link (link.href)}
-          {@const isLinkActive = isActive(link.href, currentPath)}
-          {@const isRaised = shouldRaise(link.href, currentPath, hoveredLink)}
-          <a
-            href={link.href}
-            class="nav-link text-sm font-medium"
-            class:is-raised={isRaised}
-            class:font-bold={isLinkActive}
-            on:mouseenter={() => (hoveredLink = link.href)}
-            on:mouseleave={() => (hoveredLink = null)}
-          >
-            <span
-              class="nav-link-inner inline-block transition-all duration-200 ease-out"
-              class:text-ink-900={isRaised}
-              class:dark:text-cream-100={isRaised}
-              class:-translate-y-0.5={isRaised}
-              class:text-ink-500={!isRaised}
-              class:dark:text-ink-400={!isRaised}
-            >
-              {link.name}
-            </span>
-          </a>
-        {/each}
-        <DarkModeToggle />
-      </nav>
-
-      <!-- Mobile Menu Button -->
-      <div class="flex md:hidden items-center space-x-2">
-        <DarkModeToggle />
-        <button
-          type="button"
-          class="p-2 text-ink-600 dark:text-cream-300 hover:text-ink-900 dark:hover:text-cream-100 transition-colors"
-          on:click={() => (mobileMenuOpen = !mobileMenuOpen)}
-          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={mobileMenuOpen}
-        >
-          {#if mobileMenuOpen}
-            <X size={24} />
-          {:else}
-            <Menu size={24} />
-          {/if}
-        </button>
-      </div>
-    </div>
-
-    <!-- Mobile Navigation -->
-    {#if mobileMenuOpen}
+    <div class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 md:flex md:w-auto md:items-center">
       <nav
-        class="md:hidden py-4 border-t border-ink-200 dark:border-ink-700 animate-fade-in"
+        aria-label="Site pages"
+        class="min-w-0 font-mono text-xs leading-7"
       >
-        {#each links as link (link.href)}
-          {@const isLinkActive = isActive(link.href, currentPath)}
+        {#each links as link, i (link.href)}
+          {@const active = isActive(link.href, currentPath)}
+          {#if i > 0}
+            <span class="mx-1.5 text-ink-400 dark:text-ink-600" aria-hidden="true">·</span>
+          {/if}
           <a
             href={link.href}
-            class="block py-3 transition-all duration-200"
-            class:text-ink-900={isLinkActive}
-            class:dark:text-cream-100={isLinkActive}
-            class:font-medium={isLinkActive}
-            class:pl-2={isLinkActive}
-            class:text-ink-600={!isLinkActive}
-            class:dark:text-cream-300={!isLinkActive}
-            on:click={closeMobileMenu}
+            aria-current={active ? "page" : undefined}
+            class="whitespace-nowrap transition-colors duration-200 {active ? 'text-accent-dark dark:text-accent-dark' : 'text-ink-500 hover:text-accent-dark dark:text-cream-400 dark:hover:text-accent'}"
           >
             {link.name}
           </a>
         {/each}
       </nav>
-    {/if}
+      <DarkModeToggle />
+    </div>
   </div>
 </header>
-
-<!-- Spacer to prevent content from going under fixed header -->
-<div class="h-16"></div>
-
-<style>
-  .nav-link {
-    position: relative;
-  }
-
-  .nav-link::after {
-    content: "";
-    position: absolute;
-    bottom: -2px;
-    left: 0;
-    width: 0;
-    height: 3px;
-    background-color: currentColor;
-    background-clip: content-box;
-    padding-top: 2px;
-    box-sizing: border-box;
-    transition: width 0.2s ease-out;
-  }
-
-  .nav-link:hover::after,
-  .nav-link.is-raised::after {
-    width: 100%;
-  }
-</style>

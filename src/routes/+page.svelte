@@ -131,9 +131,9 @@
       <!-- Text: col 1, row 1 -->
       <div class="md:col-start-1 md:row-start-1">
         <h1
-          class="heading-display home-hero-heading text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
+          class="heading-display text-3xl text-ink-900 dark:text-cream-100 mb-4"
         >
-          hi, i'm <HyperText text="atrey desai" />
+          hi, i'm <HyperText class="ml-[0.18em]" text="atrey desai" />
         </h1>
 
         <div class="home-intro-copy space-y-4 text-ink-700 dark:text-cream-300">
@@ -326,12 +326,6 @@
 </div>
 
 <style>
-  .home-hero-heading {
-    font-weight: 700;
-    letter-spacing: -0.015em;
-    line-height: 0.95;
-  }
-
   .home-intro-copy {
     font-size: 1.125rem;
     line-height: 1.45;
