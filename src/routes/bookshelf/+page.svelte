@@ -491,7 +491,7 @@
 <Seo
     title="Bookshelf | Atrey Desai"
     description="Curated reading list and book recommendations by Atrey Desai - science, philosophy, fiction, and essays with personal notes and ratings."
-    url="https://atreydesai.com/bookshelf"
+    url="https://atreydesai.com/bookshelf/"
 />
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">

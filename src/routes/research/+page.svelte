@@ -135,7 +135,7 @@
 <PageShell
     title="Research | Atrey Desai"
     description="Publications and preprints by Atrey Desai on NLP benchmarks, multimodal reasoning, and computational animal linguistics. Research from UMD CLIP Lab, UT Arlington ACL2 Lab, and Brown University."
-    url="https://atreydesai.com/research"
+    url="https://atreydesai.com/research/"
     heading="research"
 >
     <div class="mb-8 flex flex-wrap items-center gap-3">

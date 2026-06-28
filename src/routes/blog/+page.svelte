@@ -7,7 +7,7 @@
 <PageShell
     title="Blog | Atrey Desai"
     description="Blog posts and writings by Atrey Desai on AI, research, and more."
-    url="https://atreydesai.com/blog"
+    url="https://atreydesai.com/blog/"
     heading="blog"
 >
     <!-- Blog posts -->
@@ -15,7 +15,7 @@
         {#each posts as post (post.id)}
             <li class="py-6">
                 <a
-                    href="/blog/{post.id}"
+                    href="/blog/{post.id}/"
                     class="group block no-underline"
                 >
                     <h2 class="text-2xl text-ink-900 dark:text-cream-100 group-hover:text-accent dark:group-hover:text-accent-light transition-colors duration-200 mb-2">

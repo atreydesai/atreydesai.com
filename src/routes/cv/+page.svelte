@@ -43,7 +43,7 @@
 <PageShell
     title="CV | Atrey Desai"
     description="Curriculum Vitae of Atrey Desai - undergraduate researcher at UMD with experience at Learn Prompting, CLIP Lab, Brown University, and UT Arlington."
-    url="https://atreydesai.com/cv"
+    url="https://atreydesai.com/cv/"
 >
     <div slot="header" class="flex items-center justify-between mb-8">
         <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
@@ -64,7 +64,7 @@
 
     <p class="deck text-ink-600 dark:text-cream-400 mb-1">
         A comprehensive overview of my academic and professional history. For a
-        condensed version, see my <a href="/resume" class="link">resume</a>.
+        condensed version, see my <a href="/resume/" class="link">resume</a>.
     </p>
     {#if data.cvLastUpdated}
         <p class="text-sm italic text-ink-400 dark:text-cream-500 mb-8">

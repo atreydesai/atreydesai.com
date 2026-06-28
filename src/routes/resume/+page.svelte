@@ -8,7 +8,7 @@
 <PageShell
     title="Resume | Atrey Desai"
     description="Resume of Atrey Desai - CS & Linguistics student at University of Maryland, researching NLP and AI safety."
-    url="https://atreydesai.com/resume"
+    url="https://atreydesai.com/resume/"
 >
     <div slot="header" class="flex items-center justify-between mb-8">
         <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
@@ -29,7 +29,7 @@
 
     <p class="deck text-ink-600 dark:text-cream-400 mb-8">
         A one-page summary of my experience, skills, and education. For a more
-        comprehensive overview, see my <a href="/cv" class="link">CV</a>.
+        comprehensive overview, see my <a href="/cv/" class="link">CV</a>.
     </p>
 
     <!-- PDF Embed -->

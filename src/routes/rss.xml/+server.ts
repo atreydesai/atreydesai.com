@@ -12,8 +12,8 @@ export const GET: RequestHandler = () => {
             (post) => `
     <item>
       <title>${escapeXml(post.title)}</title>
-      <link>${siteUrl}/blog/${post.id}</link>
-      <guid isPermaLink="true">${siteUrl}/blog/${post.id}</guid>
+      <link>${siteUrl}/blog/${post.id}/</link>
+      <guid isPermaLink="true">${siteUrl}/blog/${post.id}/</guid>
       <description>${escapeXml(post.excerpt)}</description>
       <pubDate>${formatUtcDate(post.date)}</pubDate>
       ${post.tags.map((tag) => `<category>${escapeXml(tag)}</category>`).join('\n      ')}
@@ -25,7 +25,7 @@ export const GET: RequestHandler = () => {
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Atrey Desai - Blog</title>
-    <link>${siteUrl}/blog</link>
+    <link>${siteUrl}/blog/</link>
     <description>Blog posts and writings by Atrey Desai on AI, research, and more.</description>
     <language>en-us</language>
     <atom:link href="${siteUrl}/rss.xml" rel="self" type="application/rss+xml" />

@@ -11,7 +11,31 @@
 
   const siteUrl = "https://atreydesai.com";
 
-  $: canonicalUrl = url.startsWith("http") ? url : `${siteUrl}${url.startsWith("/") ? url : `/${url}`}`;
+  function absoluteUrl(value: string): string {
+    return value.startsWith("http")
+      ? value
+      : `${siteUrl}${value.startsWith("/") ? value : `/${value}`}`;
+  }
+
+  function canonicalizeUrl(value: string): string {
+    const absolute = absoluteUrl(value);
+    const parsed = new URL(absolute);
+
+    if (parsed.origin === siteUrl) {
+      const lastSegment = parsed.pathname.split("/").pop() ?? "";
+      if (
+        parsed.pathname !== "/" &&
+        !parsed.pathname.endsWith("/") &&
+        !lastSegment.includes(".")
+      ) {
+        parsed.pathname = `${parsed.pathname}/`;
+      }
+    }
+
+    return parsed.toString();
+  }
+
+  $: canonicalUrl = canonicalizeUrl(url);
   $: imageUrl = image.startsWith("http")
     ? image
     : `${siteUrl}${image.startsWith("/") ? image : `/${image}`}`;

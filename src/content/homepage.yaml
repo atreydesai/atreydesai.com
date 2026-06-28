@@ -16,7 +16,7 @@ researchInterests:
     - text: "**1. Knowing when to trust a model:** how do we improve the confidence calibration of models reasoning under uncertainty (insufficient information, excessive information, and long-tail settings) and updating on new information?"
       citations:
         - label: "ttr"
-          url: "/research#test-time-reasoners"
+          url: "/research/#test-time-reasoners"
         - label: "IP1"
           url: null
         - label: "IP2"
@@ -24,11 +24,11 @@ researchInterests:
     - text: "**2. Acting on that trust:** how can we build better harnesses and systems to act on calibrated trust in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
       citations:
         - label: "benchmarker"
-          url: "/research#benchmarker"
+          url: "/research/#benchmarker"
         - label: "quick"
-          url: "/research#llm-distractors"
+          url: "/research/#llm-distractors"
         - label: "artifacts"
-          url: "/research#mcq-artifacts"
+          url: "/research/#mcq-artifacts"
         - label: "IP2"
           url: null
         - label: "IP3"
@@ -36,7 +36,7 @@ researchInterests:
     - text: "**3. Collaborating in those environments:** how do agents interact with humans and other agents in these environments (collaborative writing, intelligence analysis)?"
       citations:
         - label: "quick"
-          url: "/research#llm-distractors"
+          url: "/research/#llm-distractors"
         - label: "IP2"
           url: null
         - label: "IP3"

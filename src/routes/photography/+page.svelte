@@ -84,7 +84,7 @@
 <Seo
     title="Photography | Atrey Desai"
     description="Photography portfolio by Atrey Desai. Follow @framedbyatrey on Instagram for more."
-    url="https://atreydesai.com/photography"
+    url="https://atreydesai.com/photography/"
 />
 
 <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">

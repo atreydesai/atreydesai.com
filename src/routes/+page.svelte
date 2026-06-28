@@ -119,7 +119,7 @@
 <Seo
   title="Atrey Desai"
   description="Atrey Desai - undergraduate researcher at University of Maryland studying NLP, AI safety, and computational linguistics. Research on benchmark evaluation and multimodal reasoning."
-  url="https://atreydesai.com"
+  url="https://atreydesai.com/"
 />
 
 <div class="layout-main py-8 md:py-12">
@@ -257,7 +257,7 @@
     <section class="mb-8">
       <div class="section-rule mb-6">
         <h2 class="section-heading mb-0">
-          <a href="/about" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">interests</a>
+          <a href="/about/" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">interests</a>
         </h2>
         <div class="section-rule-line"></div>
       </div>
@@ -311,7 +311,7 @@
     <section class="mb-8">
       <div class="section-rule mb-6">
         <h2 class="section-heading mb-0">
-          <a href="/research" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">selected works</a>
+          <a href="/research/" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">selected works</a>
         </h2>
         <div class="section-rule-line"></div>
       </div>

@@ -100,7 +100,7 @@ publications:
         - '<a href="https://arxiv.org/abs/2510.07761" class="link"><strong>Test-Time Reasoners Are Strategic Multiple-Choice Test-Takers</strong></a>.<br />ACL 2026 (Oral)<br />Nishant Balepur, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span> and Rachel Rudinger.'
         - '<a href="https://scholar.google.com/citations?view_op=view_citation&hl=en&user=hTDzj6cAAAAJ&citation_for_view=hTDzj6cAAAAJ:d1gkVwhDpl0C" class="link"><strong>Language Models Generate Multiple-Choice Questions with Artifacts</strong></a>.<br />MASC-SLL 2025<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Nishant Balepur and Rachel Rudinger.'
         - '<a href="https://scholar.google.com/citations?view_op=view_citation&hl=en&user=hTDzj6cAAAAJ&citation_for_view=hTDzj6cAAAAJ:u5HHmVD_uO8C" class="link"><strong>Reinforcement Learning As End-User Trigger-Action Programming</strong></a>.<br />IML Workshop @ AAAI 2022 · RLDM 2022<br />Chace Hayhurst, Hyojae Park, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Suheidy De Los Santos and Michael Littman.'
-  note_html: 'See the full list on my <a href="/research" class="link">research page</a>.'
+  note_html: 'See the full list on my <a href="/research/" class="link">research page</a>.'
 
 awards:
   - name: SPIRE Research Grant

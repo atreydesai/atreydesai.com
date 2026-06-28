@@ -3,12 +3,12 @@
   import DarkModeToggle from "./DarkModeToggle.svelte";
 
   const links = [
-    { name: "about", href: "/about" },
-    { name: "research", href: "/research" },
-    { name: "cv", href: "/cv" },
-    { name: "blog", href: "/blog" },
-    { name: "photography", href: "/photography" },
-    { name: "bookshelf", href: "/bookshelf" },
+    { name: "about", href: "/about/" },
+    { name: "research", href: "/research/" },
+    { name: "cv", href: "/cv/" },
+    { name: "blog", href: "/blog/" },
+    { name: "photography", href: "/photography/" },
+    { name: "bookshelf", href: "/bookshelf/" },
   ];
 
   const pageLabels: Record<string, string> = {
@@ -26,7 +26,12 @@
   $: currentLabel = currentSegment ? pageLabels[currentSegment] ?? currentSegment : "";
 
   function isActive(href: string, pathname: string): boolean {
-    return pathname === href || pathname.startsWith(href + "/");
+    const normalizedHref = href === "/" ? href : href.replace(/\/$/, "");
+    const normalizedPath = pathname === "/" ? pathname : pathname.replace(/\/$/, "");
+    return (
+      normalizedPath === normalizedHref ||
+      normalizedPath.startsWith(`${normalizedHref}/`)
+    );
   }
 </script>
 

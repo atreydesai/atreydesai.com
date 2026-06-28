@@ -76,6 +76,28 @@
       });
   }
 
+  function toggleMusic() {
+    if (audioElement && isPlaying) {
+      audioElement.pause();
+      isPlaying = false;
+      return;
+    }
+
+    if (!audioElement) {
+      skipMusic();
+      return;
+    }
+
+    audioElement.play()
+      .then(() => {
+        isPlaying = true;
+      })
+      .catch(() => {
+        isPlaying = false;
+        console.log("Audio playback requires user interaction first");
+      });
+  }
+
 </script>
 
 <footer class="layout-main w-full mt-20 pb-8">
@@ -94,34 +116,40 @@
         <div>
           updated {buildDate}
         </div>
-        <button
-          type="button"
-          on:click={skipMusic}
-          on:mouseenter={() => (hoveredMusic = true)}
-          on:mouseleave={() => (hoveredMusic = false)}
-          aria-pressed={isPlaying}
-          aria-label={isPlaying ? "Skip song" : "Play music"}
-          class="inline-flex items-center gap-2 font-[inherit] text-[length:inherit] lowercase text-inherit transition-all duration-300 hover:text-ink-700 dark:hover:text-cream-300 group"
-        >
-          <span
-            class="inline-flex items-center transition-transform duration-300 group-hover:scale-110"
+        <div class="inline-flex items-center gap-2">
+          <button
+            type="button"
+            on:click={skipMusic}
+            on:mouseenter={() => (hoveredMusic = true)}
+            on:mouseleave={() => (hoveredMusic = false)}
+            aria-label={isPlaying ? "Skip song" : "Start music"}
+            title={isPlaying ? "Skip song" : "Start music"}
+            class="inline-flex items-center text-inherit transition-all duration-300 hover:scale-110 hover:text-ink-700 dark:hover:text-cream-300"
             class:animate-pulse={isPlaying}
           >
             <Disc3 size={14} animate={hoveredMusic} />
-          </span>
-          <span>music</span>
-          <span class="inline-flex items-center transition-all duration-300">
-            {#if isPlaying}
-              <span in:fade={{ duration: 200 }} class="inline-flex">
-                <Volume2 size={14} />
-              </span>
-            {:else}
-              <span in:fade={{ duration: 200 }} class="inline-flex">
-                <VolumeOff size={14} />
-              </span>
-            {/if}
-          </span>
-        </button>
+          </button>
+          <button
+            type="button"
+            on:click={toggleMusic}
+            aria-pressed={isPlaying}
+            aria-label={isPlaying ? "Pause music" : "Play music"}
+            class="inline-flex items-center gap-2 font-[inherit] text-[length:inherit] lowercase text-inherit transition-all duration-300 hover:text-ink-700 dark:hover:text-cream-300"
+          >
+            <span>music</span>
+            <span class="inline-flex items-center transition-all duration-300">
+              {#if isPlaying}
+                <span in:fade={{ duration: 200 }} class="inline-flex">
+                  <Volume2 size={14} />
+                </span>
+              {:else}
+                <span in:fade={{ duration: 200 }} class="inline-flex">
+                  <VolumeOff size={14} />
+                </span>
+              {/if}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

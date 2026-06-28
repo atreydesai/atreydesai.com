@@ -53,14 +53,14 @@
 <Seo
     title="{post.title} | Atrey Desai"
     description={post.excerpt}
-    url="https://atreydesai.com/blog/{post.id}"
+    url="https://atreydesai.com/blog/{post.id}/"
     type="article"
 />
 
 <div class="layout-main py-8 md:py-12">
     <!-- Back link -->
     <a
-        href="/blog"
+        href="/blog/"
         class="inline-flex items-center gap-1 text-sm text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-colors mb-8"
     >
         <ArrowLeft size={14} />
@@ -116,7 +116,7 @@
             <div class="flex-1">
                 {#if prevPost}
                     <a
-                        href="/blog/{prevPost.id}"
+                        href="/blog/{prevPost.id}/"
                         class="group flex flex-col gap-1 text-sm"
                     >
                         <span class="meta-label">← older</span>
@@ -130,7 +130,7 @@
             <div class="flex-1 text-right">
                 {#if nextPost}
                     <a
-                        href="/blog/{nextPost.id}"
+                        href="/blog/{nextPost.id}/"
                         class="group flex flex-col gap-1 text-sm items-end"
                     >
                         <span class="meta-label">newer →</span>
