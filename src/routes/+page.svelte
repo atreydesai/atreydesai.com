@@ -134,7 +134,7 @@
         <h1
           class="heading-display text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
         >
-          hey, i'm <HyperText text="atrey desai." />
+          hi, i'm <HyperText text="atrey desai" />
         </h1>
 
         <div class="space-y-4 text-ink-700 dark:text-cream-300">

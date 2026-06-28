@@ -288,10 +288,6 @@
                     </p>
                 {/if}
 
-                <p class="text-ink-500 dark:text-ink-400">
-                    p.s. take a peek at your devtools console — you may find
-                    some fun hidden games. :)
-                </p>
             </div>
         </section>
 
