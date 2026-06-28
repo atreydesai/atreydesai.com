@@ -2,7 +2,6 @@
   import Seo from "$lib/components/Seo.svelte";
   import ResearchCard from "$lib/components/ResearchCard.svelte";
   import LegoImage from "$lib/components/LegoImage.svelte";
-  import { Github, Twitter, GraduationCap, Mail } from "lucide-svelte";
   import { papers, homepageData } from "$lib/content";
   import { parseInline } from "$lib/utils/text";
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
@@ -111,9 +110,9 @@
   }
 
   const socialLinks = [
-    { name: "GitHub", href: homepageData.social.github, icon: Github },
-    { name: "Twitter", href: homepageData.social.twitter, icon: Twitter },
-    { name: "Scholar", href: homepageData.social.scholar, icon: GraduationCap },
+    { name: "Google Scholar", href: homepageData.social.scholar },
+    { name: "GitHub", href: homepageData.social.github },
+    { name: "Twitter", href: homepageData.social.twitter },
   ];
 </script>
 
@@ -132,12 +131,12 @@
       <!-- Text: col 1, row 1 -->
       <div class="md:col-start-1 md:row-start-1">
         <h1
-          class="heading-display text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
+          class="heading-display home-hero-heading text-3xl md:text-4xl text-ink-900 dark:text-cream-100 mb-4"
         >
           hi, i'm <HyperText text="atrey desai" />
         </h1>
 
-        <div class="space-y-4 text-ink-700 dark:text-cream-300">
+        <div class="home-intro-copy space-y-4 text-ink-700 dark:text-cream-300">
           {#each homepageData.intro as paragraph}
             <p>
               {@html parseLinks(paragraph)}
@@ -173,36 +172,32 @@
         </div>
       </div>
 
-      <!-- Icons: col 1, row 2 — bottom aligns with image bottom -->
-      <div class="md:col-start-1 md:row-start-2 -mt-4 flex items-center gap-5">
-        {#each socialLinks as link}
+      <!-- Links: col 1, row 2 — bottom aligns with image bottom -->
+      <div class="md:col-start-1 md:row-start-2 -mt-4 flex items-center text-sm">
+        {#each socialLinks as link, i}
+          {#if i > 0}
+            <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
+          {/if}
           <a
             href={link.href}
             target="_blank"
             rel="noopener noreferrer"
             title={link.name}
-            class="text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 group"
+            class="link font-medium"
           >
-            <svelte:component
-              this={link.icon}
-              size={20}
-              class="transition-transform duration-300 group-hover:-translate-y-0.5"
-            />
+            {link.name}
           </a>
         {/each}
 
-        <div class="relative">
+        <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
+        <div class="relative inline-flex">
           <button
+            type="button"
             on:click={copyEmail}
             title="Copy email"
-            class="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-accent dark:hover:text-accent-light transition-all duration-300 cursor-pointer"
+            class="link font-[inherit] text-[length:inherit] font-medium cursor-pointer"
           >
-            <Mail size={20} class="transition-transform duration-300" />
-            <span class="inline-flex">
-              {#each homepageData.social.email.split("") as char, i}
-                <span class="letter-drop" style="animation-delay: {i * 25}ms">{char}</span>
-              {/each}
-            </span>
+            Email
           </button>
           {#if emailCopied}
             <span class="copied-tooltip">
@@ -237,10 +232,10 @@
             on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleBannerClick(e as unknown as MouseEvent); }}
             class="banner-box banner-riso-front relative select-text px-5 py-4 md:px-6 md:py-5 text-ink-800 dark:text-cream-100"
           >
-          <p class="relative z-10 text-sm md:text-base leading-relaxed font-medium">
+          <p class="relative z-10 text-sm md:text-base leading-relaxed">
             {@html parseBanner(homepageData.banner.lead)}
           </p>
-          <p class="relative z-10 mt-2 text-sm md:text-base leading-relaxed text-ink-700 dark:text-cream-200">
+          <p class="relative z-10 mt-2 text-sm md:text-base leading-relaxed">
             {@html parseBanner(homepageData.banner.body)}
           </p>
           {#if bannerCopied}
@@ -331,6 +326,17 @@
 </div>
 
 <style>
+  .home-hero-heading {
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 0.95;
+  }
+
+  .home-intro-copy {
+    font-size: 1.125rem;
+    line-height: 1.45;
+  }
+
   /* Pixel boba sitting diagonally in the photo's bottom-right corner. */
   .boba-launcher {
     position: absolute;
@@ -371,23 +377,6 @@
     .boba-launcher:hover {
       animation: none;
       transform: rotate(16deg) scale(1.08);
-    }
-  }
-
-  .letter-drop {
-    display: inline-block;
-    opacity: 0;
-    animation: letter-drop 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  }
-
-  @keyframes letter-drop {
-    from {
-      opacity: 0;
-      transform: translateY(-6px) rotate(-4deg);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) rotate(0deg);
     }
   }
 
@@ -498,7 +487,6 @@
 
   :global(.banner-copy-btn) {
     font: inherit;
-    color: inherit;
     background: none;
     border: 0;
     padding: 0;
