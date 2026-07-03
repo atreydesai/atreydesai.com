@@ -1,8 +1,19 @@
 {
   "redirects": [
     {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.atreydesai.com"
+        }
+      ],
+      "destination": "https://atreydesai.com/:path*",
+      "permanent": true
+    },
+    {
       "source": "/blog/media-list",
-      "destination": "/bookshelf",
+      "destination": "https://atreydesai.com/bookshelf/",
       "permanent": true
     }
   ]

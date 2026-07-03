@@ -1,44 +1,22 @@
 <script lang="ts">
+  import {
+    absoluteSiteUrl,
+    canonicalUrl as toCanonicalUrl,
+    SITE_URL,
+  } from "$lib/seo";
+
   export let title = "Atrey Desai";
   export let description =
     "Atrey Desai - undergraduate researcher at University of Maryland studying NLP, AI safety, and computational linguistics. Research on benchmark evaluation, multimodal reasoning, and animal vocalizations.";
   export let image = "/og-image.jpg";
-  export let url = "https://atreydesai.com";
+  export let url = SITE_URL;
   export let type = "website";
   export let keywords =
     "Atrey Desai, NLP, natural language processing, AI safety, computational linguistics, University of Maryland, machine learning, research";
   export let noindex = false;
 
-  const siteUrl = "https://atreydesai.com";
-
-  function absoluteUrl(value: string): string {
-    return value.startsWith("http")
-      ? value
-      : `${siteUrl}${value.startsWith("/") ? value : `/${value}`}`;
-  }
-
-  function canonicalizeUrl(value: string): string {
-    const absolute = absoluteUrl(value);
-    const parsed = new URL(absolute);
-
-    if (parsed.origin === siteUrl) {
-      const lastSegment = parsed.pathname.split("/").pop() ?? "";
-      if (
-        parsed.pathname !== "/" &&
-        !parsed.pathname.endsWith("/") &&
-        !lastSegment.includes(".")
-      ) {
-        parsed.pathname = `${parsed.pathname}/`;
-      }
-    }
-
-    return parsed.toString();
-  }
-
-  $: canonicalUrl = canonicalizeUrl(url);
-  $: imageUrl = image.startsWith("http")
-    ? image
-    : `${siteUrl}${image.startsWith("/") ? image : `/${image}`}`;
+  $: canonicalUrl = toCanonicalUrl(url);
+  $: imageUrl = absoluteSiteUrl(image);
 </script>
 
 <svelte:head>

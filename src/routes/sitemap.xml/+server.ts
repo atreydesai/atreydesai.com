@@ -1,10 +1,9 @@
 import { posts } from '$lib/content';
+import { SITE_URL } from '$lib/seo';
 import { execFileSync } from 'child_process';
 import type { RequestHandler } from './$types';
 
 export const prerender = true;
-
-const siteUrl = 'https://atreydesai.com';
 
 type SitemapPage = {
     path: string;
@@ -91,7 +90,7 @@ export const GET: RequestHandler = () => {
     const staticUrls = pages.map(
         (page) => `
   <url>
-    <loc>${siteUrl}${page.path}</loc>
+    <loc>${SITE_URL}${page.path}</loc>
     <lastmod>${lastModified(page.sources)}</lastmod>
     <changefreq>${page.changefreq}</changefreq>
     <priority>${page.priority}</priority>
@@ -101,7 +100,7 @@ export const GET: RequestHandler = () => {
     const postUrls = posts.map(
         (post) => `
   <url>
-    <loc>${siteUrl}/blog/${post.id}/</loc>
+    <loc>${SITE_URL}/blog/${post.id}/</loc>
     <lastmod>${lastModified([postSourcesById[post.id]].filter(Boolean), post.date)}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
