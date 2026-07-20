@@ -20,9 +20,11 @@ footnotes:
 
 # Professional section - your academic/research bio
 professional:
-  intro: "I'm **Atrey Desai**, a senior (fourth-year) undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu). I am fortunate to be advised by Professor [Rachel Rudinger](https://rudinger.github.io/) and Professor [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
+  intro: "I'm **Atrey Desai**, a senior (fourth-year) undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu). I am fortunate to be advised by Professors [Rachel Rudinger](https://rudinger.github.io/), [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg), and [Mohit Iyyer](https://www.cs.umd.edu/~miyyer/)."
 
   paragraphs:
+    - text: "My Erdős number is **3**: me → Jordan Boyd-Graber → Maria Klawe → Paul Erdős ([trace](https://users.umiacs.umd.edu/~ying/static/faq.html))."
+
     - text: "I am also eternally indebted to [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for their mentoring. Thank you for taking a curious undergraduate under your wing!"
 
     - text: "I am a member of the Computational Linguistics and Information Processing [(CLIP)](https://clip.umd.edu/) lab in UMIACS. I'm also a visiting researcher under Professor [Kenny Zhu](https://kenzhu2000.github.io/) at the Arlington Computational Linguistics [(ACL2)](https://uta-acl2.github.io/) Lab. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights into their language."

@@ -87,7 +87,7 @@ export interface HomepageData {
     intro: string[];
     banner?: {
         lead: string;
-        body: string;
+        projects: string[];
     };
     researchInterests: {
         intro: string;

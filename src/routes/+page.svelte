@@ -8,6 +8,8 @@
   import HyperText from "$lib/components/HyperText.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import { onMount } from "svelte";
+  import { slide } from "svelte/transition";
+  import { quintOut } from "svelte/easing";
   import { bobaMode } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
 
@@ -48,6 +50,10 @@
     bobaGrid = [...straw, ...CUP_BODY];
     bobaPal = { ...bobaPal, L: DRINKS[Math.floor(Math.random() * DRINKS.length)] };
 
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      slideMs = 0;
+    }
+
     // Resume audio on the first click anywhere, so the boba's hover jingle plays.
     const unlock = () => unlockAudio();
     window.addEventListener("pointerdown", unlock, { once: true });
@@ -55,6 +61,16 @@
   });
 
   const parseBanner = (text: string) => parseInline(text, { copyButton: true });
+
+  let projectsOpen = false;
+  let slideMs = 260;
+
+  // banner.lead embeds the projects toggle inline as a "{label}" token,
+  // e.g. "…about my {ongoing projects}." — split it into text around the toggle.
+  const bannerLeadMatch = (homepageData.banner?.lead ?? "").match(/^(.*)\{([^}]+)\}(.*)$/);
+  const bannerLead = bannerLeadMatch
+    ? { pre: bannerLeadMatch[1], label: bannerLeadMatch[2], post: bannerLeadMatch[3] }
+    : { pre: homepageData.banner?.lead ?? "", label: "ongoing projects", post: "" };
 
   $: featuredPapers = papers
     .filter((p) => p.featured)
@@ -88,25 +104,6 @@
     cookKey = key;
     clearTimeout(cookTimeout);
     cookTimeout = setTimeout(() => (cookKey = null), 1000);
-  }
-
-  let bannerCopied = false;
-  let bannerCopyTimeout: ReturnType<typeof setTimeout>;
-  let bannerTooltipLeft = 0;
-  let bannerTooltipTop = 0;
-  let bannerWrapperEl: HTMLDivElement;
-
-  function handleBannerClick(e: MouseEvent) {
-    const target = (e.target as HTMLElement)?.closest("[data-banner-copy]") as HTMLElement | null;
-    if (!target || !bannerWrapperEl) return;
-    navigator.clipboard.writeText(homepageData.social.email);
-    const btnRect = target.getBoundingClientRect();
-    const wrapRect = bannerWrapperEl.getBoundingClientRect();
-    bannerTooltipLeft = btnRect.left - wrapRect.left + btnRect.width / 2;
-    bannerTooltipTop = btnRect.bottom - wrapRect.top + 3;
-    bannerCopied = true;
-    clearTimeout(bannerCopyTimeout);
-    bannerCopyTimeout = setTimeout(() => (bannerCopied = false), 1000);
   }
 
   const socialLinks = [
@@ -207,18 +204,21 @@
           {/if}
         </div>
       </div>
+
     </div>
   </section>
 
   {#if homepageData.banner}
     <ScrollReveal animation="fade-up" delay={40}>
       <section class="mb-10 md:mb-12">
+        <!-- Filter regions are widened so the displaced edges never clip
+             against the default 110% filter box on a short banner. -->
         <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-          <filter id="banner-rough">
+          <filter id="banner-rough" x="-15%" y="-30%" width="130%" height="160%">
             <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="3" seed="3" />
             <feDisplacementMap in="SourceGraphic" scale="6" />
           </filter>
-          <filter id="banner-rough-strong">
+          <filter id="banner-rough-strong" x="-15%" y="-30%" width="130%" height="160%">
             <feTurbulence type="fractalNoise" baseFrequency="0.034" numOctaves="3" seed="7" />
             <feDisplacementMap in="SourceGraphic" scale="9" />
           </filter>
@@ -226,27 +226,40 @@
         <div class="banner-riso-sketch-wrap relative">
           <div class="banner-riso-back" aria-hidden="true"></div>
           <div
-            bind:this={bannerWrapperEl}
-            role="presentation"
-            on:click={handleBannerClick}
-            on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleBannerClick(e as unknown as MouseEvent); }}
-            class="banner-box banner-riso-front relative select-text px-5 py-4 md:px-6 md:py-5 text-ink-800 dark:text-cream-100"
+            class="banner-box banner-riso-front relative select-text px-5 py-3.5 md:px-6 md:py-4 text-ink-800 dark:text-cream-100"
           >
-          <p class="relative z-10 text-sm md:text-base leading-relaxed">
-            {@html parseBanner(homepageData.banner.lead)}
-          </p>
-          <p class="relative z-10 mt-2 text-sm md:text-base leading-relaxed">
-            {@html parseBanner(homepageData.banner.body)}
-          </p>
-          {#if bannerCopied}
-            <span
-              class="banner-copied-tooltip"
-              style="left: {bannerTooltipLeft}px; top: {bannerTooltipTop}px;"
-            >
-              <span class="copied-triangle"></span>
-              copied!
-            </span>
-          {/if}
+            <!-- One-line banner: the "{label}" token in banner.lead becomes
+                 the click-to-expand projects toggle, inline in the sentence. -->
+            <p class="relative z-10 text-sm md:text-[0.95rem] leading-relaxed">
+              {@html parseBanner(bannerLead.pre)}<button
+                type="button"
+                class="banner-toggle link font-[inherit] text-[length:inherit] font-medium cursor-pointer select-none"
+                aria-expanded={projectsOpen}
+                aria-controls="banner-projects-list"
+                on:click={() => (projectsOpen = !projectsOpen)}
+              ><span class="banner-toggle-label">{bannerLead.label}</span><span
+                  class="banner-caret ml-1"
+                  class:banner-caret-open={projectsOpen}
+                  aria-hidden="true">▸</span
+                ></button>{@html parseBanner(bannerLead.post)}
+            </p>
+            {#if projectsOpen}
+              <ol
+                id="banner-projects-list"
+                transition:slide={{ duration: slideMs, easing: quintOut }}
+                class="relative z-10 mt-2.5 space-y-1.5 text-sm md:text-[0.95rem] leading-relaxed"
+              >
+                {#each homepageData.banner.projects as project, i}
+                  <li class="flex items-baseline gap-2.5">
+                    <span
+                      class="font-mono text-xs text-ink-400 dark:text-cream-500 select-none"
+                      aria-hidden="true">{String(i + 1).padStart(2, "0")}</span
+                    >
+                    <span>{@html parseBanner(project)}</span>
+                  </li>
+                {/each}
+              </ol>
+            {/if}
           </div>
         </div>
       </section>
@@ -479,30 +492,30 @@
     border-color: #fdf8f3;
   }
 
-  :global(.banner-copy-btn) {
-    font: inherit;
-    background: none;
-    border: 0;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    user-select: text;
-    -webkit-user-select: text;
+  /* Hover underline belongs to the label only — never the caret. */
+  .banner-toggle:hover {
+    text-decoration: none;
+  }
+  .banner-toggle:hover .banner-toggle-label {
+    text-decoration: underline;
+    text-decoration-color: currentColor;
+    text-underline-offset: 3px;
   }
 
-  .banner-copied-tooltip {
-    position: absolute;
-    transform: translateX(-50%);
-    z-index: 30;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    white-space: nowrap;
-    pointer-events: none;
-    background: #E85D4C;
-    color: #fdf8f3;
-    padding: 4px 11px;
-    border-radius: 8px;
-    animation: tooltip-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  /* Disclosure caret for the projects toggle — rotates a quarter turn open. */
+  .banner-caret {
+    display: inline-block;
+    font-size: 0.85em;
+    line-height: 1;
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .banner-caret-open {
+    transform: rotate(90deg);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .banner-caret {
+      transition: none;
+    }
   }
 
   /* Darker selection inside the banner so it stands out from the blush bg.

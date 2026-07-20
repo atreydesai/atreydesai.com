@@ -4,11 +4,16 @@
 
 intro:
   - "I am a senior (fourth-year) undergraduate student studying computer science and linguistics with a minor in korean studies at the University of Maryland."
-  - "I am fortunate to be advised by Professors [Rachel Rudinger](https://rudinger.github.io/) and [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg)."
+  - "I am fortunate to be advised by Professors [Rachel Rudinger](https://rudinger.github.io/), [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg), and [Mohit Iyyer](https://www.cs.umd.edu/~miyyer/)."
 
 banner:
-  lead: "I am **applying to Ph.D. programs this fall (2026-27 cycle)**. I'm happy to talk virtually and I will also be attending ACL and ICML. See you in San Diego and Seoul!"
-  body: "Meanwhile, I am **(1)** organizing [QANTA](https://qanta-org.github.io/) and the [EMM-QA ICML workshop](https://qanta-org.github.io/competition/2026/icml/), and **(2)** working with Professor [Mohit Iyyer](https://www.cs.umd.edu/~miyyer/) on AI agents for long-form text generation [(autofiction.ai)](https://autofiction.ai/)."
+  # The {curly} phrase becomes the click-to-expand toggle for the projects list.
+  lead: "**I'm applying to Ph.D. programs this fall (2026-27 cycle)** and am happy to chat about my {ongoing projects}."
+  projects:
+    - "AI agents for long-form text generation ([autofiction.ai](https://autofiction.ai/))."
+    - "Calibrating human reliance and susceptibility to VQA model explanations ([QANTA](https://qanta-org.github.io/competition/2026/))."
+    - "Detection of out-of-context video misinformation using VLMs."
+    - "👀"
 
 researchInterests:
   intro: "Language models are becoming agents that act in open-ended, real-world environments, but our ability to know when to trust them for practical tasks lags behind. I want to make AI systems trustworthy, robust, and genuinely useful as they take on that role, namely:"
