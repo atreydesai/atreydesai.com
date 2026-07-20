@@ -14,5 +14,5 @@ tags:
   - "life"
   - "medical"
   - "korean"
-status: current
+enjoyment: 7.5
 ---

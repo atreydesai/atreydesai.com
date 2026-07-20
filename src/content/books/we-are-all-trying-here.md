@@ -13,5 +13,5 @@ tags:
   - "life"
   - "drama"
   - "korean"
-status: current
+status: shelved
 ---

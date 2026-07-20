@@ -23,8 +23,9 @@ function markdown() {
         let frontmatter = {};
         let content = src;
         if (src.startsWith("---")) {
-          // Find --- at the start of a line (after the opening ---)
-          const match = src.slice(3).match(/^([\s\S]*?)\r?\n---\r?\n/);
+          // Find --- at the start of a line (after the opening ---).
+          // The closing --- may sit at end-of-file with no trailing newline.
+          const match = src.slice(3).match(/^([\s\S]*?)\r?\n---[^\S\r\n]*(?:\r?\n|$)/);
           if (!match) {
             throw new Error(`Unclosed YAML frontmatter in ${id}`);
           }

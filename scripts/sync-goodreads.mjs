@@ -150,7 +150,9 @@ for (const item of items) {
         if (/^status:\s*(shelved|current)\s*$/m.test(text)) {
             text = text.replace(/^status:\s*(shelved|current)\s*\n/m, '');
             if (rating > 0 && !/^enjoyment:/m.test(text)) {
-                text = text.replace(/^---\s*$(?![\s\S]*^---)/m, `enjoyment: ${rating * 2}\n---`);
+                // [^\S\r\n]* = horizontal whitespace only — \s* would swallow the
+                // file's final newline and leave the closing --- unterminated.
+                text = text.replace(/^---[^\S\r\n]*$(?![\s\S]*^---)/m, `enjoyment: ${rating * 2}\n---`);
             }
             writeFileSync(path, text);
             promoted++;
@@ -175,7 +177,7 @@ for (const item of currentItems) {
         if (/^status:\s*shelved\s*$/m.test(text)) {
             text = text.replace(/^status:\s*shelved\s*$/m, 'status: current');
         } else if (!/^status:\s*current\s*$/m.test(text)) {
-            text = text.replace(/^---\s*$(?![\s\S]*^---)/m, 'status: current\n---');
+            text = text.replace(/^---[^\S\r\n]*$(?![\s\S]*^---)/m, 'status: current\n---');
         }
         writeFileSync(path, text);
         current++;
