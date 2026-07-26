@@ -9,11 +9,53 @@
 
     let selectedYear: string = "all";
     let selectedTag: string = "all";
-    let showPreprints: boolean = true;
+    let sortOrder: string = "year-desc";
     let highlightedPaperId: string | null = null;
+
+    const sortOptions = [
+        { value: "year-desc", label: "year descending" },
+        { value: "year-asc", label: "year ascending" },
+        { value: "title-asc", label: "title A–Z" },
+        { value: "title-desc", label: "title Z–A" },
+    ];
+
+    $: sortLabel =
+        sortOptions.find((option) => option.value === sortOrder)?.label ??
+        sortOptions[0].label;
+
+    function cycleSortOrder() {
+        const currentIndex = sortOptions.findIndex(
+            (option) => option.value === sortOrder,
+        );
+        sortOrder =
+            sortOptions[(currentIndex + 1) % sortOptions.length].value;
+    }
 
     function canonicalizeTalkTitle(title: string): string {
         return title.replace(/\s*\([^)]*\)\s*$/, "").trim();
+    }
+
+    function comparePapers(
+        a: (typeof papers)[number],
+        b: (typeof papers)[number],
+        order: string,
+    ): number {
+        const titleAscending = a.title.localeCompare(b.title, undefined, {
+            sensitivity: "base",
+            numeric: true,
+        });
+        const priority = (a.priority ?? 99) - (b.priority ?? 99);
+
+        switch (order) {
+            case "year-asc":
+                return a.year - b.year || priority || titleAscending;
+            case "title-asc":
+                return titleAscending || b.year - a.year;
+            case "title-desc":
+                return -titleAscending || b.year - a.year;
+            default:
+                return b.year - a.year || priority || titleAscending;
+        }
     }
 
     afterNavigate(async () => {
@@ -59,11 +101,17 @@
             return false;
         if (selectedTag !== "all" && !paper.tags.includes(selectedTag))
             return false;
-        if (!showPreprints && paper.preprint) return false;
         return true;
     });
 
-    $: papersByYear = filteredPapers.reduce(
+    $: sortedPapers = [...filteredPapers].sort((a, b) =>
+        comparePapers(a, b, sortOrder),
+    );
+
+    $: published = sortedPapers.filter((p) => !p.classProject);
+    $: classProjects = sortedPapers.filter((p) => p.classProject);
+
+    $: papersByYear = published.reduce(
         (acc, paper) => {
             if (!acc[paper.year]) acc[paper.year] = [];
             acc[paper.year].push(paper);
@@ -74,13 +122,9 @@
 
     $: sortedYears = Object.keys(papersByYear)
         .map(Number)
-        .sort((a, b) => b - a);
+        .sort((a, b) => (sortOrder === "year-asc" ? a - b : b - a));
 
-    $: preprints = filteredPapers.filter((p) => p.preprint && !p.classProject);
-    $: published = filteredPapers.filter((p) => !p.preprint && !p.classProject);
-    $: classProjects = filteredPapers.filter((p) => p.classProject);
-    $: activeFilters =
-        selectedYear !== "all" || selectedTag !== "all" || !showPreprints;
+    $: activeFilters = selectedYear !== "all" || selectedTag !== "all";
     $: groupedTalks = Object.values(
         talks.reduce(
             (acc, talk) => {
@@ -128,7 +172,6 @@
     function clearFilters() {
         selectedYear = "all";
         selectedTag = "all";
-        showPreprints = true;
     }
 </script>
 
@@ -173,7 +216,15 @@
         >
             {filteredPapers.length} {filteredPapers.length === 1 ? "entry" : "entries"}
         </button>
-        <span>sorted by year descending</span>
+        <button
+            type="button"
+            class="underline decoration-dotted decoration-ink-300 underline-offset-[3px] transition-colors hover:text-ink-900 dark:decoration-ink-600 dark:hover:text-cream-100"
+            on:click={cycleSortOrder}
+            title="Click to change sort order"
+            aria-label={`Sorted by ${sortLabel}. Click to change sort order.`}
+        >
+            sorted by {sortLabel}
+        </button>
     </div>
 
     {#if published.length > 0}
@@ -183,8 +234,8 @@
                 <div class="section-rule-line"></div>
             </div>
 
-            {#each sortedYears as year}
-                {#if papersByYear[year]?.some((p) => !p.preprint && !p.classProject)}
+            {#if sortOrder === "year-desc" || sortOrder === "year-asc"}
+                {#each sortedYears as year}
                     <div class="mb-7">
                         <div class="section-rule mb-4 gap-3 pl-1">
                             <p class="meta-label">{year}</p>
@@ -192,7 +243,7 @@
                         </div>
 
                         <div class="space-y-3">
-                            {#each papersByYear[year].filter((p) => !p.preprint && !p.classProject) as paper (paper.id)}
+                            {#each papersByYear[year] as paper (paper.id)}
                                 <ResearchCard
                                     {paper}
                                     variant="full"
@@ -201,27 +252,18 @@
                             {/each}
                         </div>
                     </div>
-                {/if}
-            {/each}
-        </section>
-    {/if}
-
-    {#if showPreprints && preprints.length > 0}
-        <section class="mb-12">
-            <div class="section-rule mb-5">
-                <h2 class="section-heading mb-0">preprints</h2>
-                <div class="section-rule-line"></div>
-            </div>
-
-            <div class="space-y-3">
-                {#each preprints as paper (paper.id)}
-                    <ResearchCard
-                        {paper}
-                        variant="full"
-                        highlighted={paper.id === highlightedPaperId}
-                    />
                 {/each}
-            </div>
+            {:else}
+                <div class="space-y-3">
+                    {#each published as paper (paper.id)}
+                        <ResearchCard
+                            {paper}
+                            variant="full"
+                            highlighted={paper.id === highlightedPaperId}
+                        />
+                    {/each}
+                </div>
+            {/if}
         </section>
     {/if}
 

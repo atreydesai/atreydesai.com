@@ -116,7 +116,7 @@
 
 {#if paper.image}
     <div
-        class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-40 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-48"}`}
+        class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-36 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-36"}`}
     >
         <button
             type="button"
@@ -211,8 +211,8 @@
                 on:keydown|stopPropagation={() => {}}
             >
                 {#if paper.imageAnimated && isVideo}
-                    <!-- The explainer animation, full size — not the static
-                         figure — so the lightbox shows the moving version. -->
+                    <!-- The explainer animation, full size: not the static
+                         figure: so the lightbox shows the moving version. -->
                     <!-- svelte-ignore a11y-media-has-caption -->
                     <video
                         src={paper.imageAnimated}
