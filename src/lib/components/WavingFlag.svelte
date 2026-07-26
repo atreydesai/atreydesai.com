@@ -4,7 +4,7 @@
   // A pixel-art waving flag (à la 8-bit "Octobit" flags). The song name is baked
   // crisply into a buffer at full device resolution, then redrawn each frame
   // column-by-column at 1:1 with per-column vertical offsets SNAPPED to chunky
-  // pixel steps and cycled through FRAMES discrete frames — so the cloth ripples
+  // pixel steps and cycled through FRAMES discrete frames: so the cloth ripples
   // blockily while the text stays sharp. Anchored at the pole, more sway at the
   // free end.
   export let text: string;

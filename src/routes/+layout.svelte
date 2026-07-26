@@ -51,7 +51,7 @@
       "color:#E85D4C;font-size:14px;font-weight:700",
     );
     console.log(
-      "%cI'm Atrey — applying to Ph.D. programs (2026–27). If you're a curious dev or a potential advisor, say hi: adesai10@umd.edu\n%cpsst… there's a hidden game. enter the konami code →  ↑ ↑ ↓ ↓ ← → ← → b a",
+      "%cHmm why are you poking around here. You should say hi: adesai10@umd.edu\n%cpsst… there's a hidden game. enter the konami code →  ↑ ↑ ↓ ↓ ← → ← → b a",
       "color:#8a7d70;font-size:12px;line-height:1.6",
       "color:#b0a498;font-size:11px;font-style:italic",
     );
@@ -77,7 +77,7 @@
     };
     window.addEventListener("keydown", onKey);
 
-    // Google Analytics — production only, deferred to idle time.
+    // Google Analytics: production only, deferred to idle time.
     if (!dev) {
       const loadGa = () => {
         const w = window as any;

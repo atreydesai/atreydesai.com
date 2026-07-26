@@ -15,7 +15,7 @@
   descent-override: 22%;
   line-gap-override: 0%;
 }
-/* Prose font is Optima, sourced from the system — it ships with macOS/iOS, so
+/* Prose font is Optima, sourced from the system: it ships with macOS/iOS, so
    there's no @font-face / web-font download. Where Optima is absent it falls
    back to Candara (Windows), then URW Classico (an Optima clone on some Linux
    distros), then the platform default sans-serif. Since it loads locally
@@ -23,7 +23,7 @@
    Typekit sans above). */
 
 /* ============================================
-   Type system — three roles, one source of truth. Both these CSS vars and the
+   Type system: three roles, one source of truth. Both these CSS vars and the
    Tailwind fontFamily keys (display / serif / mono) point here, so there's a
    single place to change a typeface. Roles:
      --font-display  Neue Haas Grotesk (Typekit)  → headlines / big headers
@@ -230,8 +230,8 @@
     @apply text-cream-400;
   }
 
-  /* ===== Card treatment — VARIANT D: ledger rows =====
-     No box at all — each work is a bibliography row on the bare paper,
+  /* ===== Card treatment: VARIANT D: ledger rows =====
+     No box at all: each work is a bibliography row on the bare paper,
      divided by a faded hairline (same fade as the section rules). Hover
      washes the row with a faint warm tint; nothing floats or lifts. */
   .surface-card {
@@ -282,7 +282,7 @@
     @apply bg-ink-800 hover:bg-ink-700;
   }
 
-  /* Buttons — square-cornered like the bookshelf controls */
+  /* Buttons: square-cornered like the bookshelf controls */
   .btn {
     @apply inline-flex items-center justify-center px-4 py-2 rounded-[2px];
     @apply font-medium transition-all duration-200;
@@ -298,7 +298,7 @@
     @apply bg-cream-100 text-ink-900 hover:bg-cream-200;
   }
 
-  /* Tags/Pills — compact ledger labels used across research, blog, and bookshelf.
+  /* Tags/Pills: compact ledger labels used across research, blog, and bookshelf.
      Borderless mono chips: a quiet background fill carries the shape, matching
      the [IP1]-style mono citation labels on the homepage. */
   .pill {

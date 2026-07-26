@@ -27,7 +27,7 @@
             targetY = e.clientY;
         };
 
-        // Animation loop — one layout read per frame at most.
+        // Animation loop: one layout read per frame at most.
         let animationId: number;
         const animate = () => {
             cursorX = targetX;

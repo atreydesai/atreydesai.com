@@ -112,7 +112,7 @@
 
 </script>
 
-<footer class="layout-main w-full mt-20 pb-8">
+<footer class="layout-main w-full mt-4 pb-8">
   <div class="border-t border-ink-200 dark:border-ink-700 pt-6">
     <div
       class="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-y-4"

@@ -42,7 +42,7 @@
                 readingNow = data.reading ?? null;
             }
         } catch {
-            // Network/API hiccup — footnote 7 keeps its static fallback and
+            // Network/API hiccup: footnote 7 keeps its static fallback and
             // the "currently reading" line simply doesn't render.
         }
     }
@@ -63,7 +63,7 @@
             m.rank != null
                 ? `currently <span class="fn-stat">#${m.rank}</span> in the world with a <span class="fn-stat">${mana(m.netWorth)}</span> net worth`
                 : `a <span class="fn-stat">${mana(m.netWorth)}</span> net worth`;
-        return `I run a monthly ${market} market on Manifold — ${standing}.`;
+        return `I run a monthly ${market} market on Manifold, ${standing}.`;
     })();
 
     // Place each sidenote level with its marker, then push notes down just
@@ -159,7 +159,7 @@
         }
     }
 
-    // Footnote 7's content swaps in live data after load — re-stack since
+    // Footnote 7's content swaps in live data after load: re-stack since
     // its height may change.
     $: if (browser && fn7Html) tick().then(scheduleLayout);
 
@@ -180,7 +180,7 @@
 
 <!-- Centered layout container with footnotes on the side -->
 <div class="relative" bind:this={containerEl}>
-    <!-- Sidenotes (desktop only) — each note sits in the right margin beside
+    <!-- Sidenotes (desktop only): each note sits in the right margin beside
          its marker, faint until hovered. -->
     <aside class="hidden xl:block absolute inset-y-0 right-8 w-56 z-10">
         <div class="relative h-full">
@@ -330,7 +330,7 @@
                                     rel="noopener noreferrer"
                                     class="link font-medium">{site.name}</a
                                 >
-                                —
+                                :
                                 <span class="text-ink-500 dark:text-ink-400"
                                     >{site.description}</span
                                 >
@@ -352,7 +352,7 @@
 
         <!-- Things I'm thinking about -->
         <section class="mb-12">
-            <h2 class="section-heading">things i'm thinking about lately</h2>
+            <h2 class="section-heading">thoughts floating around in my head</h2>
 
             <div class="text-ink-700 dark:text-cream-300 space-y-4">
                 <ul class="list-disc list-inside space-y-2">
@@ -406,7 +406,7 @@
     }
 
     /* Margin sidenotes: absolutely positioned level with their markers
-       (stacked apart when they'd overlap), faint until hovered — either the
+       (stacked apart when they'd overlap), faint until hovered: either the
        note itself or its marker in the text. Hidden until first layout so
        they don't flash at top: 0. */
     .sidenote {
@@ -437,7 +437,7 @@
     }
 
     /* The Manifold footnote pair [6][7]: hovering either one makes them
-       see-saw — one rises while the other dips, then they swap. */
+       see-saw: one rises while the other dips, then they swap. */
     :global(.footnote-ref[data-footnote="6"]),
     :global(.footnote-ref[data-footnote="7"]) {
         display: inline-block;
@@ -457,7 +457,7 @@
         ) {
         animation: fn-seesaw 0.65s ease-in-out infinite reverse;
     }
-    /* -global- so the name survives Svelte's keyframe hashing — the
+    /* -global- so the name survives Svelte's keyframe hashing: the
        animation is referenced from :global() selectors above. */
     @keyframes -global-fn-seesaw {
         0%,

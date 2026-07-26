@@ -3,7 +3,7 @@ id: favorites
 title: "Favorites"
 date: "2026-04-16"
 tags: [personal]
-excerpt: "A running list of favorites — books, films, music, art, and more."
+excerpt: "A running list of favorites: books, films, music, art, and more."
 published: true
 ---
 
@@ -11,7 +11,7 @@ A running collection of things I love. Updated as I discover new ones.
 
 ## Books
 
-*Yolk* — Mary H.K. Choi
+*Yolk* by Mary H.K. Choi
 
 ## Films
 
@@ -19,7 +19,7 @@ Good Will Hunting · Whiplash · 20th Century Girl
 
 ## Music
 
-**Song:** Lovers in the Night — Seori
+**Song:** Lovers in the Night by Seori
 
 **Genres**
 
@@ -42,7 +42,7 @@ Wesley Wang ([w.wang64](https://www.instagram.com/w.wang64))
 
 ## Actors
 
-Daisy Edgar-Jones · Paul Mescal
+Daisy Edgar-Jones · Paul Mescal · Jake Gyllenhaal
 
 ## Columnists
 
@@ -50,27 +50,27 @@ James Somers
 
 ## Bucket List
 
-Schäfler — Switzerland
+Schäfler, Switzerland
 
 ## Latin Phrases
 
-*ad astra per aspera* — to the stars through difficulties
+*ad astra per aspera*: to the stars through difficulties
 
-*alis volat propriis* — he flies by his own wings
+*alis volat propriis*: he flies by his own wings
 
-*ars longa, vita brevis* — art is long, life is short
+*ars longa, vita brevis*: art is long, life is short
 
-*dum spiro spero* — while I breathe, I hope
+*dum spiro spero*: while I breathe, I hope
 
-*exigo a me non ut optimus par sim sed ut malis melior* — I require myself not to be equal to the best, but to be better than the bad
+*exigo a me non ut optimus par sim sed ut malis melior*: I require myself not to be equal to the best, but to be better than the bad
 
-*experientia docet* — experience teaches
+*experientia docet*: experience teaches
 
-*helluo librorum* — a glutton for books (bookworm)
+*helluo librorum*: a glutton for books (bookworm)
 
-*in libris libertas* — in books, freedom
+*in libris libertas*: in books, freedom
 
-*littera scripta manet* — the written letter lasts
+*littera scripta manet*: the written letter lasts
 
 ## Visual Artists
 

@@ -20,7 +20,7 @@
     $: strokeDashoffset = circumference - progress;
     $: displayValue = value != null ? value : null;
 
-    // Colors based on type — enjoyment = warm (accent orange), importance = cool (steel blue)
+    // Colors based on type: enjoyment = warm (accent orange), importance = cool (steel blue)
     $: strokeColor =
         type === "enjoyment" ? "stroke-accent" : "stroke-steel";
     $: textColor =

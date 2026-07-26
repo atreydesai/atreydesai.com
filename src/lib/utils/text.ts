@@ -16,7 +16,7 @@ export interface ParseInlineOptions {
 	footnotes?: boolean;
 }
 
-// Transform order is significant — it mirrors the original per-page functions
+// Transform order is significant: it mirrors the original per-page functions
 // so output is byte-for-byte identical: strong → italic → copyButton → link →
 // footnote. (`copyButton` matches empty `()`, `link` matches non-empty `(url)`,
 // so they never collide, but copyButton runs first to match the old banner code.)

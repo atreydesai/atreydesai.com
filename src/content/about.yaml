@@ -15,7 +15,7 @@ footnotes:
   - id: 6
     content: "This had started out as a fun thing with my roommate, but we both discovered we were really good at predictions. It became a nightly tradition to come back to the apartment and talk about the progress of our trades for the day (much to the chagrin of our friends)."
   - id: 7
-    # Fallback only — the about page replaces this with live data from /api/now.
+    # Fallback only: the about page replaces this with live data from /api/now.
     content: "I run a monthly AI model releases market on Manifold."
 
 # Professional section - your academic/research bio
@@ -23,9 +23,7 @@ professional:
   intro: "I'm **Atrey Desai**, a senior (fourth-year) undergraduate student studying [computer science](https://www.cs.umd.edu/) and [linguistics](https://linguistics.umd.edu/) with a minor in [korean studies](https://sllc.umd.edu/fields/korean) at the [University of Maryland](https://umd.edu). I am fortunate to be advised by Professors [Rachel Rudinger](https://rudinger.github.io/), [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg), and [Mohit Iyyer](https://www.cs.umd.edu/~miyyer/)."
 
   paragraphs:
-    - text: "My Erdős number is **3**: me → Jordan Boyd-Graber → Maria Klawe → Paul Erdős ([trace](https://users.umiacs.umd.edu/~ying/static/faq.html))."
-
-    - text: "I am also eternally indebted to [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for their mentoring. Thank you for taking a curious undergraduate under your wing!"
+    - text: "I am also thankful to [Nishant Balepur](https://nbalepur.github.io/), [Yoo Yeon Sung](https://yysung.github.io/), and [Sathvik Nair](https://sathvikn.github.io/) for their mentoring. Thank you for taking a curious undergraduate under your wing!"
 
     - text: "I am a member of the Computational Linguistics and Information Processing [(CLIP)](https://clip.umd.edu/) lab in UMIACS. I'm also a visiting researcher under Professor [Kenny Zhu](https://kenzhu2000.github.io/) at the Arlington Computational Linguistics [(ACL2)](https://uta-acl2.github.io/) Lab. Our work focuses on identifying structural similarities to human language and contextual semantics within animal vocalizations to gain insights into their language."
       footnote: 1
@@ -35,6 +33,8 @@ professional:
 
     - text: "Before college, I worked with Professor [Michael Littman](https://littmania.com/) at the Reinforcement Learning & Adaptive Behavior [(RLAB)](http://irl.cs.brown.edu/) group at Brown University on applications of reinforcement learning to 2D non-sequential tasks."
       footnote: 3
+
+    - text: "My Erdős number is 3: me → Jordan Boyd-Graber → Maria Klawe → Paul Erdős ([trace](https://users.umiacs.umd.edu/~ying/static/faq.html))."
 
 # Personal section
 personal:
@@ -91,7 +91,7 @@ website:
     - name: "Shreya Shankar"
       url: "https://www.sh-reya.com/blog"
       description: "For the blog section, the old one was quite cluttered."
-  builtWith: "This website was built in [Antigravity](https://antigravity.google), though it now largely maintained by [Claude Code](https://code.claude.com/docs/en/overview). It uses SvelteKit, Tailwind CSS, and is deployed on Vercel."
+  builtWith: "This website was built in [Antigravity](https://antigravity.google), though it is now largely maintained by [Codex](https://openai.com/codex/). It uses SvelteKit, Tailwind CSS, and is deployed on Vercel."
 
 # Things you're thinking about
 thoughts:

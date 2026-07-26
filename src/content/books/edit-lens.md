@@ -12,4 +12,4 @@ enjoyment: 8
 importance: 7
 ---
 
-EditLens introduces a model and metrics to quantify the degree of AI editing in text—a neglected middle ground between fully human and fully AI-generated content. The paper demonstrates that AI-edited text is distinguishable from both human-written and AI-generated text, with significant implications for authorship attribution, education, and policy.
+EditLens introduces a model and metrics to quantify the degree of AI editing in text, a neglected middle ground between fully human and fully AI-generated content. The paper demonstrates that AI-edited text is distinguishable from both human-written and AI-generated text, with significant implications for authorship attribution, education, and policy.

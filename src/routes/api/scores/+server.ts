@@ -44,13 +44,13 @@ function publicEntries(board: Entry[]): PublicEntry[] {
 }
 
 // The blob's URL is stable for a fixed pathname, so cache it across warm
-// invocations: `list()` (an Advanced Operation — only 2,000/mo free on Hobby)
+// invocations: `list()` (an Advanced Operation: only 2,000/mo free on Hobby)
 // then runs just once per cold start instead of on every request. Reads hit
 // the URL directly afterward.
 let cachedUrl: string | null = null;
 
 // Resolves to the blob URL, null if the blob doesn't exist yet, or throws if
-// the store can't be reached — callers must not mistake "can't reach the
+// the store can't be reached: callers must not mistake "can't reach the
 // store" for "board is empty", or a subsequent write would clobber the board.
 async function resolveUrl(): Promise<string | null> {
 	if (cachedUrl) return cachedUrl;
@@ -65,11 +65,11 @@ async function readBoard(): Promise<Entry[] | null> {
 	try {
 		const url = await resolveUrl();
 		if (!url) return [];
-		// Authenticated download via the SDK — works for blobs in a PRIVATE store
+		// Authenticated download via the SDK: works for blobs in a PRIVATE store
 		// (a plain fetch of the URL is rejected for private blobs). get() returns a
 		// stream + metadata, not a Response.
 		const result = await get(url, { access: 'private', token });
-		// get() resolves null when the blob doesn't exist — that's a legitimately
+		// get() resolves null when the blob doesn't exist: that's a legitimately
 		// empty board, not a failure.
 		if (!result) return [];
 		if (result.statusCode !== 200) {
@@ -85,7 +85,7 @@ async function readBoard(): Promise<Entry[] | null> {
 }
 
 async function writeBoard(board: Entry[]): Promise<void> {
-	// access MUST be 'private' — the boba-game store is private, and put()
+	// access MUST be 'private': the boba-game store is private, and put()
 	// otherwise defaults to 'public', which a private store rejects.
 	const { url } = await put(PATH, JSON.stringify(board), {
 		access: 'private',
@@ -101,7 +101,7 @@ async function writeBoard(board: Entry[]): Promise<void> {
 // same instance can't lose each other's entry. Fluid Compute routes concurrent
 // requests to a shared instance, so this covers the common case; simultaneous
 // writes from *separate* instances can still race, which this store can't
-// prevent (Blob has no conditional writes) — acceptable for a toy leaderboard.
+// prevent (Blob has no conditional writes): acceptable for a toy leaderboard.
 let writeLock: Promise<unknown> = Promise.resolve();
 
 function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
@@ -113,7 +113,7 @@ function withWriteLock<T>(fn: () => Promise<T>): Promise<T> {
 	return run;
 }
 
-// Per-IP fixed-window rate limit, in-memory (per instance — a determined
+// Per-IP fixed-window rate limit, in-memory (per instance: a determined
 // attacker can still spread across instances, but this stops casual loops).
 const RATE_LIMIT = 5; // submissions
 const RATE_WINDOW_MS = 60_000; // per minute
@@ -190,7 +190,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		return await withWriteLock(async () => {
 			const board = await readBoard();
 			if (board === null) {
-				// Unknown board state — refuse to write rather than risk replacing
+				// Unknown board state: refuse to write rather than risk replacing
 				// the real leaderboard with just this entry.
 				return json({ ok: false, reason: "couldn't save, try again" }, { status: 500 });
 			}

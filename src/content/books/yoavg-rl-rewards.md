@@ -12,4 +12,4 @@ enjoyment: 9
 importance: 10
 ---
 
-Yoav Goldberg presents a compelling argument that the traditional RL model—where rewards are external to the agent—is fundamentally flawed. He argues that rewards should be modeled as an internal interpretation by the agent of environmental state changes, bringing the CS framework closer to cognitive science perspectives.
+Yoav Goldberg presents a compelling argument that the traditional RL model, where rewards are external to the agent, is fundamentally flawed. He argues that rewards should be modeled as an internal interpretation by the agent of environmental state changes, bringing the CS framework closer to cognitive science perspectives.

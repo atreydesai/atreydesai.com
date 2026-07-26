@@ -77,7 +77,7 @@
         ctx.clearRect(0, 0, width, height);
         ctx.drawImage(tempCanvas, 0, 0, width, height);
 
-        // Draw grid lines for lego effect — align with actual pixel block boundaries
+        // Draw grid lines for lego effect: align with actual pixel block boundaries
         if (progress > 0.5) {
             const gridOpacity = (progress - 0.5) * 0.3;
             ctx.strokeStyle = `rgba(0, 0, 0, ${gridOpacity})`;
@@ -150,7 +150,7 @@
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
 >
-    <!-- Plain <img> is the LCP element — renders from the <link rel=preload>
+    <!-- Plain <img> is the LCP element: renders from the <link rel=preload>
          in app.html immediately, no JS needed. The canvas sits on top and
          stays transparent until the user hovers. -->
     <img {src} {alt} class="lego-img" width="500" height="500" decoding="async" />

@@ -13,7 +13,7 @@
   import { bobaMode, openBoba } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
 
-  // Little pixel boba tucked in the photo corner — a random drink + straw
+  // Little pixel boba tucked in the photo corner: a random drink + straw
   // orientation on each page load. Click to play the minigame.
   const CUP_BODY = [
     "OOOOOOO",
@@ -66,7 +66,7 @@
   let slideMs = 260;
 
   // banner.lead embeds the projects toggle inline as a "{label}" token,
-  // e.g. "…about my {ongoing projects}." — split it into text around the toggle.
+  // e.g. "…about my {ongoing projects}.": split it into text around the toggle.
   const bannerLeadMatch = (homepageData.banner?.lead ?? "").match(/^(.*)\{([^}]+)\}(.*)$/);
   const bannerLead = bannerLeadMatch
     ? { pre: bannerLeadMatch[1], label: bannerLeadMatch[2], post: bannerLeadMatch[3] }
@@ -152,7 +152,7 @@
               blockSize={48}
             />
           </div>
-          <!-- Pixel boba peeking out of the corner — shakes + jingles on hover,
+          <!-- Pixel boba peeking out of the corner: shakes + jingles on hover,
                launches the minigame on click. Hidden while the game is open. -->
           {#if !$bobaMode}
             <button
@@ -169,7 +169,7 @@
         </div>
       </div>
 
-      <!-- Links: col 1, row 2 — bottom aligns with image bottom -->
+      <!-- Links: col 1, row 2: bottom aligns with image bottom -->
       <div class="md:col-start-1 md:row-start-2 -mt-4 flex items-center text-sm">
         {#each socialLinks as link, i}
           {#if i > 0}
@@ -374,7 +374,7 @@
       transform: rotate(25deg) translateY(-1px) scale(1.08);
     }
   }
-  /* Mouse/desktop only — the game needs a pointer to play. */
+  /* Mouse/desktop only: the game needs a pointer to play. */
   @media (max-width: 767px), (hover: none), (pointer: coarse) {
     .boba-launcher {
       display: none;
@@ -404,7 +404,7 @@
     animation: tooltip-pop 0.22s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 
-  /* Cook tooltip lives among the mono citation labels — match that font. */
+  /* Cook tooltip lives among the mono citation labels: match that font. */
   .cook-tooltip {
     font-family: var(--font-mono);
   }
@@ -430,7 +430,7 @@
     transform: translate(-2px, -2px);
   }
 
-  /* Back accent slab — offset down/right, distorted edges */
+  /* Back accent slab: offset down/right, distorted edges */
   .banner-riso-back {
     position: absolute;
     top: 6px;
@@ -457,7 +457,7 @@
     background: #F07563;
   }
 
-  /* Front sheet — cream paper drawn on ::before with the SAME rough filter
+  /* Front sheet: cream paper drawn on ::before with the SAME rough filter
      as the back slab, so both fills wobble together (no straight edge where
      cream meets accent). The sketchy outline lives on ::after. */
   .banner-riso-front {
@@ -492,7 +492,7 @@
     border-color: #fdf8f3;
   }
 
-  /* Hover underline belongs to the label only — never the caret. */
+  /* Hover underline belongs to the label only: never the caret. */
   .banner-toggle:hover {
     text-decoration: none;
   }
@@ -502,7 +502,7 @@
     text-underline-offset: 3px;
   }
 
-  /* Disclosure caret for the projects toggle — rotates a quarter turn open. */
+  /* Disclosure caret for the projects toggle: rotates a quarter turn open. */
   .banner-caret {
     display: inline-block;
     font-size: 0.85em;
@@ -519,7 +519,7 @@
   }
 
   /* Darker selection inside the banner so it stands out from the blush bg.
-     Use :global so selection applies to all descendants — including @html-rendered
+     Use :global so selection applies to all descendants: including @html-rendered
      <strong>/<a>/<button> which don't carry Svelte's scoping hash. */
   :global(.banner-box *::selection),
   :global(.banner-box::selection) {

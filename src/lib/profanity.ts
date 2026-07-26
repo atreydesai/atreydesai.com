@@ -1,7 +1,7 @@
 // Leaderboard name moderation. Used on the client for instant feedback and on
 // the server (/api/scores) as the authority. We normalize common leetspeak and
 // strip non-letters, then reject names whose normalized form contains a blocked
-// term — profanity, slurs, hate/violence, and crypto-scam bait. For 10-char
+// term: profanity, slurs, hate/violence, and crypto-scam bait. For 10-char
 // game tags we intentionally err toward blocking; the UI just asks for another.
 
 export const MAX_NAME = 20;
@@ -47,7 +47,7 @@ export interface NameCheck {
 export function cleanName(raw: string): NameCheck {
 	const name = raw.trim();
 	if (!name) return { ok: false, reason: "enter a name" };
-	if (name.length > MAX_NAME) return { ok: false, reason: `too long — ${MAX_NAME} max` };
+	if (name.length > MAX_NAME) return { ok: false, reason: `too long (${MAX_NAME} max)` };
 	if (!/^[A-Za-z0-9 ]+$/.test(name)) {
 		return { ok: false, reason: "letters & numbers only" };
 	}

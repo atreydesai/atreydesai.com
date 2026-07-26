@@ -10,7 +10,7 @@
     export let options: Option[] = [];
     export let value: string = options[0]?.value || "";
     export let placeholder: string = "Select...";
-    // Accessible name for the control — without it screen readers only announce
+    // Accessible name for the control: without it screen readers only announce
     // the current value (e.g. "All Years") with no hint of what it filters.
     export let ariaLabel: string = "";
     export let fastScroll = false;

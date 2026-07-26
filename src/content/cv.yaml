@@ -152,9 +152,9 @@ responsibilities:
   mentorship:
     title: Mentorship
     items:
-      - '<strong>Office of Undergraduate Research:</strong> Juan Cortés, Kemisola Benson, Vivian Akpala <span class="text-ink-500 dark:text-ink-400">— 2025</span>'
-      - '<strong>Technica Mentoring:</strong> Savya Miriyala, Tanya Grover, Jessica Ononye, Nakshatra Hiray <span class="text-ink-500 dark:text-ink-400">— 2024</span>'
-      - '<strong>MSET Robotics:</strong> Workshop organizer and curriculum designer <span class="text-ink-500 dark:text-ink-400">— 2020 – 2022</span>'
+      - '<strong>Office of Undergraduate Research:</strong> Juan Cortés, Kemisola Benson, Vivian Akpala <span class="text-ink-500 dark:text-ink-400">(2025)</span>'
+      - '<strong>Technica Mentoring:</strong> Savya Miriyala, Tanya Grover, Jessica Ononye, Nakshatra Hiray <span class="text-ink-500 dark:text-ink-400">(2024)</span>'
+      - '<strong>MSET Robotics:</strong> Workshop organizer and curriculum designer <span class="text-ink-500 dark:text-ink-400">(2020 – 2022)</span>'
 
 skills:
   - label: Languages

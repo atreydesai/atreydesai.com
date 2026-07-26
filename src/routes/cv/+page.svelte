@@ -63,8 +63,8 @@
     </div>
 
     <p class="deck text-ink-600 dark:text-cream-400 mb-1">
-        A comprehensive overview of my academic and professional history. For a
-        condensed version, see my <a href="/resume/" class="link">resume</a>.
+        For a condensed version, see my
+        <a href="/resume/" class="link">resume</a>.
     </p>
     {#if data.cvLastUpdated}
         <p class="text-sm italic text-ink-400 dark:text-cream-500 mb-8">
@@ -199,7 +199,7 @@
                                 <li>
                                     {venue.name} <span
                                         class="text-ink-500 dark:text-ink-400"
-                                        >— {venue.date}</span
+                                        >({venue.date})</span
                                     >
                                 </li>
                             {/each}
