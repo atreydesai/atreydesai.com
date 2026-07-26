@@ -7,6 +7,8 @@ dateAdded: ""
 favorite: false
 medium: movie
 url: "https://en.wikipedia.org/wiki/How_to_Lose_a_Guy_in_10_Days"
+letterboxdUrl: "https://letterboxd.com/film/how-to-lose-a-guy-in-10-days/"
+letterboxdYear: 2003
 tags:
   - "romantic comedy"
 ---

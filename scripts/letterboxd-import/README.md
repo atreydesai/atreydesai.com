@@ -1,0 +1,184 @@
+# Letterboxd backfill list
+
+Profile: [silentnovas](https://letterboxd.com/silentnovas/)
+
+This is the complete Letterboxd-compatible inventory from the bookshelf: **167 individual titles** (82 watched and 85 watchlist). The aggregate “Divergent series” bookshelf record is expanded into its three films.
+
+For less clicking, [watched.csv](./watched.csv) can be uploaded through Letterboxd’s watched-film importer and [watchlist.csv](./watchlist.csv) through its separate watchlist importer. Both files use exact Letterboxd URIs. They intentionally omit `WatchedDate`, so they do not invent historical diary dates. Integer bookshelf ratings are included losslessly; half-point ratings out of ten are left blank because Letterboxd cannot represent quarter-star values.
+
+## Watched (82)
+
+- [10 Things I Hate About You (1999)](https://letterboxd.com/film/10-things-i-hate-about-you/)
+- [1917 (2019)](https://letterboxd.com/film/1917/)
+- [20th Century Girl (2022)](https://letterboxd.com/film/20th-century-girl/) — bookshelf date 2022-12-06; appreciation 10/10
+- [A Guilty Conscience (2023)](https://letterboxd.com/film/a-guilty-conscience/) — bookshelf date 2023-07-11; appreciation 8.5/10
+- [A Million Miles Away (2023)](https://letterboxd.com/film/a-million-miles-away-2023/)
+- [A Walk to Remember (2002)](https://letterboxd.com/film/a-walk-to-remember/)
+- [Ad Astra (2019)](https://letterboxd.com/film/ad-astra-2019/)
+- [Allegiant (2016)](https://letterboxd.com/film/allegiant/) — from “Divergent series”
+- [BlacKkKlansman (2018)](https://letterboxd.com/film/blackkklansman/)
+- [Can't Help Falling in Love (2017)](https://letterboxd.com/film/cant-help-falling-in-love/) — bookshelf date 2022-12-06; appreciation 5/10
+- [Crimes of Grindelwald (2018)](https://letterboxd.com/film/fantastic-beasts-the-crimes-of-grindelwald/)
+- [Devotion (2022)](https://letterboxd.com/film/devotion-2022/)
+- [Divergent (2014)](https://letterboxd.com/film/divergent/) — from “Divergent series”
+- [Do Revenge (2022)](https://letterboxd.com/film/do-revenge/) — bookshelf date 2022-09-18
+- [Doctor Strange in the Multiverse of Madness (2022)](https://letterboxd.com/film/doctor-strange-in-the-multiverse-of-madness/)
+- [Drama Special Season 9: So Close, Yet So Far (2018)](https://letterboxd.com/film/so-close-yet-so-far/) — bookshelf date 2023-08-15; appreciation 7/10
+- [Dream (2023)](https://letterboxd.com/film/dream-2023/) — bookshelf date 2023-08-02; appreciation 6/10
+- [Edge of Tomorrow (2014)](https://letterboxd.com/film/edge-of-tomorrow/) — bookshelf date 2026-06-21; appreciation 8/10
+- [Enola Holmes 2 (2022)](https://letterboxd.com/film/enola-holmes-2/) — bookshelf date 2022-11-11
+- [Extraction (2020)](https://letterboxd.com/film/extraction-2020/) — bookshelf date 2022-09-28
+- [F1 (2025)](https://letterboxd.com/film/f1/) — bookshelf date 2026-06-21; appreciation 7/10
+- [Fantastic Beasts: The Secrets of Dumbledore (2022)](https://letterboxd.com/film/fantastic-beasts-the-secrets-of-dumbledore/)
+- [Flipped (2010)](https://letterboxd.com/film/flipped/)
+- [Ford v Ferrari (2019)](https://letterboxd.com/film/ford-v-ferrari/)
+- [Friends with Benefits (2011)](https://letterboxd.com/film/friends-with-benefits/)
+- [Ghosted (2023)](https://letterboxd.com/film/ghosted-2023/)
+- [Good Will Hunting (1997)](https://letterboxd.com/film/good-will-hunting/)
+- [Gran Torino (2008)](https://letterboxd.com/film/gran-torino/)
+- [Grosse Pointe Blank (1997)](https://letterboxd.com/film/grosse-pointe-blank/)
+- [Hacksaw Ridge (2016)](https://letterboxd.com/film/hacksaw-ridge/) — bookshelf date 2026-06-21; appreciation 9/10
+- [Hear Me: Our Summer (2024)](https://letterboxd.com/film/hear-me-our-summer/) — bookshelf date 2025-01-13; appreciation 9.5/10
+- [How to Lose a Guy in 10 Days (2003)](https://letterboxd.com/film/how-to-lose-a-guy-in-10-days/)
+- [Hunger (2023)](https://letterboxd.com/film/hunger-2023/) — bookshelf date 2023-05-17; appreciation 8/10
+- [Insurgent (2015)](https://letterboxd.com/film/insurgent/) — from “Divergent series”
+- [Jojo Rabbit (2019)](https://letterboxd.com/film/jojo-rabbit/)
+- [Joker (2019)](https://letterboxd.com/film/joker-2019/)
+- [Just the Way You Are (2015)](https://letterboxd.com/film/just-the-way-you-are-2015-2/) — bookshelf date 2022-12-18; appreciation 5/10
+- [Kill Bok Soon (2023)](https://letterboxd.com/film/kill-boksoon/) — bookshelf date 2023-04-14; appreciation 7.5/10
+- [Little Women (2019)](https://letterboxd.com/film/little-women-2019/)
+- [Love and Other Drugs (2010)](https://letterboxd.com/film/love-other-drugs/)
+- [Love in Taipei (2023)](https://letterboxd.com/film/love-in-taipei/) — bookshelf date 2024-10-05
+- [Love, Rosie (2014)](https://letterboxd.com/film/love-rosie/)
+- [McFarland, U.S.A. (2015)](https://letterboxd.com/film/mcfarland-usa/)
+- [Mission: Impossible – The Final Reckoning (2025)](https://letterboxd.com/film/mission-impossible-the-final-reckoning/) — bookshelf date 2026-06-21; appreciation 8/10
+- [Mrs. Harris Goes to Paris (2022)](https://letterboxd.com/film/mrs-harris-goes-to-paris/)
+- [No Strings Attached (2011)](https://letterboxd.com/film/no-strings-attached/) — bookshelf date 2022-08-16
+- [One Day (2011)](https://letterboxd.com/film/one-day-2011/)
+- [Oppenheimer (2023)](https://letterboxd.com/film/oppenheimer-2023/)
+- [Pride and Prejudice (2005)](https://letterboxd.com/film/pride-prejudice/)
+- [Shang-Chi and the Legend of the Ten Rings (2021)](https://letterboxd.com/film/shang-chi-and-the-legend-of-the-ten-rings/)
+- [Shooting Stars (2023)](https://letterboxd.com/film/shooting-stars-2023/)
+- [Spider-Man: Across the Spider-Verse (2023)](https://letterboxd.com/film/spider-man-across-the-spider-verse/)
+- [Star Wars (theatrical cut) (1977)](https://letterboxd.com/film/star-wars/)
+- [The Batman (2022)](https://letterboxd.com/film/the-batman/)
+- [The Edge of Seventeen (2016)](https://letterboxd.com/film/the-edge-of-seventeen/)
+- [The Half of It (2020)](https://letterboxd.com/film/the-half-of-it/) — bookshelf date 2022-06-16
+- [The Irishman (2019)](https://letterboxd.com/film/the-irishman-2019/)
+- [The King of Staten Island (2020)](https://letterboxd.com/film/the-king-of-staten-island/)
+- [The King's Man (2021)](https://letterboxd.com/film/the-kings-man/)
+- [The Lunchbox (2013)](https://letterboxd.com/film/the-lunchbox/) — bookshelf date 2026-06-21; appreciation 10/10
+- [The Notebook (2004)](https://letterboxd.com/film/the-notebook/)
+- [The Perfect Date (2019)](https://letterboxd.com/film/the-perfect-date-2019/) — bookshelf date 2022-06-15
+- [The Proposal (2009)](https://letterboxd.com/film/the-proposal-2009/)
+- [The Pursuit of Happyness (2006)](https://letterboxd.com/film/the-pursuit-of-happyness/)
+- [The Spectacular Now (2013)](https://letterboxd.com/film/the-spectacular-now/)
+- [The Storied Life of A.J. Fikry (2022)](https://letterboxd.com/film/the-storied-life-of-aj-fikry/)
+- [The Ugly Truth (2009)](https://letterboxd.com/film/the-ugly-truth/)
+- [The Upside (2017)](https://letterboxd.com/film/the-upside/)
+- [The Way Back (2020)](https://letterboxd.com/film/the-way-back-2020/) — bookshelf date 2026-07-25; appreciation 8/10
+- [Thor: Love and Thunder (2022)](https://letterboxd.com/film/thor-love-and-thunder/)
+- [To All the Boys I've Loved Before (2018)](https://letterboxd.com/film/to-all-the-boys-ive-loved-before/) — bookshelf date 2023-11-23
+- [Two Night Stand (2014)](https://letterboxd.com/film/two-night-stand/)
+- [Uncharted (2022)](https://letterboxd.com/film/uncharted-2022/)
+- [Unstoppable (2024)](https://letterboxd.com/film/unstoppable-2024-1/)
+- [Upcoming Summer (2021)](https://letterboxd.com/film/upcoming-summer/) — bookshelf date 2023-04-13; appreciation 9.5/10
+- [Warm Bodies (2013)](https://letterboxd.com/film/warm-bodies/)
+- [Whiplash (2014)](https://letterboxd.com/film/whiplash-2014/)
+- [Wild Child (2008)](https://letterboxd.com/film/wild-child/)
+- [Work It (2020)](https://letterboxd.com/film/work-it/) — bookshelf date 2022-06-15
+- [Yes, God, Yes (2019)](https://letterboxd.com/film/yes-god-yes-2019/)
+- [You Do You (2023)](https://letterboxd.com/film/you-do-you/) — bookshelf date 2023-06-15
+- [You've Got Mail (1998)](https://letterboxd.com/film/youve-got-mail/)
+
+## Watchlist (85)
+
+- [18×2 Beyond Youthful Days (2024)](https://letterboxd.com/film/18x2-beyond-youthful-days/) — bookshelf date 2025-04-28
+- [A Good Year (2006)](https://letterboxd.com/film/a-good-year/) — bookshelf date 2026-07-25
+- [Ae Dil Hai Mushkil (2016)](https://letterboxd.com/film/ae-dil-hai-mushkil/)
+- [Aftersun (2022)](https://letterboxd.com/film/aftersun/) — bookshelf date 2026-07-25
+- [All Quiet on the Western Front (2022)](https://letterboxd.com/film/all-quiet-on-the-western-front-2022/)
+- [All We Imagine as Light (2024)](https://letterboxd.com/film/all-we-imagine-as-light/) — bookshelf date 2026-07-25
+- [Amélie (2001)](https://letterboxd.com/film/amelie/) — bookshelf date 2026-07-25
+- [Ata Thambaycha Naay! (2025)](https://letterboxd.com/film/ata-thambaycha-naay/) — bookshelf date 2026-07-26
+- [Badhaai Do (2022)](https://letterboxd.com/film/badhaai-do/)
+- [Better Days (2019)](https://letterboxd.com/film/better-days-2019/) — bookshelf date 2025-10-16
+- [Bird (2024)](https://letterboxd.com/film/bird-2024/) — bookshelf date 2026-07-25
+- [Black Bag (2025)](https://letterboxd.com/film/black-bag-2025/)
+- [Bones and All (2022)](https://letterboxd.com/film/bones-and-all/) — bookshelf date 2026-07-25
+- [Call Me by Your Name (2017)](https://letterboxd.com/film/call-me-by-your-name/) — bookshelf date 2026-07-25
+- [Charlie (2015)](https://letterboxd.com/film/charlie-2015/) — bookshelf date 2026-07-25
+- [Cheese in the Trap (2018)](https://letterboxd.com/film/cheese-in-the-trap/) — bookshelf date 2023-07-11
+- [Cinema Paradiso (1988)](https://letterboxd.com/film/cinema-paradiso/) — bookshelf date 2026-07-25
+- [City of God (2002)](https://letterboxd.com/film/city-of-god/) — bookshelf date 2026-07-25
+- [Close (2022)](https://letterboxd.com/film/close-2022/) — bookshelf date 2026-07-25
+- [Cure (1997)](https://letterboxd.com/film/cure/) — bookshelf date 2026-07-25
+- [Do the Right Thing (1989)](https://letterboxd.com/film/do-the-right-thing/) — bookshelf date 2026-07-25
+- [Fish Tank (2009)](https://letterboxd.com/film/fish-tank/) — bookshelf date 2026-07-25
+- [Forbidden Fairytale (2025)](https://letterboxd.com/film/forbidden-fairytale/) — bookshelf date 2025-05-02
+- [Good News (2025)](https://letterboxd.com/film/good-news-2025/) — bookshelf date 2025-10-24
+- [Gumraah (2023)](https://letterboxd.com/film/gumraah/)
+- [Hana & Alice (2004)](https://letterboxd.com/film/hana-alice/) — bookshelf date 2026-07-25
+- [Happy Kanako's Killer Life (2025)](https://letterboxd.com/film/happy-kanakos-killer-life/) — bookshelf date 2026-07-25
+- [Himizu (2011)](https://letterboxd.com/film/himizu/)
+- [In the Mood for Love (2000)](https://letterboxd.com/film/in-the-mood-for-love/) — bookshelf date 2026-07-25
+- [It's Okay! (2023)](https://letterboxd.com/film/its-okay-2023/) — bookshelf date 2025-10-16
+- [Just for Meeting You (2023)](https://letterboxd.com/film/just-for-meeting-you/) — bookshelf date 2025-03-04
+- [Kamathipura Express (2026)](https://letterboxd.com/film/kamathipura-express/) — bookshelf date 2026-07-26
+- [Kiki's Delivery Service (1989)](https://letterboxd.com/film/kikis-delivery-service/)
+- [Kumbalangi Nights (2019)](https://letterboxd.com/film/kumbalangi-nights/) — bookshelf date 2026-07-25
+- [La Haine (1995)](https://letterboxd.com/film/la-haine/) — bookshelf date 2026-07-25
+- [Lilya 4-ever (2002)](https://letterboxd.com/film/lilya-4-ever/) — bookshelf date 2026-07-25
+- [Little Forest (2018)](https://letterboxd.com/film/little-forest/) — bookshelf date 2026-07-25
+- [Love 911 (2012)](https://letterboxd.com/film/love-911/) — bookshelf date 2023-04-10
+- [Love in the Big City (2024)](https://letterboxd.com/film/love-in-the-big-city/) — bookshelf date 2025-03-05
+- [Man in Love (2014)](https://letterboxd.com/film/man-in-love/) — bookshelf date 2022-12-10
+- [Manchester by the Sea (2016)](https://letterboxd.com/film/manchester-by-the-sea/) — bookshelf date 2026-07-25
+- [Memories of Murder (2003)](https://letterboxd.com/film/memories-of-murder/) — bookshelf date 2026-07-25
+- [Midnight Runners (2017)](https://letterboxd.com/film/midnight-runners/) — bookshelf date 2025-04-25
+- [Midnight Sun (2025)](https://letterboxd.com/film/midnight-sun-2025/) — bookshelf date 2026-01-07
+- [Millennium Mambo (2001)](https://letterboxd.com/film/millennium-mambo/)
+- [My Sassy Girl (2001)](https://letterboxd.com/film/my-sassy-girl/) — bookshelf date 2025-03-07
+- [Mysterious Skin (2004)](https://letterboxd.com/film/mysterious-skin/) — bookshelf date 2026-07-25
+- [Night Fever (2026)](https://letterboxd.com/film/night-fever/) — bookshelf date 2025-04-08
+- [Nightcrawler (2014)](https://letterboxd.com/film/nightcrawler/) — bookshelf date 2026-06-21
+- [Once We Were Us (2025)](https://letterboxd.com/film/once-we-were-us/) — bookshelf date 2026-03-12
+- [Parasite (2019)](https://letterboxd.com/film/parasite-2019/) — bookshelf date 2026-07-25
+- [Past Lives (2023)](https://letterboxd.com/film/past-lives/) — bookshelf date 2026-07-25
+- [Pather Panchali (1955)](https://letterboxd.com/film/pather-panchali/) — bookshelf date 2026-07-25
+- [Perfect Days (2023)](https://letterboxd.com/film/perfect-days-2023/) — bookshelf date 2026-07-25
+- [Petite Maman (2021)](https://letterboxd.com/film/petite-maman/) — bookshelf date 2026-07-25
+- [Please Be My Ear (2023)](https://letterboxd.com/film/please-be-my-ear/) — bookshelf date 2025-04-25
+- [Project Y (2025)](https://letterboxd.com/film/project-y/) — bookshelf date 2025-10-16
+- [Raavanan (2010)](https://letterboxd.com/film/raavanan/) — bookshelf date 2026-07-25
+- [Ran (1985)](https://letterboxd.com/film/ran/) — bookshelf date 2026-07-25
+- [Sairat (2016)](https://letterboxd.com/film/sairat/) — bookshelf date 2026-07-25
+- [Saving Face (2004)](https://letterboxd.com/film/saving-face/)
+- [Scrapper (2023)](https://letterboxd.com/film/scrapper-2023/)
+- [She Came from the Future (2025)](https://letterboxd.com/film/sore-a-wife-from-the-future/)
+- [Shortcomings (2023)](https://letterboxd.com/film/shortcomings/)
+- [Soulmate (2023)](https://letterboxd.com/film/soulmate-2023/) — bookshelf date 2023-04-24
+- [Spectral (2016)](https://letterboxd.com/film/spectral/) — bookshelf date 2026-06-21
+- [Spring, Summer, Fall, Winter... and Spring (2003)](https://letterboxd.com/film/spring-summer-fall-winter-and-spring/)
+- [Switch (2023)](https://letterboxd.com/film/switch-2023/) — bookshelf date 2023-06-24
+- [Taste of Cherry (1997)](https://letterboxd.com/film/taste-of-cherry/) — bookshelf date 2026-07-25
+- [The Graduate (1967)](https://letterboxd.com/film/the-graduate/) — bookshelf date 2026-07-25
+- [The Handmaiden (2016)](https://letterboxd.com/film/the-handmaiden/) — bookshelf date 2026-07-25
+- [The Hunt (2012)](https://letterboxd.com/film/the-hunt-2012/) — bookshelf date 2026-07-25
+- [The Last 10 Years (2022)](https://letterboxd.com/film/the-last-10-years/) — bookshelf date 2025-10-16
+- [The Magic of Ordinary Days (2005)](https://letterboxd.com/film/the-magic-of-ordinary-days/)
+- [The Sacrifice (1986)](https://letterboxd.com/film/the-sacrifice/) — bookshelf date 2026-07-25
+- [The Virgin Suicides (1999)](https://letterboxd.com/film/the-virgin-suicides/) — bookshelf date 2026-07-25
+- [The Worst Person in the World (2021)](https://letterboxd.com/film/the-worst-person-in-the-world/) — bookshelf date 2026-07-25
+- [Three Colours: Red (1994)](https://letterboxd.com/film/three-colours-red/) — bookshelf date 2026-07-25
+- [Tourist Family (2025)](https://letterboxd.com/film/tourist-family/)
+- [Tune in for Love (2019)](https://letterboxd.com/film/tune-in-for-love/) — bookshelf date 2022-12-27
+- [Vaazhai (2024)](https://letterboxd.com/film/vaazhai/) — bookshelf date 2026-07-25
+- [Vertigo (2019)](https://letterboxd.com/film/vertigo-2019/) — bookshelf date 2023-08-07
+- [Village Rockstars (2017)](https://letterboxd.com/film/village-rockstars/) — bookshelf date 2026-07-25
+- [Yi Yi (2000)](https://letterboxd.com/film/yi-yi/) — bookshelf date 2026-07-25
+- [You Are the Apple of My Eye (2024)](https://letterboxd.com/film/you-are-the-apple-of-my-eye-2024/) — bookshelf date 2025-10-16
+
+## Not currently available on Letterboxd (1)
+
+- **Drama Special Season 14: Love Attack** — [source record](https://mydramalist.com/757353-drama-special-season-14-confession-attack). Letterboxd does not currently carry this KBS TV special, so there is no canonical Letterboxd link to attach.

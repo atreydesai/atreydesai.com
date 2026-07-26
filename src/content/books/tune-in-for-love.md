@@ -8,6 +8,9 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/30942-joyful-music-album"
 mdlId: "30942-joyful-music-album"
+letterboxdUrl: "https://letterboxd.com/film/tune-in-for-love/"
+letterboxdYear: 2019
+letterboxdId: "film:498919"
 tags:
   - "drama"
   - "romance"

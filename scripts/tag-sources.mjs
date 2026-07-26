@@ -141,11 +141,11 @@ export async function fetchMdlGenreTagsByTitle(title) {
     }
 }
 
-export async function fetchWikidataGenreTags(title, medium) {
+export async function fetchWikidataGenreTags(title, medium, year = null) {
     if (!title || !WIKIDATA_TYPES[medium]) return [];
     const typeAllowlist = WIKIDATA_TYPES[medium];
     try {
-        const qids = await fetchWikidataCandidateIds(title, medium);
+        const qids = await fetchWikidataCandidateIds(title, medium, year);
         if (qids.length === 0) return [];
         const values = qids.map((qid) => `wd:${qid}`).join(' ');
         const query = `
@@ -190,10 +190,10 @@ SELECT ?item ?itemLabel ?typeLabel ?genreLabel WHERE {
     }
 }
 
-async function fetchWikidataCandidateIds(title, medium) {
+async function fetchWikidataCandidateIds(title, medium, year) {
     const ids = [];
     const seen = new Set();
-    for (const term of wikidataSearchTerms(title, medium)) {
+    for (const term of wikidataSearchTerms(title, medium, year)) {
         const url = `https://www.wikidata.org/w/api.php?${new URLSearchParams({
             action: 'wbsearchentities',
             search: term,
@@ -211,7 +211,7 @@ async function fetchWikidataCandidateIds(title, medium) {
     return ids;
 }
 
-function wikidataSearchTerms(title, medium) {
+function wikidataSearchTerms(title, medium, year) {
     const base = String(title)
         .replace(/\s+—\s+Season\s+\d+.*$/i, '')
         .replace(/\s*\(S\d+.*?\)\s*$/i, '')
@@ -220,9 +220,14 @@ function wikidataSearchTerms(title, medium) {
         .replace(/\s*\([^)]*version[^)]*\)\s*$/i, '')
         .replace(/\s+/g, ' ')
         .trim();
-    const terms = [base];
-    if (medium === 'movie') terms.push(`${base} film`, `${base} movie`);
-    if (medium === 'show') terms.push(`${base} television series`, `${base} TV series`);
+    const terms = [];
+    if (year && medium === 'movie') terms.push(`${base} ${year} film`);
+    if (year && medium === 'show') terms.push(`${base} ${year} television series`);
+    if (!year) {
+        terms.push(base);
+        if (medium === 'movie') terms.push(`${base} film`, `${base} movie`);
+        if (medium === 'show') terms.push(`${base} television series`, `${base} TV series`);
+    }
     if (/^f1$/i.test(base)) terms.push('F1 The Movie');
     if (/crimes of grindelwald/i.test(base)) terms.push('Fantastic Beasts The Crimes of Grindelwald');
     if (/3 body problem/i.test(base)) terms.push('Three-Body television series');

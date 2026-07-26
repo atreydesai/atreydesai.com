@@ -8,6 +8,9 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/30772-drama-special-season-9-almost-touching"
 mdlId: "30772-drama-special-season-9-almost-touching"
+letterboxdUrl: "https://letterboxd.com/film/so-close-yet-so-far/"
+letterboxdYear: 2018
+letterboxdId: "film:1092681"
 tags:
   - "drama"
   - "sports"

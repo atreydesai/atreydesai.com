@@ -8,6 +8,9 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/753291-hear-me"
 mdlId: "753291-hear-me"
+letterboxdUrl: "https://letterboxd.com/film/hear-me-our-summer/"
+letterboxdYear: 2024
+letterboxdId: "film:1047066"
 tags:
   - "comedy"
   - "romance"

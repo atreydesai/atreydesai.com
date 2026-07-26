@@ -7,6 +7,9 @@ dateAdded: ""
 favorite: false
 medium: movie
 url: "https://en.wikipedia.org/wiki/Doctor_Strange_in_the_Multiverse_of_Madness"
+letterboxdUrl: "https://letterboxd.com/film/doctor-strange-in-the-multiverse-of-madness/"
+letterboxdYear: 2022
+letterboxdId: "film:385511"
 tags:
   - "fantasy"
   - "action"

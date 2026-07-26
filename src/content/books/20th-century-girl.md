@@ -8,6 +8,9 @@ favorite: true
 medium: movie
 url: "https://mydramalist.com/699543-the-twentieth-century-girl"
 mdlId: "699543-the-twentieth-century-girl"
+letterboxdUrl: "https://letterboxd.com/film/20th-century-girl/"
+letterboxdYear: 2022
+letterboxdId: "film:766197"
 tags:
   - "romance"
   - "youth"

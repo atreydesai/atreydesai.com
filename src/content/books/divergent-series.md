@@ -7,6 +7,7 @@ dateAdded: ""
 favorite: false
 medium: movie
 url: "https://en.wikipedia.org/wiki/The_Divergent_Series"
+letterboxdUrl: "https://letterboxd.com/films/in/divergent-collection/by/release-earliest/"
 tags:
   - "action"
   - "adventure"

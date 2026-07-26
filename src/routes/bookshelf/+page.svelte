@@ -197,7 +197,7 @@
         excludedMediums.length > 0 ||
         searchQuery.trim().length > 0;
 
-    // A value can't be both the active filter and an exclusion — drop the
+    // A value can't be both the active filter and an exclusion: drop the
     // contradiction so the two pickers never cancel each other to empty.
     $: if (selectedTag !== "all" && excludedTags.includes(selectedTag)) {
         excludedTags = excludedTags.filter((tag) => tag !== selectedTag);
@@ -776,7 +776,7 @@
                                 </th>
                             </tr>
                         </thead>
-                        <!-- Keyed on page/sort/filter (not search — re-animating
+                        <!-- Keyed on page/sort/filter (not search: re-animating
                              every keystroke would flicker) so rows stagger in
                              on each view change. -->
                         <tbody class="stagger-children divide-y divide-ink-200/70 dark:divide-ink-800">
@@ -1132,7 +1132,7 @@
                             <div class="section-rule-line"></div>
                         </div>
                         <div class="flex flex-wrap items-center gap-3">
-                            {#if selectedBook.url}
+                            {#if selectedBook.url && selectedBook.url !== selectedBook.letterboxdUrl}
                                 <a
                                     href={selectedBook.url}
                                     target="_blank"
@@ -1142,7 +1142,19 @@
                                     View source
                                     <ExternalLink size={14} />
                                 </a>
-                            {:else}
+                            {/if}
+                            {#if selectedBook.letterboxdUrl}
+                                <a
+                                    href={selectedBook.letterboxdUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-1.5 border border-ink-300 bg-cream-50 px-2.5 py-1.5 text-sm text-ink-800 transition-colors hover:border-ink-900 hover:bg-white dark:border-ink-600 dark:bg-ink-800 dark:text-cream-200 dark:hover:border-cream-100 dark:hover:bg-ink-700"
+                                >
+                                    Letterboxd
+                                    <ExternalLink size={14} />
+                                </a>
+                            {/if}
+                            {#if !selectedBook.url && !selectedBook.letterboxdUrl}
                                 <span class="text-sm text-ink-500 dark:text-cream-400">
                                     No source link.
                                 </span>

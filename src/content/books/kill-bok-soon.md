@@ -8,6 +8,9 @@ favorite: false
 medium: movie
 url: "https://mydramalist.com/705863-kill-bok-soon"
 mdlId: "705863-kill-bok-soon"
+letterboxdUrl: "https://letterboxd.com/film/kill-boksoon/"
+letterboxdYear: 2023
+letterboxdId: "film:764596"
 tags:
   - "action"
   - "thriller"

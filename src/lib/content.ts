@@ -40,6 +40,11 @@ export interface Book {
     tags?: string[];            // For tag filtering
     quotes?: string[];          // Notable quotes from the work
     url?: string;               // Source link
+    letterboxdUrl?: string;     // Canonical Letterboxd film/collection link
+    letterboxdYear?: number;    // Release year used for exact feed matching
+    letterboxdId?: string;      // Namespaced Letterboxd object identity
+    tmdbId?: string;            // True TMDB identity from Letterboxd RSS only
+    tmdbType?: 'movie' | 'tv';
     dateAdded: string;
     favorite: boolean;
     status?: 'shelved' | 'current' | 'done'; // shelved = planned; current = reading/watching; absent = done

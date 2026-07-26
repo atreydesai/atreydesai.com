@@ -8,6 +8,9 @@ favorite: false
 medium: movie
 url: "https://www.imdb.com/title/tt13575838/"
 mdlId: "682547-upcoming"
+letterboxdUrl: "https://letterboxd.com/film/upcoming-summer/"
+letterboxdYear: 2021
+letterboxdId: "film:754653"
 tags:
   - "music"
   - "romance"

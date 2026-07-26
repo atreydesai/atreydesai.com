@@ -7,6 +7,9 @@ dateAdded: ""
 favorite: false
 medium: movie
 url: "https://en.wikipedia.org/wiki/Millennium_Mambo"
+letterboxdUrl: "https://letterboxd.com/film/millennium-mambo/"
+letterboxdYear: 2001
+letterboxdId: "film:45195"
 tags:
   - "drama"
   - "romance"
