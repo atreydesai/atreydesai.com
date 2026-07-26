@@ -544,10 +544,10 @@ export function sfxCatch(combo = 1, perfect = false, pan = 0) {
   if (!c) return;
   duckMusic(0.08, 0.42);
   const step = Math.min(Math.max(combo - 1, 0), 4);
-  const first = midiFrequency(scaleMidi(2, step));
-  const second = midiFrequency(scaleMidi(perfect ? 3 : 2, step + (perfect ? 2 : 1)));
-  note(first, c.currentTime, 0.055, "square", 0.21, pan);
-  note(second, c.currentTime + 0.045, perfect ? 0.15 : 0.105, "square", 0.23, pan);
+  const first = midiFrequency(scaleMidi(1, step));
+  const second = midiFrequency(scaleMidi(1, step + (perfect ? 2 : 1)));
+  note(first, c.currentTime, 0.065, "triangle", 0.16, pan);
+  note(second, c.currentTime + 0.05, perfect ? 0.16 : 0.115, "triangle", 0.18, pan);
 }
 
 export function sfxGolden(combo = 1, pan = 0) {
@@ -558,11 +558,11 @@ export function sfxGolden(combo = 1, pan = 0) {
   const comboStep = Math.min(Math.max(combo - 1, 0), 4);
   [0, 1, 2, 4].forEach((step, index) => {
     note(
-      midiFrequency(scaleMidi(2, step + comboStep)),
+      midiFrequency(scaleMidi(1, step + comboStep)),
       start + index * 0.052,
       0.13,
-      index === 3 ? "triangle" : "square",
-      0.22,
+      "triangle",
+      0.18,
       pan,
     );
   });
@@ -575,11 +575,11 @@ export function sfxMilestone(pan = 0) {
   const start = c.currentTime;
   [0, 1, 2, 3, 5].forEach((step, index) => {
     note(
-      midiFrequency(scaleMidi(2, step)),
+      midiFrequency(scaleMidi(1, step)),
       start + index * 0.06,
       index === 4 ? 0.21 : 0.105,
-      "square",
-      0.21,
+      "triangle",
+      0.17,
       pan,
     );
   });
