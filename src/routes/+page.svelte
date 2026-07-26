@@ -10,7 +10,7 @@
   import { onMount } from "svelte";
   import { slide } from "svelte/transition";
   import { quintOut } from "svelte/easing";
-  import { bobaMode } from "$lib/boba";
+  import { bobaMode, openBoba } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
 
   // Little pixel boba tucked in the photo corner — a random drink + straw
@@ -158,7 +158,7 @@
             <button
               type="button"
               class="boba-launcher"
-              on:click={() => bobaMode.set(true)}
+              on:click={openBoba}
               on:mouseenter={sfxBoba}
               aria-label="Play the boba minigame"
               title="boba?"
@@ -375,7 +375,7 @@
     }
   }
   /* Mouse/desktop only — the game needs a pointer to play. */
-  @media (hover: none), (pointer: coarse) {
+  @media (max-width: 767px), (hover: none), (pointer: coarse) {
     .boba-launcher {
       display: none;
     }

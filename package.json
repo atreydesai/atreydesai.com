@@ -11,6 +11,7 @@
     "categories:backfill": "node scripts/backfill-categories.mjs",
     "build": "npm run optimize-photos && npm run sync:goodreads && npm run sync:mdl && vite build",
     "preview": "vite preview",
+    "test:boba": "node --test tests/boba-engine.test.mjs",
     "check": "svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-check --tsconfig ./jsconfig.json --watch",
     "lint": "prettier --ignore-path .gitignore --check --plugin-search-dir=. .",

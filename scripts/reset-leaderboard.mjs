@@ -9,11 +9,11 @@ if (!token) {
 }
 
 try {
-	await del("boba/leaderboard.json", { token });
-	console.log("deleted boba/leaderboard.json");
+	await del("boba/v2-leaderboard.json", { token });
+	console.log("deleted boba/v2-leaderboard.json");
 } catch (e) {
 	console.log("del:", e?.message ?? e);
 }
 
-const { blobs } = await list({ prefix: "boba/leaderboard.json", token });
+const { blobs } = await list({ prefix: "boba/v2-leaderboard.json", token });
 console.log("remaining leaderboard blobs:", blobs.length);

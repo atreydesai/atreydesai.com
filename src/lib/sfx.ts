@@ -1,319 +1,713 @@
-// Tiny Web Audio chiptune engine — no audio assets, just square/triangle
-// oscillators for an 8-bit feel. The AudioContext is created lazily on first
-// use (which happens right after a user gesture, so autoplay policies are
-// satisfied) and persists as a module singleton across game sessions.
+// Procedural Web Audio for the boba minigame. The engine is intentionally
+// asset-free: small oscillator voices, filtered noise drums, keyed feedback,
+// and a short look-ahead scheduler keep it light and responsive.
+
+const MASTER_LEVEL = 0.48;
+const MUTE_KEY = "boba_muted_v2";
+const MUSIC_LOOKAHEAD_SECONDS = 0.24;
+const MUSIC_TICK_MS = 75;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
-let muted = false;
-
-function ac(): AudioContext | null {
-	if (typeof window === "undefined") return null;
-	if (!ctx) {
-		const AC =
-			window.AudioContext ||
-			(window as unknown as { webkitAudioContext?: typeof AudioContext })
-				.webkitAudioContext;
-		if (!AC) return null;
-		ctx = new AC();
-		master = ctx.createGain();
-		master.gain.value = muted ? 0 : 0.5;
-		master.connect(ctx.destination);
-	}
-	if (ctx.state === "suspended") ctx.resume();
-	return ctx;
-}
-
-export function setMuted(m: boolean) {
-	muted = m;
-	if (master) master.gain.value = m ? 0 : 0.5;
-}
-
-// One staccato note with a click-free attack/decay envelope.
-function note(
-	freq: number,
-	start: number,
-	dur: number,
-	type: OscillatorType = "square",
-	vol = 0.3,
-) {
-	if (!ctx || !master) return;
-	const osc = ctx.createOscillator();
-	const g = ctx.createGain();
-	osc.type = type;
-	osc.frequency.setValueAtTime(freq, start);
-	g.gain.setValueAtTime(0.0001, start);
-	g.gain.exponentialRampToValueAtTime(vol, start + 0.008);
-	g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-	osc.connect(g).connect(master);
-	osc.start(start);
-	osc.stop(start + dur + 0.02);
-}
-
-// A pitch slide (used for the "hurt" sound).
-function slide(
-	fromF: number,
-	toF: number,
-	dur: number,
-	type: OscillatorType = "square",
-	vol = 0.32,
-) {
-	if (!ctx || !master) return;
-	const t = ctx.currentTime;
-	const osc = ctx.createOscillator();
-	const g = ctx.createGain();
-	osc.type = type;
-	osc.frequency.setValueAtTime(fromF, t);
-	osc.frequency.exponentialRampToValueAtTime(Math.max(40, toF), t + dur);
-	g.gain.setValueAtTime(0.0001, t);
-	g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-	g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-	osc.connect(g).connect(master);
-	osc.start(t);
-	osc.stop(t + dur + 0.02);
-}
-
-// Ascending power-up arpeggio — plays when the game starts.
-export function sfxStart() {
-	const c = ac();
-	if (!c) return;
-	const t = c.currentTime;
-	[523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
-		note(f, t + i * 0.07, 0.09, "square", 0.28),
-	);
-}
-
-// Bright two-note "coin" blip — a boba is caught.
-export function sfxCatch() {
-	const c = ac();
-	if (!c) return;
-	const t = c.currentTime;
-	note(987.77, t, 0.06, "square", 0.28); // B5
-	note(1318.51, t + 0.06, 0.12, "square", 0.28); // E6
-}
-
-// Triumphant rising fanfare — every 10th boba caught.
-export function sfxMilestone() {
-	const c = ac();
-	if (!c) return;
-	const t = c.currentTime;
-	// quick ascending arpeggio...
-	const seq = [659.25, 783.99, 1046.5, 1318.51, 1567.98]; // E5 G5 C6 E6 G6
-	seq.forEach((f, i) => note(f, t + i * 0.07, 0.1, "square", 0.26));
-	// ...capped with a high sparkle
-	note(2093.0, t + 0.4, 0.2, "square", 0.22); // C7
-	note(1567.98, t + 0.4, 0.2, "triangle", 0.18); // G6 underneath
-}
-
-// Downward buzz — a boba was missed (lost heart).
-export function sfxMiss() {
-	const c = ac();
-	if (!c) return;
-	slide(440, 90, 0.22, "square", 0.34);
-}
-
-// Descending, slowing fanfare — game over.
-export function sfxGameOver() {
-	const c = ac();
-	if (!c) return;
-	const t = c.currentTime;
-	const seq: Array<[number, number, number]> = [
-		[659.25, 0.0, 0.14],
-		[523.25, 0.16, 0.14],
-		[415.3, 0.34, 0.16],
-		[349.23, 0.54, 0.16],
-		[261.63, 0.74, 0.34],
-	];
-	for (const [f, s, d] of seq) note(f, t + s, d, "square", 0.3);
-	note(130.81, t + 0.74, 0.4, "triangle", 0.34); // low bass under the last note
-}
-
-// Short UI blip — menu buttons.
-export function sfxBlip() {
-	const c = ac();
-	if (!c) return;
-	note(880, c.currentTime, 0.05, "square", 0.24);
-}
-
-// Playful little rising chirp — hovering the homepage boba.
-export function sfxBoba() {
-	const c = ac();
-	if (!c) return;
-	const t = c.currentTime;
-	note(880.0, t, 0.05, "square", 0.2); // A5
-	note(1174.66, t + 0.05, 0.05, "square", 0.2); // D6
-	note(1567.98, t + 0.1, 0.09, "square", 0.2); // G6
-}
-
-// Resume the AudioContext (call from a user gesture so later hover sounds play).
-export function unlockAudio() {
-	ac();
-}
-
-// ---------------------------------------------------------------------------
-// 8-bit theme music — four short chiptune loops that play one after another,
-// cycling. Routed through `musicBus -> master`, so the mute toggle (which
-// zeroes `master`) silences the music too. Each song's lead loops `reps` times,
-// with a bass line auto-looped underneath.
-// ---------------------------------------------------------------------------
-
 let musicBus: GainNode | null = null;
+let musicFilter: BiquadFilterNode | null = null;
+let noiseBuffer: AudioBuffer | null = null;
+
+let muted = false;
+let muteLoaded = false;
 let musicOn = false;
+let musicPaused = false;
+let musicPhase: MusicPhase = "opening";
 let musicTimer: ReturnType<typeof setTimeout> | null = null;
-let musicOscs: OscillatorNode[] = [];
+let musicStopTimer: ReturnType<typeof setTimeout> | null = null;
+let activeMusicSources = new Set<AudioScheduledSourceNode>();
 
-// Notified with the song name each time a new song begins (for a "now playing"
-// readout). Single listener — one game instance at a time.
-let songListener: ((name: string) => void) | null = null;
-export function onSongChange(cb: ((name: string) => void) | null) {
-	songListener = cb;
-}
+type MusicPhase = "opening" | "steady" | "rush";
+type NoteSeq = [number, number][];
 
-function ensureMusicBus(): boolean {
-	const c = ac();
-	if (!c || !master) return false;
-	if (!musicBus) {
-		musicBus = c.createGain();
-		musicBus.gain.value = 0.55; // sit under the SFX
-		musicBus.connect(master);
-	}
-	return true;
-}
-
-// MIDI note -> frequency (0 = rest).
-const mf = (m: number) => (m <= 0 ? 0 : 440 * Math.pow(2, (m - 69) / 12));
-
-function mnote(freq: number, start: number, dur: number, type: OscillatorType, vol: number) {
-	if (!ctx || !musicBus || freq <= 0) return;
-	const osc = ctx.createOscillator();
-	const g = ctx.createGain();
-	osc.type = type;
-	osc.frequency.setValueAtTime(freq, start);
-	const atk = 0.008;
-	const rel = Math.min(0.06, dur * 0.5);
-	g.gain.setValueAtTime(0.0001, start);
-	g.gain.exponentialRampToValueAtTime(vol, start + atk);
-	g.gain.setValueAtTime(vol, start + Math.max(atk, dur - rel));
-	g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-	osc.connect(g).connect(musicBus);
-	osc.start(start);
-	osc.stop(start + dur + 0.02);
-	musicOscs.push(osc);
-}
-
-type NoteSeq = [number, number][]; // [midiNote (0=rest), beats]
 interface Song {
-	name: string;
-	bpm: number;
-	reps: number;
-	wave: OscillatorType;
-	lead: NoteSeq;
-	bass: NoteSeq;
+  name: string;
+  bpm: number;
+  wave: OscillatorType;
+  root: number;
+  scale: number[];
+  lead: NoteSeq;
+  bass: NoteSeq;
 }
 
-const SONGS: Song[] = [
-	{
-		name: "HEYYYYYTEA",
-		bpm: 144, reps: 2, wave: "square",
-		lead: [
-			[72,.5],[76,.5],[79,.5],[84,.5],[83,.5],[79,.5],[76,.5],[79,.5],
-			[77,.5],[74,.5],[77,.5],[81,.5],[79,.5],[76,.5],[72,.5],[74,.5],
-			[76,.5],[79,.5],[84,.5],[86,.5],[84,.5],[81,.5],[79,.5],[76,.5],
-			[72,1],[74,1],[76,1],[72,1],
-		],
-		bass: [[36,1],[43,1],[41,1],[43,1]],
-	},
-	{
-		// "CHAGEE more like 자기야" — lilting A-minor-pentatonic K-pop feel.
-		name: "CHAGEE (자기야)",
-		bpm: 128, reps: 2, wave: "triangle",
-		lead: [
-			[76,.5],[79,.5],[81,1],[79,.5],[76,.5],[74,1],
-			[72,.5],[74,.5],[76,1],[74,.5],[72,.5],[69,1],
-			[76,.5],[79,.5],[81,.5],[79,.5],[76,.5],[74,.5],[72,1],
-			[69,1],[72,1],[69,2],
-		],
-		bass: [[45,1.5],[40,1.5],[43,1]],
-	},
-	{
-		name: "moge mog",
-		bpm: 152, reps: 2, wave: "square",
-		lead: [
-			[65,.5],[69,.5],[72,.5],[69,.5],[70,.5],[69,.5],[67,.5],[65,.5],
-			[67,.5],[70,.5],[74,.5],[70,.5],[72,.5],[70,.5],[69,.5],[67,.5],
-			[65,.5],[72,.5],[77,.5],[72,.5],[76,.5],[72,.5],[69,.5],[65,.5],
-			[67,1],[65,1],[69,1],[65,1],
-		],
-		bass: [[41,1],[36,1],[43,1],[36,1]],
-	},
-	{
-		name: "ume zoome",
-		bpm: 162, reps: 2, wave: "sawtooth",
-		lead: [
-			[67,.25],[69,.25],[71,.25],[72,.25],[74,.25],[76,.25],[78,.25],[79,.25],
-			[78,.25],[76,.25],[74,.25],[72,.25],[71,.25],[69,.25],[67,.25],[69,.25],
-			[71,.25],[72,.25],[74,.25],[76,.25],[78,.25],[79,.25],[81,.25],[83,.25],
-			[81,.25],[79,.25],[78,.25],[76,.25],[74,.25],[72,.25],[71,.25],[69,.25],
-			[67,.5],[74,.5],[79,.5],[74,.5],[71,.5],[74,.5],[79,.5],[83,.5],
-			[79,1],[76,1],[74,1],[67,1],
-		],
-		bass: [[43,1],[50,1],[48,1],[50,1]],
-	},
-];
+let songIndex = 0;
+let barIndex = 0;
+let nextBarTime = 0;
+let currentRoot = 60;
+let currentScale = [0, 2, 4, 7, 9];
 
-function scheduleVoice(
-	notes: NoteSeq,
-	t0: number,
-	spb: number,
-	type: OscillatorType,
-	vol: number,
-	fillBeats: number,
+let songListener: ((name: string) => void) | null = null;
+
+function loadMutePreference() {
+  if (muteLoaded || typeof window === "undefined") return;
+  muteLoaded = true;
+  try {
+    muted = window.localStorage.getItem(MUTE_KEY) === "1";
+  } catch {
+    // Storage may be unavailable in privacy-restricted contexts.
+  }
+}
+
+function audioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  loadMutePreference();
+
+  if (!ctx) {
+    const AudioContextConstructor =
+      window.AudioContext ||
+      (
+        window as unknown as {
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).webkitAudioContext;
+    if (!AudioContextConstructor) return null;
+
+    ctx = new AudioContextConstructor();
+    master = ctx.createGain();
+    master.gain.value = muted ? 0.0001 : MASTER_LEVEL;
+    master.connect(ctx.destination);
+  }
+
+  if (ctx.state === "suspended") {
+    void ctx.resume().catch(() => {
+      // A later user gesture will retry.
+    });
+  }
+
+  return ctx;
+}
+
+function hold(param: AudioParam, at: number) {
+  param.cancelScheduledValues(at);
+  param.setValueAtTime(Math.max(0.0001, param.value), at);
+}
+
+function panNode(value: number) {
+  if (!ctx || typeof ctx.createStereoPanner !== "function") return null;
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = Math.max(-1, Math.min(1, value));
+  return panner;
+}
+
+function trackMusicSource(source: AudioScheduledSourceNode) {
+  activeMusicSources.add(source);
+  source.addEventListener(
+    "ended",
+    () => {
+      activeMusicSources.delete(source);
+    },
+    { once: true },
+  );
+}
+
+function connectVoice(
+  source: AudioNode,
+  gain: GainNode,
+  destination: AudioNode,
+  pan = 0,
 ) {
-	if (!notes.length) return;
-	let beat = 0;
-	let i = 0;
-	while (beat < fillBeats - 1e-6) {
-		const [m, b] = notes[i % notes.length];
-		mnote(mf(m), t0 + beat * spb, b * spb, type, vol);
-		beat += b;
-		i++;
-	}
+  const panner = panNode(pan);
+  if (panner) source.connect(gain).connect(panner).connect(destination);
+  else source.connect(gain).connect(destination);
 }
 
-function scheduleSong(i: number, startTime: number) {
-	if (!musicOn || !ctx) return;
-	const song = SONGS[i];
-	songListener?.(song.name);
-	const spb = 60 / song.bpm;
-	const totalBeats = song.lead.reduce((s, n) => s + n[1], 0) * song.reps;
-	musicOscs = []; // prior song's notes are ending — drop their refs
-	scheduleVoice(song.lead, startTime, spb, song.wave, 0.2, totalBeats);
-	scheduleVoice(song.bass, startTime, spb, "triangle", 0.18, totalBeats);
-	const nextStart = startTime + totalBeats * spb;
-	// Queue the next song slightly early so the loop is seamless.
-	const ms = Math.max(0, (nextStart - ctx.currentTime) * 1000 - 120);
-	musicTimer = setTimeout(() => scheduleSong((i + 1) % SONGS.length, nextStart), ms);
+function note(
+  frequency: number,
+  start: number,
+  duration: number,
+  type: OscillatorType = "square",
+  volume = 0.3,
+  pan = 0,
+  destination: AudioNode | null = master,
+  trackAsMusic = false,
+) {
+  if (!ctx || !destination || frequency <= 0) return;
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
+  gain.gain.setValueAtTime(volume, start + Math.max(0.01, duration - 0.045));
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  connectVoice(oscillator, gain, destination, pan);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.025);
+  if (trackAsMusic) trackMusicSource(oscillator);
+}
+
+function slide(
+  fromFrequency: number,
+  toFrequency: number,
+  duration: number,
+  type: OscillatorType = "square",
+  volume = 0.32,
+  pan = 0,
+) {
+  const c = audioContext();
+  if (!c || !master) return;
+  const start = c.currentTime;
+  const oscillator = c.createOscillator();
+  const gain = c.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(fromFrequency, start);
+  oscillator.frequency.exponentialRampToValueAtTime(
+    Math.max(40, toFrequency),
+    start + duration,
+  );
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  connectVoice(oscillator, gain, master, pan);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.025);
+}
+
+function midiFrequency(midi: number) {
+  return midi <= 0 ? 0 : 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function ensureMusicGraph() {
+  const c = audioContext();
+  if (!c || !master) return false;
+  if (!musicBus || !musicFilter) {
+    musicBus = c.createGain();
+    musicFilter = c.createBiquadFilter();
+    musicBus.gain.value = phaseMusicLevel();
+    musicFilter.type = "lowpass";
+    musicFilter.frequency.value = 14_000;
+    musicFilter.Q.value = 0.35;
+    musicBus.connect(musicFilter).connect(master);
+  }
+  return true;
+}
+
+function getNoiseBuffer() {
+  if (!ctx) return null;
+  if (noiseBuffer) return noiseBuffer;
+  const length = Math.floor(ctx.sampleRate * 0.5);
+  noiseBuffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const channel = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < channel.length; i++) {
+    channel[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuffer;
+}
+
+function noiseHit(
+  start: number,
+  duration: number,
+  volume: number,
+  filterType: BiquadFilterType,
+  frequency: number,
+) {
+  if (!ctx || !musicBus) return;
+  const buffer = getNoiseBuffer();
+  if (!buffer) return;
+  const source = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(frequency, start);
+  filter.Q.value = 0.8;
+  gain.gain.setValueAtTime(Math.max(0.0001, volume), start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(filter).connect(gain).connect(musicBus);
+  source.start(start);
+  source.stop(start + duration + 0.02);
+  trackMusicSource(source);
+}
+
+function kick(start: number, volume = 0.16) {
+  if (!ctx || !musicBus) return;
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(135, start);
+  oscillator.frequency.exponentialRampToValueAtTime(48, start + 0.11);
+  gain.gain.setValueAtTime(volume, start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.15);
+  oscillator.connect(gain).connect(musicBus);
+  oscillator.start(start);
+  oscillator.stop(start + 0.17);
+  trackMusicSource(oscillator);
+}
+
+function clap(start: number) {
+  noiseHit(start, 0.11, 0.085, "bandpass", 1_650);
+  noiseHit(start + 0.022, 0.08, 0.045, "bandpass", 2_150);
+}
+
+function hat(start: number, strong = false) {
+  noiseHit(start, strong ? 0.055 : 0.032, strong ? 0.037 : 0.024, "highpass", 5_800);
+}
+
+function phaseMusicLevel() {
+  if (musicPhase === "rush") return 0.57;
+  if (musicPhase === "steady") return 0.53;
+  return 0.49;
+}
+
+function scheduleSequenceWindow(
+  sequence: NoteSeq,
+  windowStartBeat: number,
+  windowEndBeat: number,
+  barStart: number,
+  secondsPerBeat: number,
+  wave: OscillatorType,
+  volume: number,
+) {
+  if (!musicBus) return;
+  let beat = 0;
+  for (const [midi, beats] of sequence) {
+    if (beat >= windowStartBeat && beat < windowEndBeat && midi > 0) {
+      const localBeat = beat - windowStartBeat;
+      note(
+        midiFrequency(midi),
+        barStart + localBeat * secondsPerBeat,
+        Math.max(0.045, beats * secondsPerBeat * 0.88),
+        wave,
+        volume,
+        0,
+        musicBus,
+        true,
+      );
+    }
+    beat += beats;
+  }
+}
+
+function scheduleDrums(barStart: number, secondsPerBeat: number) {
+  if (musicPhase === "opening") return;
+
+  kick(barStart);
+  kick(barStart + 2 * secondsPerBeat, 0.14);
+  clap(barStart + secondsPerBeat);
+  clap(barStart + 3 * secondsPerBeat);
+
+  const step = musicPhase === "rush" ? 0.25 : 0.5;
+  for (let beat = 0; beat < 4; beat += step) {
+    hat(barStart + beat * secondsPerBeat, beat % 1 === 0);
+  }
+
+  if (musicPhase === "rush") {
+    kick(barStart + 1.5 * secondsPerBeat, 0.09);
+    kick(barStart + 3.5 * secondsPerBeat, 0.09);
+  }
+}
+
+function scheduleBar(song: Song, index: number, start: number) {
+  const secondsPerBeat = 60 / song.bpm;
+  const cycleBar = index % 4;
+  const windowStart = cycleBar * 4;
+
+  scheduleSequenceWindow(
+    song.lead,
+    windowStart,
+    windowStart + 4,
+    start,
+    secondsPerBeat,
+    song.wave,
+    musicPhase === "rush" ? 0.19 : 0.175,
+  );
+  scheduleSequenceWindow(
+    song.bass,
+    0,
+    4,
+    start,
+    secondsPerBeat,
+    "triangle",
+    0.17,
+  );
+  scheduleDrums(start, secondsPerBeat);
+}
+
+function clearMusicTimer() {
+  if (musicTimer) {
+    clearTimeout(musicTimer);
+    musicTimer = null;
+  }
+}
+
+function clearMusicStopTimer() {
+  if (musicStopTimer) {
+    clearTimeout(musicStopTimer);
+    musicStopTimer = null;
+  }
+}
+
+function stopScheduledMusic(afterSeconds = 0) {
+  if (!ctx) return;
+  const stopAt = ctx.currentTime + Math.max(0, afterSeconds);
+  for (const source of activeMusicSources) {
+    try {
+      source.stop(stopAt);
+    } catch {
+      // A source may already have ended.
+    }
+  }
+  if (afterSeconds === 0) activeMusicSources.clear();
+}
+
+function runMusicScheduler() {
+  clearMusicTimer();
+  if (!ctx || !musicOn || musicPaused) return;
+
+  const horizon = ctx.currentTime + MUSIC_LOOKAHEAD_SECONDS;
+  while (nextBarTime < horizon) {
+    const song = SONGS[songIndex];
+    if (barIndex === 0) {
+      currentRoot = song.root;
+      currentScale = song.scale;
+      songListener?.(song.name);
+    }
+
+    scheduleBar(song, barIndex, nextBarTime);
+    nextBarTime += 4 * (60 / song.bpm);
+    barIndex += 1;
+
+    if (barIndex >= 8) {
+      barIndex = 0;
+      songIndex = (songIndex + 1) % SONGS.length;
+    }
+  }
+
+  musicTimer = setTimeout(runMusicScheduler, MUSIC_TICK_MS);
+}
+
+function duckMusic(durationSeconds: number, floor = 0.4) {
+  if (!ctx || !musicBus || !musicOn || musicPaused) return;
+  const now = ctx.currentTime;
+  const base = phaseMusicLevel();
+  hold(musicBus.gain, now);
+  musicBus.gain.linearRampToValueAtTime(Math.max(0.0001, base * floor), now + 0.012);
+  musicBus.gain.linearRampToValueAtTime(base, now + durationSeconds);
+}
+
+function scaleMidi(octave: number, step: number) {
+  const normalizedStep = Math.max(0, step);
+  const scaleOctaves = Math.floor(normalizedStep / currentScale.length);
+  const interval = currentScale[normalizedStep % currentScale.length];
+  return currentRoot + (octave + scaleOctaves) * 12 + interval;
+}
+
+export function getMuted() {
+  loadMutePreference();
+  return muted;
+}
+
+export function setMuted(nextMuted: boolean) {
+  muted = nextMuted;
+  muteLoaded = true;
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+    }
+  } catch {
+    // Muting still works for the current session.
+  }
+
+  const c = audioContext();
+  if (!c || !master) return;
+  const now = c.currentTime;
+  hold(master.gain, now);
+  master.gain.exponentialRampToValueAtTime(
+    muted ? 0.0001 : MASTER_LEVEL,
+    now + 0.055,
+  );
+}
+
+export function onSongChange(callback: ((name: string) => void) | null) {
+  songListener = callback;
+}
+
+export function setMusicPhase(phase: MusicPhase) {
+  musicPhase = phase;
+  if (!ctx || !musicBus || musicPaused || !musicOn) return;
+  const now = ctx.currentTime;
+  hold(musicBus.gain, now);
+  musicBus.gain.linearRampToValueAtTime(phaseMusicLevel(), now + 0.2);
 }
 
 export function startMusic() {
-	if (!ensureMusicBus() || !ctx) return;
-	if (musicOn) return;
-	musicOn = true;
-	scheduleSong(0, ctx.currentTime + 0.15);
+  if (!ensureMusicGraph() || !ctx || !musicBus || !musicFilter) return;
+  clearMusicTimer();
+  clearMusicStopTimer();
+  stopScheduledMusic();
+
+  musicOn = true;
+  musicPaused = false;
+  songIndex = 0;
+  barIndex = 0;
+  currentRoot = SONGS[0].root;
+  currentScale = SONGS[0].scale;
+  nextBarTime = ctx.currentTime + 0.12;
+
+  const now = ctx.currentTime;
+  hold(musicBus.gain, now);
+  musicBus.gain.exponentialRampToValueAtTime(phaseMusicLevel(), now + 0.16);
+  musicFilter.frequency.cancelScheduledValues(now);
+  musicFilter.frequency.setValueAtTime(Math.max(650, musicFilter.frequency.value), now);
+  musicFilter.frequency.exponentialRampToValueAtTime(14_000, now + 0.2);
+  runMusicScheduler();
+}
+
+export function setMusicPaused(paused: boolean) {
+  if (!ctx || !musicBus || !musicOn || paused === musicPaused) return;
+  musicPaused = paused;
+  const now = ctx.currentTime;
+
+  if (paused) {
+    clearMusicTimer();
+    hold(musicBus.gain, now);
+    musicBus.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    stopScheduledMusic(0.09);
+    return;
+  }
+
+  stopScheduledMusic();
+  nextBarTime = now + 0.12;
+  hold(musicBus.gain, now);
+  musicBus.gain.exponentialRampToValueAtTime(phaseMusicLevel(), now + 0.12);
+  runMusicScheduler();
+}
+
+export function finishMusic() {
+  if (!ctx || !musicBus || !musicFilter) {
+    musicOn = false;
+    clearMusicTimer();
+    return;
+  }
+
+  musicOn = false;
+  musicPaused = false;
+  clearMusicTimer();
+  clearMusicStopTimer();
+  const now = ctx.currentTime;
+  hold(musicBus.gain, now);
+  musicBus.gain.exponentialRampToValueAtTime(0.0001, now + 0.44);
+  musicFilter.frequency.cancelScheduledValues(now);
+  musicFilter.frequency.setValueAtTime(Math.max(650, musicFilter.frequency.value), now);
+  musicFilter.frequency.exponentialRampToValueAtTime(650, now + 0.34);
+  stopScheduledMusic(0.48);
+  musicStopTimer = setTimeout(() => {
+    activeMusicSources.clear();
+    musicStopTimer = null;
+  }, 520);
 }
 
 export function stopMusic() {
-	musicOn = false;
-	if (musicTimer) {
-		clearTimeout(musicTimer);
-		musicTimer = null;
-	}
-	for (const o of musicOscs) {
-		try {
-			o.stop();
-		} catch {
-			/* already stopped */
-		}
-	}
-	musicOscs = [];
+  musicOn = false;
+  musicPaused = false;
+  clearMusicTimer();
+  clearMusicStopTimer();
+  if (ctx && musicBus) {
+    const now = ctx.currentTime;
+    hold(musicBus.gain, now);
+    musicBus.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    stopScheduledMusic(0.07);
+  } else {
+    stopScheduledMusic();
+  }
 }
+
+export function sfxCountdown(value: number) {
+  const c = audioContext();
+  if (!c) return;
+  const frequency = value > 1 ? midiFrequency(72) : midiFrequency(79);
+  note(frequency, c.currentTime, 0.075, "square", 0.19);
+}
+
+export function sfxStart() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  [0, 2, 4, 7].forEach((step, index) => {
+    note(
+      midiFrequency(currentRoot + 12 + step),
+      start + index * 0.055,
+      0.095,
+      "square",
+      0.22,
+    );
+  });
+}
+
+export function sfxCatch(combo = 1, perfect = false, pan = 0) {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.08, 0.42);
+  const step = Math.min(Math.max(combo - 1, 0), 4);
+  const first = midiFrequency(scaleMidi(2, step));
+  const second = midiFrequency(scaleMidi(perfect ? 3 : 2, step + (perfect ? 2 : 1)));
+  note(first, c.currentTime, 0.055, "square", 0.21, pan);
+  note(second, c.currentTime + 0.045, perfect ? 0.15 : 0.105, "square", 0.23, pan);
+}
+
+export function sfxGolden(combo = 1, pan = 0) {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.16, 0.3);
+  const start = c.currentTime;
+  const comboStep = Math.min(Math.max(combo - 1, 0), 4);
+  [0, 1, 2, 4].forEach((step, index) => {
+    note(
+      midiFrequency(scaleMidi(2, step + comboStep)),
+      start + index * 0.052,
+      0.13,
+      index === 3 ? "triangle" : "square",
+      0.22,
+      pan,
+    );
+  });
+}
+
+export function sfxMilestone(pan = 0) {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.19, 0.28);
+  const start = c.currentTime;
+  [0, 1, 2, 3, 5].forEach((step, index) => {
+    note(
+      midiFrequency(scaleMidi(2, step)),
+      start + index * 0.06,
+      index === 4 ? 0.21 : 0.105,
+      "square",
+      0.21,
+      pan,
+    );
+  });
+}
+
+export function sfxMiss(pan = 0) {
+  audioContext();
+  duckMusic(0.2, 0.22);
+  slide(440, 90, 0.22, "square", 0.31, pan);
+}
+
+export function sfxGameOver(reason: "hearts" | "time" = "hearts") {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+
+  if (reason === "time") {
+    [0, 4, 7, 12].forEach((interval, index) => {
+      note(
+        midiFrequency(currentRoot + 12 + interval),
+        start + index * 0.09,
+        index === 3 ? 0.32 : 0.13,
+        "square",
+        0.25,
+      );
+    });
+    return;
+  }
+
+  [7, 4, 2, 0].forEach((interval, index) => {
+    note(
+      midiFrequency(currentRoot + interval),
+      start + index * (0.13 + index * 0.015),
+      index === 3 ? 0.34 : 0.14,
+      "square",
+      0.25,
+    );
+  });
+  note(midiFrequency(currentRoot - 12), start + 0.56, 0.4, "triangle", 0.29);
+}
+
+export function sfxBlip() {
+  const c = audioContext();
+  if (!c) return;
+  note(midiFrequency(currentRoot + 19), c.currentTime, 0.05, "square", 0.2);
+}
+
+export function sfxBoba() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  [69, 74, 79].forEach((midi, index) => {
+    note(midiFrequency(midi), start + index * 0.05, index === 2 ? 0.09 : 0.05, "square", 0.18);
+  });
+}
+
+export function unlockAudio() {
+  audioContext();
+}
+
+const SONGS: Song[] = [
+  {
+    name: "HEYYYYYTEA",
+    bpm: 144,
+    wave: "square",
+    root: 60,
+    scale: [0, 2, 4, 7, 9],
+    lead: [
+      [72, 0.5], [76, 0.5], [79, 0.5], [84, 0.5],
+      [83, 0.5], [79, 0.5], [76, 0.5], [79, 0.5],
+      [77, 0.5], [74, 0.5], [77, 0.5], [81, 0.5],
+      [79, 0.5], [76, 0.5], [72, 0.5], [74, 0.5],
+      [76, 0.5], [79, 0.5], [84, 0.5], [86, 0.5],
+      [84, 0.5], [81, 0.5], [79, 0.5], [76, 0.5],
+      [72, 1], [74, 1], [76, 1], [72, 1],
+    ],
+    bass: [[36, 1], [43, 1], [41, 1], [43, 1]],
+  },
+  {
+    name: "CHAGEE (자기야)",
+    bpm: 128,
+    wave: "triangle",
+    root: 57,
+    scale: [0, 3, 5, 7, 10],
+    lead: [
+      [76, 0.5], [79, 0.5], [81, 1], [79, 0.5], [76, 0.5], [74, 1],
+      [72, 0.5], [74, 0.5], [76, 1], [74, 0.5], [72, 0.5], [69, 1],
+      [76, 0.5], [79, 0.5], [81, 0.5], [79, 0.5],
+      [76, 0.5], [74, 0.5], [72, 1], [69, 1], [72, 1], [69, 2],
+    ],
+    bass: [[45, 1.5], [40, 1.5], [43, 1]],
+  },
+  {
+    name: "moge mog",
+    bpm: 152,
+    wave: "square",
+    root: 53,
+    scale: [0, 2, 4, 7, 9],
+    lead: [
+      [65, 0.5], [69, 0.5], [72, 0.5], [69, 0.5],
+      [70, 0.5], [69, 0.5], [67, 0.5], [65, 0.5],
+      [67, 0.5], [70, 0.5], [74, 0.5], [70, 0.5],
+      [72, 0.5], [70, 0.5], [69, 0.5], [67, 0.5],
+      [65, 0.5], [72, 0.5], [77, 0.5], [72, 0.5],
+      [76, 0.5], [72, 0.5], [69, 0.5], [65, 0.5],
+      [67, 1], [65, 1], [69, 1], [65, 1],
+    ],
+    bass: [[41, 1], [36, 1], [43, 1], [36, 1]],
+  },
+  {
+    name: "ume zoome",
+    bpm: 162,
+    wave: "sawtooth",
+    root: 55,
+    scale: [0, 2, 4, 7, 9],
+    lead: [
+      [67, 0.25], [69, 0.25], [71, 0.25], [72, 0.25],
+      [74, 0.25], [76, 0.25], [78, 0.25], [79, 0.25],
+      [78, 0.25], [76, 0.25], [74, 0.25], [72, 0.25],
+      [71, 0.25], [69, 0.25], [67, 0.25], [69, 0.25],
+      [71, 0.25], [72, 0.25], [74, 0.25], [76, 0.25],
+      [78, 0.25], [79, 0.25], [81, 0.25], [83, 0.25],
+      [81, 0.25], [79, 0.25], [78, 0.25], [76, 0.25],
+      [74, 0.25], [72, 0.25], [71, 0.25], [69, 0.25],
+      [67, 0.5], [74, 0.5], [79, 0.5], [74, 0.5],
+      [71, 0.5], [74, 0.5], [79, 0.5], [83, 0.5],
+      [79, 1], [76, 1], [74, 1], [67, 1],
+    ],
+    bass: [[43, 1], [50, 1], [48, 1], [50, 1]],
+  },
+];

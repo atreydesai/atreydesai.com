@@ -8,7 +8,9 @@ import type { RequestHandler } from './$types';
 export const prerender = false;
 export const trailingSlash = 'ignore';
 
-const PATH = 'boba/leaderboard.json';
+// v2 scores use the timed/combo/golden rules and are intentionally kept
+// separate from the original endless-mode board.
+const PATH = 'boba/v2-leaderboard.json';
 const MAX_ENTRIES = 50; // keep the blob small
 const TOP = 20; // returned to clients
 
@@ -20,6 +22,25 @@ interface Entry {
 	name: string;
 	score: number;
 	t: number;
+}
+
+interface PublicEntry {
+	name: string;
+	score: number;
+}
+
+function bestPerName(board: Entry[]): Entry[] {
+	const seen = new Set<string>();
+	return board.filter((entry) => {
+		const key = entry.name.trim().toLocaleLowerCase();
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
+function publicEntries(board: Entry[]): PublicEntry[] {
+	return board.map(({ name, score }) => ({ name, score }));
 }
 
 // The blob's URL is stable for a fixed pathname, so cache it across warm
@@ -119,7 +140,10 @@ export const GET: RequestHandler = async () => {
 	if (board === null) return json({ available: false, scores: [] });
 	board.sort((a, b) => b.score - a.score);
 	return json(
-		{ available: true, scores: board.slice(0, TOP) },
+		{
+			available: true,
+			scores: publicEntries(bestPerName(board).slice(0, TOP)),
+		},
 		// CDN-cache the leaderboard response so repeat views don't re-run the
 		// function (and its blob ops). Submitters get fresh data from POST.
 		{ headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=300' } },
@@ -173,14 +197,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			const entry: Entry = { name, score, t: Date.now() };
 			board.push(entry);
 			board.sort((a, b) => b.score - a.score || a.t - b.t);
-			const trimmed = board.slice(0, MAX_ENTRIES);
+			const trimmed = bestPerName(board).slice(0, MAX_ENTRIES);
 			await writeBoard(trimmed);
 
 			const rank = trimmed.findIndex((e) => e === entry) + 1;
 			return json({
 				ok: true,
 				rank: rank > 0 ? rank : null,
-				scores: trimmed.slice(0, TOP),
+				scores: publicEntries(trimmed.slice(0, TOP)),
 			});
 		});
 	} catch (err) {

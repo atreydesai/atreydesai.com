@@ -13,7 +13,11 @@
   import Footer from "$lib/components/Footer.svelte";
   import CustomCursor from "$lib/components/CustomCursor.svelte";
   import BobaGame from "$lib/components/BobaGame.svelte";
-  import { bobaMode } from "$lib/boba";
+  import {
+    BOBA_DESKTOP_QUERY,
+    bobaMode,
+    openBoba,
+  } from "$lib/boba";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
@@ -21,11 +25,20 @@
   const isMobile = browser && /Android|iPhone/i.test(navigator.userAgent);
   const reducedMotion =
     browser && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let bobaDesktop = false;
 
   // Konami easter egg: launches the persistent "boba mode" minigame.
   // (`bobaMode` lives in $lib/boba so the homepage boba can launch it too.)
 
   onMount(() => {
+    const bobaMedia = window.matchMedia(BOBA_DESKTOP_QUERY);
+    const syncBobaDesktop = () => {
+      bobaDesktop = bobaMedia.matches;
+      if (!bobaDesktop) bobaMode.set(false);
+    };
+    syncBobaDesktop();
+    bobaMedia.addEventListener("change", syncBobaDesktop);
+
     // Vercel Analytics + Speed Insights use buffered PerformanceObservers,
     // so deferring their injection still captures paint/LCP events that
     // occurred earlier in the page lifecycle.
@@ -55,7 +68,7 @@
         pos += 1;
         if (pos === KONAMI.length) {
           pos = 0;
-          bobaMode.set(true);
+          openBoba();
         }
       } else {
         // Restart, but treat this key as a possible first step.
@@ -86,6 +99,7 @@
 
     return () => {
       window.removeEventListener("keydown", onKey);
+      bobaMedia.removeEventListener("change", syncBobaDesktop);
     };
   });
 </script>
@@ -93,7 +107,11 @@
 <!-- Custom Cursor (desktop only) -->
 <CustomCursor />
 
-<div class="min-h-screen flex flex-col cursor-custom">
+<div
+  class="min-h-screen flex flex-col cursor-custom"
+  inert={$bobaMode && bobaDesktop}
+  aria-hidden={$bobaMode && bobaDesktop ? "true" : undefined}
+>
   <a
     href="#main-content"
     class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] btn-primary focus:cursor-auto"
@@ -125,7 +143,7 @@
 </div>
 
 <!-- Konami easter egg: the persistent boba-catching minigame. -->
-{#if $bobaMode}
+{#if $bobaMode && bobaDesktop}
   <BobaGame on:close={() => bobaMode.set(false)} />
 {/if}
 

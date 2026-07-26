@@ -33,6 +33,18 @@
   let audioElement: HTMLAudioElement | null = null;
   let currentSampleIndex = -1;
 
+  // The boba game has its own reactive soundtrack. Pause the site sampler when
+  // a run opens so the two music systems never compete.
+  onMount(() => {
+    const pauseForBoba = () => {
+      if (!audioElement || audioElement.paused) return;
+      audioElement.pause();
+      isPlaying = false;
+    };
+    window.addEventListener("boba-game-start", pauseForBoba);
+    return () => window.removeEventListener("boba-game-start", pauseForBoba);
+  });
+
   const musicSamples = [
     "/audio/CARLI%20-%20CARLI%20(offizielles%20Musikvideo)%20%5BnWhtnAyD7r8%5D.mp3",
     "/audio/Diverseddie%20%E8%88%B5%20-%20Procrastination%20%E6%8B%96%E5%BB%B6%E7%97%87%20%5Bqx0f0KfA_90%5D.mp3",
