@@ -4,7 +4,7 @@ title: "The Way Back"
 author: ""
 category: fiction
 dateAdded: "2026-07-25"
-favorite: true
+favorite: false
 medium: movie
 url: "https://letterboxd.com/film/the-way-back-2020/"
 letterboxdUrl: "https://letterboxd.com/film/the-way-back-2020/"
