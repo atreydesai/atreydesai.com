@@ -45,8 +45,8 @@
     description="Curriculum Vitae of Atrey Desai - undergraduate researcher at UMD with experience at Learn Prompting, CLIP Lab, Brown University, and UT Arlington."
     url="https://atreydesai.com/cv/"
 >
-    <div slot="header" class="flex items-center justify-between mb-8">
-        <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100">
+    <header slot="header" class="page-header page-header-action">
+        <h1 class="type-page-title text-ink-900 dark:text-cream-100">
             curriculum vitae
         </h1>
 
@@ -60,7 +60,7 @@
             <Download size={16} animate={hoveredDownload} />
             Download PDF
         </a>
-    </div>
+    </header>
 
     <p class="deck text-ink-600 dark:text-cream-400 mb-1">
         For a condensed version, see my
@@ -74,7 +74,7 @@
 
     <!-- PDF Embed -->
     <div
-        class="w-full rounded-lg overflow-hidden shadow-lg border border-cream-200 dark:border-ink-700"
+        class="surface-document w-full border border-cream-200 dark:border-ink-700"
     >
         <iframe
             src="/cv.pdf"
@@ -84,7 +84,7 @@
     </div>
 
     <!-- CV Content Sections -->
-    <div class="mt-12 space-y-10 text-serif">
+    <div class="section-stack mt-12 text-serif">
         <!-- Education -->
         <section>
             <h2 class="section-heading">education</h2>

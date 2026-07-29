@@ -18,6 +18,7 @@
     bobaMode,
     openBoba,
   } from "$lib/boba";
+  import { PAGE_TRANSITION_DURATION_MS } from "$lib/motion";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
@@ -131,8 +132,8 @@
       <main
         id="main-content"
         class="flex-1"
-        in:fly={{ x: -10, duration: 350, delay: 150 }}
-        out:fly={{ y: 5, duration: 350 }}
+        in:fly={{ x: -10, duration: PAGE_TRANSITION_DURATION_MS, delay: 150 }}
+        out:fly={{ y: 5, duration: PAGE_TRANSITION_DURATION_MS }}
       >
         <slot />
       </main>
@@ -146,16 +147,3 @@
 {#if $bobaMode && bobaDesktop}
   <BobaGame on:close={() => bobaMode.set(false)} />
 {/if}
-
-<style>
-  /* CSS smooth scrolling - much simpler and more reliable */
-  :global(html) {
-    scroll-behavior: smooth;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(html) {
-      scroll-behavior: auto;
-    }
-  }
-</style>

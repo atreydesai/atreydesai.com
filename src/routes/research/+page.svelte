@@ -5,6 +5,10 @@
     import ResearchCard from "$lib/components/ResearchCard.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import { papers, talks } from "$lib/content";
+    import {
+        PAGE_TRANSITION_DURATION_MS,
+        PAGE_TRANSITION_SCROLL_BUFFER_MS,
+    } from "$lib/motion";
     import { formatMonthYear } from "$lib/utils/date";
 
     let selectedYear: string = "all";
@@ -67,14 +71,14 @@
 
         highlightedPaperId = hash;
 
-        // Wait for the layout's page transition (out: 350ms) to finish so the
-        // outgoing page is removed from the DOM before we measure scroll position.
+        // Leave one frame of scheduling margin after the outgoing page transition
+        // before measuring the deep-link target.
         setTimeout(() => {
             const el = document.getElementById(hash);
             if (el) {
                 el.scrollIntoView({ behavior: "auto", block: "start" });
             }
-        }, 400);
+        }, PAGE_TRANSITION_DURATION_MS + PAGE_TRANSITION_SCROLL_BUFFER_MS);
 
         setTimeout(() => {
             highlightedPaperId = null;
@@ -181,7 +185,7 @@
     url="https://atreydesai.com/research/"
     heading="research"
 >
-    <div class="mb-8 flex flex-wrap items-center gap-3">
+    <div class="mb-3 flex flex-wrap items-center gap-3">
         <CustomSelect
             options={yearOptions}
             bind:value={selectedYear}
@@ -207,7 +211,7 @@
         {/if}
     </div>
 
-    <div class="-mt-3 mb-6 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-cream-400">
+    <div class="type-meta mb-6 flex flex-wrap items-center justify-between gap-2 text-ink-500 dark:text-cream-400">
         <button
             type="button"
             class="transition-colors hover:text-ink-900 dark:hover:text-cream-100"
@@ -236,7 +240,7 @@
 
             {#if sortOrder === "year-desc" || sortOrder === "year-asc"}
                 {#each sortedYears as year}
-                    <div class="mb-7">
+                    <div class="mb-8">
                         <div class="section-rule mb-4 gap-3 pl-1">
                             <p class="meta-label">{year}</p>
                             <div class="section-rule-line"></div>
@@ -295,9 +299,9 @@
 
             <div class="space-y-4">
                 {#each talkGroups as talkGroup}
-                    <article class="surface-card !rounded surface-card-hover p-4 md:p-5">
+                    <article class="surface-card surface-card-hover p-4 md:p-5">
                         <h3
-                            class="text-lg font-semibold text-ink-900 dark:text-cream-100"
+                            class="type-item-heading text-ink-900 dark:text-cream-100"
                         >
                             {talkGroup.title}
                         </h3>
@@ -354,9 +358,9 @@
 
             <div class="space-y-4">
                 {#each presentationGroups as talkGroup}
-                    <article class="surface-card !rounded surface-card-hover p-4 md:p-5">
+                    <article class="surface-card surface-card-hover p-4 md:p-5">
                         <h3
-                            class="text-lg font-semibold text-ink-900 dark:text-cream-100"
+                            class="type-item-heading text-ink-900 dark:text-cream-100"
                         >
                             {talkGroup.title}
                         </h3>

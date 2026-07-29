@@ -12,11 +12,9 @@
   description="The page you're looking for doesn't exist."
 />
 
-<div class="layout-main py-16 md:py-24 text-center">
+<div class="page-shell page-shell-standard py-16 text-center md:py-24">
   <div class="space-y-6">
-    <h1
-      class="heading-display text-6xl md:text-8xl text-ink-300 dark:text-ink-600"
-    >
+    <h1 class="type-hero-title text-ink-300 dark:text-ink-600">
       404
     </h1>
 

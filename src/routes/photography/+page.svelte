@@ -1,22 +1,11 @@
 <script lang="ts">
-    import Seo from "$lib/components/Seo.svelte";
+    import PageShell from "$lib/components/PageShell.svelte";
     import OptimizedImage from "$lib/components/OptimizedImage.svelte";
     import { formatLongDate } from "$lib/utils/date";
     import { X, ChevronLeft, ChevronRight } from "@jis3r/icons";
-    import { Instagram } from "lucide-svelte";
     // Photos loaded from server (auto-scanned from folder with EXIF extraction)
     export let data;
     $: photos = data.photos;
-
-    // Split photos into three columns for masonry (photos 0,3,6... | 1,4,7... | 2,5,8...)
-    $: col1 = photos.filter((_: unknown, i: number) => i % 3 === 0);
-    $: col2 = photos.filter((_: unknown, i: number) => i % 3 === 1);
-    $: col3 = photos.filter((_: unknown, i: number) => i % 3 === 2);
-
-    // Get original index for lightbox from column index
-    function getOriginalIndex(columnIndex: number, colNum: number): number {
-        return columnIndex * 3 + colNum;
-    }
 
     // Lightbox state
     let lightboxOpen = false;
@@ -81,18 +70,15 @@
     $: currentPhoto = photos[currentPhotoIndex];
 </script>
 
-<Seo
+<PageShell
     title="Photography | Atrey Desai"
     description="Photography portfolio by Atrey Desai. Follow @framedbyatrey on Instagram for more."
     url="https://atreydesai.com/photography/"
-/>
-
-<div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">
-    <section class="mb-8">
-        <div class="flex items-baseline justify-between mb-4 gap-4">
-            <h1
-                class="heading-display mb-0 text-3xl text-ink-900 dark:text-cream-100"
-            >
+    width="wide"
+>
+    <header slot="header" class="page-header page-header-title-only">
+        <div class="flex items-baseline justify-between gap-4">
+            <h1 class="type-page-title text-ink-900 dark:text-cream-100">
                 photography
             </h1>
             <a
@@ -101,11 +87,10 @@
                 rel="noopener noreferrer"
                 class="flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400 hover:text-accent transition-colors"
             >
-                <Instagram size={18} />
                 <span>@framedbyatrey</span>
             </a>
         </div>
-    </section>
+    </header>
     <!-- Masonry-style Grid - supports items spanning 2 columns -->
     {#if photos.length > 0}
         <div
@@ -157,14 +142,14 @@
             </p>
         </div>
     {/if}
-</div>
+</PageShell>
 
 <!-- Lightbox -->
 {#if lightboxOpen && currentPhoto}
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div
         bind:this={dialogElement}
-        class="fixed inset-0 z-50 bg-ink-900/95 flex items-center justify-center"
+        class="layer-modal fixed inset-0 flex items-center justify-center bg-ink-900/95"
         on:click={closeLightbox}
         on:keydown={(e) => { trapFocus(e); if (e.key === "Escape") closeLightbox(); if (e.key === "ArrowRight") nextPhoto(); if (e.key === "ArrowLeft") prevPhoto(); }}
         role="dialog"
@@ -221,13 +206,9 @@
             >
                 <!-- Loading placeholder -->
                 <div
-                    class="absolute inset-0 bg-ink-700 flex items-center justify-center transition-opacity duration-300"
+                    class="absolute inset-0 animate-pulse bg-ink-700 transition-opacity duration-300"
                     class:opacity-0={lightboxImageLoaded}
-                >
-                    <div
-                        class="w-8 h-8 border-2 border-cream-400 border-t-transparent rounded-full animate-spin"
-                    ></div>
-                </div>
+                ></div>
 
                 <img
                     src={currentPhoto.src}

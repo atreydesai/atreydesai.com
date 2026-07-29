@@ -187,7 +187,7 @@
     <div class="lightbox-portal" use:portal>
         <div
             bind:this={dialogElement}
-            class="fixed inset-0 z-[9999] flex items-center justify-center bg-ink-900/95 p-4"
+            class="layer-modal fixed inset-0 flex items-center justify-center bg-ink-900/95 p-4"
             on:click={closeLightbox}
             on:keydown={(e) => { trapFocus(e); if (e.key === "Escape") closeLightbox(); }}
             role="dialog"

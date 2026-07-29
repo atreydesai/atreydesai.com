@@ -7,24 +7,31 @@
   export let url: string;
   export let type: string = "website";
 
-  // Standard page header. Provide `heading` for the common
-  // <section><h1>…</h1></section> block, or use the "header" slot for a
-  // custom header (e.g. a title with an action button alongside it).
+  // Standard page geometry and header rhythm. Wide is reserved for visual
+  // collections; standard is the editorial reading column.
+  export let width: "standard" | "wide" = "standard";
   export let heading: string = "";
-  export let headingClass: string = "mb-4";
+  export let headerVariant:
+    | "title-only"
+    | "deck"
+    | "meta"
+    | "action" = "title-only";
+
+  $: widthClass =
+    width === "wide" ? "page-shell-wide" : "page-shell-standard";
 </script>
 
 <Seo {title} {description} {url} {type} />
 
-<div class="layout-main py-8 md:py-12">
+<div class="page-shell {widthClass}">
   {#if $$slots.header}
     <slot name="header" />
   {:else if heading}
-    <section class="mb-6">
-      <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100 {headingClass}">
+    <header class="page-header page-header-{headerVariant}">
+      <h1 class="type-page-title text-ink-900 dark:text-cream-100">
         {heading}
       </h1>
-    </section>
+    </header>
   {/if}
 
   <slot />

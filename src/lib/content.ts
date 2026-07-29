@@ -84,7 +84,9 @@ export interface ResearchInterestCitation {
 }
 
 export interface ResearchInterestItem {
-    text: string;
+    title: string;
+    summary: string;
+    question: string;
     citations?: ResearchInterestCitation[];
 }
 

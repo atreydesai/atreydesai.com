@@ -54,7 +54,7 @@
        hidden until its stagger delay elapses. */
     .seg {
         transform-origin: left center;
-        animation: seg-in 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+        animation: seg-in var(--motion-base) var(--ease-emphasized) backwards;
     }
 
     @keyframes seg-in {

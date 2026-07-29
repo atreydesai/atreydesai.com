@@ -3,7 +3,7 @@
     import ShaderCanvas from "$lib/components/ShaderCanvas.svelte";
     import { formatLongDate } from "$lib/utils/date";
     import { marked } from "marked";
-    import { ArrowLeft, CalendarDays } from "lucide-svelte";
+    import { ArrowLeft, CalendarDays } from "@jis3r/icons";
     import type { PageData } from "./$types";
 
     export let data: PageData;
@@ -57,7 +57,7 @@
     type="article"
 />
 
-<div class="layout-main py-8 md:py-12">
+<div class="page-shell page-shell-standard">
     <!-- Back link -->
     <a
         href="/blog/"
@@ -68,12 +68,12 @@
     </a>
 
     <!-- Post header -->
-    <header class="mb-8">
-        <h1 class="heading-display text-3xl text-ink-900 dark:text-cream-100 mb-3">
+    <header class="page-header page-header-meta">
+        <h1 class="type-article-title mb-3 text-ink-900 dark:text-cream-100">
             {post.title}
         </h1>
 
-        <div class="flex items-center gap-4 text-sm">
+        <div class="type-meta flex flex-wrap items-center gap-4">
             <span class="flex items-center gap-1 text-ink-500 dark:text-ink-400">
                 <CalendarDays size={14} class="translate-y-[0.5px]" />
                 {formatLongDate(post.date)}
@@ -85,14 +85,14 @@
 
             <div class="flex gap-2">
                 {#each post.tags as tag}
-                    <span class="pill text-xs">{tag}</span>
+                    <span class="pill">{tag}</span>
                 {/each}
             </div>
         </div>
     </header>
 
     <!-- Post content -->
-    <article class="prose-custom font-serif">
+    <article class="prose-custom type-longform measure-reading">
         {#each segments as seg}
             {#if seg.type === "html"}
                 {@html seg.content}
@@ -152,8 +152,10 @@
         font-style: italic;
         font-size: 1.5rem;
         font-weight: 600;
-        margin-top: 2rem;
-        margin-bottom: 0.75rem;
+        line-height: 1.25;
+        margin-top: var(--space-8);
+        margin-bottom: var(--space-3);
+        text-wrap: pretty;
     }
 
     .prose-custom :global(h3) {
@@ -161,19 +163,14 @@
         font-style: italic;
         font-size: 1.25rem;
         font-weight: 600;
-        margin-top: 1.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    /* 18px prose (up from 17px since Optima reads smaller than the former serif):
-       Rello et al. (2016) put on-screen comprehension optimum near 18px. The
-       1.4rem inter-paragraph gap (~1.25×) keeps blocks distinct. */
-    .prose-custom {
-        font-size: 1.125rem;
+        line-height: 1.3;
+        margin-top: var(--space-6);
+        margin-bottom: var(--space-2);
+        text-wrap: pretty;
     }
 
     .prose-custom :global(p) {
-        margin-bottom: 1.4rem;
+        margin-bottom: var(--space-6);
         line-height: 1.7;
     }
 
@@ -189,12 +186,12 @@
 
     .prose-custom :global(ul),
     .prose-custom :global(ol) {
-        margin-bottom: 1rem;
-        padding-left: 1.5rem;
+        margin-bottom: var(--space-4);
+        padding-left: var(--space-6);
     }
 
     .prose-custom :global(li) {
-        margin-bottom: 0.25rem;
+        margin-bottom: var(--space-1);
         line-height: 1.7;
     }
 
@@ -208,8 +205,8 @@
 
     .prose-custom :global(blockquote) {
         border-left: 3px solid theme("colors.ink.200");
-        padding-left: 1rem;
-        margin: 1.5rem 0;
+        padding-left: var(--space-4);
+        margin: var(--space-6) 0;
         font-style: italic;
         color: theme("colors.ink.500");
     }
@@ -222,8 +219,8 @@
     .prose-custom :global(code) {
         font-size: 0.9em;
         background-color: theme("colors.cream.200");
-        padding: 0.125rem 0.375rem;
-        border-radius: 0.25rem;
+        padding: var(--space-0-5) var(--space-1-5);
+        border-radius: var(--radius-control);
     }
 
     :global(.dark) .prose-custom :global(code) {
@@ -233,10 +230,10 @@
     .prose-custom :global(pre) {
         background-color: theme("colors.ink.900");
         color: theme("colors.cream.200");
-        padding: 1rem;
-        border-radius: 0.5rem;
+        padding: var(--space-4);
+        border-radius: var(--radius-media);
         overflow-x: auto;
-        margin-bottom: 1rem;
+        margin-bottom: var(--space-4);
     }
 
     .prose-custom :global(pre code) {
@@ -245,20 +242,20 @@
     }
 
     .prose-custom :global(hr) {
-        margin: 2rem 0;
+        margin: var(--space-8) 0;
     }
 
     .blog-figure {
-        margin: 2rem 0;
+        margin: var(--space-8) 0;
     }
 
     .blog-figure img {
         width: 100%;
-        border-radius: 0.5rem;
+        border-radius: var(--radius-media);
     }
 
     .blog-figure figcaption {
-        margin-top: 0.5rem;
+        margin-top: var(--space-2);
         font-size: 0.875rem;
         font-style: italic;
         color: theme("colors.ink.500");

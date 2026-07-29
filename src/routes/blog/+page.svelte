@@ -18,7 +18,7 @@
                     href="/blog/{post.id}/"
                     class="group block no-underline"
                 >
-                    <h2 class="text-2xl text-ink-900 dark:text-cream-100 group-hover:text-accent dark:group-hover:text-accent-light transition-colors duration-200 mb-2">
+                    <h2 class="type-item-heading mb-2 text-ink-900 transition-colors duration-200 group-hover:text-accent dark:text-cream-100 dark:group-hover:text-accent-light">
                         {post.title}
                     </h2>
                     <p class="text-sm text-ink-500 dark:text-cream-500">

@@ -225,8 +225,8 @@
 
 <style lang="postcss">
   .shader-figure {
-    margin: 2rem 0;
-    border-radius: 0.75rem;
+    margin: var(--space-8) 0;
+    border-radius: var(--radius-panel);
     overflow: hidden;
     background: theme("colors.cream.100");
     border: 1px solid theme("colors.ink.100");
@@ -247,12 +247,13 @@
   }
   .fps-overlay {
     position: absolute;
-    top: 10px;
-    right: 12px;
-    padding: 4px 8px;
-    border-radius: 6px;
+    top: var(--space-2-5);
+    right: var(--space-3);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-control);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 0.6875rem;
+    line-height: 1.3;
     letter-spacing: 0.04em;
     color: rgba(20, 25, 35, 0.75);
     background: rgba(255, 255, 255, 0.55);
@@ -272,11 +273,12 @@
   figcaption {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: 0.625rem 0.875rem;
+    gap: var(--space-0-5);
+    padding: var(--space-2-5) var(--space-4);
     border-top: 1px solid theme("colors.ink.100");
     background: theme("colors.cream.50");
     font-size: 0.75rem;
+    line-height: 1.35;
   }
   :global(.dark) figcaption {
     background: theme("colors.ink.900");

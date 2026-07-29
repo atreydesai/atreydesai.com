@@ -3,7 +3,7 @@
     import { onMount } from "svelte";
     import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
-    import Seo from "$lib/components/Seo.svelte";
+    import PageShell from "$lib/components/PageShell.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import MediumIcon from "$lib/components/MediumIcon.svelte";
     import RatingGlyph from "$lib/components/RatingGlyph.svelte";
@@ -14,7 +14,7 @@
     import {
         ArrowDown,
         ArrowUp,
-        BadgeInfo,
+        BadgeQuestionMark,
         Bookmark,
         BookOpenText,
         CalendarDays,
@@ -22,16 +22,17 @@
         ChevronRight,
         ChevronsLeft,
         ChevronsRight,
-        ExternalLink,
+        ArrowUpRight,
         FileText,
-        Library,
+        Archive,
         PanelRightClose,
         Search,
         Star,
-        Tags,
+        Tag,
         X,
-    } from "lucide-svelte";
-    import { CirclePlus, Heart } from "@jis3r/icons";
+        CirclePlus,
+        Heart,
+    } from "@jis3r/icons";
 
     const PAGE_SIZE = 30;
     const sortableFields = [
@@ -488,18 +489,17 @@
     }
 </script>
 
-<Seo
+<PageShell
     title="Bookshelf | Atrey Desai"
     description="Curated reading list and book recommendations by Atrey Desai - science, philosophy, fiction, and essays with personal notes and ratings."
     url="https://atreydesai.com/bookshelf/"
-/>
-
-<div class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 md:pt-12 pb-12">
-    <header class="mb-6 max-w-3xl">
-        <h1 class="heading-display mb-4 text-3xl text-ink-900 dark:text-cream-100">
+    width="wide"
+>
+    <header slot="header" class="page-header page-header-deck max-w-3xl">
+        <h1 class="type-page-title mb-4 text-ink-900 dark:text-cream-100">
             bookshelf
         </h1>
-        <p class="deck mb-3 text-ink-600 dark:text-cream-400">
+        <p class="type-deck text-ink-600 dark:text-cream-400">
             {#if showShelved}
                 What I want to read and watch, but haven't gotten to yet.
             {:else}
@@ -512,7 +512,7 @@
         {#each categories as category}
             <button
                 type="button"
-                class="inline-flex h-8 items-center gap-1.5 border px-3 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {selectedCategory === category.id ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
+                class="control-compact inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {selectedCategory === category.id ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
                 on:click={() => setCategory(category.id)}
                 aria-pressed={selectedCategory === category.id}
             >
@@ -524,7 +524,7 @@
         {/each}
         <button
             type="button"
-            class="ml-auto inline-flex h-8 items-center gap-1.5 border px-3 text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {showShelved ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
+            class="control-compact ml-auto inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {showShelved ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
             on:click={toggleShelved}
             aria-pressed={showShelved}
             title="Things I want to read or watch but haven't yet"
@@ -548,7 +548,7 @@
                 placeholder="Search reading notes..."
                 bind:value={searchQuery}
                 on:input={() => (currentPage = 1)}
-                class="h-9 w-full border border-ink-200 bg-cream-50/70 pl-9 pr-9 text-sm text-ink-700 placeholder:text-ink-400 focus:border-ink-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900/70 dark:text-cream-300 dark:focus:border-cream-400"
+                class="control-regular w-full border border-ink-200 bg-cream-50/70 pl-9 pr-9 text-sm text-ink-700 placeholder:text-ink-400 focus:border-ink-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900/70 dark:text-cream-300 dark:focus:border-cream-400"
             />
             {#if searchQuery}
                 <button
@@ -582,8 +582,7 @@
                 placeholder="All tags"
                 ariaLabel="Filter by tag"
                 fastScroll
-                cascadeDuration={220}
-                cascadeDelayStep={24}
+                cascadeDuration={200}
             />
             {#if activeFilters}
                 <button
@@ -615,7 +614,7 @@
                 </span>
             </div>
 
-            <div class="max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 shadow-[0_1px_0_rgba(26,26,26,0.03)] dark:border-ink-800 dark:bg-ink-900/45">
+            <div class="surface-ledger max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 dark:border-ink-800 dark:bg-ink-900/45">
                 <div class="w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[1080px] table-fixed text-sm">
                         <thead class="border-b border-ink-200/90 bg-cream-200/60 text-xs font-normal text-ink-500 dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
@@ -646,7 +645,7 @@
                                         on:click={() => handleSort("category")}
                                     >
                                         <span class="inline-flex items-center gap-1.5">
-                                            <Library size={14} />
+                                            <Archive size={14} />
                                             Category
                                         </span>
                                         {#if sortField === "category"}
@@ -700,7 +699,7 @@
                                         </button>
                                         {#if hoveredRatingLegend === "enjoyment"}
                                             <div
-                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
+                                                class="surface-tooltip layer-tooltip pointer-events-none absolute left-[7px] top-full mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 dark:border-ink-700 dark:bg-ink-900"
                                                 role="tooltip"
                                             >
                                                 <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">
@@ -725,7 +724,7 @@
                                             on:blur={() => (hoveredRatingLegend = null)}
                                             aria-label="Sort by importance"
                                         >
-                                            <BadgeInfo size={14} />
+                                            <BadgeQuestionMark size={14} />
                                             {#if sortField === "importance"}
                                                 {#if sortDirection === "asc"}
                                                     <ArrowUp size={13} />
@@ -736,7 +735,7 @@
                                         </button>
                                         {#if hoveredRatingLegend === "importance"}
                                             <div
-                                                class="pointer-events-none absolute left-[7px] top-full z-30 mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 shadow-[0_10px_28px_rgba(26,26,26,0.10)] dark:border-ink-700 dark:bg-ink-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.28)]"
+                                                class="surface-tooltip layer-tooltip pointer-events-none absolute left-[7px] top-full mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 dark:border-ink-700 dark:bg-ink-900"
                                                 role="tooltip"
                                             >
                                                 <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">
@@ -770,7 +769,7 @@
                                 </th>
                                 <th class="w-[18%] px-3 py-2 text-left">
                                     <span class="inline-flex items-center gap-1.5">
-                                        <Tags size={14} />
+                                        <Tag size={14} />
                                         Tags
                                     </span>
                                 </th>
@@ -801,18 +800,20 @@
                                                 className="shrink-0 text-ink-400 dark:text-ink-500"
                                             />
                                             {#if book.favorite}
-                                                <Star
-                                                    size={13}
-                                                    class="shrink-0 fill-accent text-accent dark:fill-accent-light dark:text-accent-light"
+                                                <span
+                                                    class="status-icon inline-flex shrink-0 text-accent dark:text-accent-light"
                                                     aria-label="Favorite"
-                                                />
+                                                >
+                                                    <Star size={13} />
+                                                </span>
                                             {/if}
                                             {#if isCurrent(book)}
-                                                <Bookmark
-                                                    size={13}
-                                                    class="shrink-0 fill-ochre text-ochre-dark dark:fill-ochre-light dark:text-ochre-light"
+                                                <span
+                                                    class="status-icon inline-flex shrink-0 text-ochre-dark dark:text-ochre-light"
                                                     aria-label={currentStatusLabel(book)}
-                                                />
+                                                >
+                                                    <Bookmark size={13} />
+                                                </span>
                                             {/if}
                                             <span class="min-w-0 truncate text-ink-900 dark:text-cream-100" title={book.author ? `${book.title} | ${book.author}` : book.title}>
                                                 {book.title}
@@ -963,9 +964,9 @@
 
         {#if selectedBook}
             <aside
-                class="max-h-[calc(100dvh-6rem)] overflow-hidden border border-ink-200/90 bg-cream-100 shadow-[0_12px_36px_rgba(26,26,26,0.08)] dark:border-ink-800 dark:bg-ink-900/95 xl:sticky xl:top-24"
+                class="surface-panel max-h-[calc(100dvh-6rem)] overflow-hidden border border-ink-200/90 bg-cream-100 dark:border-ink-800 dark:bg-ink-900/95 xl:sticky xl:top-24"
                 aria-label="Selected reading note"
-                in:fly={{ x: 28, duration: 260, easing: cubicOut }}
+                in:fly={{ x: 28, duration: 300, easing: cubicOut }}
             >
                 <div class="flex items-start justify-between gap-4 border-b border-ink-200/90 p-4 dark:border-ink-800">
                     <div class="min-w-0">
@@ -1137,10 +1138,10 @@
                                     href={selectedBook.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-1.5 border border-ink-900 bg-ink-900 px-2.5 py-1.5 text-sm text-cream-100 transition-colors hover:bg-ink-700 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900 dark:hover:bg-cream-200"
+                                    class="control-compact inline-flex items-center gap-1.5 border border-ink-900 bg-ink-900 text-sm text-cream-100 transition-colors hover:bg-ink-700 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900 dark:hover:bg-cream-200"
                                 >
                                     View source
-                                    <ExternalLink size={14} />
+                                    <ArrowUpRight size={14} />
                                 </a>
                             {/if}
                             {#if selectedBook.letterboxdUrl}
@@ -1148,10 +1149,10 @@
                                     href={selectedBook.letterboxdUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-1.5 border border-ink-300 bg-cream-50 px-2.5 py-1.5 text-sm text-ink-800 transition-colors hover:border-ink-900 hover:bg-white dark:border-ink-600 dark:bg-ink-800 dark:text-cream-200 dark:hover:border-cream-100 dark:hover:bg-ink-700"
+                                    class="control-compact inline-flex items-center gap-1.5 border border-ink-300 bg-cream-50 text-sm text-ink-800 transition-colors hover:border-ink-900 hover:bg-white dark:border-ink-600 dark:bg-ink-800 dark:text-cream-200 dark:hover:border-cream-100 dark:hover:bg-ink-700"
                                 >
                                     Letterboxd
-                                    <ExternalLink size={14} />
+                                    <ArrowUpRight size={14} />
                                 </a>
                             {/if}
                             {#if !selectedBook.url && !selectedBook.letterboxdUrl}
@@ -1171,4 +1172,12 @@
             </aside>
         {/if}
     </div>
-</div>
+</PageShell>
+
+<style>
+    /* @jis3r icons set fill="none" on the nested SVG. Override that
+       presentation attribute for state glyphs that are intentionally solid. */
+    .status-icon :global(svg) {
+        fill: currentColor;
+    }
+</style>

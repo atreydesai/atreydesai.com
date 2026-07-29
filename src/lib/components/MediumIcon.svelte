@@ -7,10 +7,11 @@
         FilePenLine,
         FileQuestionMark,
         FileText,
+        GalleryHorizontal,
         MessageSquareMore,
         NotebookPen,
+        Play,
     } from "@jis3r/icons";
-    import { Film, Tv } from "lucide-svelte";
 
     export let medium: string | null | undefined = null;
     export let animate = false;
@@ -34,11 +35,11 @@
 {:else if normalized === "thread"}
     <MessageSquareMore {size} {animate} class={iconClass} />
 {:else if normalized === "video"}
-    <Clapperboard {size} {animate} class={iconClass} />
+    <Play {size} {animate} class={iconClass} />
 {:else if normalized === "movie"}
-    <Film {size} class={iconClass} />
+    <Clapperboard {size} {animate} class={iconClass} />
 {:else if normalized === "show" || normalized === "drama"}
-    <Tv {size} class={iconClass} />
+    <GalleryHorizontal {size} {animate} class={iconClass} />
 {:else if normalized === "essay"}
     <FileText {size} {animate} class={iconClass} />
 {:else}

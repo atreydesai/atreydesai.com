@@ -15,8 +15,11 @@
     export let ariaLabel: string = "";
     export let fastScroll = false;
     export let animateOptions = true;
-    export let cascadeDuration = 320;
-    export let cascadeDelayStep = 55;
+    export let cascadeDuration = 300;
+    export let cascadeDelayStep = 24;
+
+    const MAX_CASCADE_OPTIONS = 30;
+    const MAX_CASCADE_DELAY_MS = 240;
 
     // When `excludable` is on, a toggle at the top of the menu flips clicks from
     // single-select (set `value`) to multi-select exclusion (toggle membership
@@ -38,6 +41,7 @@
 
     // First option doubles as the "no filter" reset (e.g. "All tags").
     $: resetValue = options[0]?.value ?? "";
+    $: cascadeOptions = animateOptions && options.length <= MAX_CASCADE_OPTIONS;
 
     $: displayLabel = buildLabel(options, value, excluded, placeholder, resetValue);
 
@@ -141,6 +145,10 @@
         if (n === 0) return;
         activeIndex = ((index % n) + n) % n; // wrap around top/bottom
         optionRefs[activeIndex]?.focus();
+    }
+
+    function cascadeDelay(index: number): number {
+        return Math.min(index * cascadeDelayStep, MAX_CASCADE_DELAY_MS);
     }
 
     // Open the listbox from the trigger with the keyboard.
@@ -253,7 +261,7 @@
             class:fast-scroll={fastScroll}
             bind:this={dropdownRef}
             on:wheel={onDropdownWheel}
-            out:fly={{ y: -6, duration: 140, easing: cubicOut }}
+            out:fly={{ y: -6, duration: 150, easing: cubicOut }}
         >
             {#if excludable}
                 <button
@@ -275,7 +283,7 @@
                     <button
                         type="button"
                         class="select-option"
-                        class:cascade-in={animateOptions}
+                        class:cascade-in={cascadeOptions}
                         class:selected={optionStates[i] === "selected"}
                         class:excluded={optionStates[i] === "excluded"}
                         bind:this={optionRefs[i]}
@@ -284,7 +292,7 @@
                         role="option"
                         aria-selected={optionStates[i] !== "none"}
                         tabindex={activeIndex === i ? 0 : -1}
-                        style="--cascade-delay: {i * cascadeDelayStep}ms; --cascade-duration: {cascadeDuration}ms"
+                        style="--cascade-delay: {cascadeDelay(i)}ms; --cascade-duration: {cascadeDuration}ms"
                     >
                         {excludeMode && option.value === resetValue
                             ? excludeResetLabel
@@ -305,21 +313,23 @@
     .select-trigger {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        padding: 0.3rem 0.65rem;
+        gap: var(--space-2);
+        min-height: 1.75rem;
+        padding: var(--space-1-5) var(--space-2-5);
         font-family: var(--font-mono);
         font-size: 0.75rem;
         font-weight: 500;
         letter-spacing: 0.01em;
         background-color: transparent;
         border: 1px solid theme("colors.ink.200");
-        border-radius: 2px;
+        border-radius: var(--radius-control);
         color: theme("colors.ink.600");
         cursor: pointer;
-        transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                    color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                    background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        min-width: 140px;
+        transition:
+            border-color var(--motion-base) var(--ease-standard),
+            color var(--motion-base) var(--ease-standard),
+            background-color var(--motion-base) var(--ease-standard);
+        min-width: 8.75rem;
         justify-content: space-between;
     }
 
@@ -359,7 +369,7 @@
 
     .select-chevron {
         display: inline-flex;
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: transform var(--motion-slow) var(--ease-standard);
         opacity: 0.7;
     }
 
@@ -369,14 +379,14 @@
 
     .select-dropdown {
         position: absolute;
-        top: calc(100% + 6px);
+        top: calc(100% + var(--space-1-5));
         left: 0;
         min-width: 100%;
         background-color: theme("colors.cream.50");
         border: 1px solid theme("colors.ink.200");
-        border-radius: 2px;
-        box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
-        z-index: 50;
+        border-radius: var(--radius-control);
+        box-shadow: var(--shadow-popover);
+        z-index: var(--layer-popover);
         max-height: 19rem;
         overflow-x: hidden;
         overflow-y: auto;
@@ -391,7 +401,7 @@
     :global(.dark) .select-dropdown {
         background-color: theme("colors.ink.800");
         border-color: theme("colors.ink.700");
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+        box-shadow: var(--shadow-popover-dark);
     }
 
     .select-toggle {
@@ -402,8 +412,8 @@
         width: 100%;
         align-items: center;
         justify-content: space-between;
-        gap: 0.5rem;
-        padding: 0.5rem 0.75rem;
+        gap: var(--space-2);
+        padding: var(--space-2) var(--space-3);
         font-family: var(--font-mono);
         font-size: 0.6875rem;
         font-weight: 500;
@@ -415,8 +425,9 @@
         border: none;
         border-bottom: 1px solid theme("colors.ink.200");
         cursor: pointer;
-        transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-                    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transition:
+            color var(--motion-base) var(--ease-standard),
+            background-color var(--motion-base) var(--ease-standard);
     }
 
     :global(.dark) .select-toggle {
@@ -448,9 +459,10 @@
         width: 0.7rem;
         height: 0.7rem;
         border: 1px solid theme("colors.ink.300");
-        border-radius: 2px;
-        transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-                    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: var(--radius-control);
+        transition:
+            background-color var(--motion-base) var(--ease-standard),
+            border-color var(--motion-base) var(--ease-standard);
     }
 
     :global(.dark) .select-toggle-indicator {
@@ -463,21 +475,14 @@
     }
 
     .select-option.cascade-in {
-        max-height: 0;
-        padding-top: 0;
-        padding-bottom: 0;
         opacity: 0;
         transform: translateY(-6px);
-        overflow: hidden;
-        animation: select-cascade var(--cascade-duration, 320ms) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation: select-cascade var(--cascade-duration, 300ms) var(--ease-emphasized) forwards;
         animation-delay: var(--cascade-delay, 0ms);
     }
 
     @keyframes select-cascade {
         to {
-            max-height: 3rem;
-            padding-top: 0.45rem;
-            padding-bottom: 0.45rem;
             opacity: 1;
             transform: translateY(0);
         }
@@ -486,7 +491,7 @@
     .select-option {
         display: block;
         width: 100%;
-        padding: 0.45rem 0.75rem;
+        padding: var(--space-2) var(--space-3);
         font-family: var(--font-mono);
         font-size: 0.75rem;
         font-weight: 400;
@@ -495,8 +500,9 @@
         background: none;
         border: none;
         cursor: pointer;
-        transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-                    color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        transition:
+            background-color var(--motion-base) var(--ease-standard),
+            color var(--motion-base) var(--ease-standard);
         white-space: nowrap;
     }
 
@@ -528,7 +534,7 @@
 
     .select-option.selected::before {
         content: "·";
-        margin-right: 0.4rem;
+        margin-right: var(--space-1-5);
         color: theme("colors.accent.DEFAULT");
     }
 
@@ -543,7 +549,7 @@
 
     .select-option.excluded::before {
         content: "−";
-        margin-right: 0.4rem;
+        margin-right: var(--space-1-5);
         color: theme("colors.accent.DEFAULT");
     }
 </style>

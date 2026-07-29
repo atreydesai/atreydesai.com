@@ -3,12 +3,12 @@
 # You can use markdown links: [text](url) and emphasis: **bold** *italic*
 
 intro:
-  - "I am a senior (fourth-year) undergraduate student studying computer science and linguistics with a minor in korean studies at the University of Maryland."
+  - "I am a senior (fourth-year) undergraduate student studying computer science and linguistics at the University of Maryland."
   - "I am fortunate to be advised by Professors [Rachel Rudinger](https://rudinger.github.io/), [Jordan Boyd-Graber](http://www.umiacs.umd.edu/~jbg), and [Mohit Iyyer](https://www.cs.umd.edu/~miyyer/)."
 
 banner:
   # The {curly} phrase becomes the click-to-expand toggle for the projects list.
-  lead: "**I'm applying to Ph.D. programs this fall (2026-27 cycle)** and am happy to chat about my {ongoing projects}."
+  lead: "**I'm applying to Ph.D. programs this fall (2026-27 cycle)** and am happy to chat about my {ongoing projects}"
   projects:
     - "AI agents for long-form text generation ([autofiction.ai](https://autofiction.ai/))."
     - "Calibrating human reliance and susceptibility to VQA model explanations ([QANTA](https://qanta-org.github.io/competition/2026/))."
@@ -16,9 +16,11 @@ banner:
     - "👀"
 
 researchInterests:
-  intro: "Language models are becoming agents that act in open-ended, real-world environments, but our ability to know when to trust them for practical tasks lags behind. I want to make AI systems trustworthy, robust, and genuinely useful as they take on that role, namely:"
+  intro: "Language models are increasingly deployed as agents in open-ended, real-world environments; however, our ability to know when to trust these systems has not kept pace. I study how to make AI systems trustworthy, robust, and useful in practice, namely:"
   items:
-    - text: "**1. Knowing when to trust a model:** how do we improve the confidence calibration of models reasoning under uncertainty (insufficient information, excessive information, and long-tail settings) and updating on new information?"
+    - title: "Calibrate"
+      summary: "Calibrate model confidence under incomplete, uncertain, and excessive information."
+      question: "How do we improve the confidence calibration of models reasoning under uncertainty (insufficient information, excessive information, and long-tail settings) and updating on new information?"
       citations:
         - label: "ttr"
           url: "/research/#test-time-reasoners"
@@ -26,7 +28,9 @@ researchInterests:
           url: null
         - label: "IP2"
           url: null
-    - text: "**2. Acting on that trust:** how can we build better harnesses and systems to act on calibrated trust in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
+    - title: "Act"
+      summary: "Build systems for open-ended work without clear ground truth."
+      question: "How can we build better harnesses and systems to act on calibrated trust in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
       citations:
         - label: "benchmarker"
           url: "/research/#benchmarker"
@@ -38,7 +42,9 @@ researchInterests:
           url: null
         - label: "IP3"
           url: null
-    - text: "**3. Collaborating in those environments:** how do agents interact with humans and other agents in these environments (collaborative writing, intelligence analysis)?"
+    - title: "Coordinate"
+      summary: "Study how people rely on and adopt agents in open-ended settings."
+      question: "How do agents interact with humans and other agents in these environments (collaborative writing, intelligence analysis)?"
       citations:
         - label: "quick"
           url: "/research/#llm-distractors"

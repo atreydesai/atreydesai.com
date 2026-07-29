@@ -1,6 +1,5 @@
 <script lang="ts">
-    import { Twitter } from "lucide-svelte";
-    import { Binary, PenLine, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight } from "@jis3r/icons";
+    import { Binary, PenLine, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight, MessageCircle } from "@jis3r/icons";
     import FileText from "$lib/components/icons/FileText.svelte";
 
     export let paper: {
@@ -116,7 +115,7 @@
                 on:mouseenter={() => (hoveredLink = 'twitter')}
                 on:mouseleave={() => (hoveredLink = null)}
             >
-                <Twitter size={14} />
+                <MessageCircle size={14} />
                 twitter
             </a>
         {/if}

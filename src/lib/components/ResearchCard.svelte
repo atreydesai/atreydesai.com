@@ -44,7 +44,6 @@
     $: isPreview = variant === "preview" || compact;
     $: surfaceClasses = [
         "surface-card",
-        "!rounded",
         "overflow-hidden",
         "p-4",
         "md:p-5",
@@ -92,7 +91,7 @@
         >
             <div class="min-w-0 flex-1">
                 <h3
-                    class={`text-balance font-semibold text-ink-900 dark:text-cream-100 ${isPreview ? "text-lg leading-snug" : "text-xl leading-snug"}`}
+                    class="type-item-heading text-ink-900 dark:text-cream-100"
                 >
                     {#if paper.arxiv}
                         <a
@@ -140,7 +139,7 @@
 
                 {#if paper.tldr && tldrOpen}
                     <p
-                        class={`mt-2 text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm leading-6" : "text-sm leading-6"}`}
+                        class="type-body-small mt-2 text-ink-600 dark:text-cream-300"
                     >
                         {paper.tldr}
                     </p>

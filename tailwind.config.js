@@ -1,5 +1,3 @@
-const defaultTheme = require("tailwindcss/defaultTheme");
-
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./src/**/*.{html,js,svelte,ts}"],
@@ -16,12 +14,6 @@ export default {
         lg: ["1.1rem", { lineHeight: "1.7rem" }],
         xl: ["1.25rem", { lineHeight: "1.75rem" }],
         "2xl": ["1.5rem", { lineHeight: "2rem" }],
-        "3xl": ["1.875rem", { lineHeight: "2.25rem" }],
-        // Hero sizes — the homepage h1 uses text-3xl md:text-4xl. Declared
-        // explicitly so it's part of the documented scale rather than falling
-        // back to a Tailwind default that's outside the system.
-        "4xl": ["2.25rem", { lineHeight: "2.5rem" }],
-        "5xl": ["3rem", { lineHeight: "1" }],
       },
       colors: {
         // Off-pink/tan palette
@@ -104,11 +96,6 @@ export default {
         serif: ["var(--font-prose)"],
         mono: ["var(--font-mono)"],
       },
-      spacing: {
-        // 1:3:1 layout ratio helpers
-        "layout-side": "20%",
-        "layout-main": "60%",
-      },
       screens: {
         xs: "375px",
         sm: "480px",
@@ -116,28 +103,6 @@ export default {
         lg: "1024px",
         xl: "1280px",
         "2xl": "1536px",
-      },
-      animation: {
-        "fade-in": "fadeIn 0.3s ease-out",
-        "slide-up": "slideUp 0.4s ease-out",
-        "cursor-pulse": "cursorPulse 2s ease-in-out infinite",
-      },
-      keyframes: {
-        fadeIn: {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
-        slideUp: {
-          "0%": { opacity: "0", transform: "translateY(10px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        cursorPulse: {
-          "0%, 100%": { transform: "scale(1)" },
-          "50%": { transform: "scale(1.1)" },
-        },
-      },
-      transitionTimingFunction: {
-        smooth: "cubic-bezier(0.4, 0, 0.2, 1)",
       },
     },
   },

@@ -179,10 +179,10 @@
 />
 
 <!-- Centered layout container with footnotes on the side -->
-<div class="relative" bind:this={containerEl}>
+<div class="about-layout" bind:this={containerEl}>
     <!-- Sidenotes (desktop only): each note sits in the right margin beside
          its marker, faint until hovered. -->
-    <aside class="hidden xl:block absolute inset-y-0 right-8 w-56 z-10">
+    <aside class="about-sidenotes layer-raised hidden xl:block">
         <div class="relative h-full">
             {#each aboutData.footnotes as footnote (footnote.id)}
                 <!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -205,17 +205,17 @@
     </aside>
 
     <!-- Main content - centered like other pages -->
-    <div class="layout-main py-8 md:py-12">
+    <div class="about-main page-shell page-shell-standard">
         <!-- Professional Section -->
         <section class="mb-12">
-            <h1
-                class="heading-display text-3xl text-ink-900 dark:text-cream-100 mb-6"
-            >
-                who am i?
-            </h1>
+            <header class="page-header page-header-title-only">
+                <h1 class="type-page-title text-ink-900 dark:text-cream-100">
+                    who am i?
+                </h1>
+            </header>
 
             <div
-                class="prose prose-lg text-ink-700 dark:text-cream-300 space-y-4"
+                class="type-body flow-prose measure-reading text-ink-700 dark:text-cream-300"
             >
                 <h2 class="section-heading">professionally speaking...</h2>
 
@@ -243,7 +243,7 @@
             <h2 class="section-heading">personally speaking...</h2>
 
             <div
-                class="prose prose-lg text-ink-700 dark:text-cream-300 space-y-4"
+                class="type-body flow-prose measure-reading text-ink-700 dark:text-cream-300"
             >
                 {#each aboutData.personal.descriptions as description}
                     <p>
@@ -297,7 +297,7 @@
         <section class="mb-12">
             <h2 class="section-heading">where are you from?</h2>
 
-            <div class="text-ink-700 dark:text-cream-300">
+            <div class="measure-reading text-ink-700 dark:text-cream-300">
                 <p>
                     {@html parseLinks(aboutData.location.text)}
                 </p>
@@ -312,7 +312,7 @@
                 why does this website look like this?
             </h2>
 
-            <div class="text-ink-700 dark:text-cream-300 space-y-4">
+            <div class="flow-prose measure-reading text-ink-700 dark:text-cream-300">
                 <p>
                     <span class="text-ink-500 dark:text-ink-400"
                         >inspiration:</span
@@ -354,7 +354,7 @@
         <section class="mb-12">
             <h2 class="section-heading">thoughts floating around in my head</h2>
 
-            <div class="text-ink-700 dark:text-cream-300 space-y-4">
+            <div class="flow-prose measure-reading text-ink-700 dark:text-cream-300">
                 <ul class="list-disc list-inside space-y-2">
                     {#each aboutData.thoughts as thought}
                         <li>{@html parseLinks(thought)}</li>
@@ -365,7 +365,7 @@
 
         <!-- Mobile footnotes (shown at bottom wherever the sidenotes aren't) -->
         <div class="xl:hidden mt-12 pt-8">
-            <h3 class="section-heading text-sm">footnotes</h3>
+            <h3 class="type-label mb-4 text-ink-500 dark:text-cream-400">footnotes</h3>
             <div class="space-y-4">
                 {#each aboutData.footnotes as footnote}
                     <div
@@ -383,6 +383,46 @@
 </div>
 
 <style>
+    .about-layout {
+        position: relative;
+        width: 100%;
+        max-width: 820px;
+        margin-inline: auto;
+    }
+
+    .about-main {
+        width: 100%;
+        max-width: calc(68ch + 3rem);
+        margin-inline: 0;
+    }
+
+    @media (min-width: 1280px) {
+        .about-layout {
+            display: grid;
+            width: min(calc(68ch + 19rem), calc(50% + 410px));
+            max-width: none;
+            margin-left: calc(50% - 410px);
+            margin-right: 0;
+            grid-template-columns: calc(68ch + 3rem) minmax(0, 14rem);
+            column-gap: var(--space-8);
+            justify-content: start;
+            align-items: stretch;
+        }
+
+        .about-main {
+            grid-column: 1;
+            grid-row: 1;
+            max-width: none;
+        }
+
+        .about-sidenotes {
+            position: relative;
+            grid-column: 2;
+            grid-row: 1;
+            width: 100%;
+        }
+    }
+
     /* Use :global() for footnote styles since they're dynamically generated via @html */
     :global(.footnote-ref) {
         font-size: 0.75rem;
@@ -391,7 +431,7 @@
         color: theme("colors.accent.DEFAULT");
         cursor: pointer;
         text-decoration: none;
-        transition: color 0.2s;
+        transition: color var(--motion-base) var(--ease-standard);
     }
 
     :global(.footnote-ref:hover) {
@@ -414,13 +454,13 @@
         left: 0;
         right: 0;
         opacity: 0;
-        transition: opacity 0.3s ease;
+        transition: opacity var(--motion-slow) var(--ease-standard);
     }
     .sidenote.fn-ready {
         opacity: 0.45;
         transition:
-            opacity 0.3s ease,
-            top 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            opacity var(--motion-slow) var(--ease-standard),
+            top var(--motion-slow) var(--ease-emphasized);
     }
     .sidenote.fn-ready:hover,
     .sidenote.fn-ready.fn-active {

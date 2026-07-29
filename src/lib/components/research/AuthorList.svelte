@@ -148,7 +148,7 @@
     .char-reveal {
         display: inline;
         opacity: 0;
-        animation: charReveal 110ms ease-out forwards;
+        animation: charReveal var(--motion-instant) ease-out forwards;
     }
     @keyframes charReveal {
         from { opacity: 0; }

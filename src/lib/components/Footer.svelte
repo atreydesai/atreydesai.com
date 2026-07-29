@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
-  import { Disc3, VolumeOff } from "@jis3r/icons";
-  import { Volume2 } from "lucide-svelte";
+  import { AudioLines, Disc3, VolumeOff } from "@jis3r/icons";
 
   // DC Time with seconds
   let dcTime = "";
@@ -112,7 +111,7 @@
 
 </script>
 
-<footer class="layout-main w-full mt-4 pb-8">
+<footer class="page-shell-standard w-full mt-4 pb-8">
   <div class="border-t border-ink-200 dark:border-ink-700 pt-6">
     <div
       class="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-y-4"
@@ -136,7 +135,7 @@
             on:mouseleave={() => (hoveredMusic = false)}
             aria-label={isPlaying ? "Skip song" : "Start music"}
             title={isPlaying ? "Skip song" : "Start music"}
-            class="inline-flex items-center text-inherit transition-all duration-300 hover:scale-110 hover:text-ink-700 dark:hover:text-cream-300"
+            class="inline-flex items-center text-inherit transition-[color,transform] duration-300 hover:scale-110 hover:text-ink-700 dark:hover:text-cream-300"
             class:animate-pulse={isPlaying}
           >
             <Disc3 size={14} animate={hoveredMusic} />
@@ -146,13 +145,13 @@
             on:click={toggleMusic}
             aria-pressed={isPlaying}
             aria-label={isPlaying ? "Pause music" : "Play music"}
-            class="inline-flex items-center gap-2 font-[inherit] text-[length:inherit] lowercase text-inherit transition-all duration-300 hover:text-ink-700 dark:hover:text-cream-300"
+            class="inline-flex items-center gap-2 font-[inherit] text-[length:inherit] lowercase text-inherit transition-colors duration-300 hover:text-ink-700 dark:hover:text-cream-300"
           >
             <span>music</span>
-            <span class="inline-flex items-center transition-all duration-300">
+            <span class="inline-flex items-center">
               {#if isPlaying}
                 <span in:fade={{ duration: 200 }} class="inline-flex">
-                  <Volume2 size={14} />
+                  <AudioLines size={14} />
                 </span>
               {:else}
                 <span in:fade={{ duration: 200 }} class="inline-flex">
