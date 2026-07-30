@@ -87,6 +87,10 @@
 
   let researchExpanded = false;
 
+  function toggleResearchDetails() {
+    researchExpanded = !researchExpanded;
+  }
+
   let emailCopied = false;
   let copyTimeout: ReturnType<typeof setTimeout>;
 
@@ -121,12 +125,11 @@
 
 <div class="page-shell page-shell-standard">
   <section class="section-gap">
-    <!-- Mobile: flex-col. Desktop: grid with image spanning both rows so icons bottom = image bottom -->
+    <!-- Mobile: intro and links above the image. Desktop: text and image side by side. -->
     <div
-      class="flex flex-col gap-8 md:grid md:grid-cols-[1fr_minmax(0,250px)] md:grid-rows-[1fr_auto]"
+      class="flex flex-col gap-8 md:grid md:grid-cols-[1fr_minmax(0,250px)]"
     >
-      <!-- Text: col 1, row 1 -->
-      <div class="md:col-start-1 md:row-start-1">
+      <div class="md:col-start-1">
         <h1 class="type-page-title mb-4 text-ink-900 dark:text-cream-100">
           hi, i'm <HyperText class="ml-[0.18em]" text="atrey desai" />
         </h1>
@@ -138,10 +141,44 @@
             </p>
           {/each}
         </div>
+
+        <div class="mt-4 flex items-center text-sm">
+          {#each socialLinks as link, i}
+            {#if i > 0}
+              <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
+            {/if}
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={link.name}
+              class="link font-medium"
+            >
+              {link.name}
+            </a>
+          {/each}
+
+          <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
+          <div class="relative inline-flex">
+            <button
+              type="button"
+              on:click={copyEmail}
+              title="Copy email"
+              class="link font-[inherit] text-[length:inherit] font-medium cursor-pointer"
+            >
+              Email
+            </button>
+            {#if emailCopied}
+              <span class="copied-tooltip">
+                <span class="copied-triangle"></span>
+                copied!
+              </span>
+            {/if}
+          </div>
+        </div>
       </div>
 
-      <!-- Image: col 2, spans both rows -->
-      <div class="md:col-start-2 md:row-start-1 md:row-span-2">
+      <div class="md:col-start-2">
         <div class="relative w-full max-w-[250px] mx-auto md:mx-0">
           <div class="aspect-square w-full rounded-lg overflow-hidden">
             <LegoImage
@@ -166,43 +203,6 @@
           {/if}
         </div>
       </div>
-
-      <!-- Links: col 1, row 2: bottom aligns with image bottom -->
-      <div class="md:col-start-1 md:row-start-2 -mt-4 flex items-center text-sm">
-        {#each socialLinks as link, i}
-          {#if i > 0}
-            <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
-          {/if}
-          <a
-            href={link.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={link.name}
-            class="link font-medium"
-          >
-            {link.name}
-          </a>
-        {/each}
-
-        <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
-        <div class="relative inline-flex">
-          <button
-            type="button"
-            on:click={copyEmail}
-            title="Copy email"
-            class="link font-[inherit] text-[length:inherit] font-medium cursor-pointer"
-          >
-            Email
-          </button>
-          {#if emailCopied}
-            <span class="copied-tooltip">
-              <span class="copied-triangle"></span>
-              copied!
-            </span>
-          {/if}
-        </div>
-      </div>
-
     </div>
   </section>
 
@@ -282,13 +282,13 @@
         <div class="section-rule-line"></div>
       </div>
 
-      <div class="space-y-4 text-ink-700 dark:text-cream-300">
+      <div class="space-y-2 text-ink-700 dark:text-cream-300">
         <p>
           {@html parseLinks(homepageData.researchInterests.intro)}
         </p>
 
         <div>
-          <div class="mb-2">
+          <div>
             <button
               type="button"
               class="research-toggle"
@@ -297,7 +297,7 @@
               aria-label={researchExpanded
                 ? "Show concise research summaries"
                 : "Show full research questions"}
-              on:click={() => (researchExpanded = !researchExpanded)}
+              on:click={toggleResearchDetails}
             >
               <span
                 class="research-toggle-caret"
@@ -315,11 +315,29 @@
                 class:research-interest-row-expanded={researchExpanded}
                 style="--interest-delay: {i * 40}ms"
               >
-                <span class="font-mono text-xs text-ink-400 dark:text-cream-500">
+                <button
+                  type="button"
+                  class="research-interest-index font-mono text-xs text-ink-400 dark:text-cream-500"
+                  aria-expanded={researchExpanded}
+                  aria-controls="research-interest-list"
+                  aria-label={`${researchExpanded ? "Show concise summaries for" : "Show full details for"} all research interests`}
+                  on:click={toggleResearchDetails}
+                >
                   {String(i + 1).padStart(2, "0")}
-                </span>
+                </button>
                 <div class="min-w-0">
-                  <p class="font-medium text-ink-900 dark:text-cream-100">{item.title}</p>
+                  <p class="font-medium text-ink-900 dark:text-cream-100">
+                    <button
+                      type="button"
+                      class="research-interest-title"
+                      aria-expanded={researchExpanded}
+                      aria-controls="research-interest-list"
+                      aria-label={`${researchExpanded ? "Show concise summary for" : "Show full details for"} all research interests`}
+                      on:click={toggleResearchDetails}
+                    >
+                      {item.title}
+                    </button>
+                  </p>
 
                   <div
                     class="interest-summary-shell"
@@ -438,6 +456,33 @@
   .research-toggle-caret-open {
     transform: rotate(90deg);
   }
+  .research-interest-title {
+    border-radius: var(--radius-control);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    transition: color var(--motion-base) var(--ease-standard);
+  }
+  .research-interest-index {
+    align-self: baseline;
+    justify-self: start;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    transition: color var(--motion-base) var(--ease-standard);
+  }
+  .research-interest-title:hover,
+  .research-interest-index:hover {
+    color: theme("colors.accent.dark");
+  }
+  .research-interest-title:focus-visible,
+  .research-interest-index:focus-visible {
+    outline: 2px solid rgb(232 93 76 / 0.4);
+    outline-offset: 4px;
+  }
+  :global(.dark) .research-interest-title:hover,
+  :global(.dark) .research-interest-index:hover {
+    color: theme("colors.accent.light");
+  }
 
   .interest-summary-shell,
   .interest-question-shell,
@@ -476,6 +521,15 @@
     grid-template-rows: 1fr;
     opacity: 1;
     transform: translateY(0);
+  }
+  /*
+   * The inner wrapper must clip while its row is collapsing, but an expanded
+   * question needs to let citation popovers escape its bounds. Without this,
+   * the first two rows hide "let me cook :)" below the question; the final row
+   * only appears to work because its extra legend gives the popover room.
+   */
+  .research-interest-row-expanded .interest-question-shell .interest-copy-inner {
+    overflow: visible;
   }
 
   /*
