@@ -478,6 +478,42 @@
     transform: translateY(0);
   }
 
+  /*
+   * Mobile Safari can resolve an animated 1fr track before wrapped copy has
+   * reached its final height, leaving the overflow-hidden inner clipped.
+   * Let the active panel use normal document flow on small screens instead.
+   */
+  @media (max-width: 767px) {
+    .research-interest-row {
+      align-items: start;
+    }
+    .interest-summary-shell,
+    .interest-question-shell,
+    .research-interest-row-expanded .interest-summary-shell,
+    .research-interest-row-expanded .interest-question-shell {
+      grid-template-rows: none;
+      transform: none;
+      transition: none;
+    }
+    .interest-summary-shell {
+      display: block;
+      opacity: 1;
+    }
+    .interest-question-shell {
+      display: none;
+    }
+    .research-interest-row-expanded .interest-summary-shell {
+      display: none;
+    }
+    .research-interest-row-expanded .interest-question-shell {
+      display: block;
+      opacity: 1;
+    }
+    .interest-copy-inner {
+      overflow: visible;
+    }
+  }
+
   /* Pixel boba sitting diagonally in the photo's bottom-right corner. */
   .boba-launcher {
     position: absolute;
