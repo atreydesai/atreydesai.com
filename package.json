@@ -16,6 +16,7 @@
     "preview": "vite preview",
     "test:boba": "node --test tests/boba-engine.test.mjs",
     "test:letterboxd": "node --test tests/letterboxd-sync.test.mjs",
+    "test:agent": "node --test tests/agent-readiness.test.mjs",
     "check": "svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-check --tsconfig ./jsconfig.json --watch",
     "lint": "prettier --ignore-path .gitignore --check --plugin-search-dir=. .",
@@ -27,6 +28,7 @@
     "@sveltejs/kit": "^2.60.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@types/node": "^25.5.0",
+    "@types/turndown": "^5.0.6",
     "autoprefixer": "^10.4.18",
     "js-yaml": "^4.2.0",
     "patch-package": "^8.0.1",
@@ -49,6 +51,7 @@
     "@vercel/blob": "^2.4.0",
     "@vercel/speed-insights": "^1.3.1",
     "exifreader": "^4.33.1",
-    "marked": "^12.0.0"
+    "marked": "^12.0.0",
+    "turndown": "^7.2.4"
   }
 }

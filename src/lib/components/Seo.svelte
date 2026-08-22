@@ -4,6 +4,7 @@
     canonicalUrl as toCanonicalUrl,
     SITE_URL,
   } from "$lib/seo";
+  import { personStructuredData } from "$lib/structured-data";
 
   export let title = "Atrey Desai";
   export let description =
@@ -17,6 +18,10 @@
 
   $: canonicalUrl = toCanonicalUrl(url);
   $: imageUrl = absoluteSiteUrl(image);
+  $: structuredDataJson = JSON.stringify(personStructuredData({ imageUrl })).replace(
+    /</g,
+    "\\u003c",
+  );
 </script>
 
 <svelte:head>
@@ -55,55 +60,9 @@
   <!-- Additional SEO -->
   <meta name="author" content="Atrey Desai" />
   <link rel="canonical" href={canonicalUrl} />
+  <link rel="alternate" type="text/markdown" href={canonicalUrl} />
+  <link rel="describedby" type="text/plain" href="/llms.txt" />
 
-  <!-- Structured Data for Google -->
-  {@html `<script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Person",
-      "name": "Atrey Desai",
-      "givenName": "Atrey",
-      "familyName": "Desai",
-      "url": "${canonicalUrl}",
-      "image": "${imageUrl}",
-      "sameAs": [
-        "https://github.com/atreydesai",
-        "https://x.com/atreydesai",
-        "https://scholar.google.com/citations?user=hTDzj6cAAAAJ&hl=en",
-        "https://instagram.com/framedbyatrey"
-      ],
-      "jobTitle": "Undergraduate Researcher",
-      "email": "adesai10@umd.edu",
-      "affiliation": [
-        {
-          "@type": "Organization",
-          "name": "University of Maryland",
-          "url": "https://umd.edu"
-        },
-        {
-          "@type": "Organization",
-          "name": "CLIP Lab",
-          "url": "https://clip.umd.edu"
-        },
-        {
-          "@type": "Organization",
-          "name": "Learn Prompting",
-          "url": "https://learnprompting.org"
-        }
-      ],
-      "alumniOf": {
-        "@type": "CollegeOrUniversity",
-        "name": "University of Maryland",
-        "url": "https://umd.edu"
-      },
-      "knowsAbout": [
-        "Natural Language Processing",
-        "AI Safety",
-        "Computational Linguistics",
-        "Machine Learning",
-        "Benchmark Evaluation",
-        "Multimodal Reasoning"
-      ]
-    }
-  </script>`}
+  <!-- Machine-readable identity shared by every page. -->
+  {@html `<script type="application/ld+json">${structuredDataJson}</script>`}
 </svelte:head>

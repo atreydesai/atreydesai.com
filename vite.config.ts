@@ -7,10 +7,15 @@ import type { UserConfig } from "vite";
 
 // Get the last commit date from git
 let gitDate: string;
+let cvDate: string;
 try {
   gitDate = execSync("git log -1 --format=%cI").toString().trim();
+  cvDate =
+    execSync("git log -1 --format=%cI -- static/cv.pdf").toString().trim() ||
+    gitDate;
 } catch {
   gitDate = new Date().toISOString();
+  cvDate = gitDate;
 }
 
 /** A custom Markdown plugin for Vite, with YAML frontmatter support. */
@@ -25,7 +30,9 @@ function markdown() {
         if (src.startsWith("---")) {
           // Find --- at the start of a line (after the opening ---).
           // The closing --- may sit at end-of-file with no trailing newline.
-          const match = src.slice(3).match(/^([\s\S]*?)\r?\n---[^\S\r\n]*(?:\r?\n|$)/);
+          const match = src
+            .slice(3)
+            .match(/^([\s\S]*?)\r?\n---[^\S\r\n]*(?:\r?\n|$)/);
           if (!match) {
             throw new Error(`Unclosed YAML frontmatter in ${id}`);
           }
@@ -45,6 +52,7 @@ const config: UserConfig = {
   plugins: [sveltekit(), pluginYaml() as any, markdown()],
   define: {
     __BUILD_DATE__: JSON.stringify(gitDate),
+    __CV_DATE__: JSON.stringify(cvDate),
   },
 };
 

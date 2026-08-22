@@ -10,6 +10,8 @@
 <Seo
   title="Page Not Found | Atrey Desai"
   description="The page you're looking for doesn't exist."
+  url={$page.url.href}
+  noindex={true}
 />
 
 <div class="page-shell page-shell-standard py-16 text-center md:py-24">
@@ -23,6 +25,12 @@
     <p class="text-ink-600 dark:text-cream-400 max-w-md mx-auto">
       The page you're looking for doesn't exist or has been moved ┻━┻︵ \(°□°)/
       ︵ ┻━┻
+    </p>
+
+    <p class="text-sm text-ink-500 dark:text-cream-400 max-w-lg mx-auto">
+      Looking for something specific? Try the
+      <a href="/sitemap.xml" class="link">site map</a>,
+      <a href="/llms.txt" class="link">agent guide</a>, or one of the main sections below.
     </p>
 
     <div
@@ -49,6 +57,13 @@
         Go Back
       </button>
     </div>
+
+    <nav aria-label="Main sections" class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm">
+      <a href="/about/" class="link">About</a>
+      <a href="/research/" class="link">Research</a>
+      <a href="/blog/" class="link">Blog</a>
+      <a href="/cv/" class="link">CV</a>
+    </nav>
   </div>
 
   <!-- Fun decorative element -->
