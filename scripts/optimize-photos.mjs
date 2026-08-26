@@ -12,9 +12,11 @@ import { extractPhotoMeta } from './photo-exif.mjs';
 
 const PHOTOS_DIR = 'static/images/photography';
 const THUMBS_DIR = 'static/images/photography/thumbs';
-// EXIF/dimension cache consumed by src/routes/photography/+page.server.ts at
-// prerender time, so the build doesn't re-read every full-size JPG.
+const GENERATED_DIR = 'src/lib/generated';
+// EXIF/dimension cache used to avoid re-reading every full-size JPG when the
+// build regenerates the production-safe photo manifest.
 const META_PATH = join(THUMBS_DIR, 'photo-meta.json');
+const MANIFEST_PATH = join(GENERATED_DIR, 'photo-manifest.json');
 
 // Thumbnail settings
 const THUMB_WIDTH = 800;  // Default grid thumbnail width (keeps the bare name)
@@ -159,6 +161,42 @@ async function extractMetadata() {
 
     await writeFile(META_PATH, JSON.stringify(meta));
     console.log(`   ✅ Extracted: ${extracted}   ⏭️  Cached: ${imageFiles.length - extracted}`);
+
+    // Vercel serves files from static/, but they are not available for a
+    // serverless function to enumerate at request time. Bundle a manifest
+    // into the app so the photography route never depends on runtime disk
+    // access.
+    const photos = imageFiles.map((filename) => {
+        const { name } = parse(filename);
+        const { mtimeMs: _mtimeMs, ...photoMeta } = meta[filename];
+        const alt = name
+            .replace(/[-_]/g, ' ')
+            .replace(/\b\w/g, (character) => character.toUpperCase());
+
+        return {
+            src: `/images/photography/${filename}`,
+            thumbSrc: `/images/photography/thumbs/${name}.webp`,
+            thumbSrcset: [
+                `/images/photography/thumbs/${name}-400.webp 400w`,
+                `/images/photography/thumbs/${name}.webp 800w`,
+                `/images/photography/thumbs/${name}-1200.webp 1200w`,
+            ].join(', '),
+            alt,
+            filename,
+            ...photoMeta,
+        };
+    });
+
+    photos.sort((a, b) => {
+        if (a.exif.date && b.exif.date) return b.exif.date.localeCompare(a.exif.date);
+        if (a.exif.date) return -1;
+        if (b.exif.date) return 1;
+        return a.filename.localeCompare(b.filename);
+    });
+
+    await ensureDir(GENERATED_DIR);
+    await writeFile(MANIFEST_PATH, `${JSON.stringify(photos, null, 2)}\n`);
+    console.log(`   📋 Manifest: ${photos.length} photos`);
 }
 
 function summarize(results) {
