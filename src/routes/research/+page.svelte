@@ -91,12 +91,12 @@
     $: tags = [...new Set(papers.flatMap((p) => p.tags))].sort();
 
     $: yearOptions = [
-        { value: "all", label: "All Years" },
+        { value: "all", label: "all years" },
         ...years.map((y) => ({ value: y.toString(), label: y.toString() })),
     ];
 
     $: tagOptions = [
-        { value: "all", label: "All Topics" },
+        { value: "all", label: "all topics" },
         ...tags.map((t) => ({ value: t, label: t })),
     ];
 
@@ -183,53 +183,59 @@
     title="Research | Atrey Desai"
     description="Publications and preprints by Atrey Desai on NLP benchmarks, multimodal reasoning, and computational animal linguistics. Research from UMD CLIP Lab, UT Arlington ACL2 Lab, and Brown University."
     url="https://atreydesai.com/research/"
-    heading="research"
 >
-    <div class="mb-3 flex flex-wrap items-center gap-3">
-        <CustomSelect
-            options={yearOptions}
-            bind:value={selectedYear}
-            placeholder="All Years"
-            ariaLabel="Filter by year"
-        />
+    <header slot="header" class="research-header">
+        <h1 class="type-page-title text-ink-900 dark:text-cream-100">
+            research
+        </h1>
 
-        <CustomSelect
-            options={tagOptions}
-            bind:value={selectedTag}
-            placeholder="All Topics"
-            ariaLabel="Filter by topic"
-        />
+        <div class="research-controls" aria-label="Research controls">
+            <div class="research-filters">
+                <CustomSelect
+                    options={yearOptions}
+                    bind:value={selectedYear}
+                    placeholder="all years"
+                    ariaLabel="Filter by year"
+                />
 
-        {#if activeFilters}
-            <button
-                type="button"
-                class="text-xs font-medium text-ink-500 underline decoration-ink-300 underline-offset-[3px] transition-colors hover:text-ink-800 dark:text-cream-400 dark:decoration-ink-600 dark:hover:text-cream-100"
-                on:click={clearFilters}
-            >
-                Clear filters
-            </button>
-        {/if}
-    </div>
+                <CustomSelect
+                    options={tagOptions}
+                    bind:value={selectedTag}
+                    placeholder="all topics"
+                    ariaLabel="Filter by topic"
+                />
+            </div>
 
-    <div class="type-meta mb-6 flex flex-wrap items-center justify-between gap-2 text-ink-500 dark:text-cream-400">
-        <button
-            type="button"
-            class="transition-colors hover:text-ink-900 dark:hover:text-cream-100"
-            on:click={clearFilters}
-            title="Clear filters"
-        >
-            {filteredPapers.length} {filteredPapers.length === 1 ? "entry" : "entries"}
-        </button>
-        <button
-            type="button"
-            class="underline decoration-dotted decoration-ink-300 underline-offset-[3px] transition-colors hover:text-ink-900 dark:decoration-ink-600 dark:hover:text-cream-100"
-            on:click={cycleSortOrder}
-            title="Click to change sort order"
-            aria-label={`Sorted by ${sortLabel}. Click to change sort order.`}
-        >
-            sorted by {sortLabel}
-        </button>
-    </div>
+            <div class="research-summary">
+                <output class="research-count" aria-live="polite">
+                    {filteredPapers.length} {filteredPapers.length === 1
+                        ? "entry"
+                        : "entries"}
+                </output>
+
+                <button
+                    type="button"
+                    class="research-sort"
+                    on:click={cycleSortOrder}
+                    title="Click to change sort order"
+                    aria-label={`Sorted by ${sortLabel}. Click to change sort order.`}
+                >
+                    <span>sort</span>
+                    {sortLabel}
+                </button>
+
+                {#if activeFilters}
+                    <button
+                        type="button"
+                        class="research-clear"
+                        on:click={clearFilters}
+                    >
+                        clear
+                    </button>
+                {/if}
+            </div>
+        </div>
+    </header>
 
     {#if published.length > 0}
         <section class="mb-12">
@@ -239,11 +245,13 @@
             </div>
 
             {#if sortOrder === "year-desc" || sortOrder === "year-asc"}
-                {#each sortedYears as year}
+                {#each sortedYears as year, yearIndex}
                     <div class="mb-8">
                         <div class="section-rule mb-4 gap-3 pl-1">
                             <p class="meta-label">{year}</p>
-                            <div class="section-rule-line"></div>
+                            {#if yearIndex > 0}
+                                <div class="section-rule-line"></div>
+                            {/if}
                         </div>
 
                         <div class="space-y-3">
@@ -424,3 +432,117 @@
         </div>
     {/if}
 </PageShell>
+
+<style>
+    .research-header {
+        display: grid;
+        gap: var(--space-3);
+        margin-bottom: var(--space-5);
+    }
+
+    .research-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .research-filters,
+    .research-summary {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .research-filters {
+        gap: var(--space-2);
+    }
+
+    .research-summary {
+        gap: var(--space-1);
+    }
+
+    .research-controls :global(.select-trigger) {
+        min-width: 7.75rem;
+        min-height: 2rem;
+        padding-block: var(--space-1);
+    }
+
+    .research-count {
+        color: theme("colors.ink.500");
+        font-family: var(--font-mono);
+        font-size: 0.6875rem;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .research-sort,
+    .research-clear {
+        min-height: 2rem;
+        padding: var(--space-1) var(--space-1-5);
+        color: theme("colors.ink.600");
+        background: transparent;
+        border: 0;
+        border-radius: var(--radius-control);
+        cursor: pointer;
+        font-family: var(--font-mono);
+        font-size: 0.6875rem;
+        line-height: 1.25;
+        transition:
+            color var(--motion-base) var(--ease-standard),
+            background-color var(--motion-base) var(--ease-standard);
+    }
+
+    .research-sort span {
+        color: theme("colors.ink.400");
+        font-style: italic;
+    }
+
+    .research-clear {
+        color: theme("colors.accent.dark");
+        text-decoration: underline;
+        text-decoration-color: theme("colors.ink.300");
+        text-underline-offset: 3px;
+    }
+
+    .research-sort:hover,
+    .research-sort:focus-visible,
+    .research-clear:hover,
+    .research-clear:focus-visible {
+        color: theme("colors.ink.900");
+        background: theme("colors.cream.100");
+    }
+
+    :global(.dark) .research-count,
+    :global(.dark) .research-sort {
+        color: theme("colors.cream.400");
+    }
+
+    :global(.dark) .research-sort span {
+        color: theme("colors.cream.500");
+    }
+
+    :global(.dark) .research-clear {
+        color: theme("colors.accent.light");
+        text-decoration-color: theme("colors.ink.600");
+    }
+
+    :global(.dark) .research-sort:hover,
+    :global(.dark) .research-sort:focus-visible,
+    :global(.dark) .research-clear:hover,
+    :global(.dark) .research-clear:focus-visible {
+        color: theme("colors.cream.100");
+        background: theme("colors.ink.800");
+    }
+
+    @media (min-width: 768px) {
+        .research-header {
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: center;
+        }
+
+        .research-controls {
+            justify-content: flex-end;
+        }
+    }
+</style>

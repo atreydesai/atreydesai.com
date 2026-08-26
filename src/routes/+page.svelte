@@ -93,12 +93,26 @@
 
   let emailCopied = false;
   let copyTimeout: ReturnType<typeof setTimeout>;
+  // Announced politely: the "copied!" tooltip is a purely visual confirmation,
+  // so without this the button appears to do nothing to a screen reader.
+  let copyAnnouncement = "";
 
-  function copyEmail() {
-    navigator.clipboard.writeText(homepageData.social.email);
-    emailCopied = true;
+  async function copyEmail() {
+    // writeText rejects in insecure contexts and when permission is denied.
+    // Claiming success there would be a lie, so report what actually happened.
+    try {
+      await navigator.clipboard.writeText(homepageData.social.email);
+      emailCopied = true;
+      copyAnnouncement = `Copied ${homepageData.social.email} to the clipboard.`;
+    } catch {
+      emailCopied = false;
+      copyAnnouncement = `Couldn't copy automatically. My email is ${homepageData.social.email}.`;
+    }
     clearTimeout(copyTimeout);
-    copyTimeout = setTimeout(() => (emailCopied = false), 1000);
+    copyTimeout = setTimeout(() => {
+      emailCopied = false;
+      copyAnnouncement = "";
+    }, 4000);
   }
 
   let cookKey: string | null = null;
@@ -169,13 +183,17 @@
               Email
             </button>
             {#if emailCopied}
-              <span class="copied-tooltip">
+              <span class="copied-tooltip" aria-hidden="true">
                 <span class="copied-triangle"></span>
                 copied!
               </span>
             {/if}
           </div>
         </div>
+
+        <p class="sr-only" aria-live="polite" aria-atomic="true">
+          {copyAnnouncement}
+        </p>
       </div>
 
       <div class="md:col-start-2">
@@ -361,7 +379,7 @@
                       </p>
                       {#if item.citations.length > 0}
                         <div class="mt-1.5 flex flex-wrap gap-1.5 font-mono text-xs leading-none text-ink-400 dark:text-cream-500">
-                          <span class="text-ink-300 dark:text-cream-600">↳</span>
+                          <span class="text-ink-300 dark:text-cream-500">↳</span>
                           {#each item.citations as citation, ci}
                             {#if citation.url}
                               <a
@@ -438,10 +456,6 @@
   .research-toggle:hover {
     color: theme("colors.accent.dark");
   }
-  .research-toggle:focus-visible {
-    outline: 2px solid rgb(232 93 76 / 0.4);
-    outline-offset: 4px;
-  }
   :global(.dark) .research-toggle {
     color: theme("colors.cream.400");
   }
@@ -473,11 +487,6 @@
   .research-interest-title:hover,
   .research-interest-index:hover {
     color: theme("colors.accent.dark");
-  }
-  .research-interest-title:focus-visible,
-  .research-interest-index:focus-visible {
-    outline: 2px solid rgb(232 93 76 / 0.4);
-    outline-offset: 4px;
   }
   :global(.dark) .research-interest-title:hover,
   :global(.dark) .research-interest-index:hover {

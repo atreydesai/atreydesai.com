@@ -48,7 +48,7 @@
         atrey desai
       </a>
       {#if currentLabel}
-        <span class="mx-2 text-xs leading-none text-ink-400 dark:text-ink-600" aria-hidden="true">/</span>
+        <span class="mx-2 text-xs leading-none text-ink-400 dark:text-ink-400" aria-hidden="true">/</span>
         <span class="text-xs leading-none text-ink-900 dark:text-cream-100">{currentLabel}</span>
       {/if}
     </nav>
@@ -63,7 +63,7 @@
           <a
             href={link.href}
             aria-current={active ? "page" : undefined}
-            class="whitespace-nowrap transition-colors duration-200 {active ? 'text-accent-dark dark:text-accent-dark' : 'text-ink-500 hover:text-accent-dark dark:text-cream-400 dark:hover:text-accent'}"
+            class="whitespace-nowrap transition-colors duration-200 {active ? 'text-accent-dark dark:text-accent-light' : 'text-ink-500 hover:text-accent-dark dark:text-cream-400 dark:hover:text-accent'}"
           >
             {link.name}
           </a>

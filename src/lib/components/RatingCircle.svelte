@@ -103,6 +103,6 @@
         </span>
     {:else}
         <!-- Empty state -->
-        <span class="text-xs text-ink-400 dark:text-ink-500">--</span>
+        <span class="text-xs text-ink-400 dark:text-ink-300">--</span>
     {/if}
 </div>

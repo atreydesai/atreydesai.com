@@ -61,6 +61,12 @@
   --space-16: 4rem;
   --space-20: 5rem;
 
+  /* Keyboard focus. One value, used by the single :focus-visible rule below
+     and by nothing else — components must not invent their own ring. Both
+     variants clear 3:1 against their page surface (4.52:1 on cream-100,
+     6.16:1 on ink-900). */
+  --focus-ring: #c9462f; /* accent-dark */
+
   --radius-control: 0.125rem;
   --radius-inline: 0.25rem;
   --radius-media: 0.5rem;
@@ -94,6 +100,7 @@
 .dark {
   --color-surface-page: #1a1a1a;
   --color-text-primary: #faf0e6;
+  --focus-ring: #f18272; /* accent-light */
 }
 
 @layer base {
@@ -103,6 +110,16 @@
     /* Reserve space for the scrollbar so layout doesn't jump between pages
        that scroll and pages that don't (replaces the old 100vw-100% hack). */
     scrollbar-gutter: stable;
+    /* The theme is an explicit saved choice, not the system appearance, so
+       this tracks the .dark class rather than prefers-color-scheme. It tells
+       the UA which appearance to paint the surfaces it owns — scrollbars, the
+       text caret, form-control chrome, spellcheck underlines — which would
+       otherwise stay light on a near-black page. */
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   body {
@@ -110,8 +127,10 @@
     color: var(--color-text-primary);
     font-family: var(--font-prose);
     /* Match the compact reading rhythm used on aryaman.io while keeping this
-       site's existing font stack. */
-    font-size: 17px;
+       site's existing font stack. In rem, not px, so text that inherits from
+       body still scales with the reader's browser font-size setting — the same
+       17px at the 16px default, but no longer pinned there. */
+    font-size: 1.0625rem;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -185,6 +204,15 @@
   time,
   .font-mono {
     font-variant-numeric: lining-nums;
+  }
+
+  /* The site's only focus treatment. Every interactive element inherits it;
+     components add hover/active tints on top but never replace or remove the
+     ring. Anything that genuinely needs an inset ring uses a negative
+     outline-offset rather than `outline: none`. */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
   }
 
   ::selection {
@@ -267,12 +295,16 @@
     @apply text-accent underline decoration-current;
   }
 
+  /* Dark theme: accent-dark was 3.65:1 on ink-900, and the old hover
+     (accent, 5.06:1) was *more* legible than the resting state. accent-light
+     is the palette's documented dark-theme link colour (6.16:1), and hover
+     rises to cream-100 rather than falling. */
   .dark .link {
-    @apply text-accent-dark;
+    @apply text-accent-light;
   }
 
   .dark .link:hover {
-    @apply text-accent underline decoration-current;
+    @apply text-cream-100 underline decoration-current;
   }
 
   .link-subtle {
@@ -288,7 +320,7 @@
   }
 
   .dark .link-subtle {
-    @apply text-ink-400;
+    @apply text-cream-500;
   }
 
   .dark .link-subtle:hover {
@@ -390,7 +422,6 @@
       background-color var(--motion-base) var(--ease-standard),
       border-color var(--motion-base) var(--ease-standard),
       transform var(--motion-base) var(--ease-standard);
-    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
 
   .control-compact {

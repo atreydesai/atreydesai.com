@@ -1,7 +1,9 @@
 # Atrey Desai website style guide
 
-Version: 1.1  
-Status: canonical and implemented for the non-accessibility design system  
+Version: 1.2  
+Status: canonical and implemented, including the focus system and dark-theme
+contrast. Light-theme contrast and pointer-target sizing remain deferred by
+direction and are marked as such below.  
 Companion document: [Website design-system audit](./design-audit.md)
 
 ## Purpose
@@ -12,11 +14,18 @@ tokens, explains their roles, defines component states, and records the few
 places where expressive exceptions are allowed.
 
 The typography, spacing, layout, surface, motion, icon, and component rules are
-implemented in the current working tree. The accessibility chapter remains in
-the guide because a comprehensive design system should record those
-requirements, but contrast remapping, focus-standardization, text-spacing
-conformance, and target-size corrections were explicitly excluded from this
-implementation pass.
+implemented in the current working tree, as are the focus system and the
+dark-theme color mappings.
+
+Two items in the accessibility chapter remain deliberately unimplemented, and
+are called out where they appear:
+
+- **Light-theme contrast.** The light palette is unchanged by direction.
+  Several light-theme pairs still fall below `4.5:1`; the audit lists them.
+- **Pointer target size.** Navigation links and interactive pills are still
+  smaller than the `24px` minimum.
+
+Everything else in the chapter is implemented and verified.
 
 ## Design character
 
@@ -90,7 +99,10 @@ Windows, Linux, and Android.
 
 ### Type roles
 
-All sizes assume the browser’s default `16px` root.
+All sizes assume the browser’s default `16px` root. Every size in this table,
+and the `body` size that unclassed text inherits, is expressed in `rem`, so text
+scales with the reader’s browser font-size preference. Never set a text size in
+`px`: it silently opts that text out of the reader’s setting.
 
 | Token                  | Family       |                                       Size | Line height | Weight |   Tracking | Use                                        |
 | ---------------------- | ------------ | -----------------------------------------: | ----------: | -----: | ---------: | ------------------------------------------ |
@@ -198,7 +210,7 @@ limits should stay local until they have more than one consumer.
 | Token          | Value     | Use                                                 |
 | -------------- | --------- | --------------------------------------------------- |
 | `accent`       | `#E85D4C` | Graphical accent, hover wash, large dark-theme text |
-| `accent-light` | `#F07563` | Dark-theme links, focus, and interactive text       |
+| `accent-light` | `#F18272` | Dark-theme links, focus, and interactive text       |
 | `accent-dark`  | `#C9462F` | Light-theme links, focus, and interactive text      |
 | `accent-muted` | `#D4847A` | Decorative or data use, not ordinary text           |
 | `blush-50`     | `#FFF9F7` | Very subtle warm layer                              |
@@ -219,14 +231,22 @@ accents.
 | ------ | --------- | --------- | --------- | -------------------------------- |
 | Sage   | `#3D7A55` | `#7BAE8C` | `#1F5234` | Positive, complete, success      |
 | Ochre  | `#946410` | `#DBA84D` | `#704A05` | Caution, in progress, importance |
-| Wine   | `#8A3251` | `#B96481` | `#5E1F37` | Personal, favorite, affective    |
+| Wine   | `#8A3251` | `#C68098` | `#5E1F37` | Personal, favorite, affective    |
 | Steel  | `#3A6A91` | `#779BBE` | `#1F4567` | Informational, analytical        |
-| Plum   | `#6F4476` | `#A07CA8` | `#4A2A50` | Special or cross-category        |
+| Plum   | `#6F4476` | `#AA89B1` | `#4A2A50` | Special or cross-category        |
 
 Use the dark shade for ordinary text on light surfaces and the light shade for
-ordinary text on dark surfaces. Exception: `wine-light` is only `4.31:1` on
-`ink-900`; it is not approved for small text. Either map that semantic role to
-`#C06A87` or use a neutral dark-theme text token after approval.
+ordinary text on dark surfaces.
+
+The `-light` shades exist only for dark surfaces; no light-theme component uses
+them. Each was chosen to clear `4.5:1` on **both** the page (`ink-900`) and the
+raised dark surfaces where these colors actually appear — the sheet, the note
+sidebar, the select dropdown, a selected row — and to clear it again once the
+family’s own `-dark` tint is composited underneath as a pill fill.
+
+A value that passes on `ink-900` alone is not sufficient. `accent-light` at
+`#F07563` measured `6.16:1` on the page but only `4.15:1` on `ink-800`, which
+is exactly where it carries the selected state in a dropdown.
 
 The `mist` family is reserved. It must not be introduced until it has a named
 semantic role.
@@ -242,26 +262,37 @@ semantic role.
 | `text-strong`    | `ink-900`                     | `cream-100`       |
 | `text-primary`   | `ink-700`                     | `cream-200`       |
 | `text-secondary` | `ink-500`                     | `cream-400`       |
-| `text-muted`     | `ink-400`                     | `ink-400`         |
-| `text-disabled`  | `ink-400`                     | `ink-400`         |
-| `link-default`   | `accent-dark`                 | `accent-dark`     |
+| `text-muted`     | `ink-400`                     | `cream-500`      |
+| `text-disabled`  | `ink-400`                     | `ink-300`        |
+| `link-default`   | `accent-dark`                 | `accent-light`   |
 | `link-hover`     | `ink-900`                     | `cream-100`       |
 | `border-subtle`  | `ink-200`                     | `ink-700`         |
 | `border-strong`  | `ink-500`                     | `cream-400`       |
 | `focus-ring`     | `accent-dark`                 | `accent-light`    |
 | `selection`      | `blush-200`                   | `ink-600`         |
 
+Dark-theme secondary text descends the **cream** ramp
+(`cream-100` → `cream-400` → `cream-500`); it never uses the ink ramp, whose
+values are all near-black and therefore near-invisible on `ink-900`. `ink-300`
+and `ink-400` appear in the dark theme only as decorative glyphs and
+"no value recorded" placeholders, where the `3:1` graphical threshold applies
+rather than `4.5:1`.
+
 Color roles remain the same across themes even when the primitive value
 changes. This follows the role-based token model documented by
 [IBM Carbon](https://carbondesignsystem.com/elements/color/overview/).
 
-The table records the canonical role mappings. Only the globally inherited
-`surface-page` and `text-primary` roles are CSS variables; component-scoped
-roles use the matching Tailwind primitive so the palette remains the single
-source of truth. The audit identifies contrast-related remaps for `text-muted`,
-`link-default`, and support colors; those changes remain deferred by direction.
-`focus-ring` is a documented target role rather than a standardized
-implementation in this pass.
+The table records the canonical role mappings. `surface-page`, `text-primary`,
+and `focus-ring` are CSS variables because they are inherited or read by a
+single global rule; every other component-scoped role uses the matching
+Tailwind primitive so the palette remains the single source of truth.
+
+The dark theme is verified. Every route and every interactive state — the
+sheet, the note sidebar, both select dropdowns, the lightbox, the empty state,
+an expanded homepage — measures at or above `4.5:1` for ordinary text and `3:1`
+for large text and essential graphics, computed against the **composited**
+background rather than the declared one. The light theme is unchanged by
+direction and still contains failing pairs; see the audit.
 
 ### Color-use rules
 
@@ -273,7 +304,15 @@ implementation in this pass.
 - `ink-300`, `ink-400`, and low-opacity text colors are decorative or disabled
   unless the tested background and size qualify.
 - Accent hover states must remain readable; a hover state cannot reduce
-  contrast below the default state.
+  contrast below the default state. This is why the dark-theme link hover is
+  `cream-100` rather than `accent`: `accent` is *less* legible on `ink-900`
+  than the `accent-light` resting state, so hovering would have dimmed it.
+- Measure contrast against the composited background, not the declared one. A
+  translucent fill (`bg-accent/[0.08]`), a translucent surface
+  (`bg-ink-900/95`), and an ancestor’s `opacity` all change what the text is
+  actually sitting on.
+- `opacity` on a text element is a contrast change. A resting state expressed
+  as an opacity must meet its threshold *at that opacity*, not at `1`.
 - Hard-coded colors belong only to the boba sprites, canvas rendering,
   media-derived art, or the documented riso treatment.
 
@@ -430,6 +469,9 @@ subtle background wash.
 | `border-emphasis` | `2px solid text-strong`                   | Riso outline or strong selected state |
 | `border-focus`    | `2px solid focus-ring`                    | Keyboard focus only                   |
 
+`border-focus` is not applied by hand. It is the shape of the one global
+`:focus-visible` rule described under [Focus](#focus); components inherit it.
+
 ### Radius
 
 | Token            |  Value | Use                                     |
@@ -501,6 +543,16 @@ No component should invent a z-index above this scale.
 - Captions use `type-meta` or `type-body-small`, `text-secondary`, and a maximum
   `45ch` measure.
 - Every meaningful image needs descriptive alt text.
+- A filename is never alt text and never a caption. An image with no
+  human-written description is presentational: give it `alt=""`, render no
+  title line, and put the accessible name on the control that wraps it. A
+  derived string like `152 IDG 20251109 145157 722 103` is worse than nothing,
+  because it is announced as though it described the picture.
+- Photography captions come from the photo’s IPTC/XMP Title (Lightroom’s
+  **Title** field) or from an entry in `scripts/photo-captions.json`, in that
+  order of precedence.
+- Format metadata before displaying it. Raw EXIF is not display copy: a focal
+  length arrives as `6.764999866485596 mm` and must be rounded.
 - Animated research media must have a useful static first frame.
 - Hover-only media behavior must also respond to keyboard focus.
 - The paper texture stays subtle enough that it does not affect contrast.
@@ -522,6 +574,28 @@ Approved easing:
 - `ease-standard`: `cubic-bezier(0.4, 0, 0.2, 1)`;
 - `ease-emphasized`: `cubic-bezier(0.16, 1, 0.3, 1)`.
 
+#### Page transitions
+
+Route changes are the one animation that fires on every interaction, so they
+get their own, shorter budget. All of it lives in `src/lib/motion.ts`:
+
+| Constant                       |  Value | Note                                     |
+| ------------------------------ | -----: | ---------------------------------------- |
+| `PAGE_TRANSITIONS_ENABLED`     | `true` | Master switch                            |
+| `PAGE_TRANSITION_DURATION_MS`  | `180`  | Both directions                          |
+| `PAGE_TRANSITION_IN_DELAY_MS`  |   `0`  | New content paints immediately           |
+| `PAGE_TRANSITION_IN_X`         | `-8px` | Enter travel                             |
+| `PAGE_TRANSITION_OUT_Y`        |  `4px` | Exit travel                              |
+
+`motion-reveal` (`400ms`) is for a section entering an already-visible page,
+not for the page itself. A route change at `motion-reveal` plus an enter delay
+put roughly half a second of animation between one page of text and the next.
+
+The outgoing and incoming pages occupy the same single-cell grid inside one
+stable `<main>`, so they overlap during the transition instead of stacking and
+briefly doubling the page height. The `<main>` landmark and the skip-link
+target are never duplicated.
+
 ### Motion rules
 
 - Animate `transform` and `opacity` where possible.
@@ -533,6 +607,13 @@ Approved easing:
   clipping occurs under text-spacing overrides.
 - `prefers-reduced-motion: reduce` removes decorative travel, shake, stagger,
   pulse, and smooth scrolling. State changes remain immediate.
+- Read `prefers-reduced-motion`, `prefers-color-scheme`, input type, and
+  breakpoint through a **live** `matchMedia` listener, never through a single
+  read at module scope. All of them can change while the page is open — a
+  trackpad is attached, the window is resized, the system setting is flipped —
+  and a value captured once at import silently goes stale until reload.
+- Detect input type with `(hover: none) and (pointer: coarse)`, not by sniffing
+  the user-agent string. A UA test reads iPad and touch laptops as desktop.
 - The boba game may use bespoke physical timing, but menus and controls still
   honor reduced motion.
 
@@ -637,8 +718,47 @@ Rules:
 - Numeric columns use lining tabular figures.
 - Sort state uses `aria-sort`, text, and an icon.
 - Hover, selected, and keyboard-focus states remain distinct.
-- On narrow screens, use a scroll container with a visible or discoverable
-  overflow affordance.
+- **A row is a click target, not a control.** Never put `role="button"` and
+  `tabindex` on a `<tr>` that contains its own buttons or links: nested
+  interactive content inside a widget role is invalid, keyboard users tab into
+  controls the row claims to own, and a screen reader flattens the row’s name
+  into the concatenation of every cell. Give the row a real `<button>` — the
+  title cell is the natural place — and keep whole-row click as a convenience
+  that ignores clicks landing on any other control inside it.
+- **A table that needs a minimum width has a width below which it is not a
+  table.** Above that width, use the table. Below it, render the same records
+  as a stacked list rather than a horizontal scroll of a `1080px` grid on a
+  `390pt` screen. The bookshelf switches at `md`.
+- When columns disappear in the stacked form, their headers disappear with
+  them. Any icon-only column must regain a label inline.
+
+### Companion detail panels
+
+A record list paired with a detail view has two presentations, chosen by
+available width, sharing one component:
+
+- **Sidebar** (`xl` and up): a sticky column beside the list. Not modal; the
+  list stays usable.
+- **Sheet** (below `xl`): a modal bottom sheet over a dimmed backdrop. Focus
+  moves in, is trapped, Escape closes, and focus returns to the row that opened
+  it. Stacking the panel underneath a wide scrolling table is not an
+  alternative — it puts the content a long scroll away from the tap.
+
+Lock background scrolling by pinning `<body>` at its current offset and
+restoring it on close. `overflow: hidden` alone does not hold on iOS Safari and
+loses scroll position.
+
+### Disclosures
+
+- Prefer a native `<details>`/`<summary>` for optional supporting content. It
+  is keyboard-operable, touch-operable, and announced correctly with no
+  scripting, which a hover tooltip is not.
+- Replace the default marker with the site’s `▸` caret, rotated on `[open]`,
+  and honour reduced motion on the rotation. `::marker` can only be sized and
+  coloured, never positioned, so the native triangle sits on the text baseline
+  rather than its centre.
+- If the disclosure lives inside a status line, anchor its panel to that line
+  and take it out of flow, so opening it does not reflow the content below.
 
 ### Tooltips and popovers
 
@@ -661,6 +781,17 @@ Rules:
 - Escape closes the dialog.
 - Media is constrained by both `max-width` and `max-height`.
 - Caption sits `16px` below media.
+- **Give media its intrinsic `width` and `height`.** Without them the frame has
+  no size until the file decodes, so the loading placeholder covers a
+  zero-height box and the panel jumps when the image lands. The dimensions are
+  already in the photo manifest.
+- Preload the neighbouring items on open and on navigate, so stepping through a
+  set does not re-show the placeholder each time.
+- Support swipe on touch as an **addition** to the arrows. Ignore drags that
+  are more vertical than horizontal, and ignore mouse drags, so a scroll or a
+  text selection is never read as navigation.
+- Announce position changes through a live region; a visual `3 / 132` counter
+  is decorative and should be `aria-hidden`.
 
 ### Empty, error, loading, and disabled states
 
@@ -699,46 +830,108 @@ Rules:
 - Dark mode changes semantic values, not component meanings.
 - Surfaces become one step lighter as they rise.
 - Use `cream-100/200` for strong and primary text, `cream-400/500` for
-  secondary text.
-- Do not use `accent-dark` or `wine-light` for small text on `ink-900`.
+  secondary text. Never the ink ramp: every ink value is near-black and
+  disappears on `ink-900`.
+- Do not use `accent-dark` for text on `ink-900` (`3.65:1`).
+- **Check text against raised surfaces, not just the page.** `ink-800` carries
+  the select dropdown, the note sheet, and the note sidebar. A color that
+  passes on `ink-900` can fail there by a full step.
+- A *selected* row is a state, not a raised surface. Express it as a warm
+  accent wash (`bg-accent/[0.08]`) plus the accent outline, matching the light
+  theme, rather than stepping the row up to `ink-800` — stepping up lifts the
+  effective background under every tinted pill inside that row.
 - Shadows alone do not distinguish dark surfaces; include a border or value
   shift.
 - Photography and research media retain their native colors.
-- The theme toggle persists a user choice and should respect the system choice
-  when no explicit preference has been saved.
+
+### Appearance and the theme control
+
+- **The theme is an explicit saved choice, not the system appearance.** Light
+  is the default until someone toggles; the preference lives in
+  `localStorage` and is applied by an inline script before first paint. This is
+  a deliberate departure from the usual "follow the system" convention.
+- Because the choice is explicit, everything that describes the appearance must
+  follow the resolved theme rather than `prefers-color-scheme`:
+  - `color-scheme` tracks the `.dark` class in `app.css`, so the browser paints
+    the surfaces it owns — scrollbars, the text caret, form-control chrome,
+    spellcheck underlines — to match. Without it those stay light on a
+    near-black page.
+  - `theme-color` is a single meta element updated alongside the class. Two
+    metas gated on `prefers-color-scheme` let the browser chrome disagree with
+    the page whenever the saved choice differs from the system.
+- The toggle shows the **current** theme, not the destination, and carries
+  `aria-pressed`. A control whose appearance never changes reads as inert.
 
 ## Accessibility requirements
 
-The following requirements are retained as future design-system guidance. They
-were not part of the requested implementation pass and should not be read as a
-claim that the current site has been remediated against them.
+Focus, dark-theme contrast, keyboard operation, hover independence, and status
+announcement are implemented. Light-theme contrast and pointer target size are
+deferred by direction; both are marked below.
 
 ### Contrast
 
 - `4.5:1` minimum for ordinary text.
 - `3:1` minimum for qualifying large text and essential graphics.
 - Focus indicators reach `3:1` against adjacent colors.
-- Test every semantic pair in both themes.
+- Test every semantic pair in both themes, against the **composited**
+  background and at the element’s resting `opacity`.
+- Test raised surfaces as well as the page, and test each interactive state
+  that only exists once opened: dropdowns, sheets, sidebars, lightboxes, empty
+  states, and expanded disclosures.
+
+**Status.** Dark theme: verified clean across every route and interactive
+state. Light theme: **deferred by direction**, and still failing in the places
+the audit records.
 
 ### Focus
 
-Canonical treatment:
+Canonical treatment, declared once in `app.css` and inherited by every
+interactive element:
 
 ```css
+:root      { --focus-ring: #c9462f; } /* accent-dark  */
+.dark      { --focus-ring: #f18272; } /* accent-light */
+
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 ```
 
-Do not use an opacity that drops the ring below `3:1`. An inset ring may add a
-one-pixel separating stroke where the component and ring are too similar.
+Rules:
+
+- **A component never removes the ring.** `outline: none` is not permitted.
+  Replacing the ring with a background tint or a one-pixel border shift is the
+  same mistake wearing a different hat: the tints that were used for this
+  measured `1.09:1` against their own surface.
+- A component may adjust `outline-offset` and `border-radius` so the ring hugs
+  the right shape. Where a control sits flush inside a clipped, scrolling
+  container — a select option — use a negative offset so the ring is drawn
+  inside the row instead of being cut off at the first and last item.
+- Do not use an opacity that drops the ring below `3:1`. Rings at `35–40%`
+  opacity blend to roughly `1.6:1` and are not a focus indicator.
+- Hover and focus may share a tint, but focus keeps the ring on top of it.
+- `ring-*` utilities are not part of the system. Tailwind’s stock `ring-*`
+  and `ring-offset-*` default to blue-500 on white, which is how an off-palette
+  blue ring reached the skip link and the 404 buttons. `ringColor` and
+  `ringOffsetColor` defaults are pinned to palette values in
+  `tailwind.config.js` as a backstop, not as an invitation.
+
+The boba game keeps its own `3px` ring inside the documented expressive
+exception; it is solid, palette-derived, and meets the same contrast bar.
 
 ### Target size
+
+**Deferred by direction.** Recorded here as the standing requirement:
 
 Meet the [WCAG 2.2 24px target minimum](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum)
 or its spacing exception. Prefer `40px` for primary controls and at least
 `28–32px` for dense interface controls.
+
+Known gaps: site navigation links are roughly `16px` tall with a `4px` wrapped
+row gap, and interactive pills are roughly `17px` tall with `4px` neighbours.
+Both can be fixed without changing anything visible — `min-height` plus
+vertical padding on the nav links, and an inset `::after` on interactive pills.
 
 ### Text customization
 
@@ -763,10 +956,29 @@ overrides could cause loss. This requirement comes from
 ### Motion and input
 
 - Honor reduced motion.
-- Do not require hover to reveal essential information.
-- Every pointer action has a keyboard path.
+- Do not require hover to reveal essential information. If a relationship,
+  definition, or label exists only in a hover state, it does not exist on a
+  touchscreen. Give it a real home: a link, a native `<details>`, or visible
+  text, and keep the hover treatment as an enhancement on top.
+- A hover target must be big enough to hover. A tooltip triggered by a `14px`
+  glyph is a hover target the size of a glyph; pad the wrapper instead.
+- Every pointer action has a keyboard path, and every gesture has a
+  non-gesture equivalent. Swipe is an addition to the arrows, not a
+  replacement for them.
 - Focus order follows reading order.
-- Skip-to-content remains the first keyboard-reachable control.
+- Skip-to-content remains the first keyboard-reachable control, and the
+  `#main-content` target is a single stable element — including mid-transition.
+
+### Status and announcement
+
+- Any state change with a visual-only signal needs an `aria-live="polite"`
+  region: a filtered result count, a position within a set, a transient
+  confirmation.
+- Announce the truth. A confirmation must reflect what actually happened —
+  a clipboard write that rejects reports the failure and the fallback, it does
+  not claim success.
+- A transient visual confirmation and its live region are the same message:
+  mark the visual one `aria-hidden` so it is not announced twice.
 
 ## Content and editorial style
 

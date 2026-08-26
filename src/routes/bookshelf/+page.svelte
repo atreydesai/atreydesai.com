@@ -1,16 +1,26 @@
 <script lang="ts">
     import { browser } from "$app/environment";
     import { onMount } from "svelte";
-    import { fly } from "svelte/transition";
+    import { fade, fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import PageShell from "$lib/components/PageShell.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import MediumIcon from "$lib/components/MediumIcon.svelte";
     import RatingGlyph from "$lib/components/RatingGlyph.svelte";
+    import BookDetail from "$lib/components/BookDetail.svelte";
     import { books, categories } from "$lib/content";
     import type { Book } from "$lib/content";
-    import { formatMonthYear } from "$lib/utils/date";
-    import { parseInline } from "$lib/utils/text";
+    import {
+        bookTags,
+        currentStatusLabel,
+        getCategoryColor,
+        isCurrent,
+        previewTags,
+        ratingLegend,
+        shortDate,
+        tagOverflow,
+        toList,
+    } from "$lib/bookshelf";
     import {
         ArrowDown,
         ArrowUp,
@@ -66,16 +76,16 @@
     let urlReady = false;
     let lastFilterSignature = "";
 
-    const ratingLegend = {
-        enjoyment: {
-            title: "Appreciation",
-            body: "How much I personally liked it, independent of usefulness.",
-        },
-        importance: {
-            title: "Importance",
-            body: "How useful, influential, or worth remembering I found it.",
-        },
-    };
+    // Above `xl` the note sits in a sticky column beside the table. Below it
+    // there is no room for a second column, so the note is presented as a
+    // modal sheet instead of being stacked underneath a 1080px-wide table.
+    const WIDE_LAYOUT_QUERY = "(min-width: 1280px)";
+    let isWideLayout = browser && matchMedia(WIDE_LAYOUT_QUERY).matches;
+    $: asSheet = selectedBookId !== null && !isWideLayout;
+
+    let sheetElement: HTMLElement | null = null;
+    let sheetTrigger: HTMLElement | null = null;
+    let lockedScrollY = 0;
 
     $: allTags = [
         ...new Set(
@@ -186,10 +196,6 @@
     $: selectedBook = selectedBookId
         ? books.find((book) => book.id === selectedBookId) || null
         : null;
-    $: selectedNoteParagraphs = selectedBook
-        ? getNoteParagraphs(selectedBook)
-        : [];
-    $: selectedTags = selectedBook ? bookTags(selectedBook) : [];
     $: activeFilters =
         selectedCategory !== "all" ||
         selectedTag !== "all" ||
@@ -238,16 +244,66 @@
 
         const handlePopState = () => readStateFromUrl();
         window.addEventListener("popstate", handlePopState);
-        return () => window.removeEventListener("popstate", handlePopState);
+
+        const wideMedia = window.matchMedia(WIDE_LAYOUT_QUERY);
+        const syncWide = () => (isWideLayout = wideMedia.matches);
+        syncWide();
+        wideMedia.addEventListener("change", syncWide);
+
+        return () => {
+            window.removeEventListener("popstate", handlePopState);
+            wideMedia.removeEventListener("change", syncWide);
+            unlockScroll();
+        };
     });
 
-    function toList(value: string | string[] | undefined): string[] {
-        if (!value) return [];
-        if (Array.isArray(value)) return value;
-        return value
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean);
+    // Pin the body rather than setting `overflow: hidden`, which iOS Safari
+    // scrolls straight through.
+    function lockScroll() {
+        if (!browser || document.body.style.position === "fixed") return;
+        lockedScrollY = window.scrollY;
+        document.body.style.position = "fixed";
+        document.body.style.top = `-${lockedScrollY}px`;
+        document.body.style.left = "0";
+        document.body.style.right = "0";
+    }
+
+    function unlockScroll() {
+        if (!browser || document.body.style.position !== "fixed") return;
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.left = "";
+        document.body.style.right = "";
+        window.scrollTo(0, lockedScrollY);
+    }
+
+    $: if (browser) {
+        if (asSheet) lockScroll();
+        else unlockScroll();
+    }
+
+    function onSheetKeydown(event: KeyboardEvent) {
+        if (event.key === "Escape") {
+            event.stopPropagation();
+            closeDrawer();
+            return;
+        }
+        if (event.key !== "Tab" || !sheetElement) return;
+        const focusable = Array.from(
+            sheetElement.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            ),
+        ).filter((element) => !element.hasAttribute("disabled"));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
     }
 
     // Parse a comma-separated URL param into a deduped list of known values.
@@ -273,38 +329,6 @@
             showShelved ? "shelved" : "done",
             searchQuery.trim(),
         ].join("|");
-    }
-
-    function bookTags(book: Book): string[] {
-        return [
-            ...new Set([...(book.tags || []), ...toList(book.subcategory)]),
-        ];
-    }
-
-    function previewTags(book: Book): string[] {
-        return bookTags(book).slice(0, 2);
-    }
-
-    function tagOverflow(book: Book): number {
-        return Math.max(0, bookTags(book).length - 2);
-    }
-
-    function isCurrent(book: Book): boolean {
-        return (
-            book.status === "current" &&
-            (book.medium === "book" || book.medium === "drama")
-        );
-    }
-
-    function currentStatusLabel(book: Book): string {
-        return book.medium === "drama" ? "currently watching" : "currently reading";
-    }
-
-    function getNoteParagraphs(book: Book): string[] {
-        return (book.notes || book.content || "")
-            .split(/\n{2,}/)
-            .map((paragraph) => paragraph.trim())
-            .filter(Boolean);
     }
 
     function isSortField(value: string | null): value is SortField {
@@ -355,12 +379,17 @@
         currentPage = 1;
     }
 
-    function selectBook(bookId: string) {
+    function selectBook(bookId: string, trigger?: HTMLElement | null) {
         selectedBookId = bookId;
+        if (trigger) sheetTrigger = trigger;
     }
 
     function closeDrawer() {
         selectedBookId = null;
+        // Send focus back to whatever opened the note, so keyboard users don't
+        // land at the top of the document.
+        sheetTrigger?.focus();
+        sheetTrigger = null;
     }
 
     function setPage(page: number) {
@@ -382,11 +411,13 @@
         currentPage = 1;
     }
 
-    function onRowKeydown(event: KeyboardEvent, bookId: string) {
-        if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            selectBook(bookId);
-        }
+    // The row is a generous click target, but it is not itself a control:
+    // the keyboard path is the real <button> in the title cell. Clicks that
+    // landed on any other control inside the row belong to that control.
+    function onRowClick(event: MouseEvent, bookId: string) {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("button, a")) return;
+        selectBook(bookId, event.currentTarget as HTMLElement);
     }
 
     function readStateFromUrl() {
@@ -456,15 +487,6 @@
         }
     }
 
-    function shortDate(date: string): string {
-        const parsed = new Date(date);
-        if (Number.isNaN(parsed.getTime())) return "--";
-
-        return `${parsed.getMonth() + 1}.${parsed.getDate()}.${String(
-            parsed.getFullYear(),
-        ).slice(-2)}`;
-    }
-
     function categoryLabel(categoryId: string): string {
         return (
             categories.find((category) => category.id === categoryId)?.name ||
@@ -472,21 +494,6 @@
         );
     }
 
-    function getCategoryColor(category: string): string {
-        const colors: Record<string, string> = {
-            science:
-                "text-accent-dark dark:text-accent-light bg-accent/10 dark:bg-accent/15",
-            advice:
-                "text-ochre-dark dark:text-ochre-light bg-ochre/10 dark:bg-ochre-dark/20",
-            fiction:
-                "text-wine-dark dark:text-wine-light bg-wine/10 dark:bg-wine-dark/20",
-            nonfiction:
-                "text-steel-dark dark:text-steel-light bg-steel/10 dark:bg-steel-dark/20",
-            "blog post":
-                "text-plum-dark dark:text-plum-light bg-plum/10 dark:bg-plum-dark/20",
-        };
-        return colors[category] || "text-ink-600 dark:text-cream-300";
-    }
 </script>
 
 <PageShell
@@ -495,24 +502,28 @@
     url="https://atreydesai.com/bookshelf/"
     width="wide"
 >
-    <header slot="header" class="page-header page-header-deck max-w-3xl">
-        <h1 class="type-page-title mb-4 text-ink-900 dark:text-cream-100">
+    <header
+        slot="header"
+        class="page-header {showShelved ? 'page-header-deck' : 'page-header-title-only'} max-w-3xl"
+    >
+        <h1
+            class="type-page-title text-ink-900 dark:text-cream-100"
+            class:mb-4={showShelved}
+        >
             bookshelf
         </h1>
-        <p class="type-deck text-ink-600 dark:text-cream-400">
-            {#if showShelved}
+        {#if showShelved}
+            <p class="type-deck text-ink-600 dark:text-cream-400">
                 What I want to read and watch, but haven't gotten to yet.
-            {:else}
-                A collection of books, essays, papers, movies, and shows.
-            {/if}
-        </p>
+            </p>
+        {/if}
     </header>
 
     <section class="mb-5 flex flex-wrap items-center gap-2" aria-label="Bookshelf categories">
         {#each categories as category}
             <button
                 type="button"
-                class="control-compact inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {selectedCategory === category.id ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
+                class="control-compact inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 {selectedCategory === category.id ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
                 on:click={() => setCategory(category.id)}
                 aria-pressed={selectedCategory === category.id}
             >
@@ -524,7 +535,7 @@
         {/each}
         <button
             type="button"
-            class="control-compact ml-auto inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent/40 dark:focus:ring-accent-light/40 {showShelved ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
+            class="control-compact ml-auto inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 {showShelved ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
             on:click={toggleShelved}
             aria-pressed={showShelved}
             title="Things I want to read or watch but haven't yet"
@@ -548,7 +559,7 @@
                 placeholder="Search reading notes..."
                 bind:value={searchQuery}
                 on:input={() => (currentPage = 1)}
-                class="control-regular w-full border border-ink-200 bg-cream-50/70 pl-9 pr-9 text-sm text-ink-700 placeholder:text-ink-400 focus:border-ink-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900/70 dark:text-cream-300 dark:focus:border-cream-400"
+                class="control-regular w-full border border-ink-200 bg-cream-50/70 pl-9 pr-9 text-sm text-ink-700 placeholder:text-ink-400 focus:border-ink-500 dark:border-ink-700 dark:bg-ink-900/70 dark:text-cream-300 dark:focus:border-cream-400"
             />
             {#if searchQuery}
                 <button
@@ -597,7 +608,9 @@
     </section>
 
     <div
-        class="grid min-w-0 gap-5 {selectedBook ? 'xl:grid-cols-[minmax(0,1fr)_minmax(370px,0.42fr)]' : ''}"
+        class="grid min-w-0 gap-5 {selectedBook
+            ? 'xl:grid-cols-[minmax(0,1fr)_minmax(370px,0.42fr)]'
+            : ''}"
     >
         <section class="min-w-0 max-w-full overflow-hidden" aria-label="Bookshelf entries">
             <div class="relative mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-cream-400">
@@ -609,12 +622,62 @@
                 >
                     {sortedBooks.length} {sortedBooks.length === 1 ? "entry" : "entries"}
                 </button>
+
+                <!-- The two rating columns are icon-only, and their meaning used
+                     to live exclusively in a hover tooltip on the column header —
+                     unreachable by touch. A native disclosure works everywhere.
+                     It sits on this line, and opens as an absolutely-positioned
+                     panel, so the legend costs no vertical space in either
+                     state instead of pushing the list down by its own height. -->
+                <details class="rating-scale mr-auto">
+                    <summary class="type-meta text-ink-500 dark:text-cream-400">
+                        <span class="rating-scale-caret" aria-hidden="true">▸</span>
+                        <span>rating scale</span>
+                    </summary>
+                    <dl class="rating-scale-panel space-y-2 border border-ink-200 bg-cream-50 p-3 dark:border-ink-700 dark:bg-ink-900">
+                        <div class="flex items-baseline gap-2">
+                            <Heart size={13} class="shrink-0 translate-y-[2px] text-ink-400 dark:text-ink-400" />
+                            <div>
+                                <dt class="type-meta text-ink-900 dark:text-cream-100">
+                                    {ratingLegend.enjoyment.title}
+                                </dt>
+                                <dd class="type-body-small text-ink-600 dark:text-cream-400">
+                                    {ratingLegend.enjoyment.body}
+                                </dd>
+                            </div>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <BadgeQuestionMark size={13} class="shrink-0 translate-y-[2px] text-ink-400 dark:text-ink-400" />
+                            <div>
+                                <dt class="type-meta text-ink-900 dark:text-cream-100">
+                                    {ratingLegend.importance.title}
+                                </dt>
+                                <dd class="type-body-small text-ink-600 dark:text-cream-400">
+                                    {ratingLegend.importance.body}
+                                </dd>
+                            </div>
+                        </div>
+                    </dl>
+                </details>
+
                 <span>
                     sorted by {sortLabel(sortField)} {sortDirection === "asc" ? "ascending" : "descending"}
                 </span>
             </div>
 
-            <div class="surface-ledger max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 dark:border-ink-800 dark:bg-ink-900/45">
+            <!-- Filtering and sorting change the list silently otherwise: the
+                 count above is visual only. -->
+            <p class="sr-only" aria-live="polite" aria-atomic="true">
+                {sortedBooks.length}
+                {sortedBooks.length === 1 ? "entry" : "entries"} match the current
+                filters, sorted by {sortLabel(sortField)}
+                {sortDirection === "asc" ? "ascending" : "descending"}.
+            </p>
+
+            <!-- The table needs ~1080px to stay readable, so it only appears
+                 from `md`. Narrower screens get the same entries as a stacked
+                 list instead of a sideways-scrolling table. -->
+            <div class="surface-ledger hidden max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 md:block dark:border-ink-800 dark:bg-ink-900/45">
                 <div class="w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[1080px] table-fixed text-sm">
                         <thead class="border-b border-ink-200/90 bg-cream-200/60 text-xs font-normal text-ink-500 dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
@@ -781,13 +844,18 @@
                         <tbody class="stagger-children divide-y divide-ink-200/70 dark:divide-ink-800">
                             {#key `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}-${excludedTags.join(",")}-${selectedMedium}-${excludedMediums.join(",")}-${showShelved}`}
                             {#each paginatedBooks as book (book.id)}
+                                <!-- The row is a wide click target, not a
+                                     control: it used to carry role="button"
+                                     while containing real buttons, which is
+                                     invalid and made VoiceOver read the whole
+                                     row as one name. The keyboard path is the
+                                     title button in the first cell. -->
+                                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                                 <tr
-                                    class="cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-ink-800 dark:outline-accent-light/30' : ''}"
-                                    role="button"
-                                    tabindex="0"
+                                    class="cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/[0.08] dark:outline-accent-light/30' : ''}"
                                     aria-current={selectedBookId === book.id ? "true" : undefined}
-                                    on:click={() => selectBook(book.id)}
-                                    on:keydown={(event) => onRowKeydown(event, book.id)}
+                                    on:click={(event) => onRowClick(event, book.id)}
                                     on:mouseenter={() => (hoveredBookId = book.id)}
                                     on:mouseleave={() => (hoveredBookId = null)}
                                 >
@@ -797,7 +865,7 @@
                                                 medium={book.medium}
                                                 size={15}
                                                 animate={hoveredBookId === book.id || selectedBookId === book.id}
-                                                className="shrink-0 text-ink-400 dark:text-ink-500"
+                                                className="shrink-0 text-ink-400 dark:text-ink-400"
                                             />
                                             {#if book.favorite}
                                                 <span
@@ -815,14 +883,20 @@
                                                     <Bookmark size={13} />
                                                 </span>
                                             {/if}
-                                            <span class="min-w-0 truncate text-ink-900 dark:text-cream-100" title={book.author ? `${book.title} | ${book.author}` : book.title}>
+                                            <button
+                                                type="button"
+                                                class="row-open min-w-0 truncate text-left text-ink-900 dark:text-cream-100"
+                                                aria-expanded={selectedBookId === book.id}
+                                                on:click|stopPropagation={(event) =>
+                                                    selectBook(book.id, event.currentTarget)}
+                                            >
                                                 {book.title}
                                                 {#if book.author}
-                                                    <span class="text-ink-400 dark:text-ink-500">
+                                                    <span class="text-ink-400 dark:text-cream-500">
                                                         | {book.author}
                                                     </span>
                                                 {/if}
-                                            </span>
+                                            </button>
                                         </div>
                                     </td>
                                     <td class="px-3 py-2.5 align-middle">
@@ -840,7 +914,7 @@
                                                 {book.medium}
                                             </span>
                                         {:else}
-                                            <span class="font-mono text-xs text-ink-400 dark:text-ink-500">--</span>
+                                            <span class="font-mono text-xs text-ink-400 dark:text-ink-300">--</span>
                                         {/if}
                                     </td>
                                     <td class="px-3 py-2.5 text-center align-middle">
@@ -878,7 +952,8 @@
                                                     class="pill shrink-0 text-ink-500 dark:text-cream-400"
                                                     title="Open details to show all tags"
                                                     aria-label="Open details and show {tagOverflow(book)} more tags"
-                                                    on:click|stopPropagation={() => selectBook(book.id)}
+                                                    on:click|stopPropagation={(event) =>
+                                                        selectBook(book.id, event.currentTarget)}
                                                 >
                                                     <CirclePlus
                                                         size={12}
@@ -897,8 +972,142 @@
                 </div>
             </div>
 
+            <!-- Narrow screens: the same entries, stacked. Every column of the
+                 table is still here, just arranged vertically instead of
+                 behind a horizontal scroll. -->
+            <ul
+                class="stagger-children surface-ledger max-w-full divide-y divide-ink-200/70 overflow-hidden border border-ink-200/90 bg-cream-50/60 md:hidden dark:divide-ink-800 dark:border-ink-800 dark:bg-ink-900/45"
+                class:hidden={sortedBooks.length === 0}
+            >
+                {#key `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}-${excludedTags.join(",")}-${selectedMedium}-${excludedMediums.join(",")}-${showShelved}`}
+                    {#each paginatedBooks as book (book.id)}
+                        <li
+                            class="p-3 transition-colors duration-150 {selectedBookId ===
+                            book.id
+                                ? 'bg-blush-100/70 dark:bg-accent/[0.08]'
+                                : ''}"
+                            aria-current={selectedBookId === book.id
+                                ? "true"
+                                : undefined}
+                        >
+                            <div class="flex min-w-0 items-start gap-2">
+                                <MediumIcon
+                                    medium={book.medium}
+                                    size={15}
+                                    className="mt-1 shrink-0 text-ink-400 dark:text-ink-400"
+                                />
+                                {#if book.favorite}
+                                    <span
+                                        class="status-icon mt-1 inline-flex shrink-0 text-accent dark:text-accent-light"
+                                        aria-label="Favorite"
+                                    >
+                                        <Star size={13} />
+                                    </span>
+                                {/if}
+                                {#if isCurrent(book)}
+                                    <span
+                                        class="status-icon mt-1 inline-flex shrink-0 text-ochre-dark dark:text-ochre-light"
+                                        aria-label={currentStatusLabel(book)}
+                                    >
+                                        <Bookmark size={13} />
+                                    </span>
+                                {/if}
+                                <button
+                                    type="button"
+                                    class="card-open min-w-0 flex-1 text-left"
+                                    aria-expanded={selectedBookId === book.id}
+                                    on:click={(event) =>
+                                        selectBook(book.id, event.currentTarget)}
+                                >
+                                    <span
+                                        class="block text-ink-900 dark:text-cream-100"
+                                        >{book.title}</span
+                                    >
+                                    {#if book.author}
+                                        <span
+                                            class="block type-body-small text-ink-500 dark:text-cream-500"
+                                            >{book.author}</span
+                                        >
+                                    {/if}
+                                </button>
+                            </div>
+
+                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    class="pill {getCategoryColor(book.category)}"
+                                    on:click={() => setCategory(book.category)}
+                                >
+                                    {book.category}
+                                </button>
+                                {#if book.medium}
+                                    <span class="pill text-ink-600 dark:text-cream-300">
+                                        {book.medium}
+                                    </span>
+                                {/if}
+                                {#each previewTags(book) as tag}
+                                    <button
+                                        type="button"
+                                        class="pill max-w-[9rem] truncate"
+                                        on:click={() => setTag(tag)}
+                                    >
+                                        {tag}
+                                    </button>
+                                {/each}
+                                {#if tagOverflow(book) > 0}
+                                    <button
+                                        type="button"
+                                        class="pill shrink-0 text-ink-500 dark:text-cream-400"
+                                        aria-label="Open details and show {tagOverflow(
+                                            book,
+                                        )} more tags"
+                                        on:click={(event) =>
+                                            selectBook(book.id, event.currentTarget)}
+                                    >
+                                        <CirclePlus size={12} />
+                                        +{tagOverflow(book)}
+                                    </button>
+                                {/if}
+                            </div>
+
+                            <!-- The icon-only rating columns don't survive the
+                                 loss of their headers, so label them inline. -->
+                            <div
+                                class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 type-meta text-ink-500 dark:text-cream-400"
+                            >
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="sr-only"
+                                        >{ratingLegend.enjoyment.title}</span
+                                    >
+                                    <Heart size={12} />
+                                    <RatingGlyph
+                                        value={book.enjoyment}
+                                        type="enjoyment"
+                                        compact
+                                    />
+                                </span>
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="sr-only"
+                                        >{ratingLegend.importance.title}</span
+                                    >
+                                    <BadgeQuestionMark size={12} />
+                                    <RatingGlyph
+                                        value={book.importance}
+                                        type="importance"
+                                        compact
+                                    />
+                                </span>
+                                <span class="ml-auto tabular-nums">
+                                    {shortDate(book.dateAdded)}
+                                </span>
+                            </div>
+                        </li>
+                    {/each}
+                {/key}
+            </ul>
+
             {#if sortedBooks.length === 0}
-                <div class="border-x border-b border-ink-200/90 bg-cream-50/60 py-12 text-center text-ink-500 dark:border-ink-800 dark:bg-ink-900/45 dark:text-cream-400">
+                <div class="border-x border-b border-t border-ink-200/90 bg-cream-50/60 py-12 text-center text-ink-500 md:border-t-0 dark:border-ink-800 dark:bg-ink-900/45 dark:text-cream-400">
                     <BookOpenText size={42} class="mx-auto mb-4 opacity-50" />
                     <p>No books match your filters.</p>
                     <button
@@ -962,222 +1171,145 @@
             </nav>
         </section>
 
-        {#if selectedBook}
+        <!-- Desktop only: the note as a sticky companion column. Below `xl`
+             it is presented as a sheet (outside PageShell) instead. -->
+        {#if selectedBook && isWideLayout}
             <aside
                 class="surface-panel max-h-[calc(100dvh-6rem)] overflow-hidden border border-ink-200/90 bg-cream-100 dark:border-ink-800 dark:bg-ink-900/95 xl:sticky xl:top-24"
                 aria-label="Selected reading note"
                 in:fly={{ x: 28, duration: 300, easing: cubicOut }}
             >
-                <div class="flex items-start justify-between gap-4 border-b border-ink-200/90 p-4 dark:border-ink-800">
-                    <div class="min-w-0">
-                        <h2 class="flex items-start gap-2 text-balance text-xl font-medium leading-snug text-ink-900 dark:text-cream-100">
-                            <MediumIcon
-                                medium={selectedBook.medium}
-                                size={20}
-                                animate
-                                className="mt-1 shrink-0 text-ink-500 dark:text-cream-400"
-                            />
-                            <span>{selectedBook.title}</span>
-                        </h2>
-                        {#if selectedBook.author}
-                            <p class="mt-1 text-sm text-ink-500 dark:text-cream-400">
-                                by {selectedBook.author}
-                            </p>
-                        {/if}
-                    </div>
-                    <button
-                        type="button"
-                        class="shrink-0 p-1.5 text-ink-500 transition-colors hover:text-ink-900 dark:text-cream-400 dark:hover:text-cream-100"
-                        on:click={closeDrawer}
-                        aria-label="Close details"
-                    >
-                        <PanelRightClose size={18} />
-                    </button>
-                </div>
-
-                <!-- Keyed by book so switching entries re-runs the staggered
-                     section fade-in. -->
                 {#key selectedBook.id}
-                <div class="stagger-children max-h-[calc(100dvh-14rem)] space-y-5 overflow-y-auto p-4">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            class="pill {getCategoryColor(selectedBook.category)}"
-                            on:click={() => setCategory(selectedBook.category)}
-                        >
-                            {selectedBook.category}
-                        </button>
-                        {#if selectedBook.medium}
-                            <span class="pill text-ink-600 dark:text-cream-300">
-                                {selectedBook.medium}
-                            </span>
-                        {/if}
-                        {#if isCurrent(selectedBook)}
-                            <span class="pill text-ochre-dark dark:text-ochre-light">
-                                <Bookmark size={12} class="fill-current" />
-                                {currentStatusLabel(selectedBook)}
-                            </span>
-                        {/if}
-                        {#if selectedBook.favorite}
-                            <button
-                                type="button"
-                                class="pill text-accent dark:text-accent-light"
-                                on:click={() => setCategory("favorites")}
-                            >
-                                <Star size={12} class="fill-current" />
-                                favorite
-                            </button>
-                        {/if}
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-3 border-y border-ink-200/80 py-3 dark:border-ink-800">
-                        <div>
-                            <p class="meta-label mb-1.5">Appreciation</p>
-                            <RatingGlyph
-                                value={selectedBook.enjoyment}
-                                type="enjoyment"
-                            />
-                        </div>
-                        <div>
-                            <p class="meta-label mb-1.5">Importance</p>
-                            <RatingGlyph
-                                value={selectedBook.importance}
-                                type="importance"
-                            />
-                        </div>
-                        <div>
-                            <p class="meta-label mb-1.5">Date added</p>
-                            <p class="font-mono text-sm text-ink-700 dark:text-cream-300">
-                                {shortDate(selectedBook.dateAdded)}
-                            </p>
-                        </div>
-                    </div>
-
-                    {#if selectedNoteParagraphs.length > 0}
-                        <section>
-                            <div class="section-rule mb-2 gap-3">
-                                <h3 class="meta-label">TLDR</h3>
-                                <div class="section-rule-line"></div>
-                            </div>
-                            <p class="text-sm leading-6 text-ink-700 dark:text-cream-300">
-                                {@html parseInline(selectedNoteParagraphs[0])}
-                            </p>
-                        </section>
-
-                        {#if selectedNoteParagraphs.length > 1}
-                            <section>
-                                <div class="section-rule mb-2 gap-3">
-                                    <h3 class="meta-label">Notes</h3>
-                                    <div class="section-rule-line"></div>
-                                </div>
-                                <div class="space-y-3 border-l-2 border-ink-200 pl-4 dark:border-ink-700">
-                                    {#each selectedNoteParagraphs.slice(1) as paragraph}
-                                        <p class="text-sm leading-6 text-ink-700 dark:text-cream-300">
-                                            {@html parseInline(paragraph)}
-                                        </p>
-                                    {/each}
-                                </div>
-                            </section>
-                        {/if}
-                    {:else}
-                        <section>
-                            <div class="section-rule mb-2 gap-3">
-                                <h3 class="meta-label">Notes</h3>
-                                <div class="section-rule-line"></div>
-                            </div>
-                            <p class="text-sm text-ink-500 dark:text-cream-400">
-                                No notes added yet.
-                            </p>
-                        </section>
-                    {/if}
-
-                    {#if selectedBook.quotes && selectedBook.quotes.length > 0}
-                        <section>
-                            <div class="section-rule mb-2 gap-3">
-                                <h3 class="meta-label">Quotes</h3>
-                                <div class="section-rule-line"></div>
-                            </div>
-                            <div class="space-y-3">
-                                {#each selectedBook.quotes as quote}
-                                    <blockquote class="border-l-2 border-accent/35 pl-4 text-sm italic leading-6 text-ink-600 dark:border-accent-light/35 dark:text-cream-300">
-                                        {@html parseInline(quote)}
-                                    </blockquote>
-                                {/each}
-                            </div>
-                        </section>
-                    {/if}
-
-                    {#if selectedTags.length > 0}
-                        <section>
-                            <div class="section-rule mb-2 gap-3">
-                                <h3 class="meta-label">Tags</h3>
-                                <div class="section-rule-line"></div>
-                            </div>
-                            <div class="flex flex-wrap gap-1.5">
-                                {#each selectedTags as tag}
-                                    <button
-                                        type="button"
-                                        class="pill"
-                                        on:click={() => setTag(tag)}
-                                    >
-                                        {tag}
-                                    </button>
-                                {/each}
-                            </div>
-                        </section>
-                    {/if}
-
-                    <section>
-                        <div class="section-rule mb-2 gap-3">
-                            <h3 class="meta-label">Source</h3>
-                            <div class="section-rule-line"></div>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-3">
-                            {#if selectedBook.url && selectedBook.url !== selectedBook.letterboxdUrl}
-                                <a
-                                    href={selectedBook.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="control-compact inline-flex items-center gap-1.5 border border-ink-900 bg-ink-900 text-sm text-cream-100 transition-colors hover:bg-ink-700 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900 dark:hover:bg-cream-200"
-                                >
-                                    View source
-                                    <ArrowUpRight size={14} />
-                                </a>
-                            {/if}
-                            {#if selectedBook.letterboxdUrl}
-                                <a
-                                    href={selectedBook.letterboxdUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="control-compact inline-flex items-center gap-1.5 border border-ink-300 bg-cream-50 text-sm text-ink-800 transition-colors hover:border-ink-900 hover:bg-white dark:border-ink-600 dark:bg-ink-800 dark:text-cream-200 dark:hover:border-cream-100 dark:hover:bg-ink-700"
-                                >
-                                    Letterboxd
-                                    <ArrowUpRight size={14} />
-                                </a>
-                            {/if}
-                            {#if !selectedBook.url && !selectedBook.letterboxdUrl}
-                                <span class="text-sm text-ink-500 dark:text-cream-400">
-                                    No source link.
-                                </span>
-                            {/if}
-                            {#if !Number.isNaN(new Date(selectedBook.dateAdded).getTime())}
-                                <span class="text-xs text-ink-400 dark:text-ink-500">
-                                    Added {formatMonthYear(selectedBook.dateAdded)}
-                                </span>
-                            {/if}
-                        </div>
-                    </section>
-                </div>
+                    <BookDetail
+                        book={selectedBook}
+                        variant="sidebar"
+                        onClose={closeDrawer}
+                        onSelectCategory={setCategory}
+                        onSelectTag={setTag}
+                    />
                 {/key}
             </aside>
         {/if}
     </div>
 </PageShell>
 
+<!-- Narrow screens: the note as a modal sheet rather than a panel stacked
+     under a horizontally scrolling table. Focus moves in, is trapped while
+     open, and returns to the row that opened it. -->
+{#if selectedBook && asSheet}
+    <div
+        class="layer-overlay fixed inset-0 bg-ink-900/60"
+        role="presentation"
+        on:click={closeDrawer}
+        transition:fade={{ duration: 150 }}
+    ></div>
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+        bind:this={sheetElement}
+        class="book-detail-sheet surface-panel layer-modal fixed inset-x-0 bottom-0 flex max-h-[85dvh] flex-col overflow-hidden border-t border-ink-200/90 bg-cream-100 dark:border-ink-800 dark:bg-ink-900"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Selected reading note"
+        tabindex="-1"
+        on:keydown={onSheetKeydown}
+        transition:fly={{ y: 240, duration: 260, easing: cubicOut }}
+    >
+        {#key selectedBook.id}
+            <BookDetail
+                book={selectedBook}
+                variant="sheet"
+                autofocus
+                onClose={closeDrawer}
+                onSelectCategory={setCategory}
+                onSelectTag={setTag}
+            />
+        {/key}
+    </div>
+{/if}
+
 <style>
     /* @jis3r icons set fill="none" on the nested SVG. Override that
        presentation attribute for state glyphs that are intentionally solid. */
     .status-icon :global(svg) {
         fill: currentColor;
+    }
+
+    /* The title is a real button so the row has a keyboard path, but it should
+       still read as the row's text, not as a control. */
+    .row-open,
+    .card-open {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    /* Quiet native disclosure: the marker stays, the summary reads as metadata
+       rather than a control. */
+    .rating-scale {
+        position: static;
+    }
+
+    /* `::marker` can only be sized and coloured, never vertically positioned,
+       so the native triangle sits on the text baseline instead of its centre.
+       Drop it for a real element that flex can centre, using the same ▸ caret
+       the other disclosures on the site use. */
+    .rating-scale > summary {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1-5);
+        width: fit-content;
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .rating-scale > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .rating-scale-caret {
+        display: inline-block;
+        font-size: 0.85em;
+        line-height: 1;
+        transition: transform var(--motion-base) var(--ease-emphasized);
+    }
+
+    .rating-scale[open] .rating-scale-caret {
+        transform: rotate(90deg);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .rating-scale-caret {
+            transition: none;
+        }
+    }
+
+    /* Anchored to the status row (which is `relative`), not to the <details>,
+       so the panel spans a readable width instead of the summary's. Taken out
+       of flow so opening it never reflows the list below. */
+    .rating-scale-panel {
+        position: absolute;
+        top: calc(100% + var(--space-1-5));
+        left: 0;
+        z-index: var(--layer-popover);
+        width: max-content;
+        max-width: min(34rem, 100%);
+        border-radius: var(--radius-control);
+        box-shadow: var(--shadow-popover);
+        text-align: left;
+    }
+
+    :global(.dark) .rating-scale-panel {
+        box-shadow: var(--shadow-popover-dark);
+    }
+
+    .rating-scale > summary:hover {
+        color: theme("colors.ink.900");
+    }
+
+    :global(.dark) .rating-scale > summary:hover {
+        color: theme("colors.cream.100");
     }
 </style>

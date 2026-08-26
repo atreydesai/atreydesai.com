@@ -7,17 +7,18 @@ export const prerender = true;
 
 export const GET: RequestHandler = () => {
     const items = posts
-        .map(
-            (post) => `
+        .map((post) => {
+            const url = post.externalUrl ?? `${SITE_URL}/blog/${post.id}/`;
+            return `
     <item>
       <title>${escapeXml(post.title)}</title>
-      <link>${SITE_URL}/blog/${post.id}/</link>
-      <guid isPermaLink="true">${SITE_URL}/blog/${post.id}/</guid>
+      <link>${escapeXml(url)}</link>
+      <guid isPermaLink="true">${escapeXml(url)}</guid>
       <description>${escapeXml(post.excerpt)}</description>
       <pubDate>${formatUtcDate(post.date)}</pubDate>
       ${post.tags.map((tag) => `<category>${escapeXml(tag)}</category>`).join('\n      ')}
-    </item>`
-        )
+    </item>`;
+        })
         .join('');
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>

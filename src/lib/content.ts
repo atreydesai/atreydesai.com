@@ -76,6 +76,8 @@ export interface Post {
     excerpt: string;
     published: boolean;
     content: string;
+    externalUrl?: string;
+    externalSite?: string;
 }
 
 export interface ResearchInterestCitation {

@@ -1,40 +1,49 @@
 # Website design-system audit
 
-Status: all non-accessibility findings implemented; accessibility findings
-deferred at the user’s direction  
+Status: all findings implemented except light-theme contrast and pointer target
+size, both deferred at the user’s direction  
 Audit date: July 29, 2026  
-Implementation date: July 29, 2026  
+Implementation dates: July 29, 2026 (visual system);
+August 25, 2026 (focus, dark-theme contrast — see
+[Second pass](#second-pass-august-25-2026))  
 Scope: the current working tree, including the uncommitted homepage work
 
 ## Implementation disposition
 
 This document preserves the original evidence and recommendations as the
-decision record. The implementation pass applied every visual-system,
-typography, spacing, layout, motion, component, and maintainability correction.
-It deliberately did not change color pairs, focus indicators, WCAG text-spacing
-behavior, or minimum pointer-target rules.
+decision record. The first pass (July 29) applied every visual-system,
+typography, spacing, layout, motion, component, and maintainability correction,
+and deliberately did not change color pairs, focus indicators, WCAG
+text-spacing behavior, or minimum pointer-target rules.
 
-| Finding                                    | Disposition |
-| ------------------------------------------ | ----------- |
-| Computed heading leading                   | Implemented |
-| Text color contrast                        | Deferred    |
-| Focus treatment                            | Deferred    |
-| Long-form reading measure                  | Implemented |
-| No-op About prose classes                  | Implemented |
-| Purpose-named type roles                   | Implemented |
-| Heading/body leading system                | Implemented |
-| Navigation leading                         | Implemented |
-| Governed spacing scale                     | Implemented |
-| Page-shell width variants                  | Implemented |
-| Page-header spacing variants               | Implemented |
-| Named section and paragraph rhythm         | Implemented |
-| Control density variants                   | Implemented |
-| Motion tokens                              | Implemented |
-| Radius, shadow, and layer tokens           | Implemented |
-| Icon selection and one-family route groups | Implemented |
-| Unused design-system rules                 | Implemented |
-| Display wordmark exception                 | Documented  |
-| Cross-platform prose fallback              | Documented  |
+A second pass (August 25) took up the deferred accessibility findings. It
+implemented the focus treatment in full and the contrast findings for the dark
+theme only. Light-theme color pairs and pointer target sizes remain deferred by
+direction.
+
+| Finding                                    | Disposition               |
+| ------------------------------------------ | ------------------------- |
+| Computed heading leading                   | Implemented               |
+| Text color contrast                        | Dark only; light deferred |
+| Focus treatment                            | Implemented               |
+| Long-form reading measure                  | Implemented               |
+| No-op About prose classes                  | Implemented               |
+| Purpose-named type roles                   | Implemented               |
+| Heading/body leading system                | Implemented               |
+| Navigation leading                         | Implemented               |
+| Governed spacing scale                     | Implemented               |
+| Page-shell width variants                  | Implemented               |
+| Page-header spacing variants               | Implemented               |
+| Named section and paragraph rhythm         | Implemented               |
+| Control density variants                   | Implemented               |
+| Motion tokens                              | Implemented               |
+| Radius, shadow, and layer tokens           | Implemented               |
+| Icon selection and one-family route groups | Implemented               |
+| Unused design-system rules                 | Implemented               |
+| Display wordmark exception                 | Documented                |
+| Cross-platform prose fallback              | Documented                |
+| Pointer target size                        | Deferred                  |
+| WCAG text-spacing conformance              | Deferred                  |
 
 ## Executive finding
 
@@ -564,3 +573,137 @@ none.
 - [IBM Carbon Color](https://carbondesignsystem.com/elements/color/overview/)
   uses role-based color tokens across themes and requires visible focus states
   on interactive elements.
+
+## Second pass, August 25, 2026
+
+The July pass deferred every accessibility finding. This pass took up two of
+them, and added findings from a review against the
+[Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/).
+The instruction for this pass was: implement focus in full, implement contrast
+for the dark theme only, leave light-theme color alone, and leave target size
+alone.
+
+### Method
+
+Contrast was not re-derived from the class strings. A script running in the
+page walks every rendered text node, resolves its effective background by
+compositing every non-transparent ancestor layer, folds the element's own
+`opacity` into the foreground, and compares the result against the AA threshold
+for that node's computed size and weight. It was run over every route and over
+each interactive state that only exists once opened: the note sheet, the note
+sidebar, both select dropdowns, the photo lightbox, the empty state, and an
+expanded homepage.
+
+This is what surfaced the two findings that reasoning about tokens would have
+missed — a color that passes on the page and fails on a raised surface, and a
+color that passes at full opacity and fails at its resting one.
+
+### P1 — focus was three different treatments, none of them adequate
+
+Evidence:
+
+- `app.css` documented a `--focus-ring` token and a canonical `:focus-visible`
+  recipe. Neither existed in the stylesheet.
+- `.btn` used `focus:ring-2 focus:ring-offset-2` with no ring color, and
+  `tailwind.config.js` set no `ringColor`. Tailwind's stock default is
+  `rgb(59 130 246 / 0.5)` on a white offset, so the skip link and the 404
+  buttons rendered a blue-on-white ring in a cream-and-orange interface.
+- `CustomSelect` set `outline: none` on the trigger, the exclude toggle, and
+  every option, substituting a background tint measuring `1.09:1` against its
+  own surface. Arrowing through a ~200-entry tag list gave no visible position.
+- The bookshelf category filters used `ring-accent/40`, which composites to
+  roughly `1.6:1`.
+- The homepage disclosure controls used `rgb(232 93 76 / 0.4)` at a `4px`
+  offset — the same problem at a different opacity.
+
+Correction, implemented: one `--focus-ring` variable per theme and one
+`:focus-visible` rule in `@layer base`. Every per-component override removed.
+`ringColor` and `ringOffsetColor` defaults pinned to palette values so a stray
+`ring-*` cannot reach blue again. Select options use a negative
+`outline-offset` because they sit flush inside a clipped scrolling container.
+
+Verified by dispatching real `Tab` key events — programmatic `.focus()` does
+not match `:focus-visible` on buttons, so a naive check reports no ring where
+one exists.
+
+### P1 — dark-theme contrast
+
+The July audit listed the failing pairs. This pass fixed the dark half of each,
+plus three the original audit did not reach.
+
+| Pair                              |      Was | Now                      |
+| --------------------------------- | -------: | ------------------------ |
+| `.dark .link`                     | `3.65:1` | `accent-light`, `6.78:1` |
+| `.dark .link:hover`               | `5.06:1` | `cream-100`              |
+| Active nav, dark                  | `3.65:1` | `accent-light`           |
+| `dark:text-ink-400` (23 uses)     | `4.47:1` | `cream-500`, `10.21:1`   |
+| `dark:text-ink-500` as text       | `3.03:1` | `cream-500`              |
+| `dark:text-ink-600` (404, footer) | `~1.5:1` | `ink-400` / `cream-500`  |
+| `wine-light` on `ink-900`         | `4.31:1` | `#C68098`                |
+| `plum-light` on the neutral pill  | `3.96:1` | `#AA89B1`                |
+
+Note on the hover state: the old dark link was _less_ legible at rest than on
+hover, which inverts the rule that a hover state cannot reduce contrast. Moving
+the resting state up to `accent-light` required moving hover up as well, to the
+`cream-100` the semantic table already specified.
+
+Three findings the original audit did not have:
+
+1. **`accent-light` failed on raised surfaces.** `#F07563` measured `6.16:1` on
+   the `ink-900` page but `4.15:1` on `ink-800`, which is where it carries the
+   selected state in a select dropdown. Lifted to `#F18272`.
+2. **A selected row was raising its own pills.** The selected bookshelf row used
+   `dark:bg-ink-800`, a raised-surface value for what is a state. That lifted
+   the effective background under every tinted pill in the row, dropping the
+   `fiction` pill to `3.98:1`. Replaced with `bg-accent/[0.08]`, matching the
+   warm wash the light theme already used for the same state.
+3. **The About sidenotes failed on opacity, not color.** `cream-500` at the
+   resting `opacity: 0.45` composites to `3.1:1`. Raised to `0.62` in the dark
+   theme only, which keeps the note clearly recessive against its
+   full-opacity hover state.
+
+Result: zero failures across all routes and interactive states in the dark
+theme.
+
+### Deferred, unchanged
+
+- **Light-theme contrast.** 58 failures remain, by direction. The largest
+  single group is `RatingGlyph`'s `text-ink-400` at `3.69:1` (34 instances);
+  the rest are the About sidenote opacity, `footnote-ref` at `accent`
+  (`3.26:1`), and the `404` hero at `ink-300` (`2.36:1`).
+- **Pointer target size.** Navigation links (~`16px` tall, `4px` wrapped row
+  gap) and interactive pills (~`17px` tall, `4px` neighbours). Both can be
+  fixed without moving a visible pixel; see the style guide.
+- **WCAG text-spacing conformance.** Not re-tested this pass.
+
+### Findings from the HIG review
+
+Implemented in this pass; recorded here because they are design-system rules,
+not one-off fixes. Each is written up in the style guide.
+
+- **Filenames were being used as alt text and as visible captions.** All 132
+  photographs carried alt text derived from their filename, and the lightbox
+  rendered that string as the photo's title. Untitled photos are now
+  presentational; captions come from IPTC/XMP Title or a sidecar file.
+- **Raw EXIF reached the interface.** Eleven photos displayed focal lengths
+  such as `6.764999866485596 mm`.
+- **The appearance choice was not fully expressed.** The theme is a saved
+  choice rather than the system appearance, which is deliberate — but
+  `color-scheme` was absent (so the browser painted scrollbars and the caret
+  light on a near-black page) and `theme-color` was gated on
+  `prefers-color-scheme` (so the browser chrome could disagree with the page).
+  The toggle also rendered the same glyph in both states.
+- **The bookshelf table had no narrow form.** A `1080px` table scrolled
+  sideways on a phone, and its rows carried `role="button"` while containing
+  their own buttons.
+- **Route transitions were long and frequent.** `400ms` each way plus a `150ms`
+  enter delay, on every internal link, with both pages in normal flow so the
+  page height briefly doubled. Input type was detected by user-agent sniffing,
+  and `prefers-reduced-motion` was read once at module scope.
+- **Body text was pinned in `px`,** opting all inherited copy out of the
+  reader's browser font-size setting.
+- **Several relationships existed only on hover:** the About footnote markers
+  and their notes, the rating-column definitions, the external-post tooltip.
+- **No status was announced.** Filter results, lightbox position, and the copy
+  confirmation all changed silently; the copy confirmation also reported
+  success when the clipboard write had rejected.

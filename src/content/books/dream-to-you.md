@@ -12,5 +12,5 @@ tags:
   - "comedy"
   - "romance"
   - "korean"
-status: current
+enjoyment: 7
 ---

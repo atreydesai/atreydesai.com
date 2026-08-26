@@ -62,10 +62,6 @@
         </a>
     </header>
 
-    <p class="deck text-ink-600 dark:text-cream-400 mb-1">
-        For a condensed version, see my
-        <a href="/resume/" class="link">resume</a>.
-    </p>
     {#if data.cvLastUpdated}
         <p class="text-sm italic text-ink-400 dark:text-cream-500 mb-8">
             last updated {data.cvLastUpdated}
@@ -93,10 +89,10 @@
                     {cv.education.school}
                 </p>
                 <p>{cv.education.degree}</p>
-                <p class="text-sm text-ink-500 dark:text-ink-400 mt-1">
+                <p class="text-sm text-ink-500 dark:text-cream-500 mt-1">
                     {@html cv.education.advisors_html}
                 </p>
-                <p class="text-sm text-ink-500 dark:text-ink-400 mt-1">
+                <p class="text-sm text-ink-500 dark:text-cream-500 mt-1">
                     {@html cv.education.coursework_html}
                 </p>
             </div>
@@ -116,13 +112,13 @@
                             >
                                 {job.organization}
                             </p>
-                            <p class="text-sm text-ink-500 dark:text-ink-400">
+                            <p class="text-sm text-ink-500 dark:text-cream-500">
                                 {job.dates}
                             </p>
                         </div>
                         <p class="italic">{job.role}</p>
                         {#if job.advisors}
-                            <p class="text-sm text-ink-500 dark:text-ink-400">
+                            <p class="text-sm text-ink-500 dark:text-cream-500">
                                 {job.advisors}
                             </p>
                         {/if}
@@ -173,7 +169,7 @@
                                 ? ` (${award.amount})`
                                 : ""}</span
                         >
-                        <span class="text-ink-500 dark:text-ink-400"
+                        <span class="text-ink-500 dark:text-cream-500"
                             >{award.year}</span
                         >
                     </div>
@@ -198,7 +194,7 @@
                             {#each talk.venues as venue}
                                 <li>
                                     {venue.name} <span
-                                        class="text-ink-500 dark:text-ink-400"
+                                        class="text-ink-500 dark:text-cream-500"
                                         >({venue.date})</span
                                     >
                                 </li>
@@ -220,12 +216,12 @@
                                 class="flex flex-col sm:flex-row sm:justify-between"
                             >
                                 <span>{@html position.role_html}</span>
-                                <span class="text-ink-500 dark:text-ink-400"
+                                <span class="text-ink-500 dark:text-cream-500"
                                     >{position.dates}</span
                                 >
                             </div>
                             <p
-                                class="text-sm text-ink-500 dark:text-ink-400 italic ml-4"
+                                class="text-sm text-ink-500 dark:text-cream-500 italic ml-4"
                             >
                                 {position.note}
                             </p>
@@ -235,7 +231,7 @@
                             class="flex flex-col sm:flex-row sm:justify-between"
                         >
                             <span>{@html position.role_html}</span>
-                            <span class="text-ink-500 dark:text-ink-400"
+                            <span class="text-ink-500 dark:text-cream-500"
                                 >{position.dates}</span
                             >
                         </div>

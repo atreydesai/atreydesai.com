@@ -1,0 +1,3 @@
+{
+  "_readme": "Hand-written photo captions, keyed by the filename in static/images/photography. A caption becomes the photo's alt text and the title shown in the lightbox. Photos with no entry here and no IPTC/XMP Title stay untitled (empty alt, no title line) rather than falling back to their filename. Keys starting with _ are ignored. Lightroom's Title field (IPTC Object Name) is read automatically on export, so filling that in is equivalent to adding an entry here."
+}

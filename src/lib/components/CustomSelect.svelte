@@ -338,11 +338,12 @@
         color: theme("colors.cream.400");
     }
 
+    /* Hover and focus share a tint, but focus keeps the shared ring on top of
+       it — the tint alone was ~1.1:1 against the surface. */
     .select-trigger:hover,
     .select-trigger:focus-visible {
         border-color: theme("colors.ink.400");
         color: theme("colors.ink.900");
-        outline: none;
     }
 
     :global(.dark) .select-trigger:hover,
@@ -439,7 +440,6 @@
     .select-toggle:hover,
     .select-toggle:focus-visible {
         color: theme("colors.ink.900");
-        outline: none;
     }
 
     :global(.dark) .select-toggle:hover,
@@ -514,7 +514,13 @@
     .select-option:focus-visible {
         background-color: theme("colors.blush.100");
         color: theme("colors.ink.900");
-        outline: none;
+    }
+
+    /* Options sit flush against a scrolling, clipped dropdown, so the ring is
+       drawn inside the row rather than offset outside it where it would be
+       cut off at the first and last option. */
+    .select-option:focus-visible {
+        outline-offset: -2px;
     }
 
     :global(.dark) .select-option:hover,

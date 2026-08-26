@@ -97,7 +97,7 @@ export const GET: RequestHandler = () => {
   </url>`
     );
 
-    const postUrls = posts.map(
+    const postUrls = posts.filter((post) => !post.externalUrl).map(
         (post) => `
   <url>
     <loc>${SITE_URL}/blog/${post.id}/</loc>

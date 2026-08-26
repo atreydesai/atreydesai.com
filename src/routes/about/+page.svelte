@@ -13,6 +13,12 @@
     let hovered: number | null = null;
     let layoutRaf = 0;
 
+    // Matches the `xl:` breakpoint the two footnote renderings switch on.
+    const SIDENOTE_QUERY = "(min-width: 1280px)";
+    // Server-render and first paint assume the bottom list, which is the
+    // rendering that exists without JS.
+    let wideNotes = false;
+
     // Live "now" data (Manifold + Goodreads) from the /api/now endpoint.
     interface ReadingBook {
         title: string;
@@ -117,19 +123,30 @@
     onMount(() => {
         loadNow();
 
+        // Sidenotes and the bottom list are two renderings of the same notes,
+        // and only one is displayed at a time. Whichever is visible owns the
+        // `#fn-N` ids so a marker link always lands somewhere on screen.
+        const wideMedia = window.matchMedia(SIDENOTE_QUERY);
+        const syncWide = () => (wideNotes = wideMedia.matches);
+        syncWide();
+        wideMedia.addEventListener("change", syncWide);
+
         // Small delay to ensure all dynamic content is rendered (including
         // from parseLinks), then position the sidenotes.
         setTimeout(() => {
             layoutNotes();
 
-            // Hovering a marker brightens its note (the note's own hover is
-            // handled in the template; markers come from @html, so listen here).
+            // Pointing at or focusing a marker brightens its note. Markers
+            // come from @html, so the listeners are attached here; focus is
+            // wired alongside hover so the pairing isn't pointer-only.
             document.querySelectorAll("[data-footnote]").forEach((marker) => {
                 const id = parseInt(
                     marker.getAttribute("data-footnote") || "0",
                 );
                 marker.addEventListener("mouseenter", () => (hovered = id));
                 marker.addEventListener("mouseleave", () => (hovered = null));
+                marker.addEventListener("focus", () => (hovered = id));
+                marker.addEventListener("blur", () => (hovered = null));
             });
         }, 100);
 
@@ -143,6 +160,7 @@
             ro.disconnect();
             window.removeEventListener("resize", scheduleLayout);
             cancelAnimationFrame(layoutRaf);
+            wideMedia.removeEventListener("change", syncWide);
         };
     });
 
@@ -187,16 +205,20 @@
             {#each aboutData.footnotes as footnote (footnote.id)}
                 <!-- svelte-ignore a11y-no-static-element-interactions -->
                 <div
-                    class="sidenote footnote-item text-xs text-ink-500 dark:text-ink-400 leading-relaxed"
+                    class="sidenote footnote-item text-xs text-ink-500 dark:text-cream-500 leading-relaxed"
                     class:fn-ready={notesReady}
                     class:fn-active={hovered === footnote.id}
                     style="top: {noteTops[footnote.id] ?? 0}px"
-                    id="fn-{footnote.id}"
+                    id={wideNotes ? `fn-${footnote.id}` : undefined}
                     on:mouseenter={() => (hovered = footnote.id)}
                     on:mouseleave={() => (hovered = null)}
                 >
-                    <span class="font-medium text-accent-dark dark:text-accent-light"
-                        >{footnote.id}.</span
+                    <a
+                        href="#fnref-{footnote.id}"
+                        class="footnote-backref font-medium text-accent-dark dark:text-accent-light"
+                        aria-label="Back to reference {footnote.id}"
+                        on:focus={() => (hovered = footnote.id)}
+                        on:blur={() => (hovered = null)}>{footnote.id}.</a
                     >
                     {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
                 </div>
@@ -227,11 +249,18 @@
                     <p>
                         {@html parseLinks(
                             paragraph.text,
-                        )}{#if paragraph.footnote}<sup
-                                class="footnote-ref"
-                                data-footnote={paragraph.footnote}
-                                >[{paragraph.footnote}]</sup
-                            >{/if}
+                        )}{#if paragraph.footnote}<a
+                                    id="fnref-{paragraph.footnote}"
+                                    href="#fn-{paragraph.footnote}"
+                                    class="footnote-ref"
+                                    data-footnote={paragraph.footnote}
+                                    aria-label="Footnote {paragraph.footnote}"
+                                    on:mouseenter={() => (hovered = paragraph.footnote ?? null)}
+                                    on:mouseleave={() => (hovered = null)}
+                                    on:focus={() => (hovered = paragraph.footnote ?? null)}
+                                    on:blur={() => (hovered = null)}
+                                    >[{paragraph.footnote}]</a
+                                >{/if}
                     </p>
                 {/each}
 
@@ -265,7 +294,7 @@
                 {/if}
 
                 <p>
-                    <span class="text-ink-500 dark:text-ink-400"
+                    <span class="text-ink-500 dark:text-cream-500"
                         >other interests:</span
                     >
                     {@html parseLinks(aboutData.personal.interests)}
@@ -273,7 +302,7 @@
 
                 {#if aboutData.personal.blogs.length > 0}
                     <p>
-                        <span class="text-ink-500 dark:text-ink-400"
+                        <span class="text-ink-500 dark:text-cream-500"
                             >blogs i like:</span
                         >
                         {#each aboutData.personal.blogs as blog, i}
@@ -314,7 +343,7 @@
 
             <div class="flow-prose measure-reading text-ink-700 dark:text-cream-300">
                 <p>
-                    <span class="text-ink-500 dark:text-ink-400"
+                    <span class="text-ink-500 dark:text-cream-500"
                         >inspiration:</span
                     >
                     {aboutData.website.inspiration}
@@ -331,7 +360,7 @@
                                     class="link font-medium">{site.name}</a
                                 >
                                 :
-                                <span class="text-ink-500 dark:text-ink-400"
+                                <span class="text-ink-500 dark:text-cream-500"
                                     >{site.description}</span
                                 >
                             </li>
@@ -340,7 +369,7 @@
                 {/if}
 
                 <p>
-                    <span class="text-ink-500 dark:text-ink-400"
+                    <span class="text-ink-500 dark:text-cream-500"
                         >built with:</span
                     >
                     {@html parseLinks(aboutData.website.builtWith)}
@@ -369,10 +398,14 @@
             <div class="space-y-4">
                 {#each aboutData.footnotes as footnote}
                     <div
-                        class="text-xs text-ink-500 dark:text-ink-400 leading-relaxed"
+                        class="text-xs text-ink-500 dark:text-cream-500 leading-relaxed"
+                        id={wideNotes ? undefined : `fn-${footnote.id}`}
                     >
-                        <span class="font-medium text-accent-dark dark:text-accent-light"
-                            >{footnote.id}.</span
+                        <a
+                            href="#fnref-{footnote.id}"
+                            class="footnote-backref font-medium text-accent-dark dark:text-accent-light"
+                            aria-label="Back to reference {footnote.id}"
+                            >{footnote.id}.</a
                         >
                         {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
                     </div>
@@ -438,6 +471,24 @@
         color: theme("colors.accent.dark");
     }
 
+    /* The markers are links, so the shared :focus-visible ring applies. Only
+       the corner radius is local, so the ring hugs the [n] rather than boxing
+       a full line height. */
+    :global(.footnote-ref),
+    .footnote-backref {
+        border-radius: var(--radius-control);
+    }
+
+    .footnote-backref {
+        text-decoration: none;
+    }
+
+    /* Jumping to a note shouldn't land it under the sticky page top. */
+    .footnote-item,
+    .about-main [id^="fn-"] {
+        scroll-margin-top: var(--space-16);
+    }
+
     /* Live figures inside footnote 7 (injected via @html). */
     :global(.fn-stat) {
         font-family: var(--font-mono);
@@ -466,6 +517,14 @@
     .sidenote.fn-ready.fn-active {
         opacity: 1;
     }
+
+    /* Dark theme only: at 0.45 the resting note composited to 3.1:1 on
+       ink-900, below AA for 12px text. 0.62 keeps it clearly recessive next
+       to the full-opacity hover/focus state while staying legible. */
+    :global(.dark) .sidenote.fn-ready {
+        opacity: 0.62;
+    }
+
 
     /* Marker echo: while its sidenote is hovered, the in-text marker warms. */
     :global(.footnote-ref.fn-hot) {

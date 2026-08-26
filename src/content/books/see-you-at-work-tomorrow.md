@@ -14,5 +14,5 @@ tags:
   - "romance"
   - "drama"
   - "korean"
-status: current
+enjoyment: 7
 ---

@@ -18,15 +18,31 @@
     bobaMode,
     openBoba,
   } from "$lib/boba";
-  import { PAGE_TRANSITION_DURATION_MS } from "$lib/motion";
+  import {
+    PAGE_TRANSITIONS_ENABLED,
+    PAGE_TRANSITION_DURATION_MS,
+    PAGE_TRANSITION_IN_DELAY_MS,
+    PAGE_TRANSITION_IN_X,
+    PAGE_TRANSITION_OUT_Y,
+  } from "$lib/motion";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
 
-  const isMobile = browser && /Android|iPhone/i.test(navigator.userAgent);
-  const reducedMotion =
-    browser && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // Both of these were previously evaluated once at module scope: the touch
+  // test by sniffing the UA string (which reads iPad and touch laptops as
+  // desktop), and Reduce Motion by reading matchMedia a single time (so
+  // toggling it mid-session did nothing until reload). Now both track live.
+  const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";
+  const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+  let isTouch = browser && matchMedia(TOUCH_QUERY).matches;
+  let reducedMotion = browser && matchMedia(REDUCED_MOTION_QUERY).matches;
   let bobaDesktop = false;
+
+  // Transitions are a desktop-pointer nicety; on touch they compete with the
+  // platform's own back-swipe animation.
+  $: animatePages = PAGE_TRANSITIONS_ENABLED && !isTouch && !reducedMotion;
 
   // Konami easter egg: launches the persistent "boba mode" minigame.
   // (`bobaMode` lives in $lib/boba so the homepage boba can launch it too.)
@@ -39,6 +55,17 @@
     };
     syncBobaDesktop();
     bobaMedia.addEventListener("change", syncBobaDesktop);
+
+    // Input mode and Reduce Motion can both change while the page is open —
+    // a trackpad gets attached, or the setting is flipped in System Settings.
+    const touchMedia = window.matchMedia(TOUCH_QUERY);
+    const motionMedia = window.matchMedia(REDUCED_MOTION_QUERY);
+    const syncTouch = () => (isTouch = touchMedia.matches);
+    const syncMotion = () => (reducedMotion = motionMedia.matches);
+    syncTouch();
+    syncMotion();
+    touchMedia.addEventListener("change", syncTouch);
+    motionMedia.addEventListener("change", syncMotion);
 
     // Vercel Analytics + Speed Insights use buffered PerformanceObservers,
     // so deferring their injection still captures paint/LCP events that
@@ -101,6 +128,8 @@
     return () => {
       window.removeEventListener("keydown", onKey);
       bobaMedia.removeEventListener("change", syncBobaDesktop);
+      touchMedia.removeEventListener("change", syncTouch);
+      motionMedia.removeEventListener("change", syncMotion);
     };
   });
 </script>
@@ -122,23 +151,34 @@
 
   <Header />
 
-  {#if isMobile || reducedMotion}
-    <!-- Disable page transitions on mobile / reduced motion -->
-    <main id="main-content" class="flex-1">
-      <slot />
-    </main>
-  {:else}
-    {#key data.pathname}
-      <main
-        id="main-content"
-        class="flex-1"
-        in:fly={{ x: -10, duration: PAGE_TRANSITION_DURATION_MS, delay: 150 }}
-        out:fly={{ y: 5, duration: PAGE_TRANSITION_DURATION_MS }}
-      >
+  <!-- One stable <main> landmark holds the skip-link target; only the layer
+       inside it is keyed on the route. The two layers overlap in a single
+       grid cell while the transition runs, so the outgoing page can't stack
+       below the incoming one and double the page height mid-navigation. -->
+  <main id="main-content" class="page-stack flex-1">
+    {#if animatePages}
+      {#key data.pathname}
+        <div
+          class="page-layer"
+          in:fly={{
+            x: PAGE_TRANSITION_IN_X,
+            duration: PAGE_TRANSITION_DURATION_MS,
+            delay: PAGE_TRANSITION_IN_DELAY_MS,
+          }}
+          out:fly={{
+            y: PAGE_TRANSITION_OUT_Y,
+            duration: PAGE_TRANSITION_DURATION_MS,
+          }}
+        >
+          <slot />
+        </div>
+      {/key}
+    {:else}
+      <div class="page-layer">
         <slot />
-      </main>
-    {/key}
-  {/if}
+      </div>
+    {/if}
+  </main>
 
   <Footer />
 </div>
@@ -147,3 +187,19 @@
 {#if $bobaMode && bobaDesktop}
   <BobaGame on:close={() => bobaMode.set(false)} />
 {/if}
+
+<style>
+  /* Single-cell grid: during a route change both the outgoing and incoming
+     layers occupy the same cell rather than stacking in flow. */
+  .page-stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-layer {
+    grid-area: 1 / 1;
+    /* Let wide children (the bookshelf table) size their own scroll container
+       instead of forcing the grid track open. */
+    min-width: 0;
+  }
+</style>

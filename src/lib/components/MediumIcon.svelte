@@ -19,7 +19,7 @@
     export let className = "";
 
     $: normalized = (medium || "").toLowerCase();
-    $: iconClass = className || "text-ink-400 dark:text-ink-500";
+    $: iconClass = className || "text-ink-400 dark:text-ink-400";
 </script>
 
 {#if normalized === "book"}

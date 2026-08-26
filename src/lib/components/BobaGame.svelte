@@ -238,7 +238,9 @@
   let timeLeft = GAME_DURATION_SECONDS;
   let progressPercent = 0;
   let phase: GamePhase = "opening";
-  let tipVisible = true;
+  // Initialized after mount to avoid flashing first-run guidance for returning
+  // players before their cookie can be read.
+  let tipVisible = false;
   let missPulse = 0;
   let missFlash = false;
   let currentSong = "";
@@ -906,7 +908,9 @@
     timeLeft = GAME_DURATION_SECONDS;
     progressPercent = 0;
     phase = "opening";
-    tipVisible = true;
+    // A restart is still part of the same visit; first-run guidance should not
+    // return once the player has completed or abandoned their first run.
+    tipVisible = false;
     missPulse = 0;
     missFlash = false;
     gameOver = false;
@@ -932,6 +936,7 @@
   // --- High scores ---------------------------------------------------------
 
   const BEST_COOKIE = "boba_best_v2";
+  const INSTRUCTIONS_COOKIE = "boba_instructions_seen_v1";
 
   function readBest() {
     const match = document.cookie.match(/(?:^|;\s*)boba_best_v2=(\d+)/);
@@ -940,6 +945,16 @@
 
   function writeBest(value: number) {
     document.cookie = `${BEST_COOKIE}=${value}; path=/; max-age=31536000; samesite=lax`;
+  }
+
+  function hasSeenInstructions() {
+    return document.cookie
+      .split(";")
+      .some((part) => part.trim().startsWith(`${INSTRUCTIONS_COOKIE}=`));
+  }
+
+  function rememberInstructions() {
+    document.cookie = `${INSTRUCTIONS_COOKIE}=1; path=/; max-age=31536000; samesite=lax`;
   }
 
   async function fetchGlobal() {
@@ -1062,6 +1077,8 @@
     pointerX = window.innerWidth / 2;
     sizeCanvas();
     localBest = readBest();
+    tipVisible = !hasSeenInstructions();
+    if (tipVisible) rememberInstructions();
     muted = getMuted();
     onSongChange((name) => (currentSong = name));
     sfxCountdown(COUNTDOWN_SECONDS);
@@ -1193,7 +1210,7 @@
           {#if currentSong}
             <WavingFlag text={currentSong} />
           {:else}
-            <span class="boba-track-placeholder">NEXT TRACK</span>
+            <span class="boba-track-placeholder">next track</span>
           {/if}
         </span>
       </span>
@@ -1229,9 +1246,15 @@
     </div>
   </div>
 
-  <div class="boba-tip" class:boba-tip-hidden={!tipVisible}>
-    move your mouse to catch · center it for PERFECT · gold = +3 · P to pause · ESC to quit
-  </div>
+  {#if tipVisible}
+    <div class="boba-tip" role="note" aria-label="How to play">
+      <span class="boba-tip-label">how to play</span>
+      <span class="boba-tip-instruction"><strong>Move</strong> to catch</span>
+      <span class="boba-tip-instruction"><strong>Center</strong> for perfect</span>
+      <span class="boba-tip-instruction"><strong>Gold</strong> earns +3</span>
+      <span class="boba-tip-shortcuts"><kbd>P</kbd> pause <kbd>Esc</kbd> quit</span>
+    </div>
+  {/if}
 </header>
 
 {#if countdown > 0 || goVisible}
@@ -1250,13 +1273,11 @@
 {#if paused && !gameOver}
   <div class="boba-pause boba-ui" role="dialog" aria-modal="true" aria-labelledby="boba-pause-title">
     <div class="boba-pause-card" tabindex="-1">
-      <span class="boba-eyebrow">counter closed</span>
       <h2 id="boba-pause-title">PAUSED</h2>
-      <p>Your run is frozen. Nothing will fall while you’re away.</p>
       <button
         bind:this={resumeButton}
         type="button"
-        class="boba-btn"
+        class="boba-btn pause-action"
         on:click={resumeGame}
       >
         RESUME SHIFT
@@ -1282,7 +1303,7 @@
             {endReason === "time" ? "sixty seconds served" : "three drinks dropped"}
           </span>
           <h2 id="boba-over-title">
-            {endReason === "time" ? "SHIFT COMPLETE" : "GAME OVER"}
+            {endReason === "time" ? "shift complete" : "game over"}
           </h2>
         </div>
         {#if newBest}
@@ -1317,7 +1338,7 @@
 
       <div class="boba-results-lower">
         <div class="boba-board">
-          <div class="boba-board-head">GLOBAL TOP</div>
+          <div class="boba-board-head">global top</div>
           {#if globalLoading}
             <div class="boba-board-row muted">loading board…</div>
           {:else if !globalAvailable}
@@ -1345,7 +1366,7 @@
                 class="boba-name"
                 bind:value={playerName}
                 on:input={onNameInput}
-                placeholder="YOUR NAME"
+                placeholder="Your name"
                 maxlength={MAX_NAME}
                 spellcheck="false"
                 autocomplete="off"
@@ -1356,7 +1377,7 @@
                 class="boba-btn small"
                 disabled={submitting}
               >
-                {submitting ? "SAVING…" : "SUBMIT"}
+                {submitting ? "Saving…" : "Submit"}
               </button>
             </form>
             {#if nameError}
@@ -1377,8 +1398,8 @@
       </div>
 
       <div class="boba-over-actions">
-        <button type="button" class="boba-btn" on:click={restart}>PLAY AGAIN</button>
-        <button type="button" class="boba-btn ghost" on:click={exit}>EXIT</button>
+        <button type="button" class="boba-btn" on:click={restart}>Play again</button>
+        <button type="button" class="boba-btn ghost" on:click={exit}>Exit</button>
       </div>
     </div>
   </div>
@@ -1394,7 +1415,7 @@
   :global(a.boba-source),
   :global(a.boba-source-gold) {
     position: relative;
-    z-index: 9998;
+    z-index: calc(var(--layer-overlay) + 2);
     animation: boba-source-pulse 0.44s steps(2, end) infinite;
   }
 
@@ -1418,7 +1439,7 @@
   .boba-stage {
     position: fixed;
     inset: 0;
-    z-index: 9996;
+    z-index: var(--layer-overlay);
     cursor: none;
     background:
       radial-gradient(circle at 50% 88%, rgba(232, 93, 76, 0.09), transparent 34%),
@@ -1436,7 +1457,7 @@
   .boba-canvas {
     position: fixed;
     inset: 0;
-    z-index: 9997;
+    z-index: calc(var(--layer-overlay) + 1);
     pointer-events: none;
   }
 
@@ -1449,7 +1470,7 @@
   .boba-hud {
     position: fixed;
     inset: 0 0 auto;
-    z-index: 9999;
+    z-index: calc(var(--layer-overlay) + 3);
     pointer-events: none;
   }
 
@@ -1618,19 +1639,22 @@
   .boba-icon-btn {
     display: inline-grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     color: #1a1a1a;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 3px;
+    border-radius: var(--radius-control);
     cursor: pointer;
-    transition: color 0.16s ease, background 0.16s ease, transform 0.1s ease;
+    transition:
+      color var(--motion-base) var(--ease-standard),
+      background-color var(--motion-base) var(--ease-standard),
+      transform var(--motion-instant) var(--ease-standard);
   }
 
   .boba-icon-btn:hover {
-    color: #e85d4c;
+    color: #c9462f;
     background: rgba(232, 93, 76, 0.09);
   }
 
@@ -1641,37 +1665,75 @@
   .boba-icon-btn:focus-visible,
   .boba-btn:focus-visible,
   .boba-name:focus-visible,
+  .boba-pause-card:focus-visible,
   .boba-over-card:focus-visible {
-    outline: 3px solid #e85d4c;
-    outline-offset: 3px;
+    outline: 2px solid #c9462f;
+    outline-offset: 2px;
   }
 
   .boba-tip {
-    width: max-content;
-    max-width: calc(100vw - 32px);
-    margin: 10px auto 0;
-    padding: 5px 13px;
-    color: #fdf8f3;
-    background: #e85d4c;
-    border: 2px solid #1a1a1a;
-    border-radius: 3px;
-    box-shadow: 3px 3px 0 #1a1a1a;
-    font-size: 0.61rem;
-    font-weight: 700;
-    letter-spacing: 0.025em;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    max-width: calc(100vw - var(--space-8));
+    margin: var(--space-2-5) auto 0;
+    padding: var(--space-2) var(--space-2-5);
+    gap: var(--space-1) var(--space-3);
+    color: #515151;
+    background: #fffdfb;
+    border: 1px solid #c8c8c8;
+    border-radius: var(--radius-inline);
+    box-shadow: var(--shadow-popover);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.333;
     text-align: center;
-    transition: opacity 0.28s ease, transform 0.28s ease;
   }
 
-  .boba-tip.boba-tip-hidden {
-    opacity: 0;
-    transform: translateY(-7px);
+  .boba-tip-label {
+    color: #8a7d70;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 600;
+  }
+
+  .boba-tip-instruction,
+  .boba-tip-shortcuts {
+    white-space: nowrap;
+  }
+
+  .boba-tip-instruction strong {
+    color: #c9462f;
+    font-weight: 600;
+  }
+
+  .boba-tip-shortcuts {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: #666666;
+  }
+
+  .boba-tip kbd {
+    min-width: 20px;
+    padding: 1px 4px;
+    color: #1a1a1a;
+    background: #faf0e6;
+    border: 1px solid #c8c8c8;
+    border-radius: var(--radius-control);
+    box-shadow: 0 1px 0 #c8c8c8;
+    font: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.25;
   }
 
   .boba-countdown {
     position: fixed;
     inset: 0;
-    z-index: 9998;
+    z-index: calc(var(--layer-overlay) + 2);
     display: grid;
     place-content: center;
     justify-items: center;
@@ -1710,7 +1772,7 @@
   .boba-miss-flash {
     position: fixed;
     inset: auto 0 0;
-    z-index: 9998;
+    z-index: calc(var(--layer-overlay) + 2);
     height: 24vh;
     pointer-events: none;
     background: linear-gradient(transparent, rgba(201, 70, 47, 0.25));
@@ -1727,7 +1789,7 @@
   .boba-over {
     position: fixed;
     inset: 0;
-    z-index: 10000;
+    z-index: var(--layer-modal);
     display: grid;
     place-items: center;
     padding: 24px;
@@ -1746,21 +1808,12 @@
   }
 
   .boba-pause-card h2 {
-    margin: 4px 0 8px;
+    margin: 4px 0 20px;
     color: #e85d4c;
     font-family: var(--font-mono);
     font-size: 1.8rem;
     font-weight: 900;
     letter-spacing: 0.06em;
-  }
-
-  .boba-pause-card p {
-    margin: 0 auto 20px;
-    max-width: 30ch;
-    color: #665b52;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    line-height: 1.55;
   }
 
   .boba-eyebrow {
@@ -1971,20 +2024,20 @@
   .boba-name {
     min-width: 0;
     width: 100%;
-    padding: 8px 10px;
+    min-height: 40px;
+    padding: 0 var(--space-3);
     color: #1a1a1a;
-    background: #fff;
-    border: 2px solid #1a1a1a;
-    border-radius: 3px;
+    background: #fffdfb;
+    border: 1px solid #c8c8c8;
+    border-radius: var(--radius-control);
     font: inherit;
-    font-size: 0.69rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.333;
   }
 
   .boba-name::placeholder {
-    color: #b8a89a;
+    color: #666666;
   }
 
   .boba-name-err {
@@ -2004,43 +2057,74 @@
   .boba-over-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    margin-top: 28px;
+    gap: var(--space-3);
+    margin-top: var(--space-8);
   }
 
   .boba-btn {
+    min-height: 40px;
+    padding: var(--space-2) var(--space-4);
+    color: #fdf8f3;
+    background: #1a1a1a;
+    border: 1px solid #1a1a1a;
+    border-radius: var(--radius-control);
+    box-shadow: none;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+    transition:
+      color var(--motion-base) var(--ease-standard),
+      background-color var(--motion-base) var(--ease-standard),
+      border-color var(--motion-base) var(--ease-standard),
+      transform var(--motion-instant) var(--ease-standard);
+  }
+
+  .boba-btn.ghost {
+    color: #1a1a1a;
+    background: transparent;
+    border-color: #666666;
+  }
+
+  .boba-btn.pause-action {
     padding: 9px 15px;
     color: #fdf8f3;
     background: #e85d4c;
     border: 2px solid #1a1a1a;
     border-radius: 3px;
     box-shadow: 3px 3px 0 #1a1a1a;
-    cursor: pointer;
-    font: inherit;
     font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.045em;
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
-  }
-
-  .boba-btn.ghost {
-    color: #1a1a1a;
-    background: #fdf8f3;
   }
 
   .boba-btn.small {
-    padding: 8px 10px;
-    font-size: 0.63rem;
+    min-height: 32px;
+    padding: var(--space-2) var(--space-3);
   }
 
   .boba-btn:hover {
-    transform: translate(-1px, -1px);
+    background: #434343;
+  }
+
+  .boba-btn.ghost:hover {
+    background: #faf0e6;
+  }
+
+  .boba-btn.pause-action:hover {
+    background: #e85d4c;
     box-shadow: 4px 4px 0 #1a1a1a;
+    transform: translate(-1px, -1px);
+  }
+
+  .boba-btn.pause-action:active {
+    box-shadow: 1px 1px 0 #1a1a1a;
+    transform: translate(2px, 2px);
   }
 
   .boba-btn:active {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 #1a1a1a;
+    transform: translateY(1px);
   }
 
   .boba-btn:disabled {
@@ -2069,6 +2153,41 @@
     color: #fdf8f3;
   }
 
+  :global(.dark) .boba-icon-btn:hover {
+    color: #f07563;
+  }
+
+  :global(.dark) .boba-icon-btn:focus-visible,
+  :global(.dark) .boba-btn:focus-visible,
+  :global(.dark) .boba-name:focus-visible,
+  :global(.dark) .boba-pause-card:focus-visible,
+  :global(.dark) .boba-over-card:focus-visible {
+    outline-color: #f07563;
+  }
+
+  :global(.dark) .boba-tip {
+    color: #e8d5c4;
+    background: #383838;
+    border-color: #434343;
+    box-shadow: var(--shadow-popover-dark);
+  }
+
+  :global(.dark) .boba-tip-label,
+  :global(.dark) .boba-tip-shortcuts {
+    color: #b8a89a;
+  }
+
+  :global(.dark) .boba-tip-instruction strong {
+    color: #f07563;
+  }
+
+  :global(.dark) .boba-tip kbd {
+    color: #fdf8f3;
+    background: #2a2422;
+    border-color: #666666;
+    box-shadow: 0 1px 0 #666666;
+  }
+
   :global(.dark) .boba-countdown {
     color: #fdf8f3;
     text-shadow:
@@ -2076,8 +2195,7 @@
       -2px -2px 0 #1a1a1a;
   }
 
-  :global(.dark) .boba-over-card,
-  :global(.dark) .boba-pause-card {
+  :global(.dark) .boba-over-card {
     color: #fdf8f3;
     background:
       radial-gradient(rgba(253, 248, 243, 0.028) 0.8px, transparent 0.9px),
@@ -2086,7 +2204,17 @@
     box-shadow: 10px 10px 0 #f07563;
   }
 
-  :global(.dark) .boba-pause-card p,
+  :global(.dark) .boba-pause-card {
+    color: #fdf8f3;
+    background: #2a2422;
+    border-color: #fdf8f3;
+    box-shadow: 8px 8px 0 #f07563;
+  }
+
+  :global(.dark) .boba-pause-card h2 {
+    color: #f07563;
+  }
+
   :global(.dark) .boba-final strong,
   :global(.dark) .boba-run-stats dd {
     color: #fdf8f3;
@@ -2102,26 +2230,44 @@
   }
 
   :global(.dark) .boba-name {
-    color: #fdf8f3;
-    background: #1a1a1a;
-    border-color: #fdf8f3;
+    color: #faf0e6;
+    background: #383838;
+    border-color: #434343;
   }
 
   :global(.dark) .boba-btn {
+    color: #1a1a1a;
+    background: #fdf8f3;
     border-color: #fdf8f3;
-    box-shadow: 3px 3px 0 #fdf8f3;
   }
 
   :global(.dark) .boba-btn.ghost {
     color: #fdf8f3;
-    background: #1a1a1a;
+    background: transparent;
+    border-color: #e8d5c4;
+  }
+
+  :global(.dark) .boba-btn.pause-action {
+    color: #fdf8f3;
+    background: #e85d4c;
+    border-color: #fdf8f3;
+    box-shadow: 3px 3px 0 #fdf8f3;
   }
 
   :global(.dark) .boba-btn:hover {
+    background: #faf0e6;
+  }
+
+  :global(.dark) .boba-btn.ghost:hover {
+    background: #383838;
+  }
+
+  :global(.dark) .boba-btn.pause-action:hover {
+    background: #e85d4c;
     box-shadow: 4px 4px 0 #fdf8f3;
   }
 
-  :global(.dark) .boba-btn:active {
+  :global(.dark) .boba-btn.pause-action:active {
     box-shadow: 1px 1px 0 #fdf8f3;
   }
 

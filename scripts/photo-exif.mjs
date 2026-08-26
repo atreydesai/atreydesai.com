@@ -22,7 +22,55 @@ import ExifReader from 'exifreader';
  * @property {"landscape" | "portrait" | "square"} orientation
  * @property {number} [width]
  * @property {number} [height]
+ * @property {string} [caption] human-written title from IPTC/XMP, if present
  */
+
+// IPTC "Object Name" (Lightroom's Title field), XMP dc:title, and the legacy
+// EXIF ImageDescription all carry a human-written name for the photo. Any of
+// them is worth showing; the filename never is.
+const CAPTION_TAGS = [
+    'Object Name',
+    'ObjectName',
+    'title',
+    'Headline',
+    'headline',
+    'Caption/Abstract',
+    'description',
+    'ImageDescription',
+];
+
+/**
+ * @param {Record<string, any>} tags
+ * @returns {string | undefined}
+ */
+function readCaption(tags) {
+    for (const key of CAPTION_TAGS) {
+        const raw = tags[key]?.description ?? tags[key]?.value;
+        const text = typeof raw === 'string' ? raw.trim() : '';
+        // Skip generic camera/software strings that aren't real captions.
+        if (text && !/^(OLYMPUS|SONY|DSC|IMG|untitled)/i.test(text)) return text;
+    }
+    return undefined;
+}
+
+/**
+ * Round a focal length to a whole millimetre. iPhone EXIF stores these as
+ * floats, so `6.764999866485596 mm` reaches the UI verbatim without this.
+ *
+ * @param {unknown} raw
+ * @returns {string | undefined}
+ */
+function formatFocalLength(raw) {
+    const text = String(raw ?? '').trim();
+    if (!text) return undefined;
+    const match = text.match(/-?\d+(?:\.\d+)?/);
+    if (!match) return text;
+    const mm = Number(match[0]);
+    if (!Number.isFinite(mm)) return text;
+    // Sub-10mm lenses keep one decimal ("6.8 mm"); longer ones round to whole.
+    const rounded = mm < 10 ? Math.round(mm * 10) / 10 : Math.round(mm);
+    return `${rounded} mm`;
+}
 
 /**
  * Extract camera EXIF fields, orientation, and pixel dimensions from an
@@ -41,9 +89,13 @@ export function extractPhotoMeta(fileBuffer, filename) {
     let width;
     /** @type {number | undefined} */
     let height;
+    /** @type {string | undefined} */
+    let caption;
 
     try {
         const tags = ExifReader.load(fileBuffer);
+
+        caption = readCaption(tags);
 
         // Extract camera info
         const make = tags.Make?.description || '';
@@ -75,9 +127,9 @@ export function extractPhotoMeta(fileBuffer, filename) {
             exif.iso = `ISO ${tags.PhotographicSensitivity.description}`;
         }
 
-        // Extract focal length
+        // Extract focal length (rounded — raw EXIF floats are unreadable)
         if (tags.FocalLength?.description) {
-            exif.focalLength = tags.FocalLength.description;
+            exif.focalLength = formatFocalLength(tags.FocalLength.description);
         }
 
         // Extract date
@@ -121,5 +173,5 @@ export function extractPhotoMeta(fileBuffer, filename) {
         console.warn(`Could not read EXIF from ${filename}:`, exifError);
     }
 
-    return { exif, orientation, width, height };
+    return { exif, orientation, width, height, caption };
 }

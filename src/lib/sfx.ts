@@ -29,6 +29,7 @@ interface Song {
   name: string;
   bpm: number;
   wave: OscillatorType;
+  leadTranspose?: number;
   root: number;
   scale: number[];
   lead: NoteSeq;
@@ -262,6 +263,7 @@ function scheduleSequenceWindow(
   secondsPerBeat: number,
   wave: OscillatorType,
   volume: number,
+  transpose = 0,
 ) {
   if (!musicBus) return;
   let beat = 0;
@@ -269,7 +271,7 @@ function scheduleSequenceWindow(
     if (beat >= windowStartBeat && beat < windowEndBeat && midi > 0) {
       const localBeat = beat - windowStartBeat;
       note(
-        midiFrequency(midi),
+        midiFrequency(midi + transpose),
         barStart + localBeat * secondsPerBeat,
         Math.max(0.045, beats * secondsPerBeat * 0.88),
         wave,
@@ -315,6 +317,7 @@ function scheduleBar(song: Song, index: number, start: number) {
     secondsPerBeat,
     song.wave,
     musicPhase === "rush" ? 0.19 : 0.175,
+    song.leadTranspose,
   );
   scheduleSequenceWindow(
     song.bass,
@@ -644,7 +647,9 @@ const SONGS: Song[] = [
   {
     name: "HEYYYYYTEA",
     bpm: 144,
-    wave: "square",
+    // Lower and soften the opening melody so a run does not start piercingly.
+    wave: "triangle",
+    leadTranspose: -12,
     root: 60,
     scale: [0, 2, 4, 7, 9],
     lead: [

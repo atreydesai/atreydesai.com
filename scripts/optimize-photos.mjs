@@ -17,6 +17,12 @@ const GENERATED_DIR = 'src/lib/generated';
 // build regenerates the production-safe photo manifest.
 const META_PATH = join(THUMBS_DIR, 'photo-meta.json');
 const MANIFEST_PATH = join(GENERATED_DIR, 'photo-manifest.json');
+// Hand-written captions, keyed by filename. Photos with no IPTC/XMP title and
+// no entry here stay untitled rather than falling back to their filename.
+const CAPTIONS_PATH = 'scripts/photo-captions.json';
+// Bump when extractPhotoMeta's output shape changes so the mtime-keyed cache
+// re-extracts instead of serving stale fields.
+const META_VERSION = 2;
 
 // Thumbnail settings
 const THUMB_WIDTH = 800;  // Default grid thumbnail width (keeps the bare name)
@@ -138,9 +144,22 @@ async function extractMetadata() {
     /** @type {Record<string, import('./photo-exif.mjs').PhotoMeta & { mtimeMs: number }>} */
     let cache = {};
     try {
-        cache = JSON.parse(await readFile(META_PATH, 'utf-8'));
+        const raw = JSON.parse(await readFile(META_PATH, 'utf-8'));
+        if (raw.__version === META_VERSION) cache = raw.photos ?? {};
     } catch {
         // no cache yet — extract everything
+    }
+
+    /** @type {Record<string, string>} */
+    let captionOverrides = {};
+    try {
+        const raw = JSON.parse(await readFile(CAPTIONS_PATH, 'utf-8'));
+        // Keys starting with `_` are notes (e.g. `_readme`), not captions.
+        captionOverrides = Object.fromEntries(
+            Object.entries(raw).filter(([key]) => !key.startsWith('_')),
+        );
+    } catch {
+        // no overrides file — captions come from embedded metadata only
     }
 
     /** @type {typeof cache} */
@@ -159,7 +178,7 @@ async function extractMetadata() {
         extracted++;
     }
 
-    await writeFile(META_PATH, JSON.stringify(meta));
+    await writeFile(META_PATH, JSON.stringify({ __version: META_VERSION, photos: meta }));
     console.log(`   ✅ Extracted: ${extracted}   ⏭️  Cached: ${imageFiles.length - extracted}`);
 
     // Vercel serves files from static/, but they are not available for a
@@ -168,10 +187,11 @@ async function extractMetadata() {
     // access.
     const photos = imageFiles.map((filename) => {
         const { name } = parse(filename);
-        const { mtimeMs: _mtimeMs, ...photoMeta } = meta[filename];
-        const alt = name
-            .replace(/[-_]/g, ' ')
-            .replace(/\b\w/g, (character) => character.toUpperCase());
+        const { mtimeMs: _mtimeMs, caption: embedded, ...photoMeta } = meta[filename];
+        // Precedence: hand-written override > embedded IPTC/XMP title > none.
+        // A missing caption means the photo is presentational: it gets an empty
+        // alt and no visible title, rather than a filename dressed up as one.
+        const caption = (captionOverrides[filename] ?? embedded ?? '').trim();
 
         return {
             src: `/images/photography/${filename}`,
@@ -181,7 +201,8 @@ async function extractMetadata() {
                 `/images/photography/thumbs/${name}.webp 800w`,
                 `/images/photography/thumbs/${name}-1200.webp 1200w`,
             ].join(', '),
-            alt,
+            caption: caption || undefined,
+            alt: caption,
             filename,
             ...photoMeta,
         };

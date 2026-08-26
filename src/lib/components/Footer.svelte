@@ -117,13 +117,13 @@
       class="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-y-4"
     >
       <!-- Left side - DC Time -->
-      <div class="space-y-1 text-center font-mono text-xs lowercase text-ink-500 dark:text-ink-400 sm:text-left">
+      <div class="space-y-1 text-center font-mono text-xs lowercase text-ink-500 dark:text-cream-500 sm:text-left">
         <div class="tabular-nums">{dcTime.toLowerCase()}</div>
         <div>washington, dc</div>
       </div>
 
       <!-- Right side - Last updated + Music player -->
-      <div class="flex flex-col items-center space-y-1 font-mono text-xs lowercase text-ink-500 dark:text-ink-400 sm:items-end">
+      <div class="flex flex-col items-center space-y-1 font-mono text-xs lowercase text-ink-500 dark:text-cream-500 sm:items-end">
         <div>
           updated {buildDate}
         </div>

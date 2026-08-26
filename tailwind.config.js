@@ -47,7 +47,10 @@ export default {
         // Bright orange — primary accent (keep)
         accent: {
           DEFAULT: "#E85D4C",
-          light: "#F07563",
+          // Lightened from #F07563, which was 6.16:1 on the ink-900 page but
+          // only 4.15:1 on raised dark surfaces (dropdowns, the sheet), where
+          // it carries the selected/active state. Dark theme only.
+          light: "#F18272",
           dark: "#C9462F",
           muted: "#D4847A",
         },
@@ -64,7 +67,10 @@ export default {
         },
         wine: {
           DEFAULT: "#8A3251",
-          light: "#B96481",
+          // Lightened from #B96481, which was only 4.31:1 on ink-900 and
+          // 3.46:1 on the neutral pill fill. The -light shades are dark-theme
+          // only, so this doesn't touch any light-theme surface.
+          light: "#C68098",
           dark: "#5E1F37",
         },
         steel: {
@@ -74,7 +80,8 @@ export default {
         },
         plum: {
           DEFAULT: "#6F4476",
-          light: "#A07CA8",
+          // Lightened from #A07CA8 (3.96:1 on the neutral pill fill).
+          light: "#AA89B1",
           dark: "#4A2A50",
         },
         // Purple-gray for code blocks & secondary surfaces (future use)
@@ -95,6 +102,16 @@ export default {
         display: ["var(--font-display)"],
         serif: ["var(--font-prose)"],
         mono: ["var(--font-mono)"],
+      },
+      // Tailwind's stock `ring-*`/`ring-offset-*` default to blue-500 and
+      // white. Nothing in the design system should use a ring — focus is a
+      // single `:focus-visible` outline in app.css — but if a stray `ring-2`
+      // ever appears, it lands on palette colours instead of off-brand blue.
+      ringColor: {
+        DEFAULT: "#C9462F",
+      },
+      ringOffsetColor: {
+        DEFAULT: "#FDF8F3",
       },
       screens: {
         xs: "375px",

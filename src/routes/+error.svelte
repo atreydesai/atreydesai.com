@@ -16,7 +16,7 @@
 
 <div class="page-shell page-shell-standard py-16 text-center md:py-24">
   <div class="space-y-6">
-    <h1 class="type-hero-title text-ink-300 dark:text-ink-600">
+    <h1 class="type-hero-title text-ink-300 dark:text-ink-400">
       404
     </h1>
 
@@ -67,7 +67,7 @@
   </div>
 
   <!-- Fun decorative element -->
-  <div class="mt-16 text-ink-200 dark:text-ink-700 text-sm">
+  <div class="mt-16 text-ink-200 dark:text-cream-500 text-sm">
     <p>
       If you think this is an error, feel free to
       <a href="mailto:adesai10@umd.edu" class="link">reach out</a>.
