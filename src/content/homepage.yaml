@@ -20,7 +20,7 @@ researchInterests:
   items:
     - title: "Calibrate"
       summary: "Calibrate model confidence under incomplete, uncertain, and excessive information."
-      question: "How do we improve how models form and update calibrated beliefs about the world and about their partners under uncertainty (insufficient information, excessive information, and long-tail settings). How can we build better harnesses and systems to act on calibrated trust in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
+      question: "How do we improve how models form and update calibrated beliefs about the world and about their partners under uncertainty (insufficient information, excessive information, and long-tail settings)?"
       citations:
         - label: "ttr"
           url: "/research/#test-time-reasoners"
@@ -30,7 +30,7 @@ researchInterests:
           url: null
     - title: "Act"
       summary: "Build systems for open-ended work without clear ground truth."
-      question: "How should agents use calibrated uncertainty to act in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth. How do agents interact with humans and other agents in these environments (collaborative writing, intelligence analysis)?"
+      question: "How should agents use calibrated uncertainty to act in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
       citations:
         - label: "benchmarker"
           url: "/research/#benchmarker"
