@@ -16,11 +16,11 @@ banner:
     - "👀"
 
 researchInterests:
-  intro: "Language models are increasingly deployed as agents in open-ended, real-world environments; however, our ability to know when to trust these systems has not kept pace. I study how to make AI systems trustworthy, robust, and useful in practice, namely:"
+  intro: "Language models are increasingly deployed as agents in open-ended, real-world environments; however, our ability to know when to trust these systems has not kept pace. I study how humans and AI systems can build calibrated trust in the world and in each other, namely:"
   items:
     - title: "Calibrate"
       summary: "Calibrate model confidence under incomplete, uncertain, and excessive information."
-      question: "How do we improve the confidence calibration of models reasoning under uncertainty (insufficient information, excessive information, and long-tail settings) and updating on new information?"
+      question: "How do we improve how models form and update calibrated beliefs about the world and about their partners under uncertainty (insufficient information, excessive information, and long-tail settings). How can we build better harnesses and systems to act on calibrated trust in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
       citations:
         - label: "ttr"
           url: "/research/#test-time-reasoners"
@@ -30,7 +30,7 @@ researchInterests:
           url: null
     - title: "Act"
       summary: "Build systems for open-ended work without clear ground truth."
-      question: "How can we build better harnesses and systems to act on calibrated trust in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
+      question: "How should agents use calibrated uncertainty to act in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth. How do agents interact with humans and other agents in these environments (collaborative writing, intelligence analysis)?"
       citations:
         - label: "benchmarker"
           url: "/research/#benchmarker"
@@ -44,7 +44,7 @@ researchInterests:
           url: null
     - title: "Coordinate"
       summary: "Study how people rely on and adopt agents in open-ended settings."
-      question: "How do agents interact with humans and other agents in these environments (collaborative writing, intelligence analysis)?"
+      question: "How do humans and agents form accurate expectations of one another and adapt to each other over repeated interaction (collaborative writing, human-AI teams, multi-agent systems)?"
       citations:
         - label: "quick"
           url: "/research/#llm-distractors"
