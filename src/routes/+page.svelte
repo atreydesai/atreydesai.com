@@ -156,11 +156,8 @@
           {/each}
         </div>
 
-        <div class="mt-4 flex items-center text-sm">
-          {#each socialLinks as link, i}
-            {#if i > 0}
-              <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
-            {/if}
+        <div class="mt-4 flex flex-wrap items-center gap-x-4 text-sm">
+          {#each socialLinks as link}
             <a
               href={link.href}
               target="_blank"
@@ -172,7 +169,6 @@
             </a>
           {/each}
 
-          <span class="mx-2 text-ink-700 dark:text-cream-300" aria-hidden="true">·</span>
           <div class="relative inline-flex">
             <button
               type="button"
@@ -198,7 +194,7 @@
 
       <div class="md:col-start-2">
         <div class="relative w-full max-w-[250px] mx-auto md:mx-0">
-          <div class="aspect-square w-full rounded-lg overflow-hidden">
+          <div class="aspect-square w-full overflow-hidden">
             <LegoImage
               src="/images/profile.webp"
               alt="Atrey Desai"
@@ -363,7 +359,17 @@
                   >
                     <div class="interest-copy-inner">
                       <p class="mt-0.5 text-sm leading-snug text-ink-500 dark:text-cream-400">
-                        {item.summary}
+                        <button
+                          type="button"
+                          class="research-interest-summary"
+                          tabindex={researchExpanded ? -1 : 0}
+                          aria-expanded={researchExpanded}
+                          aria-controls="research-interest-list"
+                          aria-label="Show full details for all research interests"
+                          on:click={toggleResearchDetails}
+                        >
+                          {item.summary}
+                        </button>
                       </p>
                     </div>
                   </div>
@@ -375,7 +381,16 @@
                   >
                     <div class="interest-copy-inner">
                       <p class="mt-0.5 text-sm leading-relaxed text-ink-600 dark:text-cream-300">
-                        {@html parseInterestText(item.question)}
+                        <button
+                          type="button"
+                          class="research-interest-summary"
+                          aria-expanded={researchExpanded}
+                          aria-controls="research-interest-list"
+                          aria-label="Show concise summaries for all research interests"
+                          on:click={toggleResearchDetails}
+                        >
+                          {@html parseInterestText(item.question)}
+                        </button>
                       </p>
                       {#if item.citations.length > 0}
                         <div class="mt-1.5 flex flex-wrap gap-1.5 font-mono text-xs leading-none text-ink-400 dark:text-cream-500">
@@ -476,6 +491,12 @@
     font: inherit;
     cursor: pointer;
     transition: color var(--motion-base) var(--ease-standard);
+  }
+  .research-interest-summary {
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
   .research-interest-index {
     align-self: baseline;
