@@ -1,5 +1,6 @@
 <script lang="ts">
     import Seo from "$lib/components/Seo.svelte";
+    import FruitStudies from "$lib/components/FruitStudies.svelte";
     import ShaderCanvas from "$lib/components/ShaderCanvas.svelte";
     import { formatLongDate } from "$lib/utils/date";
     import { marked } from "marked";
@@ -12,15 +13,15 @@
     $: prevPost = data.prevPost;
     $: nextPost = data.nextPost;
 
-    // Split content on [[shader:variant]] markers so we can interleave live
-    // shader canvases between rendered markdown segments.
+    // Interleave interactive artwork and images with rendered Markdown.
     type Segment =
         | { type: "html"; content: string }
         | { type: "shader"; variant: "mound" | "nebula" }
+        | { type: "fruits" }
         | { type: "image"; src: string; caption: string };
 
     function parseSegments(src: string): Segment[] {
-        const re = /\[\[shader:(mound|nebula)\]\]|\[\[image:([^\]|]+)\|([^\]]+)\]\]/g;
+        const re = /\[\[fruits\]\]|\[\[shader:(mound|nebula)\]\]|\[\[image:([^\]|]+)\|([^\]]+)\]\]/g;
         const out: Segment[] = [];
         let last = 0;
         let match: RegExpExecArray | null;
@@ -28,7 +29,9 @@
             if (match.index > last) {
                 out.push({ type: "html", content: marked(src.slice(last, match.index)) as string });
             }
-            if (match[1]) {
+            if (match[0] === "[[fruits]]") {
+                out.push({ type: "fruits" });
+            } else if (match[1]) {
                 out.push({ type: "shader", variant: match[1] as "mound" | "nebula" });
             } else {
                 out.push({ type: "image", src: match[2], caption: match[3] });
@@ -55,6 +58,7 @@
     description={post.excerpt}
     url="https://atreydesai.com/blog/{post.id}/"
     type="article"
+    noindex={post.unlisted === true || post.published === false}
 />
 
 <div class="page-shell page-shell-standard">
@@ -66,6 +70,10 @@
         <ArrowLeft size={14} />
         Back to blog
     </a>
+
+    {#if post.published === false}
+        <span class="pill mb-4">Draft</span>
+    {/if}
 
     <!-- Post header -->
     <header class="page-header page-header-meta">
@@ -98,6 +106,8 @@
                 {@html seg.content}
             {:else if seg.type === "shader"}
                 <ShaderCanvas variant={seg.variant} />
+            {:else if seg.type === "fruits"}
+                <FruitStudies />
             {:else}
                 <figure class="blog-figure">
                     <img src={seg.src} alt={seg.caption} />

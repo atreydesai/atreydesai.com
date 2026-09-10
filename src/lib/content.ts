@@ -1,3 +1,5 @@
+import { dev } from '$app/environment';
+
 // Content loader utilities for markdown and YAML files
 
 // Type definitions
@@ -75,6 +77,7 @@ export interface Post {
     tags: string[];
     excerpt: string;
     published: boolean;
+    unlisted?: boolean;
     content: string;
     externalUrl?: string;
     externalSite?: string;
@@ -107,6 +110,7 @@ export interface HomepageData {
         twitter: string;
         scholar: string;
         email: string;
+        feedback: string;
     };
 }
 
@@ -187,7 +191,7 @@ export const books: Book[] = Object.entries(bookModules).map(([path, mod]) => {
 
 // Import all post markdown files
 const postModules = import.meta.glob<Post>('/src/content/posts/*.md', { eager: true });
-export const posts: Post[] = Object.entries(postModules)
+const publishedPosts: Post[] = Object.entries(postModules)
     .map(([path, mod]) => {
         validateFrontmatter(path, mod, {
             id: 'string', title: 'string', date: 'string', excerpt: 'string', tags: 'array',
@@ -196,6 +200,15 @@ export const posts: Post[] = Object.entries(postModules)
     })
     .filter((p) => p.published !== false)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+// Public discovery surfaces share this list; unlisted posts retain direct access.
+export const posts: Post[] = publishedPosts.filter((post) => !post.unlisted);
+export const unlistedPosts: Post[] = publishedPosts.filter((post) => post.unlisted);
+
+// Drafts are available by direct URL in development, never in published listings.
+export const draftPosts: Post[] = dev
+    ? Object.values(postModules).filter((p) => p.published === false)
+    : [];
 
 // Import YAML files
 import talksYaml from '../content/talks.yaml';

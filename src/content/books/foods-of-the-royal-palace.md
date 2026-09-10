@@ -1,0 +1,14 @@
+---
+id: "foods-of-the-royal-palace"
+title: "Foods of the Royal Palace"
+author: "Michael J. Pettid"
+category: "nonfiction"
+dateAdded: "2026-09-10T12:00:00-04:00"
+favorite: false
+medium: "chapter"
+url: "https://www.amazon.com/dp/B01HD7I9SM"
+tags: ["korea", "food", "history"]
+status: "done"
+notes: "Chapter 5, “Foods of the Royal Palace,” in Korean Cuisine: An Illustrated History (2008).\n\n**On “Liquor plentiful as a river and meats piled up as a levee”** — what a nice phrase\n\n**On “For example, attached to the Board of Personnel (Ijo) were positions charged with the procurement of rice and the preparation of meals for the royal family; the Board of Rites (Yejo) had positions responsible for the preparation of foods for ancestor rites, for providing wines and other beverages to the court, and with medicinal foods.”** — It’s very interesting that specific foods had people assigned to them for procurement and whatnot. Would have expected higher level positions like a person in charge for breakfast, lunch, etc.\n\n**On “Each of the governors of the eight provinces had to arrange for specific goods from their region to be sent to the palace each month of the year.6 Consequently, the cooks of the palace had a wide array of seasonal and regional foods to work with on a regular basis.”** — What were the methods used to transport such goods during this time?\n\n**On “Sura is a special word for 'meal' and was only used for the royals.”** — An interesting linguistic phenomenon that maybe how’s how important and/or different royal food was versus that of commoners.\n\n**On “In the winter food was served in silver dishes and in the summer wooden dishes.”** — Why?"
+quotes: ["Liquor plentiful as a river and meats piled up as a levee", "As Chosŏn had legal measures prohibiting marriage among those with the same surname and clan seat, members of the royal family necessarily married outside of the royal family and with members of the yangban status group.", "For example, attached to the Board of Personnel (Ijo) were positions charged with the procurement of rice and the preparation of meals for the royal family; the Board of Rites (Yejo) had positions responsible for the preparation of foods for ancestor rites, for providing wines and other beverages to the court, and with medicinal foods.", "This apprenticeship could last from seven to ten or more years.", "Each of the governors of the eight provinces had to arrange for specific goods from their region to be sent to the palace each month of the year.6 Consequently, the cooks of the palace had a wide array of seasonal and regional foods to work with on a regular basis.", "Sura is a special word for 'meal' and was only used for the royals.", "In the winter food was served in silver dishes and in the summer wooden dishes."]
+---

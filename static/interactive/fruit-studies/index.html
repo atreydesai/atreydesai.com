@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4f0">
+  <title>making fruit — interactive paintings</title>
+  <style>
+:root {
+  color-scheme: light;
+  --font-prose: Optima, Candara, "URW Classico", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --radius-control: .125rem;
+  --radius-media: .5rem;
+  --motion-fast: 150ms;
+  --focus-ring: #c9462f;
+  --paper: #FDF8F3;
+  --ink: #434343;
+  --strong: #1A1A1A;
+  --secondary: #666666;
+  --line: #C8C8C8;
+  --control: #666666;
+  --hover: #FFF0EB;
+  --selected: #FFE4DB;
+  --accent: #C9462F;
+}
+.dark {
+  color-scheme: dark;
+  --paper: #1A1A1A;
+  --ink: #FAF0E6;
+  --strong: #FDF8F3;
+  --secondary: #E8D5C4;
+  --line: #434343;
+  --control: #E8D5C4;
+  --hover: #383838;
+  --selected: #515151;
+  --accent: #F18272;
+  --focus-ring: #F18272;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: transparent; color: var(--ink); font: 400 1.0625rem/1.55 var(--font-prose); }
+main { margin: auto; padding: 0 0 .5rem; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { color: var(--strong); }
+.collection { display: grid; grid-template-columns: minmax(0,1.8fr) minmax(20rem,1fr); gap: 1.5rem; align-items: start; }
+/* The painting is an illustration: its pigment colors and ground are intentional art colors. */
+.stage { position: relative; background: #e8edde; border-radius: var(--radius-media); overflow: hidden; }
+.stage-heading { position: absolute; left: 1.5rem; right: 1.5rem; top: 1rem; display: flex; justify-content: space-between; gap: .75rem; align-items: baseline; pointer-events: none; color: #3e4837; }
+h2 { font: italic 400 1.2rem/1.4 var(--font-prose); letter-spacing: 0; text-transform: lowercase; margin: 0; }
+.index, .caption, .attribution { font: 400 .75rem/1.333 var(--font-mono); letter-spacing: 0; }
+.index, .count { font-variant-numeric: tabular-nums; }
+#fruit { display: block; width: 100%; height: 27rem; touch-action: none; cursor: crosshair; }
+.caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; margin: .75rem 0 0; color: var(--secondary); }
+.fruit-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .5rem; }
+button, select { font: 500 .95rem/1.4 var(--font-mono); color: var(--ink); }
+.fruit-choice { display: flex; flex-direction: column; align-items: stretch; cursor: pointer; border: 1px solid transparent; border-radius: var(--radius-control); background: transparent; padding: .25rem .25rem .5rem; min-width: 0; }
+.fruit-choice:hover, .action:hover { background: var(--hover); border-color: var(--control); }
+.fruit-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--selected); }
+.fruit-choice canvas { display: block; width: 100%; height: 7rem; pointer-events: none; }
+.fruit-choice span { font: inherit; overflow-wrap: anywhere; }
+.controls { display: flex; align-items: end; gap: .75rem; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 1rem; margin-top: 1.5rem; }
+label { display: flex; flex-direction: column; gap: .5rem; font: 400 .75rem/1.333 var(--font-mono); }
+select, .action { min-height: 2.5rem; padding: .5rem .75rem; border: 1px solid var(--line); border-radius: var(--radius-control); background: transparent; }
+select { min-width: 9.5rem; }
+select:hover { border-color: var(--control); }
+select option { background: var(--paper); color: var(--ink); }
+.action { padding-inline: 1rem; cursor: pointer; }
+.action[aria-pressed="true"] { background: var(--strong); color: var(--paper); }
+button:active { border-color: var(--accent); }
+button:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
+.grain { min-width: 10rem; flex: 1; max-width: 20rem; }
+.grain-label { display: flex; justify-content: space-between; gap: .75rem; }
+input[type="range"] { accent-color: var(--accent); width: 100%; height: 2.5rem; margin: 0; cursor: pointer; }
+.actions { display: flex; gap: .5rem; }
+.attribution { display: block; margin-top: 1rem; }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+#fruit:focus-visible { outline-offset: -4px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+@media(max-width:53.125rem) {
+  .collection { grid-template-columns: 1fr; gap: 1.5rem; }
+  .fruit-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .fruit-choice canvas { height: 5.75rem; }
+  #fruit { height: 25rem; }
+}
+@media(max-width:33.75rem) {
+  .fruit-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .fruit-choice canvas { height: 5.5rem; }
+  #fruit { height: 20.5rem; }
+  .stage-heading { left: 1rem; right: 1rem; }
+  .grain { min-width: 8.75rem; }
+  .actions { width: 100%; }
+  .actions button { flex: 1; }
+}
+@media(prefers-reduced-motion:no-preference) {
+  button, select { transition: background-color var(--motion-fast) ease, border-color var(--motion-fast) ease, color var(--motion-fast) ease; }
+}
+  </style>
+</head>
+<body>
+<main>
+  <div class="collection">
+    <section aria-labelledby="fruit-name">
+      <div class="stage">
+        <div class="stage-heading"><h2 id="fruit-name">Persimmon</h2><span class="index" id="fruit-index">01 / 09</span></div>
+        <canvas id="fruit" role="img" aria-label="Interactive pointillist persimmon" aria-describedby="instructions">An interactive fruit painted with thousands of individual pigment marks. Canvas 2D is required.</canvas>
+      </div>
+      <p class="caption"><span id="instructions">Move to light. Drag to ripple.</span><span class="count" id="mark-count"></span></p>
+    </section>
+    <nav class="fruit-grid" id="fruit-grid" aria-label="Choose a fruit"></nav>
+  </div>
+  <div class="controls" aria-label="Painting controls">
+    <label for="light">Light<select id="light"><option value="daylight">Daylight</option><option value="golden">Golden hour</option><option value="dusk">Dusk</option></select></label>
+    <label class="grain" for="grain"><span class="grain-label">Pigment size <output id="grain-value" for="grain">1.00×</output></span><input id="grain" type="range" min="0.65" max="1.6" step="0.05" value="1"></label>
+    <div class="actions"><button class="action" id="scatter" type="button" aria-pressed="false">Scatter</button><button class="action" id="reset" type="button">Reset</button></div>
+  </div>
+  <a class="attribution" href="https://persimmon.humansand.ai/blog/persimmon.html" target="_blank" rel="noreferrer">Reference: humans&amp; Persimmon ↗</a>
+  <span class="sr-only" id="status" aria-live="polite"></span>
+</main>
+<script src="./fruit-painting.js"></script>
+<script>
+  const canvas=document.getElementById('fruit');
+  const painting=new FruitPainting(canvas);
+  const fruits=Object.entries(FruitPainting.fruits);
+  const light=document.getElementById('light'),grain=document.getElementById('grain');
+  const scatter=document.getElementById('scatter'),grid=document.getElementById('fruit-grid');
+  const thumbnails=[];
+  for(const [id,name] of fruits) {
+    const button=document.createElement('button');button.type='button';button.className='fruit-choice';
+    button.dataset.fruit=id;button.setAttribute('aria-label',name);button.setAttribute('aria-pressed',String(id===painting.fruit));
+    const thumbnail=document.createElement('canvas');thumbnail.setAttribute('aria-hidden','true');
+    const label=document.createElement('span');label.textContent=name;
+    button.append(thumbnail,label);grid.append(button);
+    thumbnails.push(new FruitPainting(thumbnail,{fruit:id,grain:1.4,interactive:false,background:null}));
+    button.addEventListener('click',()=>{if(id!==painting.fruit)painting.setFruit(id);});
+  }
+  function sync() {
+    const name=FruitPainting.fruits[painting.fruit];
+    document.getElementById('fruit-name').textContent=name;
+    document.getElementById('fruit-index').textContent=String(fruits.findIndex(([id])=>id===painting.fruit)+1).padStart(2,'0')+' / 09';
+    canvas.setAttribute('aria-label','Interactive pointillist '+name.toLowerCase());
+    light.value=painting.lightName;grain.value=painting.grain;
+    document.getElementById('grain-value').value=painting.grain.toFixed(2)+'×';
+    scatter.textContent=painting.targetSpread?'Settle':'Scatter';scatter.setAttribute('aria-pressed',String(!!painting.targetSpread));
+    document.getElementById('mark-count').textContent=painting.dots.length.toLocaleString()+' pigment marks';
+    for(const button of grid.children)button.setAttribute('aria-pressed',String(button.dataset.fruit===painting.fruit));
+  }
+  light.addEventListener('change',()=>painting.setLight(light.value));
+  grain.addEventListener('input',()=>painting.setGrain(Number(grain.value)));
+  scatter.addEventListener('click',()=>painting.setScatter(!painting.targetSpread));
+  document.getElementById('reset').addEventListener('click',()=>painting.reset());
+  canvas.addEventListener('paintingchange',()=>{
+    sync();document.getElementById('status').textContent=FruitPainting.fruits[painting.fruit]+', '+light.options[light.selectedIndex].text+', '+(painting.targetSpread?'scattered.':'settled.');
+  });
+  sync();
+  // The parent owns the page scroll and theme; no nested scrollbars are needed.
+  let previousHeight = 0;
+  const reportSize = () => {
+    const height = Math.ceil(document.querySelector('main').getBoundingClientRect().height);
+    if (height !== previousHeight) {
+      previousHeight = height;
+      parent.postMessage({type:'fruit-studies:resize',height}, '*');
+    }
+  };
+  new ResizeObserver(reportSize).observe(document.querySelector('main'));
+  window.addEventListener('message', event => {
+    if (event.source !== parent || event.data?.type !== 'fruit-studies:theme' || typeof event.data.dark !== 'boolean') return;
+    document.documentElement.classList.toggle('dark', event.data.dark);
+    const tokens = event.data.tokens;
+    if (tokens && typeof tokens === 'object') {
+      for (const name of ['--font-prose', '--font-mono', '--radius-control', '--radius-media', '--motion-fast', '--focus-ring']) {
+        if (typeof tokens[name] === 'string' && tokens[name].length < 500) {
+          document.documentElement.style.setProperty(name, tokens[name]);
+        }
+      }
+    }
+    previousHeight = 0;
+    reportSize();
+  });
+  window.addEventListener('load', reportSize);
+  reportSize();
+</script>
+</body>
+</html>

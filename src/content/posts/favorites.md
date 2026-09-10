@@ -5,6 +5,7 @@ date: "2026-04-16"
 tags: [personal]
 excerpt: "A running list of favorites: books, films, music, art, and more."
 published: true
+unlisted: true
 ---
 
 A running collection of things I love. Updated as I discover new ones.

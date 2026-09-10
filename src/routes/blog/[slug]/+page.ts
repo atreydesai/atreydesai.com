@@ -1,4 +1,4 @@
-import { posts } from '$lib/content';
+import { posts, unlistedPosts, draftPosts } from '$lib/content';
 import { error, redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
@@ -7,6 +7,13 @@ export const prerender = false;
 export const load: PageLoad = ({ params }) => {
     const index = posts.findIndex((p) => p.id === params.slug);
     if (index === -1) {
+        const unlisted = unlistedPosts.find((post) => post.id === params.slug);
+        if (unlisted) {
+            if (unlisted.externalUrl) throw redirect(307, unlisted.externalUrl);
+            return { post: unlisted, prevPost: null, nextPost: null };
+        }
+        const draft = draftPosts.find((post) => post.id === params.slug);
+        if (draft) return { post: draft, prevPost: null, nextPost: null };
         throw error(404, 'Post not found');
     }
     if (posts[index].externalUrl) {

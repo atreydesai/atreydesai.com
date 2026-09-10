@@ -24,7 +24,7 @@
 
 {#if normalized === "book"}
     <BookOpenText {size} {animate} class={iconClass} />
-{:else if normalized === "short story"}
+{:else if normalized === "short story" || normalized === "chapter"}
     <BookText {size} {animate} class={iconClass} />
 {:else if normalized === "blog post"}
     <NotebookPen {size} {animate} class={iconClass} />
@@ -40,7 +40,7 @@
     <Clapperboard {size} {animate} class={iconClass} />
 {:else if normalized === "show" || normalized === "drama"}
     <GalleryHorizontal {size} {animate} class={iconClass} />
-{:else if normalized === "essay"}
+{:else if normalized === "essay" || normalized === "report"}
     <FileText {size} {animate} class={iconClass} />
 {:else}
     <FileQuestionMark {size} {animate} class={iconClass} />

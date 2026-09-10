@@ -128,6 +128,7 @@
     { name: "Google Scholar", href: homepageData.social.scholar },
     { name: "GitHub", href: homepageData.social.github },
     { name: "Twitter", href: homepageData.social.twitter },
+    { name: "Anonymous feedback", href: homepageData.social.feedback },
   ];
 </script>
 

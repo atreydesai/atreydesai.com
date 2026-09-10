@@ -14,6 +14,7 @@
     <!-- Blog posts -->
     <ul class="stagger-children">
         {#each posts as post (post.id)}
+            {@const classification = post.tags.find((tag) => tag === "fun" || tag === "academic")}
             <li class="blog-row">
                 <a
                     href={post.externalUrl ?? `/blog/${post.id}/`}
@@ -24,6 +25,7 @@
                         : undefined}
                     class="external-post-card group blog-row-link no-underline"
                 >
+                    <div class="blog-row-heading">
                     <h2
                         class="blog-row-title type-item-heading text-ink-900 transition-colors duration-200 group-hover:text-accent-dark dark:text-cream-100 dark:group-hover:text-accent-light"
                     >{post.title}{#if post.externalUrl}<span
@@ -40,6 +42,10 @@
                             </span></span
                         >{/if}</h2
                     >
+                    {#if classification}
+                        <span class="pill">{classification}</span>
+                    {/if}
+                    </div>
                     <p
                         class="blog-row-meta type-meta text-ink-500 dark:text-cream-400"
                     >
@@ -92,8 +98,16 @@
        resolves to full Bold: too heavy for an index row. Drop to Regular and
        synthesize the missing middle weight with a hairline stroke. currentColor
        keeps it in step with the accent shift on hover and with dark mode. */
-    .blog-row-title {
+    .blog-row-heading {
+        display: flex;
         flex: 1 1 auto;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2);
+        min-width: 0;
+    }
+
+    .blog-row-title {
         font-weight: 400;
         -webkit-text-stroke: 0.5px currentColor;
     }

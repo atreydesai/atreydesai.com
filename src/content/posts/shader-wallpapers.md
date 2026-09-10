@@ -1,8 +1,8 @@
 ---
 id: shader-wallpapers
-title: "Wallpapers"
+title: "wallpapers"
 date: "2026-04-18"
-tags: [graphics, experiments]
+tags: [fun, graphics, experiments]
 excerpt: "Playing around with shaders"
 published: true
 ---
