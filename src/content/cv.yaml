@@ -90,11 +90,9 @@ experience:
 
 publications:
   groups:
-    - heading: Preprints
-      items:
-        - '<strong>A Preview of Computational Animal Linguistics</strong>.<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Tirza Panunto, Lindsay Pike, Theron S. Wang, Tuan M. Dang, Hridayesh Lekhak and Kenny Q. Zhu.<br /><em>Under Review (ACM Computing Surveys)</em>.'
     - heading: Publications
       items:
+        - '<a href="/papers/CAL_CSUR.pdf" class="link"><strong>A Preview of Computational Animal Linguistics</strong></a>.<br />ACM Computing Surveys 2026<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Tirza Panunto, Lindsay Pike, Theron S. Wang, Tuan M. Dang, Hridayesh Lekhak and Kenny Q. Zhu.'
         - '<strong>Filling in the Mechanisms: How do LMs Learn Filler-Gap Dependencies under Developmental Constraints?</strong><br />ACL 2026 (Findings) · <em>Oral at TLS 2026</em><br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span> and Sathvik Nair.'
         - '<a href="https://arxiv.org/abs/2602.06221" class="link"><strong>BenchMarker: An Education-Inspired Toolkit for Highlighting Flaws in Multiple-Choice Benchmarks</strong></a>.<br />ACL 2026<br />Nishant Balepur, Bhavya Rajasekaran, Jane Oh, Michael Xie, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, …, Jordan Boyd-Graber.'
         - '<a href="https://arxiv.org/abs/2510.07761" class="link"><strong>Test-Time Reasoners Are Strategic Multiple-Choice Test-Takers</strong></a>.<br />ACL 2026 (Oral)<br />Nishant Balepur, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span> and Rachel Rudinger.'

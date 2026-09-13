@@ -9,10 +9,10 @@ authors:
   - Tuan M. Dang
   - Hridayesh Lekhak
   - Kenny Q. Zhu
-year: 2025
-venue: Under Review at ACM Computing Surveys
+year: 2026
+venue: ACM Computing Surveys
 arxiv: null
-pdf: null
+pdf: /papers/CAL_CSUR.pdf
 code: null
 demo: null
 twitter: null
@@ -22,7 +22,7 @@ tags:
   - Linguistics
 tldr: null
 awards: []
-preprint: true
+preprint: false
 featured: false
 highlight: false
 priority: 99
@@ -30,4 +30,3 @@ image: /images/papers/cal-survey.png
 imageAnimated: null
 imageDescription: "Existing Concepts and Tasks of Computational Animal Linguistics"
 ---
-
