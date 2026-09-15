@@ -521,6 +521,9 @@
      behind it, the same two-colour riso idea as the banner. Colors are
      hard-coded for the same reason the banner's are: this is the documented
      riso treatment, not ordinary UI. */
+  /* The marker leads the title at every width. Its left edge sits on the
+     reading edge, so the summary below it stays aligned with the intro
+     paragraph rather than being indented into a gutter. */
   .interest-title-line {
     display: flex;
     align-items: center;
@@ -577,23 +580,6 @@
   }
   :global(.dark) .interest-mark-num {
     color: #fdf8f3;
-  }
-
-  /* The page column is 820px wide, so the marker only hangs in the margin
-     once there is room for it outside the text. Below that it leads the
-     title inline instead of pushing the page sideways. */
-  @media (min-width: 960px) {
-    .research-interest-row {
-      position: relative;
-    }
-    .interest-title-line {
-      display: block;
-    }
-    .interest-mark {
-      position: absolute;
-      left: -3.6rem;
-      top: 0.68rem;
-    }
   }
 
   .research-interest-summary {
