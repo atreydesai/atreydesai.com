@@ -80,6 +80,15 @@
       { italic: true },
     );
 
+  // Hand-drawn pen loops for the interest markers: one per row, each a
+  // different pass so no two circles match and none closes cleanly. Drawn as
+  // paths rather than a border because a border cannot overshoot itself.
+  const interestLoops = [
+    "M4.5 9.0C6.4 8.0 11.6 3.9 15.8 3.2C20.0 2.4 25.4 3.3 29.5 4.4C33.6 5.4 39.0 7.4 40.6 9.6C42.1 11.9 40.2 15.3 38.6 17.8C37.0 20.3 34.5 23.6 31.0 24.6C27.4 25.6 21.2 25.0 17.3 24.0C13.5 23.1 10.5 21.0 7.9 19.0C5.3 17.0 1.1 14.2 1.9 12.1C2.8 10.1 11.1 7.5 12.9 6.6",
+    "M5.5 10.4C7.2 9.5 11.6 6.1 15.6 5.1C19.5 4.2 25.7 3.8 29.3 4.5C33.0 5.1 35.6 7.0 37.4 9.2C39.1 11.4 40.8 15.4 39.8 17.9C38.9 20.4 35.4 23.3 31.7 24.1C27.9 24.9 21.7 23.5 17.4 22.6C13.0 21.7 8.0 20.6 5.7 18.6C3.5 16.6 2.8 12.5 3.9 10.6C5.0 8.6 10.9 7.4 12.3 6.8",
+    "M6.8 10.0C8.1 9.2 11.1 6.2 14.6 5.1C18.1 4.1 24.1 3.0 27.9 3.7C31.8 4.3 35.6 7.0 37.6 9.3C39.5 11.5 41.2 14.9 39.8 17.0C38.4 19.1 33.1 20.5 29.3 21.8C25.5 23.0 20.8 24.7 16.9 24.3C13.0 23.9 7.6 21.3 5.9 19.3C4.1 17.3 5.3 15.0 6.3 12.5C7.2 10.0 10.8 5.4 11.8 4.0",
+  ];
+
   const interestRows = homepageData.researchInterests.items.map((item) => ({
     ...item,
     citations: item.citations ?? [],
@@ -323,25 +332,40 @@
             </button>
           </div>
 
+          <!-- Roughening filter for the interest markers, gentler than the
+               banner's so 12px numerals stay legible inside the loop. -->
+          <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+            <filter id="interest-loop-rough" x="-50%" y="-70%" width="200%" height="240%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" seed="4" />
+              <feDisplacementMap in="SourceGraphic" scale="2.6" />
+            </filter>
+          </svg>
           <ol id="research-interest-list">
             {#each interestRows as item, i}
               <li
-                class="research-interest-row grid grid-cols-[2.25rem_minmax(0,1fr)] items-baseline gap-3 py-3"
+                class="research-interest-row py-3"
                 class:research-interest-row-expanded={researchExpanded}
                 style="--interest-delay: {i * 40}ms"
               >
-                <button
-                  type="button"
-                  class="research-interest-index font-mono text-xs text-ink-400 dark:text-cream-500"
-                  aria-expanded={researchExpanded}
-                  aria-controls="research-interest-list"
-                  aria-label={`${researchExpanded ? "Show concise summaries for" : "Show full details for"} all research interests`}
-                  on:click={toggleResearchDetails}
-                >
-                  {String(i + 1).padStart(2, "0")}
-                </button>
                 <div class="min-w-0">
-                  <p class="font-medium text-ink-900 dark:text-cream-100">
+                  <p class="interest-title-line font-medium text-ink-900 dark:text-cream-100">
+                    <span class="interest-mark select-none" aria-hidden="true">
+                      <svg class="interest-loop" viewBox="0 0 44 28">
+                        <path
+                          class="interest-loop-ghost"
+                          d={interestLoops[i % interestLoops.length]}
+                        />
+                        <path
+                          class="interest-loop-fill"
+                          d={interestLoops[i % interestLoops.length]}
+                        />
+                        <path
+                          class="interest-loop-stroke"
+                          d={interestLoops[i % interestLoops.length]}
+                        />
+                      </svg>
+                      <span class="interest-mark-num">{String(i + 1).padStart(2, "0")}</span>
+                    </span>
                     <button
                       type="button"
                       class="research-interest-title"
@@ -493,25 +517,95 @@
     cursor: pointer;
     transition: color var(--motion-base) var(--ease-standard);
   }
+  /* Interest markers: a drawn pen loop with the accent slab misregistered
+     behind it, the same two-colour riso idea as the banner. Colors are
+     hard-coded for the same reason the banner's are: this is the documented
+     riso treatment, not ordinary UI. */
+  .interest-title-line {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .interest-mark {
+    position: relative;
+    flex: none;
+    width: 44px;
+    height: 28px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+  .interest-loop {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    /* One filter for all three layers so the fills and the outline wobble
+       together, exactly as the banner's slab and sheet do. */
+    filter: url(#interest-loop-rough);
+  }
+  .interest-loop-ghost {
+    fill: #e85d4c;
+    transform: translate(2.5px, 2.5px);
+  }
+  .interest-loop-fill {
+    fill: #fbf2e8;
+  }
+  .interest-loop-stroke {
+    fill: none;
+    stroke: #1a1a1a;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+  .interest-mark-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a1a1a;
+  }
+  :global(.dark) .interest-loop-ghost {
+    fill: #f07563;
+  }
+  :global(.dark) .interest-loop-fill {
+    fill: #2a2422;
+  }
+  :global(.dark) .interest-loop-stroke {
+    stroke: #fdf8f3;
+  }
+  :global(.dark) .interest-mark-num {
+    color: #fdf8f3;
+  }
+
+  /* The page column is 820px wide, so the marker only hangs in the margin
+     once there is room for it outside the text. Below that it leads the
+     title inline instead of pushing the page sideways. */
+  @media (min-width: 960px) {
+    .research-interest-row {
+      position: relative;
+    }
+    .interest-title-line {
+      display: block;
+    }
+    .interest-mark {
+      position: absolute;
+      left: -3.6rem;
+      top: 0.68rem;
+    }
+  }
+
   .research-interest-summary {
     color: inherit;
     font: inherit;
     text-align: left;
     cursor: pointer;
   }
-  .research-interest-index {
-    align-self: baseline;
-    justify-self: start;
-    border-radius: var(--radius-control);
-    cursor: pointer;
-    transition: color var(--motion-base) var(--ease-standard);
-  }
-  .research-interest-title:hover,
-  .research-interest-index:hover {
+  .research-interest-title:hover {
     color: theme("colors.accent.dark");
   }
-  :global(.dark) .research-interest-title:hover,
-  :global(.dark) .research-interest-index:hover {
+  :global(.dark) .research-interest-title:hover {
     color: theme("colors.accent.light");
   }
 
