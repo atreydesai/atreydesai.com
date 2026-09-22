@@ -705,7 +705,7 @@ Rules:
 - Title uses `type-item-heading`.
 - Authors and venue use `type-body-small`.
 - Links and tags begin `12px` after metadata.
-- Media is `144px` square on desktop and full width on mobile.
+- Media is `160px` square on desktop and full width on mobile.
 - Highlight corners are decorative and cannot be the only indication of a
   highlighted item.
 
@@ -1029,6 +1029,60 @@ into ordinary routes.
 Canvas shaders, LEGO image treatment, and pixel sprites may use internal
 rendering values. Their surrounding controls, captions, and states use the
 website system.
+
+### Research explainers
+
+Every paper carries a live explainer: hand-written inline SVG animated by a
+GSAP timeline (`src/lib/explainers/`), registered by paper id and rendered by
+`PaperMedia` in place of the static image. Every explainer is drawn on the
+same plate so the set reads as one system.
+
+- **Plate.** A 240-unit square on `surface-raised` (`cream-50` / `ink-800`),
+  inside the standard `8px` media frame. Content sits in a 14-unit margin; the
+  bottom band holds the caption and, on the card, the progress rail.
+- **Palette roles.** Ink carries structure. `accent` is the paper's subject
+  (the LLM, the model, the claim); `steel` is the human or reference side;
+  `sage` is ground truth (the correct answer, the child benchmark). Colors come
+  from the `--xp-*` variables in `ExplainerFrame.svelte`, which switch with the
+  theme. Tints use `fill-opacity`, never `opacity`, because the timeline owns
+  opacity.
+- **Type.** Optima for content, Optima italic for the caption (the site's
+  section-heading voice), system mono for letters, labels, and ticks, and Neue
+  Haas Grotesk only for a hero number. The scale is `T` in `motion.ts`: content
+  21 units (about 14px on the 160px card), captions 20, and nothing below 13.5
+  (about 9px). Glyphs are thickened with a same-colour stroke painted under the
+  fill (Optima has no medium weight), so text is coloured with `color`, never
+  `fill`. If a label will not fit at that size, cut the label rather than
+  shrink it. Captions are at most two lines of about 170 units.
+- **Shapes.** Ledger rows with hairline rules rather than boxes; dashed means
+  blank or unknown; a filled dot is a model, a ring is the human baseline;
+  `2`-unit corners.
+- **Motion.** Arrivals fade and rise 4 units on `power3.out` (the emphasized
+  ease) in `0.45s`; exits fade in `0.3s`; lines draw rather than pop. Each beat
+  holds long enough to read, and the loop ends back on its first frame.
+- **The first frame is the poster.** It is server-rendered, complete without
+  script, and exported as the paper's `image` (`?xp-t=0` on the dev-only
+  `/dev/explainers` route). Elements for later beats are in the markup with
+  `xp-later` and revealed by the timeline.
+- **Charts.** Bars grow from the axis upward and their numbers appear only
+  once the bar has arrived. Bars sit in a group clipped just above the axis and
+  the axis line is drawn after them, so no bar is ever painted over its axis
+  (`rise`, `resize`, `barBox` in `motion.ts`).
+- **Playback.** Live by default: the loop plays while on screen and pauses
+  offscreen or in a background tab. Pointing at or focusing one card plays that
+  card and sends every other card back to its first frame, slightly darkened,
+  where it waits until attention moves on. Cards carry no play/pause control
+  by direction; Reduce Motion stops autoplay entirely. In the lightbox the numbered
+  step chips are the only control, on one line: choosing a step holds its
+  settled frame, and choosing it again plays on. On a narrow stage only the
+  current chip keeps its words. Under Reduce Motion nothing autoplays and GSAP
+  is not loaded for cards; the chips still jump between settled frames.
+- **Checked, not eyeballed.** On the dev route, every plate can be driven
+  through each step's settled frame (`window.__xp`); run a layout pass over
+  them for text that overflows the plate, falls under 13 units, or collides
+  with other text or marks.
+- **Truth.** Examples and numbers come from the paper; digitized values are
+  noted as such in the component header.
 
 ## Implementation conventions
 

@@ -26,6 +26,6 @@ highlight: false
 priority: 99
 image: /images/papers/rl-floorplan.png
 imageAnimated: null
-imageDescription: "Floorplan of the house for our experiments."
+imageDescription: "A mobile robot is tasked with moving boxes throughout a house, starting from the entry. In the TAP version, the user creates rules that pair a trigger and an action: “If The robot is in the Entry then Go through a door to the North,” and the same rule for the Kitchen. In the RL version, the user specifies the goal of the agent, “Get a ‘yes’ answer to: Is the robot in the Dining Room?”, and the learner works out the choices the agent should make; this trial run is illustrative, as the paper proposes a study and reports no results. Reinforcement learning allows a system designer to consider what an agent’s objective is instead of the details of how this objective can ultimately be achieved."
 ---
 

@@ -24,6 +24,6 @@ highlight: false
 priority: 3
 image: /images/papers/filler-gap-poster.png
 imageAnimated: /images/papers/filler-gap.mp4
-imageDescription: "Animated explainer: in 'Who did the teacher like __?', the filler 'Who' links to a gap later in the sentence. Injecting a learned filler signal into a child-scale LM's activations (DAS) flips its prediction from a pronoun to a gap, and this causal effect grows steadily with training data, emerging far later than in children, who show it by age 3."
+imageDescription: "In \"Who did the teacher like _?\", who is the object of like: the filler is fronted to form a dependency with the gap, which is unpronounced but marked with _. Implanting the learned filler-gap DAS feature from the source into the base sentence \"Did the teacher like him?\" should shift the prediction of the model from the base label (him) toward the source label (?). Across 19 BabyLM checkpoints, filler-gap localization increased with training duration, from near zero at 1M tokens (MAX ODDS ≈ 0.8) to a robust effect by 100M (MAX ODDS ≈ 10.6 for Wh→Wh), while the effects are weaker (MAX ODDS ≈ 3) around 10M tokens, and the 10M checkpoint corresponds to children's linguistic knowledge between the ages of 2 and 5. The model learns a shared representation for filler-gap dependencies, but still requires far more data than children would."
 ---
 

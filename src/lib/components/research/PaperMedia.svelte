@@ -2,8 +2,11 @@
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
     import { X } from "@jis3r/icons";
+    import { explainers, type ExplainerComponent } from "$lib/explainers";
+    import { focusedExplainer } from "$lib/explainers/focus";
 
     export let paper: {
+        id: string;
         title: string;
         image: string | null;
         imageAnimated: string | null;
@@ -30,10 +33,25 @@
         }
     }
 
-    // The explainer animation plays while the card (or the thumbnail) is
-    // hovered/focused. Start it from the top each time so it reads as a
-    // fresh loop.
-    $: playing = active || isHovered;
+    // A live explainer (an animated SVG scene) replaces the static image for
+    // papers that have one. It plays by default and holds while its own
+    // lightbox is open.
+    let Explainer: ExplainerComponent | null = null;
+    $: Explainer = explainers[paper.id] ?? null;
+
+    // Pointing at or focusing a card plays its explainer and sends every other
+    // card back to its first frame; letting go lets them all play again.
+    const focusToken = Symbol(paper.id);
+    $: if (Explainer && active) focusedExplainer.set(focusToken);
+    $: if (!active && $focusedExplainer === focusToken) focusedExplainer.set(null);
+    $: resting = $focusedExplainer !== null && $focusedExplainer !== focusToken;
+
+    // Reduce Motion, read live: it can be flipped while the page is open.
+    let reduceMotion = false;
+
+    // Animated media is live by default; under Reduce Motion it plays only
+    // while the card is hovered or focused.
+    $: playing = !reduceMotion || active || isHovered;
 
     $: if (videoEl) {
         if (playing) {
@@ -47,7 +65,17 @@
     }
 
     onMount(() => {
+        const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+        const release = () => {
+            if ($focusedExplainer === focusToken) focusedExplainer.set(null);
+        };
+        const syncMotion = () => (reduceMotion = motion.matches);
+        syncMotion();
+        motion.addEventListener("change", syncMotion);
+
         return () => {
+            release();
+            motion.removeEventListener("change", syncMotion);
             if (typeof document !== "undefined") {
                 document.body.style.overflow = "";
             }
@@ -55,7 +83,7 @@
     });
 
     function openLightbox(trigger: HTMLElement) {
-        if (!paper.image) return;
+        if (!paper.image && !Explainer) return;
 
         lightboxOpen = true;
         triggerElement = trigger;
@@ -114,9 +142,9 @@
 
 <svelte:window on:keydown={(e) => e.key === "Escape" && closeLightbox()} />
 
-{#if paper.image}
+{#if paper.image || Explainer}
     <div
-        class={`w-full md:flex-shrink-0 ${isPreview ? "md:w-36 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-36"}`}
+        class={`relative w-full md:flex-shrink-0 ${isPreview ? "md:w-40 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-40"}`}
     >
         <button
             type="button"
@@ -125,9 +153,23 @@
             on:mouseleave={() => (isHovered = false)}
             on:focus={() => (isHovered = true)}
             on:blur={() => (isHovered = false)}
-            class={`relative block aspect-square w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-100 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-900 ${isPreview ? "md:mt-1" : ""}`}
-            aria-label={`Open image for ${paper.title}`}
+            class={`relative block aspect-square w-full overflow-hidden rounded-lg border border-ink-200/80 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 ${Explainer ? "bg-cream-50 dark:bg-ink-800" : "bg-cream-100 dark:bg-ink-900"} ${isPreview ? "md:mt-1" : ""}`}
+            aria-label={Explainer
+                ? `Open the animated explainer for ${paper.title}`
+                : `Open image for ${paper.title}`}
         >
+            {#if Explainer}
+                <svelte:component
+                    this={Explainer}
+                    size="card"
+                    label={paper.imageDescription ?? paper.title}
+                    paused={lightboxOpen}
+                    {resting}
+                />
+                <!-- While another card has the viewer's attention, this one
+                     rests on its first frame, slightly darkened. -->
+                <span class="explainer-dim" class:explainer-dim-on={resting} aria-hidden="true"></span>
+            {:else if paper.image}
             <picture>
                 <source
                     srcset={paper.image.replace(/\.(png|jpe?g)$/i, ".webp")}
@@ -178,11 +220,12 @@
                     />
                 {/if}
             {/if}
+            {/if}
         </button>
     </div>
 {/if}
 
-{#if lightboxOpen && paper.image && browser}
+{#if lightboxOpen && (paper.image || Explainer) && browser}
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <div class="lightbox-portal" use:portal>
         <div
@@ -208,9 +251,18 @@
             <div
                 class="flex max-h-[80vh] max-w-3xl flex-col items-center"
                 on:click|stopPropagation={() => {}}
-                on:keydown|stopPropagation={() => {}}
+                on:keydown={() => {}}
             >
-                {#if paper.imageAnimated && isVideo}
+                {#if Explainer}
+                    <!-- Sized to leave room for its controls within 80vh. -->
+                    <div class="w-[min(560px,90vw,62vh)]">
+                        <svelte:component
+                            this={Explainer}
+                            size="stage"
+                            label={paper.imageDescription ?? paper.title}
+                        />
+                    </div>
+                {:else if paper.imageAnimated && isVideo}
                     <!-- The explainer animation, full size: not the static
                          figure: so the lightbox shows the moving version. -->
                     <!-- svelte-ignore a11y-media-has-caption -->
@@ -228,7 +280,7 @@
                         alt={`${paper.title} animated diagram`}
                         class="max-h-[70vh] max-w-full rounded-lg object-contain"
                     />
-                {:else}
+                {:else if paper.image}
                     <img
                         src={paper.image}
                         alt={`${paper.title} diagram`}
@@ -269,6 +321,23 @@
         25%      { object-position: center 35%; }
         75%      { object-position: center 65%; }
     }
+    /* A resting card (another one has the viewer's attention) dims a little,
+       so the one playing reads as the focus. */
+    .explainer-dim {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: rgb(26 26 26 / 0.12);
+        opacity: 0;
+        transition: opacity var(--motion-slow) var(--ease-standard);
+    }
+    :global(.dark) .explainer-dim {
+        background: rgb(0 0 0 / 0.38);
+    }
+    .explainer-dim-on {
+        opacity: 1;
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .preview-shake.shake-x,
         .preview-shake.shake-y {

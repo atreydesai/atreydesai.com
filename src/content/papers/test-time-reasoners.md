@@ -24,6 +24,6 @@ highlight: false
 priority: 2
 image: /images/papers/test-time-reasoners-poster.png
 imageAnimated: /images/papers/test-time-reasoners.mp4
-imageDescription: "Animated explainer: hide the question and show a reasoning model only the answer choices. It infers what the question probably asked (something that makes heat), picks the right answer, and scores 56% on ARC versus 25% random guessing. Reasoning traces reveal these strategies, so choices-only success is not always a flaw."
+imageDescription: "Reasoning LLMs solve MCQs without using the question, i.e., choices-only: (A) oil, (B) coal, (C) trees, and (D) aluminum. Three are non-renewable, and one, trees, is renewable, so the question \"Which of the following is a renewable resource?\" immediately springs to mind, making C (trees) a very probable answer. All LLMs score well above random with just choices; GPT-5 hits 0.557 on ARC, much higher than random (0.25). In all, we challenge claims that partial-input success is always a flaw, so we propose how reasoning traces could separate problematic data from less problematic reasoning."
 ---
 

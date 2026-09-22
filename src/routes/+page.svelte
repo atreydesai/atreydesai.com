@@ -137,7 +137,7 @@
     { name: "Google Scholar", href: homepageData.social.scholar },
     { name: "GitHub", href: homepageData.social.github },
     { name: "Twitter", href: homepageData.social.twitter },
-    { name: "Anonymous feedback", href: homepageData.social.feedback },
+    { name: "Anon Feedback", href: homepageData.social.feedback },
   ];
 </script>
 
@@ -158,7 +158,8 @@
           hi, i'm <HyperText class="ml-[0.18em]" text="atrey desai" />
         </h1>
 
-        <div class="type-deck flow-prose text-ink-700 dark:text-cream-300">
+        <!-- No hyphenation in the intro: it reads better with whole words. -->
+        <div class="type-deck flow-prose hyphens-none text-ink-700 dark:text-cream-300">
           {#each homepageData.intro as paragraph}
             <p>
               {@html parseLinks(paragraph)}

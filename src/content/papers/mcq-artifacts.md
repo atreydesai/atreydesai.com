@@ -24,6 +24,6 @@ highlight: false
 priority: 99
 image: /images/papers/mcq-artifacts.png
 imageAnimated: null
-imageDescription: "LLMs Questions Look Good At First... But They're Full of Shortcuts!"
+imageDescription: "An LLM-generated MCQ asks for the predicate logic translation of 'For all x, if P of x then Q of x': (A) ∃x (P(x) ∧ Q(x)), (B) ∀x (P(x) ∧ Q(x)), (C) ∀x (P(x) → Q(x)), (D) ∃x (P(x) → Q(x)); A: (C). With the Choices-Only Prompt the question is struck out, and the answer is still (C) ∀x (P(x) → Q(x)). GPT-4o-mini accuracy, read from the poster's bar charts: 80% with the Full Prompt vs 38% Choices Only on Human-Written ARC/MMLU questions, but 96% vs 96% on its own generated questions (question-answer-distractors, comprehension); GPT-4o-mini often exceeds 90% accuracy using only the choices. LLMs' questions look good at first... but they're full of shortcuts!"
 ---
 

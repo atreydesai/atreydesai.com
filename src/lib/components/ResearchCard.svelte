@@ -38,8 +38,10 @@
     // Per-pill hover states for award icon animation triggering
     let hoveredLink: string | null = null;
 
-    // Hovering anywhere on the card plays the explainer animation.
+    // Pointing at or focusing anywhere on the card plays its explainer and
+    // holds the others on their first frame.
     let cardHovered = false;
+    let cardFocused = false;
 
     $: isPreview = variant === "preview" || compact;
     $: surfaceClasses = [
@@ -63,6 +65,11 @@
     style="scroll-margin-top: 80px"
     on:mouseenter={() => (cardHovered = true)}
     on:mouseleave={() => (cardHovered = false)}
+    on:focusin={() => (cardFocused = true)}
+    on:focusout={(e) => {
+        const next = e.relatedTarget;
+        if (!(next instanceof Node && e.currentTarget.contains(next))) cardFocused = false;
+    }}
 >
     <div class={surfaceClasses}>
         {#if paper.highlight}
@@ -154,7 +161,7 @@
                 {/if}
             </div>
 
-            <PaperMedia {paper} {isPreview} active={cardHovered} />
+            <PaperMedia {paper} {isPreview} active={cardHovered || cardFocused} />
         </div>
     </div>
 

@@ -26,6 +26,6 @@ priority: 99
 classProject: true
 image: /images/papers/lol-to-llm.png
 imageAnimated: null
-imageDescription: "Comprehensive performance metrics for Full Set (English and Spanish) across Task 1 (Top) and Task 2 (Bottom)."
+imageDescription: "Transcripts of stand-up comedy shows, each newline-separated line of a multi-line joke labelled by its role: establishing context, timing, punchline. The models tended to guess “escalation” or “establishing context” for many of the labels, including for many punchlines; “Punchline” was the label that was incorrectly guessed the most, with OLMo3.1-32B answering incorrectly 97% of the time. For the overall joke classification task, the 32 billion parameter models drastically outperformed the smaller 6-10 billion parameter models: on the English set at Pass@5, Qwen3-32B reached 30.8% and OLMo3.1-32B 26.6%, while Falcon3-10B can only reach 8% and the other models fall below 5%."
 ---
 

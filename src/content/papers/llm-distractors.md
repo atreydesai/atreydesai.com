@@ -24,5 +24,5 @@ highlight: false
 priority: 1
 image: /images/papers/llm-distractors-poster.png
 imageAnimated: /images/papers/llm-distractors.mp4
-imageDescription: "Animated explainer: a benchmark question needs wrong answers (distractors). People write them carefully; LLMs write them instantly. Grading both with metrics from education research, LLM distractors often make harder questions, but human-guided ones better separate models and follow MCQ writing guidelines."
+imageDescription: "Multiple-choice questions such as \"What best describes skin? A) flexible B) stiff C) brittle D) hard\" need plausible but wrong distractor choices; distractor creation used to rely on humans, but now work uses LLMs to replace this. We score MCQs via metrics in education research: difficulty for test-taker models, discriminability of model ranks, and writing quality. In nine generator-benchmark combinations, LLM distractors often exceed human-guided items in difficulty, but can jointly sacrifice writing quality and discriminability. We validate LLMs as a promising tool for distractor generation, but find areas benchmark creators must supervise."
 ---

@@ -22,6 +22,6 @@ priority: 99
 classProject: true
 image: /images/papers/booktube-phonetic.png
 imageAnimated: null
-imageDescription: "Comparison of Vocal Fry usage percentages between Early and Late career stages. The shaded column represents the average."
+imageDescription: "Vocal fry and engagement rate, early vs. late, for 10 BookTube channels, each with 10 videos split equally from their earliest and most recent uploads. Engagement rate increased significantly while vocal fry decreased. On average, vocal fry in 15.0% of analyzed speech dropped to 8.7%, pitch range increased from a mean of 290.9 Hz to 319.3 Hz, and engagement rates increased, rising from 4.38 to 7.31. BookTube creators tend to professionalize and inhibit their natural speech patterns, instead of becoming more informal."
 ---
 

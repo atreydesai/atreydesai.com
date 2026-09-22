@@ -750,3 +750,29 @@ img {
   -moz-user-select: none;
   -ms-user-select: none;
 }
+
+/* ============================================
+   Justified prose (src/lib/justify.ts). Justice picks every line break in a
+   paragraph together; each line is rendered as its own nowrap block at its
+   natural width so the script can measure it and set its spacing exactly.
+   ============================================ */
+.j-render {
+  display: block;
+}
+
+.j-line {
+  display: block;
+  width: max-content;
+  white-space: nowrap;
+  text-indent: 0;
+}
+
+/* `list-inside` items: the marker is an inline box on the first line, so the
+   first line sits beside it instead of dropping below it. */
+.j-render.j-inline {
+  display: inline;
+}
+
+.j-inline > .j-probe + .j-line {
+  display: inline-block;
+}

@@ -13,6 +13,7 @@
   import Footer from "$lib/components/Footer.svelte";
   import CustomCursor from "$lib/components/CustomCursor.svelte";
   import BobaGame from "$lib/components/BobaGame.svelte";
+  import { startJustify } from "$lib/justify";
   import {
     BOBA_DESKTOP_QUERY,
     bobaMode,
@@ -48,6 +49,9 @@
   // (`bobaMode` lives in $lib/boba so the homepage boba can launch it too.)
 
   onMount(() => {
+    // Knuth–Plass justification for running prose, site-wide.
+    const stopJustify = startJustify();
+
     const bobaMedia = window.matchMedia(BOBA_DESKTOP_QUERY);
     const syncBobaDesktop = () => {
       bobaDesktop = bobaMedia.matches;
@@ -126,6 +130,7 @@
     }
 
     return () => {
+      stopJustify();
       window.removeEventListener("keydown", onKey);
       bobaMedia.removeEventListener("change", syncBobaDesktop);
       touchMedia.removeEventListener("change", syncTouch);
