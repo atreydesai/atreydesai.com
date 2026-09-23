@@ -142,6 +142,7 @@ export function startJustify(): () => void {
 	sourceObserver = new MutationObserver(onSourceMutation);
 
 	document.addEventListener("copy", onCopy);
+	document.addEventListener("mousedown", onMultiClick);
 	document.fonts?.ready.then(invalidateAll);
 	document.fonts?.addEventListener?.("loadingdone", invalidateAll);
 
@@ -159,6 +160,7 @@ export function startJustify(): () => void {
 		bodyObserver.disconnect();
 		sourceObserver.disconnect();
 		document.removeEventListener("copy", onCopy);
+		document.removeEventListener("mousedown", onMultiClick);
 		document.fonts?.removeEventListener?.("loadingdone", invalidateAll);
 		for (const block of blocks.values()) revert(block);
 		blocks.clear();
@@ -744,6 +746,24 @@ function syncAttribute(block: Block, source: Element, name: string) {
 		if (value === null) clone.removeAttribute(name);
 		else clone.setAttribute(name, value);
 	}
+}
+
+// ------------------------------------------------------------ selection
+
+// Each rendered line is its own block, so the browser's paragraph selection
+// (triple-click) would stop at the line's edges. Select the whole rendered
+// paragraph instead, as it would for an unjustified one.
+function onMultiClick(event: MouseEvent) {
+	if (event.detail < 3 || event.button !== 0) return;
+	const target = event.target instanceof Element ? event.target : null;
+	const render = target?.closest(".j-render");
+	const selection = document.getSelection();
+	if (!render || !selection) return;
+	event.preventDefault();
+	const range = document.createRange();
+	range.selectNodeContents(render);
+	selection.removeAllRanges();
+	selection.addRange(range);
 }
 
 // ----------------------------------------------------------------- copy
