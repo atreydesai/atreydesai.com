@@ -7,12 +7,13 @@
   import ScrollReveal from "$lib/components/ScrollReveal.svelte";
   import HyperText from "$lib/components/HyperText.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
+  import Mark from "$lib/components/Mark.svelte";
   import { onMount } from "svelte";
-  import { bobaMode, openBoba } from "$lib/boba";
+  import { arcadeScreen, openArcade } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
 
   // Little pixel boba tucked in the photo corner: a random drink + straw
-  // orientation on each page load. Click to play the minigame.
+  // orientation on each page load. Click to open the boba arcade.
   const CUP_BODY = [
     "OOOOOOO",
     ".OLLLO.",
@@ -86,7 +87,7 @@
   const interestLoops = [
     "M4.5 9.0C6.4 8.0 11.6 3.9 15.8 3.2C20.0 2.4 25.4 3.3 29.5 4.4C33.6 5.4 39.0 7.4 40.6 9.6C42.1 11.9 40.2 15.3 38.6 17.8C37.0 20.3 34.5 23.6 31.0 24.6C27.4 25.6 21.2 25.0 17.3 24.0C13.5 23.1 10.5 21.0 7.9 19.0C5.3 17.0 1.1 14.2 1.9 12.1C2.8 10.1 11.1 7.5 12.9 6.6",
     "M5.5 10.4C7.2 9.5 11.6 6.1 15.6 5.1C19.5 4.2 25.7 3.8 29.3 4.5C33.0 5.1 35.6 7.0 37.4 9.2C39.1 11.4 40.8 15.4 39.8 17.9C38.9 20.4 35.4 23.3 31.7 24.1C27.9 24.9 21.7 23.5 17.4 22.6C13.0 21.7 8.0 20.6 5.7 18.6C3.5 16.6 2.8 12.5 3.9 10.6C5.0 8.6 10.9 7.4 12.3 6.8",
-    "M6.8 10.0C8.1 9.2 11.1 6.2 14.6 5.1C18.1 4.1 24.1 3.0 27.9 3.7C31.8 4.3 35.6 7.0 37.6 9.3C39.5 11.5 41.2 14.9 39.8 17.0C38.4 19.1 33.1 20.5 29.3 21.8C25.5 23.0 20.8 24.7 16.9 24.3C13.0 23.9 7.6 21.3 5.9 19.3C4.1 17.3 5.3 15.0 6.3 12.5C7.2 10.0 10.8 5.4 11.8 4.0",
+    "M6.8 10.0C8.1 9.2 11.1 6.2 14.6 5.1C18.1 4.1 24.1 3.0 27.9 3.7C31.8 4.3 35.6 7.0 37.6 9.3C39.5 11.5 41.2 14.9 39.8 17.0C38.4 19.1 33.1 20.5 29.3 21.8C25.5 23.0 20.8 24.7 16.9 24.3C13.0 23.9 7.6 21.3 5.9 19.3C4.1 17.3 5.3 15.0 6.3 12.5C7.2 10.0 10.2 7.9 11.9 7.2",
   ];
 
   const interestRows = homepageData.researchInterests.items.map((item) => ({
@@ -98,6 +99,30 @@
 
   function toggleResearchDetails() {
     researchExpanded = !researchExpanded;
+  }
+
+  // Anywhere in a row toggles it: the marker, the gaps, the padding. The
+  // row's own buttons already toggle and its citations do their own thing,
+  // so clicks on those are left alone. Keyboard users reach the same toggle
+  // through the title button.
+  //
+  // A drag that selects text in the row also ends in a click on it, and that
+  // shouldn't toggle. It's told apart by how far the press travelled, not by
+  // whether the page has a selection: a selection left anywhere on the page
+  // (and one Safari keeps while you click the non-selectable marker) used to
+  // swallow the click, so a row could open and then refuse to close.
+  let pressX = 0;
+  let pressY = 0;
+
+  function handleInterestRowPress(e: PointerEvent) {
+    pressX = e.clientX;
+    pressY = e.clientY;
+  }
+
+  function handleInterestRowClick(e: MouseEvent) {
+    if ((e.target as Element).closest("a, button")) return;
+    if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 4) return;
+    toggleResearchDetails();
   }
 
   let emailCopied = false;
@@ -213,14 +238,14 @@
             />
           </div>
           <!-- Pixel boba peeking out of the corner: shakes + jingles on hover,
-               launches the minigame on click. Hidden while the game is open. -->
-          {#if !$bobaMode}
+               opens the boba arcade on click. Hidden while the arcade is open. -->
+          {#if !$arcadeScreen}
             <button
               type="button"
               class="boba-launcher"
-              on:click={openBoba}
+              on:click={() => openArcade("menu")}
               on:mouseenter={sfxBoba}
-              aria-label="Play the boba minigame"
+              aria-label="Open the boba arcade"
               title="boba?"
             >
               <PixelIcon grid={bobaGrid} palette={bobaPal} px={6} />
@@ -260,11 +285,9 @@
                 aria-expanded={projectsOpen}
                 aria-controls="banner-projects-list"
                 on:click={() => (projectsOpen = !projectsOpen)}
-              ><span class="banner-toggle-label">{bannerLead.label}</span><span
-                  class="banner-caret ml-1"
-                  class:banner-caret-open={projectsOpen}
-                  aria-hidden="true">▸</span
-                ></button>{@html parseBanner(bannerLead.post)}
+              ><span class="banner-toggle-label">{bannerLead.label}</span><Mark
+                  kind="caret"
+                /></button>{@html parseBanner(bannerLead.post)}
             </p>
             <div
               id="banner-projects-list"
@@ -324,11 +347,7 @@
                 : "Show full research questions"}
               on:click={toggleResearchDetails}
             >
-              <span
-                class="research-toggle-caret"
-                class:research-toggle-caret-open={researchExpanded}
-                aria-hidden="true">▸</span
-              >
+              <Mark kind="caret" />
               <span>{researchExpanded ? "want a summary?" : "want more detail?"}</span>
             </button>
           </div>
@@ -343,10 +362,13 @@
           </svg>
           <ol id="research-interest-list">
             {#each interestRows as item, i}
+              <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
               <li
                 class="research-interest-row py-3"
                 class:research-interest-row-expanded={researchExpanded}
                 style="--interest-delay: {i * 40}ms"
+                on:pointerdown={handleInterestRowPress}
+                on:click={handleInterestRowClick}
               >
                 <div class="min-w-0">
                   <p class="interest-title-line font-medium text-ink-900 dark:text-cream-100">
@@ -503,14 +525,6 @@
   :global(.dark) .research-toggle:hover {
     color: theme("colors.accent.light");
   }
-  .research-toggle-caret {
-    display: inline-block;
-    transform-origin: center;
-    transition: transform var(--motion-slow) var(--ease-emphasized);
-  }
-  .research-toggle-caret-open {
-    transform: rotate(90deg);
-  }
   .research-interest-title {
     border-radius: var(--radius-control);
     color: inherit;
@@ -589,10 +603,13 @@
     text-align: left;
     cursor: pointer;
   }
-  .research-interest-title:hover {
+  .research-interest-row {
+    cursor: pointer;
+  }
+  .research-interest-row:hover .research-interest-title {
     color: theme("colors.accent.dark");
   }
-  :global(.dark) .research-interest-title:hover {
+  :global(.dark) .research-interest-row:hover .research-interest-title {
     color: theme("colors.accent.light");
   }
 
@@ -708,12 +725,6 @@
     }
     75% {
       transform: rotate(25deg) translateY(-1px) scale(1.08);
-    }
-  }
-  /* Mouse/desktop only: the game needs a pointer to play. */
-  @media (max-width: 767px), (hover: none), (pointer: coarse) {
-    .boba-launcher {
-      display: none;
     }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -839,15 +850,9 @@
     text-underline-offset: 3px;
   }
 
-  /* Disclosure caret for the projects toggle: rotates a quarter turn open. */
-  .banner-caret {
-    display: inline-block;
-    font-size: 0.85em;
-    line-height: 1;
-    transition: transform var(--motion-base) var(--ease-emphasized);
-  }
-  .banner-caret-open {
-    transform: rotate(90deg);
+  /* The drawn caret (a global .mark) sits a thin space after the label. */
+  .banner-toggle :global(.mark-caret) {
+    margin-left: 0.3em;
   }
 
   .banner-projects-shell {
@@ -871,12 +876,6 @@
     opacity: 1;
     transform: translateY(0);
     transition-delay: var(--project-delay, 0ms);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .banner-caret {
-      transition: none;
-    }
   }
 
   /* Darker selection inside the banner so it stands out from the blush bg.

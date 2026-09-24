@@ -14,7 +14,7 @@
     "categories:backfill": "node scripts/backfill-categories.mjs",
     "build": "npm run optimize-photos && npm run sync:goodreads && npm run sync:mdl && npm run sync:letterboxd && vite build",
     "preview": "vite preview",
-    "test:boba": "node --test tests/boba-engine.test.mjs",
+    "test:boba": "node --test tests/boba-engine.test.mjs tests/arcade-engines.test.mjs",
     "test:letterboxd": "node --test tests/letterboxd-sync.test.mjs",
     "test:agent": "node --test tests/agent-readiness.test.mjs",
     "check": "svelte-check --tsconfig ./jsconfig.json",

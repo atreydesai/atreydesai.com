@@ -30,10 +30,13 @@
 
 	let { scene, label, size = "card", paused = false, resting = false, children }: Props = $props();
 
-	const RAIL_Y = 234;
+	const RAIL_Y = 237.5;
 	const RAIL_X0 = 14;
 	const RAIL_X1 = 226;
 	const RAIL_GAP = 3;
+	/** How long the poster holds before the first step moves, on first play
+	 *  and after resting. Later loops keep the full first beat as a breather. */
+	const POSTER_HOLD = 0.5;
 
 	let svg: SVGSVGElement;
 	let tl = $state.raw<Timeline | null>(null);
@@ -74,6 +77,10 @@
 		return index;
 	});
 
+	// Every first beat is the still poster, so starting there would look like
+	// nothing is animating; start just before the first change instead.
+	const lead = $derived(Math.max(0, (scene.beats[1]?.at ?? 0) - POSTER_HOLD));
+
 	let context: gsap.Context | null = null;
 	let building = false;
 
@@ -98,6 +105,7 @@
 			built = timeline;
 		}, svg);
 		tl = built;
+		(tl as Timeline | null)?.seek(lead, false);
 		// Dev-only: ?xp-t=<seconds> freezes every plate on one frame, for
 		// visual QA and for exporting the static poster images.
 		const freeze = dev ? new URLSearchParams(location.search).get("xp-t") : null;
@@ -165,7 +173,7 @@
 	// While another card has the viewer's attention, this one goes back to
 	// its first frame and waits there.
 	$effect(() => {
-		if (tl && resting) tl.pause().seek(0, false);
+		if (tl && resting) tl.pause().seek(lead, false);
 	});
 
 	$effect(() => {

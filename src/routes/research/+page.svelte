@@ -183,59 +183,55 @@
     title="Research | Atrey Desai"
     description="Publications and preprints by Atrey Desai on NLP benchmarks, multimodal reasoning, and computational animal linguistics. Research from UMD CLIP Lab, UT Arlington ACL2 Lab, and Brown University."
     url="https://atreydesai.com/research/"
+    heading="research"
 >
-    <header slot="header" class="research-header">
-        <h1 class="type-page-title text-ink-900 dark:text-cream-100">
-            research
-        </h1>
+    <!-- One line of text controls on the title's baseline. "clear" comes
+         first: the row is right-aligned, so an item appearing at its start
+         doesn't shift the controls you're about to reach for. -->
+    <svelte:fragment slot="aside">
+        {#if activeFilters}
+            <button
+                type="button"
+                class="control-text control-accent"
+                on:click={clearFilters}
+            >
+                clear
+            </button>
+        {/if}
 
-        <div class="research-controls" aria-label="Research controls">
-            <div class="research-filters">
-                <CustomSelect
-                    options={yearOptions}
-                    bind:value={selectedYear}
-                    placeholder="all years"
-                    ariaLabel="Filter by year"
-                />
+        <CustomSelect
+            options={yearOptions}
+            bind:value={selectedYear}
+            label="year"
+            placeholder="all"
+            ariaLabel="Filter by year"
+        />
 
-                <CustomSelect
-                    options={tagOptions}
-                    bind:value={selectedTag}
-                    placeholder="all topics"
-                    ariaLabel="Filter by topic"
-                />
-            </div>
+        <CustomSelect
+            options={tagOptions}
+            bind:value={selectedTag}
+            label="topic"
+            placeholder="all"
+            ariaLabel="Filter by topic"
+        />
 
-            <div class="research-summary">
-                <output class="research-count" aria-live="polite">
-                    {filteredPapers.length} {filteredPapers.length === 1
-                        ? "entry"
-                        : "entries"}
-                </output>
+        <button
+            type="button"
+            class="control-text"
+            on:click={cycleSortOrder}
+            title="Click to change sort order"
+            aria-label={`Sorted by ${sortLabel}. Click to change sort order.`}
+        >
+            <span class="control-label">sort</span>
+            {sortLabel}
+        </button>
+    </svelte:fragment>
 
-                <button
-                    type="button"
-                    class="research-sort"
-                    on:click={cycleSortOrder}
-                    title="Click to change sort order"
-                    aria-label={`Sorted by ${sortLabel}. Click to change sort order.`}
-                >
-                    <span>sort</span>
-                    {sortLabel}
-                </button>
-
-                {#if activeFilters}
-                    <button
-                        type="button"
-                        class="research-clear"
-                        on:click={clearFilters}
-                    >
-                        clear
-                    </button>
-                {/if}
-            </div>
-        </div>
-    </header>
+    <!-- The count isn't shown, but filtering still says what it left. -->
+    <p class="sr-only" aria-live="polite" aria-atomic="true">
+        {filteredPapers.length}
+        {filteredPapers.length === 1 ? "entry" : "entries"}
+    </p>
 
     {#if published.length > 0}
         <section class="mb-12">
@@ -433,116 +429,3 @@
     {/if}
 </PageShell>
 
-<style>
-    .research-header {
-        display: grid;
-        gap: var(--space-3);
-        margin-bottom: var(--space-5);
-    }
-
-    .research-controls {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: var(--space-2) var(--space-4);
-    }
-
-    .research-filters,
-    .research-summary {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-
-    .research-filters {
-        gap: var(--space-2);
-    }
-
-    .research-summary {
-        gap: var(--space-1);
-    }
-
-    .research-controls :global(.select-trigger) {
-        min-width: 7.75rem;
-        min-height: 2rem;
-        padding-block: var(--space-1);
-    }
-
-    .research-count {
-        color: theme("colors.ink.500");
-        font-family: var(--font-mono);
-        font-size: 0.6875rem;
-        font-variant-numeric: tabular-nums;
-        white-space: nowrap;
-    }
-
-    .research-sort,
-    .research-clear {
-        min-height: 2rem;
-        padding: var(--space-1) var(--space-1-5);
-        color: theme("colors.ink.600");
-        background: transparent;
-        border: 0;
-        border-radius: var(--radius-control);
-        cursor: pointer;
-        font-family: var(--font-mono);
-        font-size: 0.6875rem;
-        line-height: 1.25;
-        transition:
-            color var(--motion-base) var(--ease-standard),
-            background-color var(--motion-base) var(--ease-standard);
-    }
-
-    .research-sort span {
-        color: theme("colors.ink.400");
-        font-style: italic;
-    }
-
-    .research-clear {
-        color: theme("colors.accent.dark");
-        text-decoration: underline;
-        text-decoration-color: theme("colors.ink.300");
-        text-underline-offset: 3px;
-    }
-
-    .research-sort:hover,
-    .research-sort:focus-visible,
-    .research-clear:hover,
-    .research-clear:focus-visible {
-        color: theme("colors.ink.900");
-        background: theme("colors.cream.100");
-    }
-
-    :global(.dark) .research-count,
-    :global(.dark) .research-sort {
-        color: theme("colors.cream.400");
-    }
-
-    :global(.dark) .research-sort span {
-        color: theme("colors.cream.500");
-    }
-
-    :global(.dark) .research-clear {
-        color: theme("colors.accent.light");
-        text-decoration-color: theme("colors.ink.600");
-    }
-
-    :global(.dark) .research-sort:hover,
-    :global(.dark) .research-sort:focus-visible,
-    :global(.dark) .research-clear:hover,
-    :global(.dark) .research-clear:focus-visible {
-        color: theme("colors.cream.100");
-        background: theme("colors.ink.800");
-    }
-
-    @media (min-width: 768px) {
-        .research-header {
-            grid-template-columns: auto minmax(0, 1fr);
-            align-items: center;
-        }
-
-        .research-controls {
-            justify-content: flex-end;
-        }
-    }
-</style>

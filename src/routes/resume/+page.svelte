@@ -9,28 +9,24 @@
     title="Resume | Atrey Desai"
     description="Resume of Atrey Desai - CS & Linguistics student at University of Maryland, researching NLP and AI safety."
     url="https://atreydesai.com/resume/"
+    heading="resume"
 >
-    <header slot="header" class="page-header page-header-action">
-        <h1 class="type-page-title text-ink-900 dark:text-cream-100">
-            resume
-        </h1>
+    <a
+        slot="aside"
+        href="/resume.pdf"
+        download="Atrey_Desai_Resume.pdf"
+        class="control-text control-accent"
+        on:mouseenter={() => (hoveredDownload = true)}
+        on:mouseleave={() => (hoveredDownload = false)}
+    >
+        <Download size={13} animate={hoveredDownload} />
+        Download PDF
+    </a>
 
-        <a
-            href="/resume.pdf"
-            download="Atrey_Desai_Resume.pdf"
-            class="btn-primary inline-flex items-center gap-2 hover:-translate-y-0.5"
-            on:mouseenter={() => (hoveredDownload = true)}
-            on:mouseleave={() => (hoveredDownload = false)}
-        >
-            <Download size={16} animate={hoveredDownload} />
-            Download PDF
-        </a>
-    </header>
-
-    <p class="deck text-ink-600 dark:text-cream-400 mb-8">
+    <svelte:fragment slot="deck">
         A one-page summary of my experience, skills, and education. For a more
         comprehensive overview, see my <a href="/cv/" class="link">CV</a>.
-    </p>
+    </svelte:fragment>
 
     <!-- PDF Embed -->
     <div

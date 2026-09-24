@@ -95,12 +95,20 @@
   --layer-overlay: 50;
   --layer-modal: 60;
   --layer-cursor: 70;
+
+  /* Riso colours for the drawn marks ($lib/marks), the same paper and plate
+     as the banner and the interest loops. Variables so a dark surface (the
+     photo lightbox) can hand a mark its own paper. */
+  --mark-paper: #fbf2e8;
+  --mark-plate: #e85d4c;
 }
 
 .dark {
   --color-surface-page: #1a1a1a;
   --color-text-primary: #faf0e6;
   --focus-ring: #f18272; /* accent-light */
+  --mark-paper: #2a2422;
+  --mark-plate: #f07563;
 }
 
 @layer base {
@@ -265,8 +273,155 @@
     margin-bottom: var(--space-8);
   }
 
-  .page-header-action {
-    @apply flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
+  /* Header anatomy shared by every route: the title, an optional aside of
+     quiet interface text on the title's baseline (counts, filters, a
+     download), and an optional deck underneath. On narrow screens the aside
+     wraps under the title rather than squeezing it. */
+  .page-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-6);
+  }
+
+  /* Every item carries the text controls' 6px inline padding, and the aside
+     is pulled out by the same amount, so its text lines up with the column
+     edges (right on desktop, left once it wraps) while hover fills overshoot
+     them slightly, like the blog index rows. Items read 16px apart, the
+     navigation's spacing. */
+  .page-header-aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1);
+    margin-inline: calc(-1 * var(--space-1-5));
+    color: theme("colors.ink.500");
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.333;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .page-header-aside > :not(.control-text, .custom-select) {
+    padding-inline: var(--space-1-5);
+    white-space: nowrap;
+  }
+
+  .dark .page-header-aside {
+    color: theme("colors.cream.400");
+  }
+
+  .page-deck {
+    margin-top: var(--space-3);
+    max-width: 58ch;
+  }
+
+  /* Wide routes keep their header in the standard column, aligned with the
+     wordmark, so the title never jumps sideways between pages. Only the
+     collection underneath breaks out to the wide measure. 820px minus the
+     standard gutters is the standard column's content width. */
+  .page-shell-wide > .page-header {
+    max-width: calc(820px - 2 * var(--space-6));
+    margin-inline: auto;
+  }
+
+  /* Text controls: filters, sort, tabs, and header actions. Borderless mono
+     text like the navigation, with a quiet fill for hover and for the
+     pressed state instead of a box. 28px is the dense target height. */
+  .control-text {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    min-height: 1.75rem;
+    padding-inline: var(--space-1-5);
+    color: theme("colors.ink.700");
+    background-color: transparent;
+    border: 0;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.333;
+    letter-spacing: 0;
+    text-decoration: none;
+    white-space: nowrap;
+    font-variant-numeric: lining-nums tabular-nums;
+    transition:
+      color var(--motion-base) var(--ease-standard),
+      background-color var(--motion-base) var(--ease-standard);
+  }
+
+  .control-text:hover,
+  .control-text:focus-visible {
+    color: theme("colors.ink.900");
+    background-color: rgb(26 26 26 / 0.04);
+  }
+
+  .control-text[aria-pressed="true"] {
+    color: theme("colors.ink.900");
+    background-color: rgb(26 26 26 / 0.07);
+  }
+
+  .dark .control-text {
+    color: theme("colors.cream.300");
+  }
+
+  .dark .control-text:hover,
+  .dark .control-text:focus-visible {
+    color: theme("colors.cream.100");
+    background-color: rgb(253 248 243 / 0.06);
+  }
+
+  .dark .control-text[aria-pressed="true"] {
+    color: theme("colors.cream.100");
+    background-color: rgb(253 248 243 / 0.1);
+  }
+
+  .control-text:disabled,
+  .dark .control-text:disabled {
+    background-color: transparent;
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  /* A leading icon would otherwise set the control's baseline (a box with no
+     text uses its bottom edge), dropping "Download PDF" below the text beside
+     it. A zero-width first item keeps the baseline on the text; its negative
+     margin cancels the gap it would add. */
+  .control-text::before {
+    content: "\200b";
+    margin-inline-end: calc(-1 * var(--space-1-5));
+  }
+
+  /* The dimension a control acts on ("year", "tag", "sort"), set quieter than
+     the value it currently holds. */
+  .control-label {
+    color: theme("colors.ink.500");
+  }
+
+  .dark .control-label {
+    color: theme("colors.cream.500");
+  }
+
+  /* An action rather than a filter: Download PDF, clear. */
+  .control-text.control-accent {
+    color: theme("colors.accent.dark");
+  }
+
+  .dark .control-text.control-accent {
+    color: theme("colors.accent.light");
+  }
+
+  .control-text.control-accent:hover,
+  .control-text.control-accent:focus-visible {
+    color: theme("colors.ink.900");
+  }
+
+  .dark .control-text.control-accent:hover,
+  .dark .control-text.control-accent:focus-visible {
+    color: theme("colors.cream.100");
   }
 
   /* Named vertical rhythm. */
@@ -684,6 +839,63 @@
       transform: translateY(0);
     }
   }
+}
+
+/* Marks ($lib/marks): the drawn disclosure caret and separator. Sized in
+   em so they follow the text they sit in; the ink takes the text colour.
+   Deliberately outside @layer: their classes are assembled in a template
+   string (`mark-${kind}`), which Tailwind's content scan can't see, so a
+   layered rule would be purged from the build. */
+.mark {
+  display: inline-flex;
+  flex: none;
+  vertical-align: middle;
+  line-height: 0;
+}
+
+.mark-caret {
+  width: 0.8em;
+  height: 0.8em;
+}
+
+.mark-dot {
+  width: 0.6em;
+  height: 0.6em;
+}
+
+.mark-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mark-plate {
+  fill: var(--mark-plate);
+}
+
+.mark-paper {
+  fill: var(--mark-paper);
+}
+
+.mark-ink {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+/* A caret turns a quarter when its disclosure opens. Each layer turns about
+   the box's centre, and the plate's offset is applied outside the turn, so
+   the misregistration keeps pointing down and to the right. */
+.mark-turn {
+  transform-origin: 6px 6px;
+  transform: rotate(var(--mark-turn, 0deg));
+  transition: transform var(--motion-slow) var(--ease-emphasized);
+}
+
+[aria-expanded="true"] > .mark-caret,
+details[open] > summary > .mark-caret {
+  --mark-turn: 90deg;
 }
 
 /* Custom Cursor Styles */

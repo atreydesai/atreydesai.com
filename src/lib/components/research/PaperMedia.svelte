@@ -167,7 +167,7 @@
                     {resting}
                 />
                 <!-- While another card has the viewer's attention, this one
-                     rests on its first frame, slightly darkened. -->
+                     rests on its first frame, very faintly darkened. -->
                 <span class="explainer-dim" class:explainer-dim-on={resting} aria-hidden="true"></span>
             {:else if paper.image}
             <picture>
@@ -321,18 +321,18 @@
         25%      { object-position: center 35%; }
         75%      { object-position: center 65%; }
     }
-    /* A resting card (another one has the viewer's attention) dims a little,
+    /* A resting card (another one has the viewer's attention) dims just barely,
        so the one playing reads as the focus. */
     .explainer-dim {
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background: rgb(26 26 26 / 0.12);
+        background: rgb(26 26 26 / 0.04);
         opacity: 0;
         transition: opacity var(--motion-slow) var(--ease-standard);
     }
     :global(.dark) .explainer-dim {
-        background: rgb(0 0 0 / 0.38);
+        background: rgb(0 0 0 / 0.12);
     }
     .explainer-dim-on {
         opacity: 1;

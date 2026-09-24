@@ -11,19 +11,7 @@
     { name: "bookshelf", href: "/bookshelf/" },
   ];
 
-  const pageLabels: Record<string, string> = {
-    about: "about",
-    research: "research",
-    cv: "cv",
-    resume: "resume",
-    photography: "photography",
-    blog: "blog",
-    bookshelf: "bookshelf",
-  };
-
   $: currentPath = $page.url.pathname;
-  $: currentSegment = currentPath.split("/").filter(Boolean)[0] ?? "";
-  $: currentLabel = currentSegment ? pageLabels[currentSegment] ?? currentSegment : "";
 
   function isActive(href: string, pathname: string): boolean {
     const normalizedHref = href === "/" ? href : href.replace(/\/$/, "");
@@ -37,21 +25,15 @@
 
 <header class="page-shell-standard w-full pt-7 md:pt-8" data-sveltekit-preload-code="eager">
   <div class="flex flex-col gap-2 md:flex-row md:items-baseline md:justify-between md:gap-6">
-    <nav
-      aria-label="Breadcrumb"
-      class="flex min-w-0 shrink-0 items-center font-mono text-sm leading-none text-ink-700 dark:text-cream-300"
+    <!-- Just the wordmark: the page's own title and the highlighted nav item
+         already say where you are, so a "/ page" crumb here only repeated
+         the heading directly beneath it. -->
+    <a
+      href="/"
+      class="w-fit shrink-0 font-display text-base font-bold leading-none text-ink-900 transition-colors duration-200 hover:text-accent-dark dark:text-cream-100 dark:hover:text-accent"
     >
-      <a
-        href="/"
-        class="font-display text-base font-bold leading-none text-ink-900 transition-colors duration-200 hover:text-accent-dark dark:text-cream-100 dark:hover:text-accent"
-      >
-        atrey desai
-      </a>
-      {#if currentLabel}
-        <span class="mx-2 text-xs leading-none text-ink-400 dark:text-ink-400" aria-hidden="true">/</span>
-        <span class="text-xs leading-none text-ink-900 dark:text-cream-100">{currentLabel}</span>
-      {/if}
-    </nav>
+      atrey desai
+    </a>
 
     <div class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3 md:flex md:w-auto md:items-center">
       <nav

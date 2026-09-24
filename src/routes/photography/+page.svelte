@@ -1,8 +1,9 @@
 <script lang="ts">
     import PageShell from "$lib/components/PageShell.svelte";
     import OptimizedImage from "$lib/components/OptimizedImage.svelte";
+    import Mark from "$lib/components/Mark.svelte";
     import { formatLongDate } from "$lib/utils/date";
-    import { X, ChevronLeft, ChevronRight } from "@jis3r/icons";
+    import { X, ChevronLeft, ChevronRight, ArrowUpRight } from "@jis3r/icons";
     // Photos are bundled into a generated manifest during the build.
     export let data;
     $: photos = data.photos;
@@ -169,22 +170,20 @@
     description="Photography portfolio by Atrey Desai. Follow @framedbyatrey on Instagram for more."
     url="https://atreydesai.com/photography/"
     width="wide"
+    heading="photography"
+    headerVariant="title-only"
 >
-    <header slot="header" class="page-header page-header-title-only">
-        <div class="flex items-baseline justify-between gap-4">
-            <h1 class="type-page-title text-ink-900 dark:text-cream-100">
-                photography
-            </h1>
-            <a
-                href="https://instagram.com/framedbyatrey"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex items-center gap-2 text-sm text-ink-500 dark:text-cream-500 hover:text-accent transition-colors"
-            >
-                <span>@framedbyatrey</span>
-            </a>
-        </div>
-    </header>
+    <a
+        slot="aside"
+        href="https://instagram.com/framedbyatrey"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="control-text"
+    >
+        @framedbyatrey
+        <ArrowUpRight size={12} />
+        <span class="sr-only">(opens Instagram in a new tab)</span>
+    </a>
     <!-- Dense mosaic: mixed heights plus recurring two-column feature tiles. -->
     {#if photos.length > 0}
         <div
@@ -318,7 +317,7 @@
 
             <!-- EXIF data -->
             {#if currentPhoto.exif}
-                <div class="mt-4 text-cream-300 text-sm text-center space-y-1">
+                <div class="photo-exif mt-4 text-cream-300 text-sm text-center space-y-1">
                     {#if currentPhoto.caption}
                         <p class="font-medium text-cream-100">
                             {currentPhoto.caption}
@@ -326,22 +325,12 @@
                     {/if}
                     {#if currentPhoto.exif.camera || currentPhoto.exif.lens}
                         <p>
-                            {currentPhoto.exif.camera || ""}{currentPhoto.exif
-                                .camera && currentPhoto.exif.lens
-                                ? " · "
-                                : ""}{currentPhoto.exif.lens || ""}
+                            {#each [currentPhoto.exif.camera, currentPhoto.exif.lens].filter(Boolean) as part, i}{#if i}{" "}<Mark kind="dot" />{" "}{/if}{part}{/each}
                         </p>
                     {/if}
                     {#if currentPhoto.exif.aperture || currentPhoto.exif.shutter || currentPhoto.exif.iso}
                         <p class="text-cream-400">
-                            {[
-                                currentPhoto.exif.focalLength,
-                                currentPhoto.exif.aperture,
-                                currentPhoto.exif.shutter,
-                                currentPhoto.exif.iso,
-                            ]
-                                .filter(Boolean)
-                                .join(" · ")}
+                            {#each [currentPhoto.exif.focalLength, currentPhoto.exif.aperture, currentPhoto.exif.shutter, currentPhoto.exif.iso].filter(Boolean) as part, i}{#if i}{" "}<Mark kind="dot" />{" "}{/if}{part}{/each}
                         </p>
                     {/if}
                     {#if currentPhoto.exif.date}
@@ -366,6 +355,13 @@
 {/if}
 
 <style>
+    /* The lightbox is dark in both themes, so the drawn separators in its
+       caption take a dark paper and the lighter plate. */
+    .photo-exif {
+        --mark-paper: theme("colors.ink.900");
+        --mark-plate: #f07563;
+    }
+
     .photo-tile {
         grid-column: span 1;
     }

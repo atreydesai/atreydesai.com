@@ -1,4 +1,4 @@
-// Procedural Web Audio for the boba minigame. The engine is intentionally
+// Procedural Web Audio for the boba arcade. The engine is intentionally
 // asset-free: small oscillator voices, filtered noise drums, keyed feedback,
 // and a short look-ahead scheduler keep it light and responsive.
 
@@ -6,6 +6,8 @@ const MASTER_LEVEL = 0.48;
 const MUTE_KEY = "boba_muted_v2";
 const MUSIC_LOOKAHEAD_SECONDS = 0.24;
 const MUSIC_TICK_MS = 75;
+/** Each song plays this many bars before the soundtrack moves on. */
+export const BARS_PER_SONG = 8;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -35,6 +37,12 @@ interface Song {
   lead: NoteSeq;
   bass: NoteSeq;
 }
+
+// Song order for the current run; empty means every song, in order.
+let playlist: number[] = [];
+// While a game holds the clock (see suspendAudio), nothing may wake the
+// context: a stray blip would restart the soundtrack under a pause card.
+let clockHeld = false;
 
 let songIndex = 0;
 let barIndex = 0;
@@ -73,6 +81,8 @@ function audioContext(): AudioContext | null {
     master.gain.value = muted ? 0.0001 : MASTER_LEVEL;
     master.connect(ctx.destination);
   }
+
+  if (clockHeld) return null;
 
   if (ctx.state === "suspended") {
     void ctx.resume().catch(() => {
@@ -358,13 +368,18 @@ function stopScheduledMusic(afterSeconds = 0) {
   if (afterSeconds === 0) activeMusicSources.clear();
 }
 
+function activePlaylist() {
+  return playlist.length ? playlist : SONGS.map((_, index) => index);
+}
+
 function runMusicScheduler() {
   clearMusicTimer();
   if (!ctx || !musicOn || musicPaused) return;
 
+  const order = activePlaylist();
   const horizon = ctx.currentTime + MUSIC_LOOKAHEAD_SECONDS;
   while (nextBarTime < horizon) {
-    const song = SONGS[songIndex];
+    const song = SONGS[order[songIndex % order.length]];
     if (barIndex === 0) {
       currentRoot = song.root;
       currentScale = song.scale;
@@ -375,9 +390,9 @@ function runMusicScheduler() {
     nextBarTime += 4 * (60 / song.bpm);
     barIndex += 1;
 
-    if (barIndex >= 8) {
+    if (barIndex >= BARS_PER_SONG) {
       barIndex = 0;
-      songIndex = (songIndex + 1) % SONGS.length;
+      songIndex = (songIndex + 1) % order.length;
     }
   }
 
@@ -426,8 +441,60 @@ export function setMuted(nextMuted: boolean) {
   );
 }
 
+/** Returns an unsubscribe that only clears the listener if it is still ours. */
 export function onSongChange(callback: ((name: string) => void) | null) {
   songListener = callback;
+  return () => {
+    if (songListener === callback) songListener = null;
+  };
+}
+
+/** Tempo of each song in `order` (every song, in order, by default). */
+export function songTempos(order?: number[]) {
+  const indices = order?.length ? order : SONGS.map((_, index) => index);
+  return indices.map((index) => SONGS[index].bpm);
+}
+
+/**
+ * The audio time reaching the listener right now, in the same coordinate
+ * that notes are scheduled in, or null while the context is not running.
+ * A rhythm game draws against this so its visuals line up with what is
+ * heard rather than with what was merely scheduled.
+ */
+export function audioClock(): number | null {
+  if (!ctx || ctx.state !== "running") return null;
+  const scheduled = ctx.currentTime;
+  const stamp =
+    typeof ctx.getOutputTimestamp === "function" ? ctx.getOutputTimestamp() : null;
+  if (stamp?.contextTime !== undefined && stamp.performanceTime) {
+    const heard = stamp.contextTime + (performance.now() - stamp.performanceTime) / 1000;
+    // A stale stamp (no output device yet, a device switch) can wander;
+    // trust it only while it sits just behind the scheduling clock.
+    if (heard <= scheduled + 0.02 && heard >= scheduled - 0.5) return heard;
+  }
+  return scheduled - (ctx.outputLatency || ctx.baseLatency || 0);
+}
+
+/**
+ * Freezes the audio clock, soundtrack and all, mid-note. Resuming picks up
+ * exactly where it stopped, so a paused rhythm game stays on the beat.
+ */
+export function suspendAudio() {
+  clockHeld = true;
+  if (ctx?.state === "running") {
+    void ctx.suspend().catch(() => {
+      // Already suspended or closed.
+    });
+  }
+}
+
+export function resumeAudio() {
+  clockHeld = false;
+  if (ctx && ctx.state !== "running" && ctx.state !== "closed") {
+    void ctx.resume().catch(() => {
+      // A later user gesture will retry.
+    });
+  }
 }
 
 export function setMusicPhase(phase: MusicPhase) {
@@ -438,19 +505,27 @@ export function setMusicPhase(phase: MusicPhase) {
   musicBus.gain.linearRampToValueAtTime(phaseMusicLevel(), now + 0.2);
 }
 
-export function startMusic() {
-  if (!ensureMusicGraph() || !ctx || !musicBus || !musicFilter) return;
+/**
+ * Starts the soundtrack from the top of `order` (every song, in order, by
+ * default). Returns the audio time of the first downbeat, or null when
+ * there is no audio to start.
+ */
+export function startMusic(order?: number[]): number | null {
+  if (!ensureMusicGraph() || !ctx || !musicBus || !musicFilter) return null;
   clearMusicTimer();
   clearMusicStopTimer();
   stopScheduledMusic();
 
+  playlist = order?.filter((index) => SONGS[index]) ?? [];
+  const first = SONGS[activePlaylist()[0]];
   musicOn = true;
   musicPaused = false;
   songIndex = 0;
   barIndex = 0;
-  currentRoot = SONGS[0].root;
-  currentScale = SONGS[0].scale;
+  currentRoot = first.root;
+  currentScale = first.scale;
   nextBarTime = ctx.currentTime + 0.12;
+  const firstDownbeat = nextBarTime;
 
   const now = ctx.currentTime;
   hold(musicBus.gain, now);
@@ -459,6 +534,7 @@ export function startMusic() {
   musicFilter.frequency.setValueAtTime(Math.max(650, musicFilter.frequency.value), now);
   musicFilter.frequency.exponentialRampToValueAtTime(14_000, now + 0.2);
   runMusicScheduler();
+  return firstDownbeat;
 }
 
 export function setMusicPaused(paused: boolean) {
@@ -637,6 +713,148 @@ export function sfxBoba() {
   [69, 74, 79].forEach((midi, index) => {
     note(midiFrequency(midi), start + index * 0.05, index === 2 ? 0.09 : 0.05, "square", 0.18);
   });
+}
+
+// --- Arcade effects -----------------------------------------------------
+
+function effectNoise(
+  start: number,
+  duration: number,
+  volume: number,
+  filterType: BiquadFilterType,
+  frequency: number,
+  sweepTo = 0,
+  pan = 0,
+) {
+  if (!ctx || !master) return;
+  const buffer = getNoiseBuffer();
+  if (!buffer) return;
+  const source = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  source.buffer = buffer;
+  filter.type = filterType;
+  filter.frequency.setValueAtTime(frequency, start);
+  if (sweepTo > 0) filter.frequency.exponentialRampToValueAtTime(sweepTo, start + duration);
+  filter.Q.value = 0.9;
+  gain.gain.setValueAtTime(Math.max(0.0001, volume), start);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  source.connect(filter);
+  connectVoice(filter, gain, master, pan);
+  source.start(start);
+  source.stop(start + duration + 0.02);
+}
+
+/** Straw stab: the film pops, then a note that climbs with the combo. */
+export function sfxStab(rating: "perfect" | "good" | "graze", combo = 1, pan = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  duckMusic(0.07, 0.5);
+  effectNoise(start, 0.045, rating === "graze" ? 0.09 : 0.15, "highpass", 3_200, 0, pan);
+  const step = Math.min(Math.max(combo - 1, 0), 7) + (rating === "perfect" ? 2 : 0);
+  note(
+    midiFrequency(scaleMidi(1, step)),
+    start + 0.012,
+    rating === "perfect" ? 0.12 : 0.08,
+    "triangle",
+    rating === "graze" ? 0.1 : 0.16,
+    pan,
+  );
+}
+
+/** Straw stab: the straw hits the belt instead of a cup. */
+export function sfxWhiff(pan = 0) {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.18, 0.3);
+  slide(220, 70, 0.16, "square", 0.2, pan);
+  effectNoise(c.currentTime, 0.09, 0.14, "lowpass", 600, 0, pan);
+}
+
+/** Order up: tea poured into the cup. */
+export function sfxPour(step = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.22, 0.07, "bandpass", 500, 1_800);
+  note(midiFrequency(scaleMidi(1, step)), start + 0.05, 0.09, "triangle", 0.1);
+}
+
+/** Order up: a topping drops in. */
+export function sfxPlop(step = 0) {
+  audioContext();
+  slide(900 - step * 70, 240, 0.1, "sine", 0.24);
+}
+
+/** Order up: the cup is emptied. */
+export function sfxDump() {
+  const c = audioContext();
+  if (!c) return;
+  effectNoise(c.currentTime, 0.3, 0.12, "lowpass", 2_400, 300);
+}
+
+/** Order up: a drink goes out; a tip adds a third note. */
+export function sfxServe(tip = false) {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.2, 0.35);
+  const start = c.currentTime;
+  note(midiFrequency(scaleMidi(2, 0)), start, 0.09, "triangle", 0.18);
+  note(midiFrequency(scaleMidi(2, 2)), start + 0.08, tip ? 0.1 : 0.18, "triangle", 0.18);
+  if (tip) note(midiFrequency(scaleMidi(2, 4)), start + 0.16, 0.2, "triangle", 0.16);
+}
+
+/** Order up: nobody ordered that. */
+export function sfxWrong() {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.25, 0.25);
+  const start = c.currentTime;
+  note(midiFrequency(currentRoot - 1), start, 0.12, "square", 0.15);
+  note(midiFrequency(currentRoot - 2), start + 0.13, 0.2, "square", 0.15);
+}
+
+/** Order up: a new ticket clips onto the rail. */
+export function sfxTicket() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  note(midiFrequency(currentRoot + 31), start, 0.05, "triangle", 0.1);
+  note(midiFrequency(currentRoot + 36), start + 0.06, 0.12, "triangle", 0.09);
+}
+
+/** Cup stack: a cardboard thunk, pitched up the scale as the tower grows. */
+export function sfxPlace(perfect = false, height = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  duckMusic(0.08, 0.5);
+  slide(170, 70, 0.09, "sine", 0.28);
+  effectNoise(start, 0.05, 0.1, "lowpass", 900);
+  const step = height % 10;
+  note(
+    midiFrequency(scaleMidi(1, step)),
+    start + 0.02,
+    perfect ? 0.14 : 0.08,
+    "triangle",
+    perfect ? 0.17 : 0.11,
+  );
+  if (perfect) note(midiFrequency(scaleMidi(2, step)), start + 0.08, 0.16, "triangle", 0.12);
+}
+
+/** Cup stack: the overhang is sliced away. */
+export function sfxSlice() {
+  const c = audioContext();
+  if (!c) return;
+  effectNoise(c.currentTime, 0.12, 0.12, "highpass", 5_200, 1_400);
+}
+
+/** Cup stack: the tower's last cup falls. */
+export function sfxTopple() {
+  audioContext();
+  duckMusic(0.4, 0.2);
+  slide(300, 50, 0.5, "triangle", 0.26);
 }
 
 export function unlockAudio() {

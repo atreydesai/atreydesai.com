@@ -43,7 +43,7 @@ dashboard or a generic portfolio template.
    interface. Orange marks interaction and emphasis. Support hues convey
    category or data meaning, not decoration.
 4. **Quiet interface, expressive moments.** Navigation and controls should stay
-   restrained. The riso banner, research media, photography, and boba game may
+   restrained. The riso banner, research media, photography, and boba arcade may
    be more characterful.
 5. **Density follows the task.** Long-form reading is relaxed; the bookshelf is
    compact; primary actions remain comfortably sized.
@@ -410,8 +410,11 @@ device.
 | `overlay`  | `1280px` or viewport-constrained | `16–32px`        | Media lightboxes and game panels   |
 
 Header and footer use the standard container even when the page body is wide.
-That preserves a consistent site frame while letting task-specific content
-expand.
+So does the page header: on a wide route the title, aside, and deck stay in
+the standard column, aligned with the wordmark, and only the collection below
+(the photo grid, the bookshelf toolbar and table) breaks out to the wide
+measure. That preserves a consistent site frame, keeps the title from jumping
+sideways between routes, and lets task-specific content expand.
 
 ### Grid rules
 
@@ -435,18 +438,32 @@ expand.
 
 ### Page shell and page header
 
-Every page selects a container variant and page-header variant.
+Every page selects a container variant, and `PageShell` builds the header from
+three parts:
 
-Page-header variants:
+- **Title** (`heading`): `type-page-title`, lowercase.
+- **Aside** (`slot="aside"`): an optional line of interface text that shares
+  the title's baseline at the right: counts, filters, sort, a download. It uses
+  `type-meta` color and size, and its controls are text controls (see
+  Buttons). It wraps under the title on narrow screens with a `12px` gap.
+- **Deck** (`slot="deck"`): an optional `type-deck` sentence under the title,
+  `12px` below it, capped at `58ch`.
+
+The masthead carries only the wordmark and navigation. The page's title and
+the active nav item already say where the reader is, so the header does not
+repeat the page name as a breadcrumb.
+
+Spacing to content follows from what the header holds, or from an explicit
+`headerVariant`:
 
 - `title-only`: title, then `24px` to content.
-- `title-deck`: `12px` title-to-deck, then `32px` to content.
-- `title-meta`: `12px` title-to-meta, then `32px` to content.
-- `title-action`: title and action share a row from `sm`; `16px` stacked gap on
-  smaller screens; `32px` to content.
+- `deck`: `12px` title-to-deck, then `32px` to content.
+- `meta`: `12px` title-to-meta, then `32px` to content.
+- `action`: title and aside share a row; `32px` to content.
 
 The page title itself has no external margin. The page-header recipe owns the
-relationship.
+relationship. A route that needs a different header (About, blog posts) may
+still pass its own `slot="header"`, using the same `page-header` classes.
 
 ## Surfaces, borders, radius, and shadow
 
@@ -614,7 +631,7 @@ target are never duplicated.
   and a value captured once at import silently goes stale until reload.
 - Detect input type with `(hover: none) and (pointer: coarse)`, not by sniffing
   the user-agent string. A UA test reads iPad and touch laptops as desktop.
-- The boba game may use bespoke physical timing, but menus and controls still
+- The boba arcade may use bespoke physical timing, but menus and controls still
   honor reduced motion.
 
 ## Components
@@ -642,6 +659,14 @@ Variants:
 - Primary: ink background, cream text; inverted in dark mode.
 - Secondary: transparent or subtle surface, one-pixel strong border.
 - Tertiary: text link with an icon; no container.
+- Text control (`control-text`): the interface-font text button used for
+  filters, sort, tabs, pagination steps, and header actions. `12px` mono at
+  `400`, `28px` minimum height, `6px` horizontal padding, no border. Hover is a
+  4% ink fill; the pressed state (`aria-pressed="true"`) is a 7% fill with ink
+  text, so a row of tabs reads like the navigation rather than like a set of
+  boxes. `control-label` sets the dimension a control acts on ("year", "tag",
+  "sort") quieter than its value; `control-accent` marks an action rather than
+  a filter ("Download PDF", "clear").
 - Destructive: reserved for destructive actions, with explicit wording and a
   support color tested for contrast.
 
@@ -672,7 +697,16 @@ Rules:
 - Placeholder text uses `text-secondary`, not a failing muted color.
 - Errors appear inline below the field with text and icon; color alone is not
   sufficient.
-- Dropdown rows are at least `32px` high.
+- Select triggers are text controls: the dimension as a `control-label`, the
+  current value, and a `12px` chevron. A value that is filtering the view is
+  set in the accent, so a glance at a toolbar shows what is narrowing it.
+- Dropdown rows are `28px` high (dense), above the `24px` target minimum, with a
+  fixed marker column so the selected mark never shifts a label.
+- A long option list gets a filter field at the top of its menu and may show a
+  right-aligned count per option. Options with nothing behind them in the
+  current view drop out, except one that is selected or excluded.
+- Menus flip to the trigger's right edge when they would overflow the
+  viewport.
 - Control groups use `8–12px` gaps and wrap on narrow screens.
 
 ### Pills and tags
@@ -732,6 +766,26 @@ Rules:
 - When columns disappear in the stacked form, their headers disappear with
   them. Any icon-only column must regain a label inline.
 
+### Filter toolbars
+
+A collection with more than a couple of filters groups them by the question
+each one answers, in at most two rows of text controls, with no tinted band or
+boxed fields around them:
+
+- **Row one picks the list.** On the bookshelf: the category tabs, and at the
+  right the shelf switch ("read & watched" / "shelved"), each with its count.
+- **Row two narrows it.** An underline search field, the select triggers, and
+  `clear` when anything is set. Supporting disclosures (the rating scale) sit
+  at the end of the row.
+- Counts are faceted: each one says how many entries that choice would show
+  given every other active filter, so switching never lands on an unexpected
+  empty list.
+- The total lives in the counts and the pagination line (`1–30 of 572`); the
+  sort order lives in the column header. Neither is repeated in a status line.
+- A control that changes which list is shown must not move when it is used.
+  Copy that explains the views sits in a deck that stays the same for all of
+  them.
+
 ### Companion detail panels
 
 A record list paired with a detail view has two presentations, chosen by
@@ -753,12 +807,41 @@ loses scroll position.
 - Prefer a native `<details>`/`<summary>` for optional supporting content. It
   is keyboard-operable, touch-operable, and announced correctly with no
   scripting, which a hover tooltip is not.
-- Replace the default marker with the site’s `▸` caret, rotated on `[open]`,
-  and honour reduced motion on the rotation. `::marker` can only be sized and
-  coloured, never positioned, so the native triangle sits on the text baseline
-  rather than its centre.
+- Replace the default marker with the site’s drawn caret (see Marks).
+  `::marker` can only be sized and coloured, never positioned, so the native
+  triangle sits on the text baseline rather than its centre.
 - If the disclosure lives inside a status line, anchor its panel to that line
   and take it out of flow, so opening it does not reflow the content below.
+
+### Marks
+
+The site draws its two small typographic marks instead of taking them from a
+font. Both are the riso recipe of the banner and the interest loops at text
+size: an ink outline in the text colour, over a paper fill (`#FBF2E8`, dark
+`#2A2422`), with the accent plate (`#E85D4C`, dark `#F07563`) printed off
+register down and to the right. They live in `src/lib/marks.ts` and render
+through `<Mark kind="caret|dot" />`.
+
+- **Caret** (`kind="caret"`, `0.8em`) replaces `▸` on every disclosure. It
+  turns a quarter by itself inside an element with `aria-expanded="true"` or
+  a `<summary>` whose `<details>` is open; the plate keeps its down-right
+  offset while it turns. The turn uses `motion-slow` and the emphasized
+  easing, so reduced motion removes it.
+- **Separator** (`kind="dot"`, `0.6em`) replaces `·` between metadata items,
+  and marks the chosen option in a select menu, like circling it in pen. It is
+  the interest markers’ loop at separator size. As a separator it carries a
+  visually hidden `·`, so copied text and screen readers keep the separator;
+  as a purely visual marker it passes `text=""`.
+- Separators typed into trusted HTML (CV publications, Markdown posts) are
+  swapped for the drawn mark by `withMarks()`; don’t hand-write the SVG.
+- Each shape closes on itself. At this size an overshooting pen tail reads as
+  a stray stroke, not a gesture.
+- The plate’s offset must clear half the ink’s stroke with room to spare, or
+  the plate hides under the ink and the mark reads as plain grey.
+- A dark surface in both themes (the photo lightbox) sets `--mark-paper` and
+  `--mark-plate` for its marks.
+- Canvas text (the boba arcade’s floating scores) can’t hold a drawn mark and
+  keeps the plain `·`.
 
 ### Tooltips and popovers
 
@@ -807,7 +890,8 @@ loses scroll position.
 - Standard container.
 - `28px` top padding on mobile, `32px` from `md`.
 - Mobile layout may wrap into two rows with an `8–12px` gap.
-- Wordmark uses the documented small-size display exception.
+- Wordmark uses the documented small-size display exception. It stands alone:
+  no breadcrumb segment after it.
 - Navigation uses interface metadata type.
 - Navigation destinations are separated by a `16px` horizontal gap rather
   than punctuation.
@@ -917,8 +1001,8 @@ Rules:
   `ringOffsetColor` defaults are pinned to palette values in
   `tailwind.config.js` as a backstop, not as an invitation.
 
-The boba game keeps its own `3px` ring inside the documented expressive
-exception; it is solid, palette-derived, and meets the same contrast bar.
+The boba arcade inherits the global ring like everything else; its riso
+sheets do not restyle focus.
 
 ### Target size
 
@@ -1009,20 +1093,69 @@ May use:
 
 Must still use accessible semantic text, link, focus, and selection colors.
 
-### Boba game
+### Boba arcade
 
-The game owns a separate `.boba-*` system for:
+The pixel boba on the homepage opens a menu of four small games; the Konami
+code drops straight into the first. The arcade owns a separate `.boba-*`
+system, and its surfaces extend the riso banner rather than inventing an
+arcade look, so every game reads as part of the site:
 
-- sprite colors;
-- arcade typography;
-- dense HUD spacing;
-- score animation;
-- modal geometry;
-- game-specific shadows and borders.
+| Game       | Verb                         | Input                  | Where                  |
+| ---------- | ---------------------------- | ---------------------- | ---------------------- |
+| boba catch | Catch cups thrown by links   | Mouse                  | Desktop only           |
+| straw stab | Stab each cup on the beat    | Tap, click, Space      | Everywhere             |
+| order up   | Build drinks for the tickets | Tap, click, `1`–`8`    | Everywhere             |
+| cup stack  | Drop cups onto a tower       | Tap, click, Space      | Everywhere             |
 
-Editorial tokens do not need to replace game art values. Shared accessibility,
-input, focus, and reduced-motion rules still apply. Game styles must not leak
-into ordinary routes.
+- **Riso sheets.** HUD tickets, the menu, pause cards, results slips, and
+  order tickets are `.boba-riso` sheets: `#FBF2E8` paper (`#2A2422` dark) with
+  a `2.25px` ink outline, and an accent slab misregistered `5px` behind it
+  (`3px` for `.is-small` slips). Paper, outline, and slab share one
+  displacement filter so they wobble together. Each sheet sets a `--tilt` of at
+  most `±2deg` on its slab only, never on the text.
+- **HUD.** Tickets pinned along the top: score at the start, controls and
+  lives at the end, anything else in the middle (a phone moves the middle
+  ticket to a second row). A paper wash fades the site header behind them.
+  Timers are a drawn cup whose tea drains over the shift; lives are three
+  tapioca pearls, and a dropped one becomes a dashed ring.
+- **Stages.** Catch plays on the page itself, lightly dimmed. The others lay
+  paper over the page at 93%, so the site stays faintly visible underneath.
+- **Type.** The site's three roles, not an arcade face: Neue Haas Grotesk for
+  scores, clocks, countdowns, and titles; Optima for menu names, and Optima
+  italic for phases, decks, and section labels; mono `12px` at `400`/`500` for
+  labels, stats, and controls. No uppercase outside the stamps.
+- **Hand-drawn marks.** Countdowns and final scores are circled with the same
+  unclosed pen loops as the homepage interest markers, drawn on with a
+  stroke-dash reveal; straw stab rings the spot on its belt the same way. A
+  new personal best, and a ready order, get a crooked rubber stamp.
+  Separators in the arcade's own copy (tips, the serve toast) and order
+  up's "not yet" checklist marker use the site's drawn dot (see Marks);
+  canvas popups keep the plain `·`.
+- **Color.** Scoped `--b-*` variables on `.boba-ui` map to palette values and
+  switch with the theme; canvas marks read the same values through
+  `risoColors()`. Golden cups use ochre; canvas popups use the page's text
+  colors for the active theme. Sprite colors remain game art.
+- **Voice.** Lowercase titles and labels, sentence-case actions, and a light
+  joke in the decks (“The pearls will wait.”).
+
+Structure:
+
+- The arcade is loaded the first time it opens, so its code and its global
+  sheet (`arcade.css`) never ship with an ordinary page view. It sets
+  `data-justify="off"` so the paragraph justifier leaves game copy alone.
+- Shared pieces live in `src/lib/components/arcade/` (countdown, pause card,
+  results slip with the per-game leaderboard, pearls, cup timer, HUD buttons),
+  and each game's rules live in a DOM-free module under `src/lib/arcade/`
+  with node tests.
+- Straw stab draws its belt against the audio clock itself (`audioClock()` in
+  `sfx.ts`), so cups land on what is heard; pausing suspends the audio context
+  rather than stopping the music, so it resumes on the same beat. Without
+  running audio the game falls back to the page clock and plays silently.
+
+Shared focus, input, contrast, and reduced-motion rules still apply: reduced
+motion removes the pops, draws, stamps, jitter, and bumps and shows every mark
+in its finished state. Every game plays by keyboard as well as pointer, and
+touch devices hide key hints. Game styles must not leak into ordinary routes.
 
 ### Canvas and generated art
 

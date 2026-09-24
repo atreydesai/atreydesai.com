@@ -1,0 +1,627 @@
+/* Boba arcade: the expressive exception in the style guide.
+
+   Its surfaces borrow the homepage banner's two-colour riso treatment, so
+   colors here are hard-coded palette values rather than utilities; every
+   text pair is measured against the riso paper it sits on. Everything is
+   namespaced `.boba-*`, and this sheet only loads once the arcade opens. */
+
+body.boba-active .custom-cursor {
+  display: none !important;
+}
+
+/* --- Theme ---------------------------------------------------------------- */
+
+.boba-ui {
+  --b-paper: #fbf2e8; /* the banner's riso sheet */
+  --b-raised: #fffdfb; /* cream-50 */
+  --b-line: #1a1a1a; /* ink-900 */
+  --b-slab: #e85d4c; /* accent */
+  --b-strong: #1a1a1a; /* ink-900 */
+  --b-text: #434343; /* ink-700 */
+  --b-muted: #666666; /* ink-500 */
+  --b-accent: #c9462f; /* accent-dark */
+  --b-gold: #704a05; /* ochre-dark */
+  --b-rule: #c8c8c8; /* ink-200 */
+  --b-wash: rgb(26 26 26 / 0.05);
+  --b-mine: #ffe4db; /* blush-200 */
+  --b-tea: #e8b8a8; /* blush-400 */
+  --b-tea-rush: #e85d4c; /* accent */
+  --b-btn: #1a1a1a;
+  --b-btn-text: #fdf8f3;
+
+  color: var(--b-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: lining-nums tabular-nums;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.dark .boba-ui {
+  --b-paper: #2a2422;
+  --b-raised: #383838; /* ink-800 */
+  --b-line: #fdf8f3; /* cream-100 */
+  --b-slab: #f07563;
+  --b-strong: #fdf8f3; /* cream-100 */
+  --b-text: #faf0e6; /* cream-200 */
+  --b-muted: #e8d5c4; /* cream-400 */
+  --b-accent: #f18272; /* accent-light */
+  --b-gold: #dba84d; /* ochre-light */
+  --b-rule: #515151; /* ink-600 */
+  --b-wash: rgb(253 248 243 / 0.07);
+  --b-mine: rgb(232 93 76 / 0.2);
+  --b-tea: #d4847a; /* accent-muted */
+  --b-tea-rush: #f18272;
+  --b-btn: #fdf8f3;
+  --b-btn-text: #1a1a1a;
+}
+
+.boba-ui input {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* --- Stage: what the game is played on ------------------------------------ */
+
+.boba-stage {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-overlay);
+  touch-action: none;
+}
+
+/* Catch plays on the page itself, lightly dimmed. */
+.boba-stage.is-page {
+  cursor: none;
+  background:
+    radial-gradient(circle at 50% 88%, rgb(232 93 76 / 0.09), transparent 34%),
+    linear-gradient(rgb(253 248 243 / 0.28), rgb(253 248 243 / 0.34));
+  backdrop-filter: saturate(0.72) contrast(0.96);
+}
+
+.dark .boba-stage.is-page {
+  background:
+    radial-gradient(circle at 50% 88%, rgb(241 130 114 / 0.1), transparent 34%),
+    linear-gradient(rgb(26 26 26 / 0.26), rgb(26 26 26 / 0.34));
+  backdrop-filter: saturate(0.78) brightness(0.86);
+}
+
+/* The others lay a sheet of paper over the page, which stays faintly
+   visible underneath. */
+.boba-stage.is-paper {
+  background: rgb(253 248 243 / 0.93);
+  backdrop-filter: blur(2px) saturate(0.6);
+}
+
+.dark .boba-stage.is-paper {
+  background: rgb(26 26 26 / 0.93);
+}
+
+.boba-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--layer-overlay) + 1);
+  pointer-events: none;
+}
+
+/* --- Riso sheet -------------------------------------------------------------
+   Paper and outline on ::after, the misregistered accent slab on ::before,
+   both behind the content and both roughened by the same filter. The slab
+   takes a small per-sheet tilt, so each one is printed a little off. */
+
+.boba-riso {
+  position: relative;
+  isolation: isolate;
+}
+
+.boba-riso::before,
+.boba-riso::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  filter: url(#boba-rough);
+}
+
+.boba-riso::before {
+  background: var(--b-slab);
+  border-radius: 14px 5px 12px 7px;
+  transform: translate(5px, 5px) rotate(var(--tilt, 0deg));
+  transition: transform var(--motion-slow) var(--ease-emphasized);
+}
+
+.boba-riso::after {
+  background: var(--b-paper);
+  border: 2.25px solid var(--b-line);
+  border-radius: 12px 16px 11px 14px;
+}
+
+/* A smaller print for slips that sit many to a row. */
+.boba-riso.is-small::before {
+  transform: translate(3px, 3px) rotate(var(--tilt, 0deg));
+}
+
+.boba-riso.is-small::after {
+  border-width: 1.75px;
+}
+
+/* --- HUD: order tickets pinned along the top ------------------------------ */
+
+.boba-hud {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: calc(var(--layer-overlay) + 3);
+  padding: max(var(--space-3), env(safe-area-inset-top)) var(--space-6) 0;
+  pointer-events: none;
+}
+
+/* A wash of page paper behind the tickets, so the site header recedes
+   instead of peeking between them. */
+.boba-hud::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  height: calc(100% + var(--space-6));
+  background: linear-gradient(rgb(253 248 243 / 0.94) 55%, rgb(253 248 243 / 0));
+}
+
+.dark .boba-hud::before {
+  background: linear-gradient(rgb(26 26 26 / 0.94) 55%, rgb(26 26 26 / 0));
+}
+
+.boba-hud-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.boba-ticket {
+  display: inline-flex;
+  grid-row: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.25rem;
+  padding: var(--space-2) var(--space-4);
+  pointer-events: auto;
+  cursor: default;
+}
+
+.boba-ticket-start {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.boba-ticket-center {
+  grid-column: 2;
+}
+
+.boba-ticket-end {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.boba-ticket-icon {
+  display: grid;
+  place-items: center;
+  color: var(--b-line);
+}
+
+.boba-big {
+  min-width: 2ch;
+  color: var(--b-strong);
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.015em;
+  line-height: 1;
+}
+
+.boba-stack {
+  display: grid;
+  gap: var(--space-0-5);
+  justify-items: start;
+}
+
+.boba-meta {
+  color: var(--b-muted);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.boba-combo {
+  display: inline-block;
+  color: var(--b-muted);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  transform-origin: left bottom;
+}
+
+.boba-combo.active {
+  color: var(--b-accent);
+  font-weight: 500;
+  animation: boba-bump var(--motion-slow) var(--ease-emphasized);
+}
+
+.boba-phase {
+  color: var(--b-strong);
+  font-family: var(--font-prose);
+  font-size: 0.95rem;
+  font-style: italic;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.is-rush .boba-phase {
+  color: var(--b-accent);
+}
+
+/* In a rush the ticket's slab jitters like a sweaty barista. */
+.boba-riso.is-rush::before {
+  animation: boba-jitter 0.5s steps(2, end) infinite;
+}
+
+.boba-hud-buttons {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.boba-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--b-strong);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-instant) var(--ease-standard);
+}
+
+.boba-icon-btn:hover {
+  color: var(--b-accent);
+  background: var(--b-wash);
+}
+
+.boba-icon-btn[aria-pressed="true"] {
+  background: var(--b-wash);
+}
+
+.boba-icon-btn:active {
+  transform: translateY(1px);
+}
+
+/* --- First-run tip ---------------------------------------------------------- */
+
+.boba-tip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-1) var(--space-2);
+  width: fit-content;
+  max-width: min(45rem, calc(100vw - var(--space-8)));
+  margin: var(--space-4) auto 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--b-text);
+  background: var(--b-raised);
+  border: 1px solid var(--b-rule);
+  border-radius: var(--radius-inline);
+  box-shadow: var(--shadow-popover);
+  font-size: 0.75rem;
+  line-height: 1.333;
+  text-align: center;
+  pointer-events: auto;
+  animation: boba-rise var(--motion-slow) var(--ease-emphasized) both;
+}
+
+.dark .boba-tip {
+  box-shadow: var(--shadow-popover-dark);
+}
+
+.boba-tip-label {
+  margin-right: var(--space-1);
+  color: var(--b-strong);
+  font-family: var(--font-prose);
+  font-size: 0.95rem;
+  font-style: italic;
+}
+
+.boba-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  color: var(--b-muted);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.boba-tip .boba-keys {
+  margin-left: var(--space-2);
+}
+
+.boba-keys kbd {
+  padding: var(--space-0-5) var(--space-1-5);
+  color: var(--b-strong);
+  background: var(--b-wash);
+  border-radius: var(--radius-control);
+  font: inherit;
+}
+
+.boba-keys kbd:not(:first-child) {
+  margin-left: var(--space-1-5);
+}
+
+/* Touch devices have no keys to hint at. */
+@media (hover: none) and (pointer: coarse) {
+  .boba-keys {
+    display: none;
+  }
+}
+
+/* --- Dialogs ------------------------------------------------------------------ */
+
+.boba-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--layer-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--space-8) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgb(26 26 26 / 0.56);
+  backdrop-filter: blur(3px);
+}
+
+.boba-card {
+  width: min(100%, 23rem);
+  margin: auto;
+  padding: var(--space-8);
+  animation: boba-card-in var(--motion-reveal) var(--ease-emphasized) both;
+}
+
+.boba-title {
+  margin: 0;
+  color: var(--b-strong);
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+.boba-deck {
+  max-width: 58ch;
+  margin: var(--space-3) 0 0;
+  color: var(--b-text);
+  font-family: var(--font-prose);
+  font-size: 1.0625rem;
+  font-style: italic;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.boba-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-8);
+}
+
+.boba-actions.is-start {
+  justify-content: flex-start;
+  margin-top: var(--space-6);
+}
+
+.boba-keys-row {
+  margin: var(--space-4) 0 0;
+}
+
+.boba-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+  color: var(--b-btn-text);
+  background: var(--b-btn);
+  border: 1px solid var(--b-btn);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transition:
+    transform var(--motion-base) var(--ease-emphasized),
+    box-shadow var(--motion-base) var(--ease-emphasized);
+}
+
+/* Hover lifts the button off its own accent print, like the banner. */
+@media (hover: hover) {
+  .boba-btn:hover {
+    box-shadow: 3px 3px 0 var(--b-slab);
+    transform: translate(-2px, -2px);
+  }
+}
+
+.boba-btn:active {
+  box-shadow: 0 0 0 var(--b-slab);
+  transform: translateY(1px);
+  transition-duration: var(--motion-instant);
+}
+
+.boba-btn.secondary {
+  color: var(--b-strong);
+  background: transparent;
+  border-color: var(--b-muted);
+}
+
+.boba-btn:disabled {
+  box-shadow: none;
+  cursor: default;
+  opacity: 0.6;
+  transform: none;
+}
+
+/* --- Feedback ----------------------------------------------------------------- */
+
+.boba-miss-flash {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: calc(var(--layer-overlay) + 2);
+  height: 24vh;
+  pointer-events: none;
+  background: linear-gradient(transparent, rgb(201 70 47 / 0.22));
+  animation: boba-fade 0.25s ease-out both;
+}
+
+/* --- Motion --------------------------------------------------------------------- */
+
+@keyframes boba-bump {
+  40% {
+    transform: translateY(-3px) rotate(-3deg) scale(1.1);
+  }
+}
+
+@keyframes boba-jitter {
+  50% {
+    transform: translate(6px, 4px) rotate(calc(var(--tilt, 0deg) * -1.5));
+  }
+}
+
+@keyframes boba-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes boba-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) rotate(-1.5deg);
+  }
+}
+
+@keyframes boba-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-8deg);
+  }
+}
+
+@keyframes boba-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes boba-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes boba-shake {
+  30% {
+    transform: translateX(-4px) rotate(-4deg);
+  }
+  65% {
+    transform: translateX(3px) rotate(2deg);
+  }
+}
+
+/* --- Responsive ----------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .boba-hud {
+    padding-inline: var(--space-4);
+  }
+
+  .boba-ticket {
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
+  }
+
+  .boba-ticket-icon {
+    display: none;
+  }
+}
+
+/* Phones: score and controls share the first row; anything in the middle
+   moves to a second row. */
+@media (max-width: 640px) {
+  .boba-hud {
+    padding-top: max(var(--space-2), env(safe-area-inset-top));
+  }
+
+  .boba-hud-row {
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .boba-ticket {
+    min-height: 2.75rem;
+    padding: var(--space-1-5) var(--space-3);
+  }
+
+  .boba-ticket-end {
+    grid-column: 2;
+  }
+
+  .boba-ticket-center {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+  }
+
+  .boba-big {
+    font-size: 1.5rem;
+  }
+
+  .boba-scrim {
+    padding: var(--space-4);
+  }
+
+  .boba-card {
+    padding: var(--space-6) var(--space-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boba-riso.is-rush::before,
+  .boba-combo.active,
+  .boba-tip,
+  .boba-card,
+  .boba-miss-flash {
+    animation: none;
+  }
+
+  .boba-riso::before,
+  .boba-btn {
+    transition: none;
+  }
+
+  .boba-btn:hover {
+    transform: none;
+  }
+}

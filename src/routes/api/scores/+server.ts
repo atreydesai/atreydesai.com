@@ -8,9 +8,23 @@ import type { RequestHandler } from './$types';
 export const prerender = false;
 export const trailingSlash = 'ignore';
 
-// v2 scores use the timed/combo/golden rules and are intentionally kept
-// separate from the original endless-mode board.
-const PATH = 'boba/v2-leaderboard.json';
+// One board per arcade game. Catch keeps its v2 file: v2 scores use the
+// timed/combo/golden rules and are intentionally kept separate from the
+// original endless-mode board. A request without a game means catch, so
+// older clients keep working.
+const BOARDS = {
+	catch: 'boba/v2-leaderboard.json',
+	stab: 'boba/stab-v1-leaderboard.json',
+	orders: 'boba/orders-v1-leaderboard.json',
+	stack: 'boba/stack-v1-leaderboard.json',
+} as const;
+
+function boardPath(game: unknown): string | null {
+	if (game === null || game === undefined || game === '') return BOARDS.catch;
+	if (typeof game !== 'string' || !Object.hasOwn(BOARDS, game)) return null;
+	return BOARDS[game as keyof typeof BOARDS];
+}
+
 const MAX_ENTRIES = 50; // keep the blob small
 const TOP = 20; // returned to clients
 
@@ -43,27 +57,29 @@ function publicEntries(board: Entry[]): PublicEntry[] {
 	return board.map(({ name, score }) => ({ name, score }));
 }
 
-// The blob's URL is stable for a fixed pathname, so cache it across warm
+// Each blob's URL is stable for a fixed pathname, so cache it across warm
 // invocations: `list()` (an Advanced Operation: only 2,000/mo free on Hobby)
-// then runs just once per cold start instead of on every request. Reads hit
-// the URL directly afterward.
-let cachedUrl: string | null = null;
+// then runs at most once per board per cold start instead of on every
+// request. Reads hit the URL directly afterward.
+const cachedUrls = new Map<string, string>();
 
 // Resolves to the blob URL, null if the blob doesn't exist yet, or throws if
 // the store can't be reached: callers must not mistake "can't reach the
 // store" for "board is empty", or a subsequent write would clobber the board.
-async function resolveUrl(): Promise<string | null> {
-	if (cachedUrl) return cachedUrl;
-	const { blobs } = await list({ prefix: PATH, token });
-	cachedUrl = blobs.find((x) => x.pathname === PATH)?.url ?? null;
-	return cachedUrl;
+async function resolveUrl(path: string): Promise<string | null> {
+	const cached = cachedUrls.get(path);
+	if (cached) return cached;
+	const { blobs } = await list({ prefix: path, token });
+	const url = blobs.find((x) => x.pathname === path)?.url ?? null;
+	if (url) cachedUrls.set(path, url);
+	return url;
 }
 
 // [] = board genuinely empty (no blob yet); null = read failed, state unknown.
-async function readBoard(): Promise<Entry[] | null> {
+async function readBoard(path: string): Promise<Entry[] | null> {
 	if (!token) return [];
 	try {
-		const url = await resolveUrl();
+		const url = await resolveUrl(path);
 		if (!url) return [];
 		// Authenticated download via the SDK: works for blobs in a PRIVATE store
 		// (a plain fetch of the URL is rejected for private blobs). get() returns a
@@ -84,17 +100,17 @@ async function readBoard(): Promise<Entry[] | null> {
 	}
 }
 
-async function writeBoard(board: Entry[]): Promise<void> {
+async function writeBoard(path: string, board: Entry[]): Promise<void> {
 	// access MUST be 'private': the boba-game store is private, and put()
 	// otherwise defaults to 'public', which a private store rejects.
-	const { url } = await put(PATH, JSON.stringify(board), {
+	const { url } = await put(path, JSON.stringify(board), {
 		access: 'private',
 		contentType: 'application/json',
 		addRandomSuffix: false,
 		allowOverwrite: true,
 		token,
 	});
-	cachedUrl = url;
+	cachedUrls.set(path, url);
 }
 
 // Serialize read-modify-write cycles so concurrent submissions handled by the
@@ -134,9 +150,11 @@ function rateLimited(ip: string, now: number): boolean {
 	return bucket.count > RATE_LIMIT;
 }
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ url }) => {
+	const path = boardPath(url.searchParams.get('game'));
+	if (!path) return json({ available: false, scores: [] }, { status: 400 });
 	if (!token) return json({ available: false, scores: [] });
-	const board = await readBoard();
+	const board = await readBoard(path);
 	if (board === null) return json({ available: false, scores: [] });
 	board.sort((a, b) => b.score - a.score);
 	return json(
@@ -166,12 +184,15 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		return json({ ok: false, reason: 'too many submissions, slow down' }, { status: 429 });
 	}
 
-	let body: { name?: unknown; score?: unknown };
+	let body: { name?: unknown; score?: unknown; game?: unknown };
 	try {
 		body = await request.json();
 	} catch {
 		return json({ ok: false, reason: 'bad request' }, { status: 400 });
 	}
+
+	const path = boardPath(body.game);
+	if (!path) return json({ ok: false, reason: 'unknown game' }, { status: 400 });
 
 	// Validate score: a non-negative integer within a sane ceiling.
 	const score = Math.floor(Number(body.score));
@@ -188,7 +209,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
 	try {
 		return await withWriteLock(async () => {
-			const board = await readBoard();
+			const board = await readBoard(path);
 			if (board === null) {
 				// Unknown board state: refuse to write rather than risk replacing
 				// the real leaderboard with just this entry.
@@ -198,7 +219,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			board.push(entry);
 			board.sort((a, b) => b.score - a.score || a.t - b.t);
 			const trimmed = bestPerName(board).slice(0, MAX_ENTRIES);
-			await writeBoard(trimmed);
+			await writeBoard(path, trimmed);
 
 			const rank = trimmed.findIndex((e) => e === entry) + 1;
 			return json({

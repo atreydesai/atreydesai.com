@@ -1,11 +1,14 @@
 <script lang="ts">
     import { browser } from "$app/environment";
+    import { afterNavigate, replaceState } from "$app/navigation";
+    import { page } from "$app/state";
     import { onMount } from "svelte";
     import { fade, fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import PageShell from "$lib/components/PageShell.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import MediumIcon from "$lib/components/MediumIcon.svelte";
+    import Mark from "$lib/components/Mark.svelte";
     import RatingGlyph from "$lib/components/RatingGlyph.svelte";
     import BookDetail from "$lib/components/BookDetail.svelte";
     import { books, categories } from "$lib/content";
@@ -96,68 +99,152 @@
         ),
     ].sort((a, b) => a.localeCompare(b));
 
-    $: tagOptions = [
-        { value: "all", label: "All tags" },
-        ...allTags.map((tag) => ({ value: tag, label: tag })),
-    ];
-
     $: allMediums = [
         ...new Set(books.map((book) => book.medium).filter(Boolean)),
     ].sort((a, b) => a!.localeCompare(b!)) as string[];
 
-    $: mediumOptions = [
-        { value: "all", label: "All mediums" },
-        ...allMediums.map((medium) => ({ value: medium, label: medium })),
-    ];
-
-    $: filteredBooks = books.filter((book) => {
-        if ((book.status === "shelved") !== showShelved) return false;
-        if (selectedMedium !== "all" && book.medium !== selectedMedium) {
-            return false;
-        }
-        if (book.medium && excludedMediums.includes(book.medium)) {
-            return false;
-        }
-        if (selectedCategory === "favorites" && !book.favorite) return false;
-        if (
-            selectedCategory !== "all" &&
-            selectedCategory !== "favorites" &&
-            book.category !== selectedCategory
-        ) {
-            return false;
-        }
-
-        if (selectedTag !== "all" && !bookTags(book).includes(selectedTag)) {
-            return false;
-        }
-        if (
-            excludedTags.length > 0 &&
-            bookTags(book).some((tag) => excludedTags.includes(tag))
-        ) {
-            return false;
-        }
-
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase().trim();
-            const searchableText = [
+    // What the filters read for every entry on every keystroke, built once.
+    const tagsById = new Map(books.map((book) => [book.id, bookTags(book)]));
+    const searchTextById = new Map(
+        books.map((book) => [
+            book.id,
+            [
                 book.title,
                 book.author,
                 book.category,
                 book.medium,
                 book.notes,
                 book.content,
-                ...(book.tags || []),
-                ...toList(book.subcategory),
+                ...(tagsById.get(book.id) ?? []),
             ]
                 .filter(Boolean)
                 .join(" ")
-                .toLowerCase();
+                .toLowerCase(),
+        ]),
+    );
 
-            if (!searchableText.includes(query)) return false;
+    type Facet = "view" | "category" | "medium" | "tag";
+
+    // Bundled so every derived list below depends on it explicitly; `matches`
+    // reads it as an argument rather than closing over the loose variables,
+    // which Svelte would not track.
+    $: filters = {
+        category: selectedCategory,
+        tag: selectedTag,
+        excludedTags,
+        medium: selectedMedium,
+        excludedMediums,
+        shelved: showShelved,
+        query: searchQuery.trim().toLowerCase(),
+    };
+
+    // Whether an entry passes every active filter except `skip`. Leaving one
+    // facet out is what gives that facet its counts: how many entries each of
+    // its options would show, given everything else that's set.
+    function matches(book: Book, f: typeof filters, skip?: Facet): boolean {
+        if (skip !== "view" && (book.status === "shelved") !== f.shelved) {
+            return false;
         }
-
+        if (skip !== "medium") {
+            if (f.medium !== "all" && book.medium !== f.medium) return false;
+            if (book.medium && f.excludedMediums.includes(book.medium)) {
+                return false;
+            }
+        }
+        if (skip !== "category") {
+            if (f.category === "favorites" && !book.favorite) return false;
+            if (
+                f.category !== "all" &&
+                f.category !== "favorites" &&
+                book.category !== f.category
+            ) {
+                return false;
+            }
+        }
+        if (skip !== "tag") {
+            const tags = tagsById.get(book.id) ?? [];
+            if (f.tag !== "all" && !tags.includes(f.tag)) return false;
+            if (
+                f.excludedTags.length > 0 &&
+                tags.some((tag) => f.excludedTags.includes(tag))
+            ) {
+                return false;
+            }
+        }
+        if (f.query && !searchTextById.get(book.id)?.includes(f.query)) {
+            return false;
+        }
         return true;
-    });
+    }
+
+    function countBy(
+        list: Book[],
+        keysOf: (book: Book) => string[],
+    ): Map<string, number> {
+        const counts = new Map<string, number>();
+        for (const book of list) {
+            for (const key of keysOf(book)) {
+                counts.set(key, (counts.get(key) ?? 0) + 1);
+            }
+        }
+        return counts;
+    }
+
+    // Most common first, and options with nothing behind them in the current
+    // view drop out (268 tags otherwise). A value that's in use always stays,
+    // so it can still be cleared or un-excluded.
+    function facetOptions(
+        values: string[],
+        counts: Map<string, number>,
+        selected: string,
+        excluded: string[],
+    ) {
+        return values
+            .filter(
+                (value) =>
+                    (counts.get(value) ?? 0) > 0 ||
+                    value === selected ||
+                    excluded.includes(value),
+            )
+            .map((value) => ({
+                value,
+                label: value,
+                count: counts.get(value) ?? 0,
+            }))
+            .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    }
+
+    $: filteredBooks = books.filter((book) => matches(book, filters));
+
+    $: viewCounts = books.reduce(
+        (counts, book) => {
+            if (matches(book, filters, "view")) {
+                counts[book.status === "shelved" ? "shelved" : "done"] += 1;
+            }
+            return counts;
+        },
+        { done: 0, shelved: 0 },
+    );
+
+    $: mediumCounts = countBy(
+        books.filter((book) => matches(book, filters, "medium")),
+        (book) => (book.medium ? [book.medium] : []),
+    );
+
+    $: tagCounts = countBy(
+        books.filter((book) => matches(book, filters, "tag")),
+        (book) => tagsById.get(book.id) ?? [],
+    );
+
+    $: mediumOptions = [
+        { value: "all", label: "all mediums" },
+        ...facetOptions(allMediums, mediumCounts, selectedMedium, excludedMediums),
+    ];
+
+    $: tagOptions = [
+        { value: "all", label: "all tags" },
+        ...facetOptions(allTags, tagCounts, selectedTag, excludedTags),
+    ];
 
     $: sortedBooks = [...filteredBooks].sort((a, b) => {
         const modifier = sortDirection === "asc" ? 1 : -1;
@@ -216,7 +303,10 @@
         );
     }
 
-    $: if (urlReady) {
+    // `filters` is named here only so the statement re-runs on every filter
+    // change (dropdowns included); a call to filterSignature() alone isn't
+    // tracked. The signature check skips changes that came from the URL.
+    $: if (urlReady && filters) {
         const nextFilterSignature = filterSignature();
         if (nextFilterSignature !== lastFilterSignature) {
             currentPage = 1;
@@ -234,15 +324,35 @@
         pendingBookPageId = null;
     }
 
-    $: if (browser && urlReady) {
-        syncUrl();
-    }
+    // Everything the URL records. syncUrl() takes it as an argument because a
+    // `$:` statement only re-runs for the names written in it, not for what
+    // the functions it calls happen to read.
+    $: urlState = {
+        category: selectedCategory,
+        tag: selectedTag,
+        excludedTags,
+        medium: selectedMedium,
+        excludedMediums,
+        shelved: showShelved,
+        query: searchQuery.trim(),
+        sortField,
+        sortDirection,
+        selectedBookId,
+        currentPage,
+    };
+
+    $: if (urlReady) syncUrl(urlState);
 
     onMount(() => {
         readStateFromUrl();
-        urlReady = true;
 
-        const handlePopState = () => readStateFromUrl();
+        // Back/forward between this page's own history entries. A popstate
+        // that is leaving for another page is the router's: re-reading here
+        // would sync the URL, and that write would land on the other page.
+        const { pathname } = window.location;
+        const handlePopState = () => {
+            if (window.location.pathname === pathname) readStateFromUrl();
+        };
         window.addEventListener("popstate", handlePopState);
 
         const wideMedia = window.matchMedia(WIDE_LAYOUT_QUERY);
@@ -255,6 +365,15 @@
             wideMedia.removeEventListener("change", syncWide);
             unlockScroll();
         };
+    });
+
+    // The URL is only written from here on. On a full page load onMount runs
+    // while SvelteKit is still mounting the app, and its replaceState() fails
+    // until the router has started. A link to this same page (the header's
+    // bookshelf link) doesn't remount it, so that URL is read here instead.
+    afterNavigate(({ from, to }) => {
+        if (from?.route.id === to?.route.id) readStateFromUrl();
+        urlReady = true;
     });
 
     // Pin the body rather than setting `overflow: hidden`, which iOS Safari
@@ -406,8 +525,8 @@
         currentPage = 1;
     }
 
-    function toggleShelved() {
-        showShelved = !showShelved;
+    function setShelved(shelved: boolean) {
+        showShelved = shelved;
         currentPage = 1;
     }
 
@@ -460,30 +579,34 @@
         lastFilterSignature = filterSignature();
     }
 
-    function syncUrl() {
+    function syncUrl(state: typeof urlState) {
         const params = new URLSearchParams();
 
-        if (selectedCategory !== "all") params.set("c", selectedCategory);
-        if (selectedTag !== "all") params.set("tag", selectedTag);
-        if (excludedTags.length) params.set("excludeTag", excludedTags.join(","));
-        if (selectedMedium !== "all") params.set("m", selectedMedium);
-        if (excludedMediums.length)
-            params.set("excludeM", excludedMediums.join(","));
-        if (showShelved) params.set("view", "shelved");
-        if (searchQuery.trim()) params.set("q", searchQuery.trim());
-        if (!(sortField === "dateAdded" && sortDirection === "desc")) {
-            params.set("sort", sortField);
-            params.set("dir", sortDirection);
+        if (state.category !== "all") params.set("c", state.category);
+        if (state.tag !== "all") params.set("tag", state.tag);
+        if (state.excludedTags.length)
+            params.set("excludeTag", state.excludedTags.join(","));
+        if (state.medium !== "all") params.set("m", state.medium);
+        if (state.excludedMediums.length)
+            params.set("excludeM", state.excludedMediums.join(","));
+        if (state.shelved) params.set("view", "shelved");
+        if (state.query) params.set("q", state.query);
+        if (!(state.sortField === "dateAdded" && state.sortDirection === "desc")) {
+            params.set("sort", state.sortField);
+            params.set("dir", state.sortDirection);
         }
-        if (selectedBookId) params.set("book", selectedBookId);
-        if (currentPage > 1) params.set("p", String(currentPage));
+        if (state.selectedBookId) params.set("book", state.selectedBookId);
+        if (state.currentPage > 1) params.set("p", String(state.currentPage));
 
         const query = params.toString();
         const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
         const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
+        // Through SvelteKit, not history.replaceState(), which would overwrite
+        // the router's own entry state and break back/forward. Only the URL
+        // changes; page.state (shallow-routing state) is passed through.
         if (nextUrl !== currentUrl) {
-            window.history.replaceState(null, "", nextUrl);
+            replaceState(nextUrl, page.state);
         }
     }
 
@@ -501,109 +624,158 @@
     description="Curated reading list and book recommendations by Atrey Desai - science, philosophy, fiction, and essays with personal notes and ratings."
     url="https://atreydesai.com/bookshelf/"
     width="wide"
+    heading="bookshelf"
 >
-    <header
-        slot="header"
-        class="page-header {showShelved ? 'page-header-deck' : 'page-header-title-only'} max-w-3xl"
-    >
-        <h1
-            class="type-page-title text-ink-900 dark:text-cream-100"
-            class:mb-4={showShelved}
-        >
-            bookshelf
-        </h1>
-        {#if showShelved}
-            <p class="type-deck text-ink-600 dark:text-cream-400">
-                What I want to read and watch, but haven't gotten to yet.
-            </p>
-        {/if}
-    </header>
+    <svelte:fragment slot="deck">
+        What I've read and watched, plus a shelf of what I haven't gotten to
+        yet.
+    </svelte:fragment>
 
-    <section class="mb-5 flex flex-wrap items-center gap-2" aria-label="Bookshelf categories">
-        {#each categories as category}
-            <button
-                type="button"
-                class="control-compact inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 {selectedCategory === category.id ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
-                on:click={() => setCategory(category.id)}
-                aria-pressed={selectedCategory === category.id}
-            >
-                {#if category.id === "favorites"}
-                    <Star size={13} class={selectedCategory === category.id ? "fill-current" : ""} />
-                {/if}
-                {category.name}
-            </button>
-        {/each}
-        <button
-            type="button"
-            class="control-compact ml-auto inline-flex items-center gap-1.5 border text-sm transition-colors duration-200 {showShelved ? 'border-ink-900 bg-ink-900 text-cream-100 dark:border-cream-100 dark:bg-cream-100 dark:text-ink-900' : 'border-ink-200 bg-cream-50/80 text-ink-700 hover:bg-white/70 dark:border-ink-700 dark:bg-ink-800/60 dark:text-cream-300 dark:hover:bg-ink-700/70'}"
-            on:click={toggleShelved}
-            aria-pressed={showShelved}
-            title="Things I want to read or watch but haven't yet"
-        >
-            <Bookmark size={13} class={showShelved ? "fill-current" : ""} />
-            Shelved
-        </button>
-    </section>
+    <!-- Two rows, one job each. The first picks which list you're looking
+         at: a category, or the shelf of things not yet read. The second
+         narrows it: search, medium, tag. Everything is text-weight, so the
+         entries stay the loudest thing on the page. -->
+    <section class="shelf-toolbar" aria-label="Bookshelf filters">
+        <div class="shelf-row">
+            <div class="shelf-group" role="group" aria-label="Category">
+                {#each categories as category}
+                    <button
+                        type="button"
+                        class="control-text"
+                        aria-pressed={selectedCategory === category.id}
+                        on:click={() => setCategory(category.id)}
+                    >
+                        {#if category.id === "favorites"}
+                            <Star
+                                size={12}
+                                class={selectedCategory === category.id
+                                    ? "fill-current"
+                                    : ""}
+                            />
+                        {/if}
+                        {category.name.toLowerCase()}
+                    </button>
+                {/each}
+            </div>
 
-    <section
-        class="mb-5 flex flex-col gap-3 border-y border-ink-200/80 bg-cream-200/40 px-4 py-3 dark:border-ink-800 dark:bg-ink-900/35 md:flex-row md:items-center"
-        aria-label="Bookshelf controls"
-    >
-        <div class="relative min-w-0 flex-1">
-            <Search
-                size={15}
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
-            />
-            <input
-                type="text"
-                placeholder="Search reading notes..."
-                bind:value={searchQuery}
-                on:input={() => (currentPage = 1)}
-                class="control-regular w-full border border-ink-200 bg-cream-50/70 pl-9 pr-9 text-sm text-ink-700 placeholder:text-ink-400 focus:border-ink-500 dark:border-ink-700 dark:bg-ink-900/70 dark:text-cream-300 dark:focus:border-cream-400"
-            />
-            {#if searchQuery}
+            <div class="shelf-group shelf-views" role="group" aria-label="Shelf">
                 <button
                     type="button"
-                    aria-label="Clear search"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 transition-colors hover:text-ink-700 dark:hover:text-cream-200"
-                    on:click={() => {
-                        searchQuery = "";
-                        currentPage = 1;
-                    }}
+                    class="control-text"
+                    aria-pressed={!showShelved}
+                    on:click={() => setShelved(false)}
                 >
-                    <X size={14} />
+                    read &amp; watched
+                    <span class="shelf-count">{viewCounts.done}</span>
                 </button>
-            {/if}
+                <button
+                    type="button"
+                    class="control-text"
+                    aria-pressed={showShelved}
+                    on:click={() => setShelved(true)}
+                    title="Things I want to read or watch but haven't yet"
+                >
+                    shelved
+                    <span class="shelf-count">{viewCounts.shelved}</span>
+                </button>
+            </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-            <CustomSelect
-                options={mediumOptions}
-                bind:value={selectedMedium}
-                bind:excluded={excludedMediums}
-                excludable
-                placeholder="All mediums"
-                ariaLabel="Filter by medium"
-            />
-            <CustomSelect
-                options={tagOptions}
-                bind:value={selectedTag}
-                bind:excluded={excludedTags}
-                excludable
-                placeholder="All tags"
-                ariaLabel="Filter by tag"
-                fastScroll
-                cascadeDuration={200}
-            />
-            {#if activeFilters}
-                <button
-                    type="button"
-                    class="text-xs font-medium text-ink-500 underline decoration-ink-300 underline-offset-[3px] transition-colors hover:text-ink-800 dark:text-cream-400 dark:decoration-ink-600 dark:hover:text-cream-100"
-                    on:click={clearFilters}
-                >
-                    Clear filters
-                </button>
-            {/if}
+        <div class="shelf-row shelf-refine">
+            <div class="shelf-search">
+                <Search size={13} />
+                <input
+                    type="text"
+                    placeholder="search titles, authors, notes"
+                    aria-label="Search the bookshelf"
+                    autocomplete="off"
+                    spellcheck="false"
+                    bind:value={searchQuery}
+                    on:input={() => (currentPage = 1)}
+                />
+                {#if searchQuery}
+                    <button
+                        type="button"
+                        class="shelf-search-clear"
+                        aria-label="Clear search"
+                        on:click={() => {
+                            searchQuery = "";
+                            currentPage = 1;
+                        }}
+                    >
+                        <X size={12} />
+                    </button>
+                {/if}
+            </div>
+
+            <div class="shelf-group">
+                <CustomSelect
+                    options={mediumOptions}
+                    bind:value={selectedMedium}
+                    bind:excluded={excludedMediums}
+                    excludable
+                    label="medium"
+                    placeholder="all"
+                    ariaLabel="Filter by medium"
+                />
+                <CustomSelect
+                    options={tagOptions}
+                    bind:value={selectedTag}
+                    bind:excluded={excludedTags}
+                    excludable
+                    searchable
+                    searchPlaceholder="find a tag"
+                    label="tag"
+                    placeholder="all"
+                    ariaLabel="Filter by tag"
+                    animateOptions={false}
+                />
+                {#if activeFilters}
+                    <button
+                        type="button"
+                        class="control-text control-accent"
+                        on:click={clearFilters}
+                    >
+                        clear
+                    </button>
+                {/if}
+            </div>
+
+            <!-- The two rating columns are icon-only, and their meaning used
+                 to live exclusively in a hover tooltip on the column header —
+                 unreachable by touch. A native disclosure works everywhere.
+                 Its panel is anchored to this row and taken out of flow, so
+                 opening it never pushes the list down. -->
+            <details class="rating-scale">
+                <summary class="control-text">
+                    <Mark kind="caret" />
+                    <span>rating scale</span>
+                </summary>
+                <dl class="rating-scale-panel space-y-2 border border-ink-200 bg-cream-50 p-3 dark:border-ink-700 dark:bg-ink-900">
+                    <div class="flex items-baseline gap-2">
+                        <Heart size={13} class="shrink-0 translate-y-[2px] text-ink-400 dark:text-ink-400" />
+                        <div>
+                            <dt class="type-meta text-ink-900 dark:text-cream-100">
+                                {ratingLegend.enjoyment.title}
+                            </dt>
+                            <dd class="type-body-small text-ink-600 dark:text-cream-400">
+                                {ratingLegend.enjoyment.body}
+                            </dd>
+                        </div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <BadgeQuestionMark size={13} class="shrink-0 translate-y-[2px] text-ink-400 dark:text-ink-400" />
+                        <div>
+                            <dt class="type-meta text-ink-900 dark:text-cream-100">
+                                {ratingLegend.importance.title}
+                            </dt>
+                            <dd class="type-body-small text-ink-600 dark:text-cream-400">
+                                {ratingLegend.importance.body}
+                            </dd>
+                        </div>
+                    </div>
+                </dl>
+            </details>
         </div>
     </section>
 
@@ -613,58 +785,6 @@
             : ''}"
     >
         <section class="min-w-0 max-w-full overflow-hidden" aria-label="Bookshelf entries">
-            <div class="relative mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-500 dark:text-cream-400">
-                <button
-                    type="button"
-                    class="transition-colors hover:text-ink-900 dark:hover:text-cream-100"
-                    on:click={clearFilters}
-                    title="Clear filters"
-                >
-                    {sortedBooks.length} {sortedBooks.length === 1 ? "entry" : "entries"}
-                </button>
-
-                <!-- The two rating columns are icon-only, and their meaning used
-                     to live exclusively in a hover tooltip on the column header —
-                     unreachable by touch. A native disclosure works everywhere.
-                     It sits on this line, and opens as an absolutely-positioned
-                     panel, so the legend costs no vertical space in either
-                     state instead of pushing the list down by its own height. -->
-                <details class="rating-scale mr-auto">
-                    <summary class="type-meta text-ink-500 dark:text-cream-400">
-                        <span class="rating-scale-caret" aria-hidden="true">▸</span>
-                        <span>rating scale</span>
-                    </summary>
-                    <dl class="rating-scale-panel space-y-2 border border-ink-200 bg-cream-50 p-3 dark:border-ink-700 dark:bg-ink-900">
-                        <div class="flex items-baseline gap-2">
-                            <Heart size={13} class="shrink-0 translate-y-[2px] text-ink-400 dark:text-ink-400" />
-                            <div>
-                                <dt class="type-meta text-ink-900 dark:text-cream-100">
-                                    {ratingLegend.enjoyment.title}
-                                </dt>
-                                <dd class="type-body-small text-ink-600 dark:text-cream-400">
-                                    {ratingLegend.enjoyment.body}
-                                </dd>
-                            </div>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <BadgeQuestionMark size={13} class="shrink-0 translate-y-[2px] text-ink-400 dark:text-ink-400" />
-                            <div>
-                                <dt class="type-meta text-ink-900 dark:text-cream-100">
-                                    {ratingLegend.importance.title}
-                                </dt>
-                                <dd class="type-body-small text-ink-600 dark:text-cream-400">
-                                    {ratingLegend.importance.body}
-                                </dd>
-                            </div>
-                        </div>
-                    </dl>
-                </details>
-
-                <span>
-                    sorted by {sortLabel(sortField)} {sortDirection === "asc" ? "ascending" : "descending"}
-                </span>
-            </div>
-
             <!-- Filtering and sorting change the list silently otherwise: the
                  count above is visual only. -->
             <p class="sr-only" aria-live="polite" aria-atomic="true">
@@ -680,7 +800,7 @@
             <div class="surface-ledger hidden max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 md:block dark:border-ink-800 dark:bg-ink-900/45">
                 <div class="w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[1080px] table-fixed text-sm">
-                        <thead class="border-b border-ink-200/90 bg-cream-200/60 text-xs font-normal text-ink-500 dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
+                        <thead class="border-b border-ink-200/90 bg-cream-200/60 font-mono text-xs font-normal text-ink-500 [&_th]:font-normal dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
                             <tr>
                                 <th class="w-[35%] px-3 py-2 text-left" aria-sort={ariaSort("title")}>
                                     <button
@@ -740,7 +860,7 @@
                                     </button>
                                 </th>
                                 <th class="w-[7%] px-3 py-2 text-center" aria-sort={ariaSort("enjoyment")}>
-                                    <div class="relative inline-flex justify-center">
+                                    <div class="relative mx-auto flex w-fit justify-center">
                                         <button
                                             type="button"
                                             class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
@@ -776,7 +896,7 @@
                                     </div>
                                 </th>
                                 <th class="w-[7%] px-3 py-2 text-center" aria-sort={ariaSort("importance")}>
-                                    <div class="relative inline-flex justify-center">
+                                    <div class="relative mx-auto flex w-fit justify-center">
                                         <button
                                             type="button"
                                             class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
@@ -831,7 +951,7 @@
                                     </button>
                                 </th>
                                 <th class="w-[18%] px-3 py-2 text-left">
-                                    <span class="inline-flex items-center gap-1.5">
+                                    <span class="flex items-center gap-1.5">
                                         <Tag size={14} />
                                         Tags
                                     </span>
@@ -853,7 +973,7 @@
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                                 <tr
-                                    class="cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/[0.08] dark:outline-accent-light/30' : ''}"
+                                    class="group cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/[0.08] dark:outline-accent-light/30' : ''}"
                                     aria-current={selectedBookId === book.id ? "true" : undefined}
                                     on:click={(event) => onRowClick(event, book.id)}
                                     on:mouseenter={() => (hoveredBookId = book.id)}
@@ -865,11 +985,12 @@
                                                 medium={book.medium}
                                                 size={15}
                                                 animate={hoveredBookId === book.id || selectedBookId === book.id}
-                                                className="shrink-0 text-ink-400 dark:text-ink-400"
+                                                strokeWidth={1.5}
+                                                className="shrink-0 text-ink-300 transition-colors duration-150 group-hover:text-ink-500 dark:text-ink-600 dark:group-hover:text-ink-400"
                                             />
                                             {#if book.favorite}
                                                 <span
-                                                    class="status-icon inline-flex shrink-0 text-accent dark:text-accent-light"
+                                                    class="status-icon inline-flex shrink-0 text-accent opacity-60 transition-opacity duration-150 group-hover:opacity-100 dark:text-accent-light"
                                                     aria-label="Favorite"
                                                 >
                                                     <Star size={13} />
@@ -877,7 +998,7 @@
                                             {/if}
                                             {#if isCurrent(book)}
                                                 <span
-                                                    class="status-icon inline-flex shrink-0 text-ochre-dark dark:text-ochre-light"
+                                                    class="status-icon inline-flex shrink-0 text-ochre-dark opacity-60 transition-opacity duration-150 group-hover:opacity-100 dark:text-ochre-light"
                                                     aria-label={currentStatusLabel(book)}
                                                 >
                                                     <Bookmark size={13} />
@@ -994,11 +1115,12 @@
                                 <MediumIcon
                                     medium={book.medium}
                                     size={15}
-                                    className="mt-1 shrink-0 text-ink-400 dark:text-ink-400"
+                                    strokeWidth={1.5}
+                                    className="mt-1 shrink-0 text-ink-300 dark:text-ink-600"
                                 />
                                 {#if book.favorite}
                                     <span
-                                        class="status-icon mt-1 inline-flex shrink-0 text-accent dark:text-accent-light"
+                                        class="status-icon mt-1 inline-flex shrink-0 text-accent opacity-60 dark:text-accent-light"
                                         aria-label="Favorite"
                                     >
                                         <Star size={13} />
@@ -1006,7 +1128,7 @@
                                 {/if}
                                 {#if isCurrent(book)}
                                     <span
-                                        class="status-icon mt-1 inline-flex shrink-0 text-ochre-dark dark:text-ochre-light"
+                                        class="status-icon mt-1 inline-flex shrink-0 text-ochre-dark opacity-60 dark:text-ochre-light"
                                         aria-label={currentStatusLabel(book)}
                                     >
                                         <Bookmark size={13} />
@@ -1109,10 +1231,10 @@
             {#if sortedBooks.length === 0}
                 <div class="border-x border-b border-t border-ink-200/90 bg-cream-50/60 py-12 text-center text-ink-500 md:border-t-0 dark:border-ink-800 dark:bg-ink-900/45 dark:text-cream-400">
                     <BookOpenText size={42} class="mx-auto mb-4 opacity-50" />
-                    <p>No books match your filters.</p>
+                    <p>Nothing on this shelf matches those filters.</p>
                     <button
                         type="button"
-                        class="mt-2 text-sm text-accent underline underline-offset-[3px] dark:text-accent-light"
+                        class="control-text control-accent mt-2"
                         on:click={clearFilters}
                     >
                         Clear filters
@@ -1120,54 +1242,53 @@
                 </div>
             {/if}
 
-            <nav
-                class="mt-4 flex flex-col gap-3 text-sm text-ink-500 dark:text-cream-400 sm:flex-row sm:items-center sm:justify-between"
-                aria-label="Bookshelf pagination"
-            >
+            <nav class="shelf-pages" aria-label="Bookshelf pagination">
                 <span>
-                    Showing {entryStart} to {pageEnd} of {sortedBooks.length} entries
+                    {entryStart}–{pageEnd} of {sortedBooks.length}
                 </span>
-                <div class="flex items-center gap-1">
-                    <button
-                        type="button"
-                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
-                        on:click={() => setPage(1)}
-                        disabled={currentPage === 1}
-                        aria-label="First page"
-                    >
-                        <ChevronsLeft size={15} />
-                    </button>
-                    <button
-                        type="button"
-                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
-                        on:click={() => setPage(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        aria-label="Previous page"
-                    >
-                        <ChevronLeft size={15} />
-                    </button>
-                    <span class="px-3 font-mono text-xs tabular-nums">
-                        {currentPage} / {totalPages}
-                    </span>
-                    <button
-                        type="button"
-                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
-                        on:click={() => setPage(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                        aria-label="Next page"
-                    >
-                        <ChevronRight size={15} />
-                    </button>
-                    <button
-                        type="button"
-                        class="border border-ink-200 bg-cream-50 p-1.5 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:border-ink-700 dark:bg-ink-800 dark:hover:bg-ink-700"
-                        on:click={() => setPage(totalPages)}
-                        disabled={currentPage === totalPages}
-                        aria-label="Last page"
-                    >
-                        <ChevronsRight size={15} />
-                    </button>
-                </div>
+                {#if totalPages > 1}
+                    <div class="flex items-center gap-0.5">
+                        <button
+                            type="button"
+                            class="control-text shelf-page-step"
+                            on:click={() => setPage(1)}
+                            disabled={currentPage === 1}
+                            aria-label="First page"
+                        >
+                            <ChevronsLeft size={14} />
+                        </button>
+                        <button
+                            type="button"
+                            class="control-text shelf-page-step"
+                            on:click={() => setPage(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            aria-label="Previous page"
+                        >
+                            <ChevronLeft size={14} />
+                        </button>
+                        <span class="px-2">
+                            {currentPage} / {totalPages}
+                        </span>
+                        <button
+                            type="button"
+                            class="control-text shelf-page-step"
+                            on:click={() => setPage(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            aria-label="Next page"
+                        >
+                            <ChevronRight size={14} />
+                        </button>
+                        <button
+                            type="button"
+                            class="control-text shelf-page-step"
+                            on:click={() => setPage(totalPages)}
+                            disabled={currentPage === totalPages}
+                            aria-label="Last page"
+                        >
+                            <ChevronsRight size={14} />
+                        </button>
+                    </div>
+                {/if}
             </nav>
         </section>
 
@@ -1246,22 +1367,165 @@
         cursor: pointer;
     }
 
-    /* Quiet native disclosure: the marker stays, the summary reads as metadata
-       rather than a control. */
+    .shelf-toolbar {
+        display: grid;
+        gap: var(--space-2);
+        margin-bottom: var(--space-4);
+    }
+
+    .shelf-row {
+        /* Anchors the rating-scale panel. */
+        position: relative;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-2) var(--space-4);
+    }
+
+    .shelf-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-1);
+    }
+
+    @media (min-width: 768px) {
+        .shelf-views {
+            margin-left: auto;
+        }
+    }
+
+    .shelf-count {
+        color: theme("colors.ink.500");
+    }
+
+    :global(.dark) .shelf-count {
+        color: theme("colors.cream.500");
+    }
+
+    /* An underline field rather than a box, so it sits in the row like the
+       text controls beside it. */
+    .shelf-search {
+        display: flex;
+        flex: 1 1 16rem;
+        max-width: 22rem;
+        align-items: center;
+        gap: var(--space-1-5);
+        min-height: 1.75rem;
+        padding-inline: var(--space-1-5);
+        color: theme("colors.ink.400");
+        border-bottom: 1px solid theme("colors.ink.200");
+        border-radius: var(--radius-control) var(--radius-control) 0 0;
+        transition: border-color var(--motion-base) var(--ease-standard);
+    }
+
+    .shelf-search:focus-within {
+        border-bottom-color: theme("colors.ink.500");
+    }
+
+    :global(.dark) .shelf-search {
+        color: theme("colors.cream.500");
+        border-bottom-color: theme("colors.ink.700");
+    }
+
+    :global(.dark) .shelf-search:focus-within {
+        border-bottom-color: theme("colors.cream.500");
+    }
+
+    .shelf-search input {
+        flex: 1;
+        min-width: 0;
+        min-height: 1.75rem;
+        padding: 0;
+        color: theme("colors.ink.900");
+        background: transparent;
+        border: 0;
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        line-height: 1.333;
+    }
+
+    .shelf-search input::placeholder {
+        color: theme("colors.ink.500");
+    }
+
+    :global(.dark) .shelf-search input {
+        color: theme("colors.cream.100");
+    }
+
+    :global(.dark) .shelf-search input::placeholder {
+        color: theme("colors.cream.500");
+    }
+
+    /* The shared ring goes around the whole field (icon, text, clear) rather
+       than the bare input inside it. Browsers without :has() keep the ring on
+       the input. */
+    .shelf-search:has(input:focus-visible) {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+    }
+
+    @supports selector(:has(*)) {
+        .shelf-search input:focus-visible {
+            outline: none;
+        }
+    }
+
+    .shelf-search-clear {
+        display: inline-flex;
+        padding: var(--space-1);
+        color: theme("colors.ink.400");
+        background: none;
+        border: 0;
+        border-radius: var(--radius-control);
+        cursor: pointer;
+        transition: color var(--motion-base) var(--ease-standard);
+    }
+
+    .shelf-search-clear:hover {
+        color: theme("colors.ink.800");
+    }
+
+    :global(.dark) .shelf-search-clear:hover {
+        color: theme("colors.cream.100");
+    }
+
+    .shelf-pages {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-2) var(--space-4);
+        margin-top: var(--space-3);
+        color: theme("colors.ink.500");
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        line-height: 1.333;
+        font-variant-numeric: lining-nums tabular-nums;
+    }
+
+    :global(.dark) .shelf-pages {
+        color: theme("colors.cream.400");
+    }
+
+    .shelf-page-step {
+        justify-content: center;
+        min-width: 1.75rem;
+        padding-inline: 0;
+    }
+
+    /* Quiet native disclosure at the end of the refine row. */
     .rating-scale {
         position: static;
+        margin-left: auto;
     }
 
     /* `::marker` can only be sized and coloured, never vertically positioned,
        so the native triangle sits on the text baseline instead of its centre.
-       Drop it for a real element that flex can centre, using the same ▸ caret
-       the other disclosures on the site use. */
+       Drop it for the site's drawn caret ($lib/marks), which turns itself a
+       quarter when the <details> opens. */
     .rating-scale > summary {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-1-5);
         width: fit-content;
-        cursor: pointer;
         list-style: none;
     }
 
@@ -1269,30 +1533,13 @@
         display: none;
     }
 
-    .rating-scale-caret {
-        display: inline-block;
-        font-size: 0.85em;
-        line-height: 1;
-        transition: transform var(--motion-base) var(--ease-emphasized);
-    }
-
-    .rating-scale[open] .rating-scale-caret {
-        transform: rotate(90deg);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .rating-scale-caret {
-            transition: none;
-        }
-    }
-
-    /* Anchored to the status row (which is `relative`), not to the <details>,
+    /* Anchored to the refine row (which is `relative`), not to the <details>,
        so the panel spans a readable width instead of the summary's. Taken out
        of flow so opening it never reflows the list below. */
     .rating-scale-panel {
         position: absolute;
         top: calc(100% + var(--space-1-5));
-        left: 0;
+        right: 0;
         z-index: var(--layer-popover);
         width: max-content;
         max-width: min(34rem, 100%);
@@ -1303,13 +1550,5 @@
 
     :global(.dark) .rating-scale-panel {
         box-shadow: var(--shadow-popover-dark);
-    }
-
-    .rating-scale > summary:hover {
-        color: theme("colors.ink.900");
-    }
-
-    :global(.dark) .rating-scale > summary:hover {
-        color: theme("colors.cream.100");
     }
 </style>

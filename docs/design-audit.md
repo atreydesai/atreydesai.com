@@ -104,7 +104,7 @@ A later correction pass should include screenshots at 375, 480, 768, 1024,
 - The site uses left-aligned reading text, balanced display headings, old-style
   figures in prose, tabular figures for data, and reduced-motion handling.
 - Research cards use a ledger-row language instead of generic elevated cards.
-- The riso banner, paper texture, animated research media, and boba game give
+- The riso banner, paper texture, animated research media, and boba arcade give
   the site a distinctive visual voice.
 
 These qualities should be preserved.
@@ -486,13 +486,14 @@ brand moment. They should not be normalized to ordinary card tokens. The
 component should use semantic colors where possible, but its geometry is an
 approved exception.
 
-### Boba game
+### Boba arcade
 
-The game is a self-contained illustrated experience with a deliberately denser
-type scale, brighter sprite palette, and arcade-like spacing. Its `.boba-*`
-namespace should remain separate from the editorial design system. Shared
-requirements still apply to focus visibility, reduced motion, keyboard access,
-and text contrast.
+The arcade is a self-contained set of illustrated games. Their sprites keep a
+brighter palette, and the HUD, menu, and dialogs extend the riso banner
+treatment (wobbly paper sheets, a misregistered accent slab, hand-drawn loops)
+using the site's type roles. Its `.boba-*` namespace should remain separate
+from the editorial design system. Shared requirements still apply to focus
+visibility, reduced motion, keyboard access, and text contrast.
 
 ### Photography and Bookshelf widths
 

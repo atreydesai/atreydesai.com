@@ -4,6 +4,7 @@
     import ShaderCanvas from "$lib/components/ShaderCanvas.svelte";
     import { formatLongDate } from "$lib/utils/date";
     import { marked } from "marked";
+    import { withMarks } from "$lib/marks";
     import { ArrowLeft, CalendarDays } from "@jis3r/icons";
     import type { PageData } from "./$types";
 
@@ -27,7 +28,7 @@
         let match: RegExpExecArray | null;
         while ((match = re.exec(src)) !== null) {
             if (match.index > last) {
-                out.push({ type: "html", content: marked(src.slice(last, match.index)) as string });
+                out.push({ type: "html", content: withMarks(marked(src.slice(last, match.index)) as string) });
             }
             if (match[0] === "[[fruits]]") {
                 out.push({ type: "fruits" });
@@ -39,7 +40,7 @@
             last = match.index + match[0].length;
         }
         if (last < src.length) {
-            out.push({ type: "html", content: marked(src.slice(last)) as string });
+            out.push({ type: "html", content: withMarks(marked(src.slice(last)) as string) });
         }
         return out;
     }
@@ -65,7 +66,7 @@
     <!-- Back link -->
     <a
         href="/blog/"
-        class="inline-flex items-center gap-1 text-sm text-ink-500 dark:text-cream-500 hover:text-accent dark:hover:text-accent-light transition-colors mb-8"
+        class="type-meta inline-flex items-center gap-1 text-ink-500 dark:text-cream-500 hover:text-accent-dark dark:hover:text-accent-light transition-colors mb-8"
     >
         <ArrowLeft size={14} />
         Back to blog

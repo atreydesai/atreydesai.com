@@ -1,5 +1,6 @@
 <script lang="ts">
     import PageShell from "$lib/components/PageShell.svelte";
+    import Mark from "$lib/components/Mark.svelte";
     import { posts } from "$lib/content";
     import { formatShortDate } from "$lib/utils/date";
     import { SquareArrowOutUpRight } from "@jis3r/icons";
@@ -51,7 +52,7 @@
                     >
                         {#if post.externalSite}
                             <span class="blog-row-site">{post.externalSite}</span>
-                            <span aria-hidden="true">·</span>
+                            <Mark kind="dot" text="" />
                         {/if}
                         <time datetime={post.date}
                             >{formatShortDate(post.date)}</time

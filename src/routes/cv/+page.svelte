@@ -1,5 +1,7 @@
 <script lang="ts">
     import PageShell from "$lib/components/PageShell.svelte";
+    import Mark from "$lib/components/Mark.svelte";
+    import { withMarks } from "$lib/marks";
     import { Download } from "@jis3r/icons";
     import cvYaml from "../../content/cv.yaml";
 
@@ -44,29 +46,23 @@
     title="CV | Atrey Desai"
     description="Curriculum Vitae of Atrey Desai - undergraduate researcher at UMD with experience at Learn Prompting, CLIP Lab, Brown University, and UT Arlington."
     url="https://atreydesai.com/cv/"
+    heading="curriculum vitae"
 >
-    <header slot="header" class="page-header page-header-action">
-        <h1 class="type-page-title text-ink-900 dark:text-cream-100">
-            curriculum vitae
-        </h1>
-
+    <svelte:fragment slot="aside">
+        {#if data.cvLastUpdated}
+            <span>updated {data.cvLastUpdated}</span>
+        {/if}
         <a
             href="/cv.pdf"
             download="Atrey_Desai_CV.pdf"
-            class="btn-primary inline-flex items-center gap-2"
+            class="control-text control-accent"
             on:mouseenter={() => (hoveredDownload = true)}
             on:mouseleave={() => (hoveredDownload = false)}
         >
-            <Download size={16} animate={hoveredDownload} />
+            <Download size={13} animate={hoveredDownload} />
             Download PDF
         </a>
-    </header>
-
-    {#if data.cvLastUpdated}
-        <p class="text-sm italic text-ink-400 dark:text-cream-500 mb-8">
-            last updated {data.cvLastUpdated}
-        </p>
-    {/if}
+    </svelte:fragment>
 
     <!-- PDF Embed -->
     <div
@@ -88,7 +84,9 @@
                 <p class="font-medium text-ink-900 dark:text-cream-100">
                     {cv.education.school}
                 </p>
-                <p>{cv.education.degree}</p>
+                <p>
+                    {#each cv.education.degree.split(" · ") as part, i}{#if i}{" "}<Mark kind="dot" />{" "}{/if}{part}{/each}
+                </p>
                 <p class="text-sm text-ink-500 dark:text-cream-500 mt-1">
                     {@html cv.education.advisors_html}
                 </p>
@@ -147,7 +145,7 @@
                         </h3>
                         <ol class="list-decimal list-inside space-y-3 text-sm">
                             {#each group.items as item}
-                                <li>{@html item}</li>
+                                <li>{@html withMarks(item)}</li>
                             {/each}
                         </ol>
                     </div>

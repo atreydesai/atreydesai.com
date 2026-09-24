@@ -12,13 +12,8 @@
   import Header from "$lib/components/Header.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import CustomCursor from "$lib/components/CustomCursor.svelte";
-  import BobaGame from "$lib/components/BobaGame.svelte";
   import { startJustify } from "$lib/justify";
-  import {
-    BOBA_DESKTOP_QUERY,
-    bobaMode,
-    openBoba,
-  } from "$lib/boba";
+  import { BOBA_DESKTOP_QUERY, arcadeScreen, openArcade } from "$lib/boba";
   import {
     PAGE_TRANSITIONS_ENABLED,
     PAGE_TRANSITION_DURATION_MS,
@@ -39,25 +34,33 @@
 
   let isTouch = browser && matchMedia(TOUCH_QUERY).matches;
   let reducedMotion = browser && matchMedia(REDUCED_MOTION_QUERY).matches;
-  let bobaDesktop = false;
+  // The arcade is loaded the first time it opens, so its code and styles
+  // never ship with an ordinary page view.
+  let Arcade: (typeof import("$lib/components/arcade/Arcade.svelte"))["default"] | null =
+    null;
+  $: if (browser && $arcadeScreen && !Arcade) {
+    void import("$lib/components/arcade/Arcade.svelte").then((module) => {
+      Arcade = module.default;
+    });
+  }
 
   // Transitions are a desktop-pointer nicety; on touch they compete with the
   // platform's own back-swipe animation.
   $: animatePages = PAGE_TRANSITIONS_ENABLED && !isTouch && !reducedMotion;
 
-  // Konami easter egg: launches the persistent "boba mode" minigame.
-  // (`bobaMode` lives in $lib/boba so the homepage boba can launch it too.)
+  // Konami easter egg: drops straight into boba catch. (The arcade store
+  // lives in $lib/boba so the homepage boba can open the menu too.)
 
   onMount(() => {
     // Knuth–Plass justification for running prose, site-wide.
     const stopJustify = startJustify();
 
+    // Catch needs a mouse; if the pointer stops qualifying mid-game (a
+    // window squeezed narrow, a tablet undocked), fall back to the menu.
     const bobaMedia = window.matchMedia(BOBA_DESKTOP_QUERY);
     const syncBobaDesktop = () => {
-      bobaDesktop = bobaMedia.matches;
-      if (!bobaDesktop) bobaMode.set(false);
+      if (!bobaMedia.matches && $arcadeScreen === "catch") arcadeScreen.set("menu");
     };
-    syncBobaDesktop();
     bobaMedia.addEventListener("change", syncBobaDesktop);
 
     // Input mode and Reduce Motion can both change while the page is open —
@@ -88,7 +91,7 @@
       "color:#b0a498;font-size:11px;font-style:italic",
     );
 
-    // Easter egg #2: the konami code launches boba mode.
+    // Easter egg #2: the konami code launches boba catch.
     const KONAMI = [
       "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
       "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a",
@@ -100,7 +103,7 @@
         pos += 1;
         if (pos === KONAMI.length) {
           pos = 0;
-          openBoba();
+          openArcade("catch");
         }
       } else {
         // Restart, but treat this key as a possible first step.
@@ -144,8 +147,8 @@
 
 <div
   class="min-h-screen flex flex-col cursor-custom"
-  inert={$bobaMode && bobaDesktop}
-  aria-hidden={$bobaMode && bobaDesktop ? "true" : undefined}
+  inert={$arcadeScreen !== null}
+  aria-hidden={$arcadeScreen !== null ? "true" : undefined}
 >
   <a
     href="#main-content"
@@ -188,9 +191,9 @@
   <Footer />
 </div>
 
-<!-- Konami easter egg: the persistent boba-catching minigame. -->
-{#if $bobaMode && bobaDesktop}
-  <BobaGame on:close={() => bobaMode.set(false)} />
+<!-- The boba arcade: the homepage boba opens its menu, Konami opens catch. -->
+{#if $arcadeScreen && Arcade}
+  <svelte:component this={Arcade} />
 {/if}
 
 <style>

@@ -16,6 +16,7 @@
     export let medium: string | null | undefined = null;
     export let animate = false;
     export let size = 15;
+    export let strokeWidth = 2;
     export let className = "";
 
     $: normalized = (medium || "").toLowerCase();
@@ -23,25 +24,25 @@
 </script>
 
 {#if normalized === "book"}
-    <BookOpenText {size} {animate} class={iconClass} />
+    <BookOpenText {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "short story" || normalized === "chapter"}
-    <BookText {size} {animate} class={iconClass} />
+    <BookText {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "blog post"}
-    <NotebookPen {size} {animate} class={iconClass} />
+    <NotebookPen {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "article"}
-    <FilePenLine {size} {animate} class={iconClass} />
+    <FilePenLine {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "research paper" || normalized === "paper"}
-    <FileChartLine {size} {animate} class={iconClass} />
+    <FileChartLine {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "thread"}
-    <MessageSquareMore {size} {animate} class={iconClass} />
+    <MessageSquareMore {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "video"}
-    <Play {size} {animate} class={iconClass} />
+    <Play {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "movie"}
-    <Clapperboard {size} {animate} class={iconClass} />
+    <Clapperboard {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "show" || normalized === "drama"}
-    <GalleryHorizontal {size} {animate} class={iconClass} />
+    <GalleryHorizontal {size} {strokeWidth} {animate} class={iconClass} />
 {:else if normalized === "essay" || normalized === "report"}
-    <FileText {size} {animate} class={iconClass} />
+    <FileText {size} {strokeWidth} {animate} class={iconClass} />
 {:else}
-    <FileQuestionMark {size} {animate} class={iconClass} />
+    <FileQuestionMark {size} {strokeWidth} {animate} class={iconClass} />
 {/if}
