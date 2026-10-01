@@ -117,7 +117,10 @@
       const loadGa = () => {
         const w = window as any;
         w.dataLayer = w.dataLayer || [];
-        function gtag(...args: any[]) { w.dataLayer.push(args); }
+        function gtag(..._args: any[]) {
+          // Google processes gtag commands as Arguments objects, not arrays.
+          w.dataLayer.push(arguments);
+        }
         gtag("js", new Date());
         gtag("config", "G-4NTR1HXBLW");
         const s = document.createElement("script");
