@@ -1,31 +1,10 @@
 # Atrey Desai website style guide
 
-Version: 1.2  
-Status: canonical and implemented, including the focus system and dark-theme
-contrast. Light-theme contrast and pointer-target sizing remain deferred by
-direction and are marked as such below.  
-Companion document: [Website design-system audit](./design-audit.md)
-
-## Purpose
-
-This guide defines the website’s visual language and the rules for applying it.
-It is intentionally more specific than a mood board: it names the available
-tokens, explains their roles, defines component states, and records the few
-places where expressive exceptions are allowed.
-
-The typography, spacing, layout, surface, motion, icon, and component rules are
-implemented in the current working tree, as are the focus system and the
-dark-theme color mappings.
-
-Two items in the accessibility chapter remain deliberately unimplemented, and
-are called out where they appear:
-
-- **Light-theme contrast.** The light palette is unchanged by direction.
-  Several light-theme pairs still fall below `4.5:1`; the audit lists them.
-- **Pointer target size.** Navigation links and interactive pills are still
-  smaller than the `24px` minimum.
-
-Everything else in the chapter is implemented and verified.
+This guide defines the website’s visual language and the rules for applying it:
+the available tokens and their roles, component states, and the few places
+where expressive exceptions are allowed. Everything here is implemented except
+two accessibility items deferred by direction, which are marked where they
+appear: light-theme contrast and pointer target size.
 
 ## Design character
 
@@ -242,14 +221,8 @@ The `-light` shades exist only for dark surfaces; no light-theme component uses
 them. Each was chosen to clear `4.5:1` on **both** the page (`ink-900`) and the
 raised dark surfaces where these colors actually appear — the sheet, the note
 sidebar, the select dropdown, a selected row — and to clear it again once the
-family’s own `-dark` tint is composited underneath as a pill fill.
-
-A value that passes on `ink-900` alone is not sufficient. `accent-light` at
-`#F07563` measured `6.16:1` on the page but only `4.15:1` on `ink-800`, which
-is exactly where it carries the selected state in a dropdown.
-
-The `mist` family is reserved. It must not be introduced until it has a named
-semantic role.
+family’s own `-dark` tint is composited underneath as a pill fill. A value
+that passes on `ink-900` alone is not sufficient.
 
 ### Semantic color tokens
 
@@ -287,12 +260,10 @@ and `focus-ring` are CSS variables because they are inherited or read by a
 single global rule; every other component-scoped role uses the matching
 Tailwind primitive so the palette remains the single source of truth.
 
-The dark theme is verified. Every route and every interactive state — the
-sheet, the note sidebar, both select dropdowns, the lightbox, the empty state,
-an expanded homepage — measures at or above `4.5:1` for ordinary text and `3:1`
-for large text and essential graphics, computed against the **composited**
-background rather than the declared one. The light theme is unchanged by
-direction and still contains failing pairs; see the audit.
+The dark theme meets `4.5:1` for ordinary text and `3:1` for large text and
+essential graphics on every route and interactive state, measured against the
+composited background. The light theme still has failing pairs, deferred by
+direction; see [Contrast](#contrast).
 
 ### Color-use rules
 
@@ -405,7 +376,7 @@ device.
 | Variant    |                    Maximum width | Gutters          | Use                                |
 | ---------- | -------------------------------: | ---------------- | ---------------------------------- |
 | `reading`  |                           `68ch` | inherited        | Long-form text only                |
-| `standard` |                          `820px` | `16 / 24px`      | Home, Research, Blog, CV, Resume   |
+| `standard` |                          `820px` | `16 / 24px`      | Home, Research, Blog, CV           |
 | `wide`     |                         `1152px` | `16 / 24 / 32px` | Photography and Bookshelf          |
 | `overlay`  | `1280px` or viewport-constrained | `16–32px`        | Media lightboxes and game panels   |
 
@@ -605,8 +576,7 @@ get their own, shorter budget. All of it lives in `src/lib/motion.ts`:
 | `PAGE_TRANSITION_OUT_Y`        |  `4px` | Exit travel                              |
 
 `motion-reveal` (`400ms`) is for a section entering an already-visible page,
-not for the page itself. A route change at `motion-reveal` plus an enter delay
-put roughly half a second of animation between one page of text and the next.
+not for the page itself.
 
 The outgoing and incoming pages occupy the same single-cell grid inside one
 stable `<main>`, so they overlap during the transition instead of stacking and
@@ -619,7 +589,8 @@ target are never duplicated.
 - Color transitions use `motion-fast` or `motion-base`.
 - A press state uses `translateY(1px)` or `scale(0.98)`.
 - Staggers use `30–40ms` steps and stop increasing after ten items.
-- Page transitions use `motion-reveal` and no more than `10px` movement.
+- Page transitions use the budget in [Page transitions](#page-transitions) and
+  no more than `10px` movement.
 - Disclosures may animate height only when content remains accessible and no
   clipping occurs under text-spacing overrides.
 - `prefers-reduced-motion: reduce` removes decorative travel, shake, stagger,
@@ -963,9 +934,10 @@ deferred by direction; both are marked below.
   that only exists once opened: dropdowns, sheets, sidebars, lightboxes, empty
   states, and expanded disclosures.
 
-**Status.** Dark theme: verified clean across every route and interactive
-state. Light theme: **deferred by direction**, and still failing in the places
-the audit records.
+**Status.** Dark theme: clean across every route and interactive state. Light
+theme: **deferred by direction**. Known failures: `RatingGlyph`'s `ink-400`
+placeholders (`3.69:1`), the About sidenote opacity, `footnote-ref` in `accent`
+(`3.26:1`), and the `404` hero in `ink-300` (`2.36:1`).
 
 ### Focus
 
@@ -984,10 +956,9 @@ interactive element:
 
 Rules:
 
-- **A component never removes the ring.** `outline: none` is not permitted.
-  Replacing the ring with a background tint or a one-pixel border shift is the
-  same mistake wearing a different hat: the tints that were used for this
-  measured `1.09:1` against their own surface.
+- **A component never removes the ring.** `outline: none` is not permitted,
+  and neither is replacing the ring with a background tint or a one-pixel
+  border shift, which fall far below `3:1` against their own surface.
 - A component may adjust `outline-offset` and `border-radius` so the ring hugs
   the right shape. Where a control sits flush inside a clipped, scrolling
   container — a select option — use a negative offset so the ring is drawn
@@ -995,9 +966,8 @@ Rules:
 - Do not use an opacity that drops the ring below `3:1`. Rings at `35–40%`
   opacity blend to roughly `1.6:1` and are not a focus indicator.
 - Hover and focus may share a tint, but focus keeps the ring on top of it.
-- `ring-*` utilities are not part of the system. Tailwind’s stock `ring-*`
-  and `ring-offset-*` default to blue-500 on white, which is how an off-palette
-  blue ring reached the skip link and the 404 buttons. `ringColor` and
+- `ring-*` utilities are never a focus indicator. Tailwind’s stock `ring-*`
+  and `ring-offset-*` default to blue-500 on white, so `ringColor` and
   `ringOffsetColor` defaults are pinned to palette values in
   `tailwind.config.js` as a backstop, not as an invitation.
 
@@ -1167,8 +1137,9 @@ website system.
 
 Every paper carries a live explainer: hand-written inline SVG animated by a
 GSAP timeline (`src/lib/explainers/`), registered by paper id and rendered by
-`PaperMedia` in place of the static image. Every explainer is drawn on the
-same plate so the set reads as one system.
+`PaperMedia` as the paper's card media and lightbox. A paper without an
+explainer shows no media. Every explainer is drawn on the same plate so the set
+reads as one system.
 
 - **Plate.** A 240-unit square on `surface-raised` (`cream-50` / `ink-800`),
   inside the standard `8px` media frame. Content sits in a 14-unit margin; the
@@ -1193,10 +1164,10 @@ same plate so the set reads as one system.
 - **Motion.** Arrivals fade and rise 4 units on `power3.out` (the emphasized
   ease) in `0.45s`; exits fade in `0.3s`; lines draw rather than pop. Each beat
   holds long enough to read, and the loop ends back on its first frame.
-- **The first frame is the poster.** It is server-rendered, complete without
-  script, and exported as the paper's `image` (`?xp-t=0` on the dev-only
-  `/dev/explainers` route). Elements for later beats are in the markup with
-  `xp-later` and revealed by the timeline.
+- **The first frame is the poster.** It is server-rendered and complete
+  without script (`?xp-t=0` on the dev-only `/dev/explainers` route shows it).
+  Elements for later beats are in the markup with `xp-later` and revealed by
+  the timeline.
 - **Charts.** Bars grow from the axis upward and their numbers appear only
   once the bar has arrived. Bars sit in a group clipped just above the axis and
   the axis line is drawn after them, so no bar is ever painted over its axis

@@ -25,17 +25,15 @@
 
   export let data: LayoutData;
 
-  // Both of these were previously evaluated once at module scope: the touch
-  // test by sniffing the UA string (which reads iPad and touch laptops as
-  // desktop), and Reduce Motion by reading matchMedia a single time (so
-  // toggling it mid-session did nothing until reload). Now both track live.
+  // Both are read through live media queries (kept in sync in onMount): a
+  // trackpad can be attached or Reduce Motion flipped while the page is open.
   const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";
   const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
   let isTouch = browser && matchMedia(TOUCH_QUERY).matches;
   let reducedMotion = browser && matchMedia(REDUCED_MOTION_QUERY).matches;
-  // The arcade is loaded the first time it opens, so its code and styles
-  // never ship with an ordinary page view.
+  // The arcade component is loaded the first time it opens, so its code and
+  // styles never ship with an ordinary page view.
   let Arcade: (typeof import("$lib/components/arcade/Arcade.svelte"))["default"] | null =
     null;
   $: if (browser && $arcadeScreen && !Arcade) {
@@ -47,9 +45,6 @@
   // Transitions are a desktop-pointer nicety; on touch they compete with the
   // platform's own back-swipe animation.
   $: animatePages = PAGE_TRANSITIONS_ENABLED && !isTouch && !reducedMotion;
-
-  // Konami easter egg: drops straight into boba catch. (The arcade store
-  // lives in $lib/boba so the homepage boba can open the menu too.)
 
   onMount(() => {
     // Knuth–Plass justification for running prose, site-wide.

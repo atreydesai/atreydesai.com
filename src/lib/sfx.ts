@@ -2,12 +2,12 @@
 // asset-free: small oscillator voices, filtered noise drums, keyed feedback,
 // and a short look-ahead scheduler keep it light and responsive.
 
+import { BARS_PER_SONG, barSeconds } from "$lib/arcade/stab-engine.js";
+
 const MASTER_LEVEL = 0.48;
 const MUTE_KEY = "boba_muted_v2";
 const MUSIC_LOOKAHEAD_SECONDS = 0.24;
 const MUSIC_TICK_MS = 75;
-/** Each song plays this many bars before the soundtrack moves on. */
-export const BARS_PER_SONG = 8;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -387,7 +387,7 @@ function runMusicScheduler() {
     }
 
     scheduleBar(song, barIndex, nextBarTime);
-    nextBarTime += 4 * (60 / song.bpm);
+    nextBarTime += barSeconds(song.bpm);
     barIndex += 1;
 
     if (barIndex >= BARS_PER_SONG) {

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { afterNavigate } from "$app/navigation";
     import PageShell from "$lib/components/PageShell.svelte";
-    import { tick } from "svelte";
+    import { onDestroy, tick } from "svelte";
     import ResearchCard from "$lib/components/ResearchCard.svelte";
     import CustomSelect from "$lib/components/CustomSelect.svelte";
     import { papers, talks } from "$lib/content";
@@ -15,6 +15,8 @@
     let selectedTag: string = "all";
     let sortOrder: string = "year-desc";
     let highlightedPaperId: string | null = null;
+    let scrollTimer: ReturnType<typeof setTimeout> | undefined;
+    let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 
     const sortOptions = [
         { value: "year-desc", label: "year descending" },
@@ -69,20 +71,30 @@
 
         await tick();
 
+        // A newer deep link takes over: an earlier link's timers would scroll
+        // back to its target or clear this highlight early.
+        clearTimeout(scrollTimer);
+        clearTimeout(highlightTimer);
+
         highlightedPaperId = hash;
 
         // Leave one frame of scheduling margin after the outgoing page transition
         // before measuring the deep-link target.
-        setTimeout(() => {
+        scrollTimer = setTimeout(() => {
             const el = document.getElementById(hash);
             if (el) {
                 el.scrollIntoView({ behavior: "auto", block: "start" });
             }
         }, PAGE_TRANSITION_DURATION_MS + PAGE_TRANSITION_SCROLL_BUFFER_MS);
 
-        setTimeout(() => {
+        highlightTimer = setTimeout(() => {
             highlightedPaperId = null;
         }, 3000);
+    });
+
+    onDestroy(() => {
+        clearTimeout(scrollTimer);
+        clearTimeout(highlightTimer);
     });
 
     $: years = [...new Set(papers.map((p) => p.year))].sort(
@@ -170,8 +182,16 @@
                 new Date(a.appearances[0].date).getTime(),
         );
 
-    $: talkGroups = groupedTalks.filter((g) => g.type === "research talk");
-    $: presentationGroups = groupedTalks.filter((g) => g.type === "poster");
+    $: talkSections = [
+        {
+            heading: "talks",
+            groups: groupedTalks.filter((g) => g.type === "research talk"),
+        },
+        {
+            heading: "presentations",
+            groups: groupedTalks.filter((g) => g.type === "poster"),
+        },
+    ];
 
     function clearFilters() {
         selectedYear = "all";
@@ -294,123 +314,66 @@
         </section>
     {/if}
 
-    {#if talkGroups.length > 0}
-        <section class="mb-12">
-            <div class="section-rule mb-5">
-                <h2 class="section-heading mb-0">talks</h2>
-                <div class="section-rule-line"></div>
-            </div>
+    {#each talkSections as section}
+        {#if section.groups.length > 0}
+            <section class="mb-12">
+                <div class="section-rule mb-5">
+                    <h2 class="section-heading mb-0">{section.heading}</h2>
+                    <div class="section-rule-line"></div>
+                </div>
 
-            <div class="space-y-4">
-                {#each talkGroups as talkGroup}
-                    <article class="surface-card surface-card-hover p-4 md:p-5">
-                        <h3
-                            class="type-item-heading text-ink-900 dark:text-cream-100"
-                        >
-                            {talkGroup.title}
-                        </h3>
+                <div class="space-y-4">
+                    {#each section.groups as talkGroup}
+                        <article class="surface-card surface-card-hover p-4 md:p-5">
+                            <h3
+                                class="type-item-heading text-ink-900 dark:text-cream-100"
+                            >
+                                {talkGroup.title}
+                            </h3>
 
-                        <div class="mt-3 space-y-2.5">
-                            {#each talkGroup.appearances as appearance}
-                                <div class="text-sm text-ink-600 dark:text-cream-300">
-                                    <p>
-                                        {appearance.venue}, {formatMonthYear(appearance.date)}
-                                    </p>
+                            <div class="mt-3 space-y-2.5">
+                                {#each talkGroup.appearances as appearance}
+                                    <div class="text-sm text-ink-600 dark:text-cream-300">
+                                        <p>
+                                            {appearance.venue}, {formatMonthYear(appearance.date)}
+                                        </p>
 
-                                    {#if appearance.slides || appearance.video}
-                                        <div
-                                            class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs"
-                                        >
-                                            {#if appearance.slides}
-                                                <a
-                                                    href={appearance.slides}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    class="link-subtle"
-                                                >
-                                                    Slides
-                                                </a>
-                                            {/if}
+                                        {#if appearance.slides || appearance.video}
+                                            <div
+                                                class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                                            >
+                                                {#if appearance.slides}
+                                                    <a
+                                                        href={appearance.slides}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        class="link-subtle"
+                                                    >
+                                                        Slides
+                                                    </a>
+                                                {/if}
 
-                                            {#if appearance.video}
-                                                <a
-                                                    href={appearance.video}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    class="link-subtle"
-                                                >
-                                                    Video
-                                                </a>
-                                            {/if}
-                                        </div>
-                                    {/if}
-                                </div>
-                            {/each}
-                        </div>
-                    </article>
-                {/each}
-            </div>
-        </section>
-    {/if}
-
-    {#if presentationGroups.length > 0}
-        <section class="mb-12">
-            <div class="section-rule mb-5">
-                <h2 class="section-heading mb-0">presentations</h2>
-                <div class="section-rule-line"></div>
-            </div>
-
-            <div class="space-y-4">
-                {#each presentationGroups as talkGroup}
-                    <article class="surface-card surface-card-hover p-4 md:p-5">
-                        <h3
-                            class="type-item-heading text-ink-900 dark:text-cream-100"
-                        >
-                            {talkGroup.title}
-                        </h3>
-
-                        <div class="mt-3 space-y-2.5">
-                            {#each talkGroup.appearances as appearance}
-                                <div class="text-sm text-ink-600 dark:text-cream-300">
-                                    <p>
-                                        {appearance.venue}, {formatMonthYear(appearance.date)}
-                                    </p>
-
-                                    {#if appearance.slides || appearance.video}
-                                        <div
-                                            class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs"
-                                        >
-                                            {#if appearance.slides}
-                                                <a
-                                                    href={appearance.slides}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    class="link-subtle"
-                                                >
-                                                    Slides
-                                                </a>
-                                            {/if}
-
-                                            {#if appearance.video}
-                                                <a
-                                                    href={appearance.video}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    class="link-subtle"
-                                                >
-                                                    Video
-                                                </a>
-                                            {/if}
-                                        </div>
-                                    {/if}
-                                </div>
-                            {/each}
-                        </div>
-                    </article>
-                {/each}
-            </div>
-        </section>
-    {/if}
+                                                {#if appearance.video}
+                                                    <a
+                                                        href={appearance.video}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        class="link-subtle"
+                                                    >
+                                                        Video
+                                                    </a>
+                                                {/if}
+                                            </div>
+                                        {/if}
+                                    </div>
+                                {/each}
+                            </div>
+                        </article>
+                    {/each}
+                </div>
+            </section>
+        {/if}
+    {/each}
 
     {#if filteredPapers.length === 0}
         <div class="surface-card p-8 text-center">

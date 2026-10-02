@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import MediumIcon from "$lib/components/MediumIcon.svelte";
     import RatingGlyph from "$lib/components/RatingGlyph.svelte";
-    import type { Book } from "$lib/content";
+    import type { Book } from "$lib/books";
     import { formatMonthYear } from "$lib/utils/date";
     import { parseInline } from "$lib/utils/text";
     import {
@@ -110,24 +110,23 @@
             </button>
         {/if}
 
-        <!-- Ratings and date ride the pill line rather than a labelled
-             three-column grid below it, which costs the panel ~75px of height
-             before any actual content. Same icon + compact-meter treatment the
-             card list already uses, so the glyphs read the same in both places:
-             the icon and colour carry what the "Appreciation" / "Importance"
-             headings used to, and each meter keeps its own title tooltip. -->
+        <!-- Ratings and date ride the pill line, so they cost the panel no
+             height before the notes. Same icon + meter treatment as the card
+             list, so the glyphs read the same in both places: the icon and
+             colour say which rating it is (the visually hidden label names it
+             for screen readers), and each meter keeps its own title tooltip. -->
         <div
             class="ml-auto flex items-center gap-x-3 type-meta text-ink-500 dark:text-cream-400"
         >
             <span class="inline-flex items-center gap-1.5">
                 <span class="sr-only">{ratingLegend.enjoyment.title}</span>
                 <Heart size={12} />
-                <RatingGlyph value={book.enjoyment} type="enjoyment" compact />
+                <RatingGlyph value={book.enjoyment} type="enjoyment" />
             </span>
             <span class="inline-flex items-center gap-1.5">
                 <span class="sr-only">{ratingLegend.importance.title}</span>
                 <BadgeQuestionMark size={12} />
-                <RatingGlyph value={book.importance} type="importance" compact />
+                <RatingGlyph value={book.importance} type="importance" />
             </span>
             <span class="tabular-nums">{shortDate(book.dateAdded)}</span>
         </div>

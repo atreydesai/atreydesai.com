@@ -2,19 +2,10 @@
 // list and the detail panel both need them, and the detail panel is its own
 // component so it can render either as the desktop sidebar or as a sheet on
 // narrow screens.
-import type { Book } from "$lib/content";
-
-export function toList(value: string | string[] | undefined): string[] {
-    if (!value) return [];
-    if (Array.isArray(value)) return value;
-    return value
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-}
+import type { Book } from "$lib/books";
 
 export function bookTags(book: Book): string[] {
-    return [...new Set([...(book.tags || []), ...toList(book.subcategory)])];
+    return [...new Set([...(book.tags || []), ...book.subcategory])];
 }
 
 export function previewTags(book: Book): string[] {
@@ -37,7 +28,7 @@ export function currentStatusLabel(book: Book): string {
 }
 
 export function getNoteParagraphs(book: Book): string[] {
-    return (book.notes || book.content || "")
+    return (book.notes || "")
         .split(/\n{2,}/)
         .map((paragraph) => paragraph.trim())
         .filter(Boolean);

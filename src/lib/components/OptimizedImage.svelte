@@ -4,7 +4,6 @@
     export let src: string;
     export let alt: string;
     export let aspectRatio: "landscape" | "portrait" | "square" = "landscape";
-    export let priority: boolean = false; // For above-the-fold images
     export let class_: string = "";
     export { class_ as class };
     // Responsive candidate set (e.g. "img-400.webp 400w, img-800.webp 800w").
@@ -40,7 +39,7 @@
         aspectRatio
     ]} {class_}"
 >
-    <!-- Blur placeholder background with CSS pattern -->
+    <!-- Gradient placeholder, faded out once the image has loaded -->
     <div
         class="absolute inset-0 bg-gradient-to-br from-cream-200 to-cream-300 transition-opacity duration-[400ms] dark:from-ink-700 dark:to-ink-800"
         class:opacity-0={loaded}
@@ -53,9 +52,9 @@
         {alt}
         {sizes}
         srcset={srcset || undefined}
-        loading={priority ? "eager" : "lazy"}
+        loading="lazy"
         decoding="async"
-        fetchpriority={priority ? "high" : "auto"}
+        fetchpriority="auto"
         on:load={handleLoad}
         class="h-full w-full object-cover transition-[opacity,transform] duration-[400ms]"
         class:opacity-0={!loaded}

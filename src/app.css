@@ -114,9 +114,8 @@
 @layer base {
   html {
     @apply motion-safe:scroll-smooth;
-    scroll-behavior: smooth;
     /* Reserve space for the scrollbar so layout doesn't jump between pages
-       that scroll and pages that don't (replaces the old 100vw-100% hack). */
+       that scroll and pages that don't. */
     scrollbar-gutter: stable;
     /* The theme is an explicit saved choice, not the system appearance, so
        this tracks the .dark class rather than prefers-color-scheme. It tells
@@ -134,10 +133,8 @@
     background-color: var(--color-surface-page);
     color: var(--color-text-primary);
     font-family: var(--font-prose);
-    /* Match the compact reading rhythm used on aryaman.io while keeping this
-       site's existing font stack. In rem, not px, so text that inherits from
-       body still scales with the reader's browser font-size setting — the same
-       17px at the 16px default, but no longer pinned there. */
+    /* 17px at the browser default, in rem so text that inherits from body
+       still scales with the reader's font-size setting. */
     font-size: 1.0625rem;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
@@ -154,10 +151,7 @@
   }
 
   /* Dark mode base styles */
-  .dark body,
-  body.dark {
-    background-color: var(--color-surface-page);
-    color: var(--color-text-primary);
+  .dark body {
     /* Warm-cream dots over the near-black background; size/position inherit. */
     background-image: radial-gradient(
       rgba(250, 240, 230, 0.018) 1px,
@@ -450,10 +444,8 @@
     @apply text-accent underline decoration-current;
   }
 
-  /* Dark theme: accent-dark was 3.65:1 on ink-900, and the old hover
-     (accent, 5.06:1) was *more* legible than the resting state. accent-light
-     is the palette's documented dark-theme link colour (6.16:1), and hover
-     rises to cream-100 rather than falling. */
+  /* Dark theme: accent-light rests at 6.16:1 on ink-900, and hover rises to
+     cream-100 so it never reads dimmer than the resting state. */
   .dark .link {
     @apply text-accent-light;
   }
@@ -518,10 +510,9 @@
     @apply text-cream-400;
   }
 
-  /* ===== Card treatment: VARIANT D: ledger rows =====
-     No box at all: each work is a bibliography row on the bare paper,
-     divided by a faded hairline (same fade as the section rules). Hover
-     washes the row with a faint warm tint; nothing floats or lifts. */
+  /* Ledger rows: no box at all. Each work is a bibliography row on the bare
+     paper, divided by a faded hairline (same fade as the section rules).
+     Hover washes the row with a faint warm tint; nothing floats or lifts. */
   .surface-card {
     background: transparent;
     border: 0;
@@ -582,11 +573,6 @@
   .control-compact {
     min-height: 2rem;
     padding-inline: var(--space-3);
-  }
-
-  .control-regular {
-    min-height: 2.5rem;
-    padding-inline: var(--space-4);
   }
 
   .btn-primary {
@@ -754,39 +740,9 @@
     cursor: none;
   }
 
-  /* Smooth image loading */
-  .img-loading {
-    @apply blur-sm;
-    transition-property: filter;
-    transition-duration: var(--motion-slow);
-  }
-
-  .img-loaded {
-    @apply blur-0;
-  }
-
-  /* Prevent layout shift */
-  .aspect-photo {
-    aspect-ratio: 3/2;
-  }
-
-  .aspect-portrait {
-    aspect-ratio: 2/3;
-  }
-
   /* Text balance for headings */
   .text-balance {
     text-wrap: balance;
-  }
-
-  /* Hide scrollbar but keep scrolling */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
   }
 
   /* Staggered fade-in animation for list items */
@@ -948,10 +904,6 @@ details[open] > summary > .mark-caret {
 @media print {
   body {
     @apply bg-white text-black;
-  }
-
-  .no-print {
-    display: none !important;
   }
 }
 

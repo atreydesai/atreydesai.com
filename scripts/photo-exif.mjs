@@ -1,8 +1,5 @@
-// Shared EXIF extraction for the photography page. Used by
-// scripts/optimize-photos.mjs to build the photo-meta.json cache at build
-// time, and by src/routes/photography/+page.server.ts as a fallback for
-// photos the cache doesn't know about yet (e.g. a new photo in `npm run dev`
-// before optimize-photos has run).
+// EXIF extraction for the photography page, used by scripts/optimize-photos.mjs
+// to build the photo manifest at build time.
 import ExifReader from 'exifreader';
 
 /**

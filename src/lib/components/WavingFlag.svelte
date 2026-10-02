@@ -31,7 +31,7 @@
   let timer: ReturnType<typeof setInterval> | null = null;
   let mounted = false;
 
-  function build() {
+  function build(name: string) {
     if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const f = Math.round(FONT_CSS * dpr);
@@ -45,7 +45,7 @@
     const m = document.createElement("canvas").getContext("2d");
     if (!m) return;
     m.font = font;
-    const label = (text || "").toUpperCase();
+    const label = (name || "").toUpperCase();
     const tw = Math.max(1, Math.ceil(m.measureText(label).width));
     bw = tw + padx * 2;
     bh = f + pady * 2;
@@ -105,8 +105,6 @@
 
   onMount(() => {
     mounted = true;
-    build();
-    draw();
     const reduce =
       typeof matchMedia !== "undefined" &&
       matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -116,9 +114,9 @@
     };
   });
 
-  // Rebuild when the song name changes.
-  $: if (mounted && text) {
-    build();
+  // Build once mounted, and rebuild whenever the song name changes.
+  $: if (mounted) {
+    build(text);
     draw();
   }
 </script>

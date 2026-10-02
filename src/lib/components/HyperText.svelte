@@ -12,6 +12,7 @@
     const characters = "abcdefghijklmnopqrstuvwxyz";
     let displayText = text;
     let interval: ReturnType<typeof setInterval>;
+    let startTimeout: ReturnType<typeof setTimeout>;
     let isAnimating = false;
     let prefersReducedMotion = false;
 
@@ -54,11 +55,12 @@
         // simply shows it statically for reduced-motion users.
         prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (animateOnLoad && !prefersReducedMotion) {
-            setTimeout(() => triggerAnimation(), delay);
+            startTimeout = setTimeout(() => triggerAnimation(), delay);
         }
     });
 
     onDestroy(() => {
+        clearTimeout(startTimeout);
         clearInterval(interval);
     });
 </script>

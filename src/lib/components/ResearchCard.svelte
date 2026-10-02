@@ -3,33 +3,11 @@
     import AuthorList from "$lib/components/research/AuthorList.svelte";
     import PaperLinks from "$lib/components/research/PaperLinks.svelte";
     import PaperMedia from "$lib/components/research/PaperMedia.svelte";
+    import type { Paper } from "$lib/content";
+    import { explainers } from "$lib/explainers";
 
-    export let paper: {
-        id: string;
-        title: string;
-        authors: string[];
-        year: number;
-        venue: string | null;
-        arxiv: string | null;
-        pdf: string | null;
-        code: string | null;
-        demo: string | null;
-        twitter: string | null;
-        blog: string | null;
-        tags: string[];
-        tldr: string | null;
-        awards: string[];
-        preprint: boolean;
-        featured: boolean;
-        highlight: boolean;
-        priority: number;
-        image: string | null;
-        imageAnimated: string | null;
-        imageDescription: string | null;
-        classProject?: boolean;
-    };
+    export let paper: Paper;
 
-    export let compact = false;
     export let highlighted = false;
     export let variant: "preview" | "full" = "full";
 
@@ -43,7 +21,7 @@
     let cardHovered = false;
     let cardFocused = false;
 
-    $: isPreview = variant === "preview" || compact;
+    $: isPreview = variant === "preview";
     $: surfaceClasses = [
         "surface-card",
         "overflow-hidden",
@@ -94,7 +72,7 @@
         {/if}
 
         <div
-            class={`flex flex-col gap-4 ${paper.image ? "md:flex-row md:items-start md:gap-5" : ""}`}
+            class={`flex flex-col gap-4 ${explainers[paper.id] ? "md:flex-row md:items-start md:gap-5" : ""}`}
         >
             <div class="min-w-0 flex-1">
                 <h3
@@ -114,12 +92,12 @@
                     {/if}
                 </h3>
 
-                <AuthorList authors={paper.authors} {isPreview} />
+                <AuthorList authors={paper.authors} />
 
                 {#if paper.venue || paper.awards.length > 0 || paper.preprint}
                     <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
                         {#if paper.venue}
-                            <span class="font-serif italic text-ink-500 dark:text-cream-400 {isPreview ? 'text-sm' : 'text-sm'}">
+                            <span class="font-serif text-sm italic text-ink-500 dark:text-cream-400">
                                 {paper.venue}{paper.year ? `, ${paper.year}` : ""}
                             </span>
                         {/if}

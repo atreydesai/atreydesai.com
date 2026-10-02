@@ -1,19 +1,13 @@
 // Page-transition tuning. All of it lives here so the effect can be retuned
 // or switched off without touching +layout.svelte.
-//
-// To revert to the original feel: set DURATION back to 400 and IN_DELAY to 150.
-// To turn page transitions off entirely: set PAGE_TRANSITIONS_ENABLED to false.
 
 /** Master switch. `false` renders every route with no enter/exit animation. */
 export const PAGE_TRANSITIONS_ENABLED = true;
 
 /**
- * Length of both the exit and enter animation.
- *
- * This fires on every internal navigation, so it wants to be short enough that
- * it never becomes something to wait through. 180ms reads as a settle rather
- * than a transition; the previous 400ms plus a 150ms enter delay meant roughly
- * half a second of animation between one page of text and the next.
+ * Length of both the exit and enter animation. This fires on every internal
+ * navigation, so it stays short enough to read as a settle rather than
+ * something to wait through.
  */
 export const PAGE_TRANSITION_DURATION_MS = 180;
 
@@ -29,4 +23,5 @@ export const PAGE_TRANSITION_IN_X = -8;
 /** Vertical travel of the exit animation, in px. */
 export const PAGE_TRANSITION_OUT_Y = 4;
 
+/** Extra wait after a transition before scrolling to a deep-linked anchor. */
 export const PAGE_TRANSITION_SCROLL_BUFFER_MS = 50;

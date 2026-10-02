@@ -2,7 +2,6 @@
     import { onMount } from "svelte";
 
     export let authors: string[];
-    export let isPreview = false;
 
     let authorsExpanded = false;
     let authorsEl: HTMLElement | null = null;
@@ -15,7 +14,7 @@
                 authors[0].length + 2 + authors[1].length;
         } else if (authorsEl && authorsEl.scrollWidth > 0) {
             const ratio = authorsEl.clientWidth / authorsEl.scrollWidth;
-            visibleCharCount = Math.max(0, Math.floor(authorChars.length * ratio) - 2);
+            visibleCharCount = Math.max(0, Math.floor(totalChars * ratio) - 2);
         } else {
             visibleCharCount = 0;
         }
@@ -41,18 +40,8 @@
         }
     }
 
-    $: authorChars = (() => {
-        const out: { c: string; bold: boolean }[] = [];
-        authors.forEach((author, idx) => {
-            const bold = author.includes("Atrey Desai");
-            for (const ch of author) out.push({ c: ch, bold });
-            if (idx < authors.length - 1) {
-                out.push({ c: ",", bold: false });
-                out.push({ c: " ", bold: false });
-            }
-        });
-        return out;
-    })();
+    // Characters in the full "A, B, C" list, the unit of the reveal below.
+    $: totalChars = [...authors.join(", ")].length;
 
     $: authorGroups = (() => {
         const groups: { kind: "name" | "sep"; chars: { c: string; bold: boolean; i: number }[] }[] = [];
@@ -98,7 +87,7 @@
 <div class="mt-2 min-w-0">
     {#if authorsExpanded && hasHiddenAuthors}
         <p
-            class={`leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-sm"}`}
+            class="text-sm leading-snug text-ink-600 dark:text-cream-300"
         >
             {#each authorGroups as group}
                 {#if group.kind === "name"}
@@ -129,7 +118,7 @@
         >
             <p
                 bind:this={authorsEl}
-                class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-sm"}`}
+                class="truncate text-sm leading-snug text-ink-600 dark:text-cream-300"
             >
                 {@html formatAuthors(collapsedAuthorList)}
             </p>
@@ -137,7 +126,7 @@
     {:else}
         <p
             bind:this={authorsEl}
-            class={`truncate leading-snug text-ink-600 dark:text-cream-300 ${isPreview ? "text-sm" : "text-sm"}`}
+            class="truncate text-sm leading-snug text-ink-600 dark:text-cream-300"
         >
             {@html formatAuthors(authors)}
         </p>

@@ -19,6 +19,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeTitle, slugify, yamlString } from './bookshelf-utils.mjs';
 import { cleanTags, fetchMdlGenreTagsByUrl, yamlListLines } from './tag-sources.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,26 +35,6 @@ const overrides = existsSync(OVERRIDES_PATH)
 const favoriteIds = new Set(overrides.favorites ?? []);
 const excludeIds = new Set(overrides.exclude ?? []);
 
-function slugify(s) {
-    return s
-        .toLowerCase()
-        .normalize('NFKD')
-        .replace(/[̀-ͯ]/g, '')
-        .replace(/[''']/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 60)
-        .replace(/-+$/, '');
-}
-
-function yamlString(s) {
-    return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
-}
-
-function normTitle(s) {
-    return s.toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
 function existingMdlFiles() {
     const byId = new Map();
     const titles = new Set();
@@ -67,7 +48,7 @@ function existingMdlFiles() {
         // not duplicated if the API starts returning them.
         const medium = text.match(/^medium:\s*(movie|show|drama)\s*$/m);
         const title = text.match(/^title:\s*"(.*)"\s*$/m);
-        if (medium && title) titles.add(normTitle(title[1]));
+        if (medium && title) titles.add(normalizeTitle(title[1]));
     }
     return { byId, titles };
 }
@@ -127,7 +108,7 @@ for (const bucket of buckets) {
             continue;
         }
 
-        if (knownTitles.has(normTitle(item.name))) continue;
+        if (knownTitles.has(normalizeTitle(item.name))) continue;
 
         const score = parseFloat(item.score) || 0;
         const medium = item.episode_total === '1' ? 'movie' : 'drama';

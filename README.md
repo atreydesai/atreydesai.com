@@ -2,6 +2,13 @@
 
 Source code for my [personal website](https://atreydesai.com/), hosted on Vercel.
 
+```sh
+npm run dev     # local dev server
+npm run build   # sync the bookshelf, optimize photos, build
+npm test        # node tests for the sync scripts, game engines, and agent endpoints
+npm run check   # svelte-check
+```
+
 ## Bookshelf sources
 
 The bookshelf treats external services as the source of truth:
@@ -19,6 +26,5 @@ the public watchlist for shelved films, and RSS for diary dates and reviews.
 Watchlist films remain untagged until watched; when they are promoted, up to
 five exact Letterboxd genres are added unless the bookshelf already has
 curated tags.
-Run `npm run letterboxd:backfill` to attach canonical Letterboxd links to older
-film records and `npm run letterboxd:export` to regenerate the one-time
-watched/watchlist import files.
+
+The design system is documented in [docs/style-guide.md](docs/style-guide.md).

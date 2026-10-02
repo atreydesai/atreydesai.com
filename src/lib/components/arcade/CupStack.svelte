@@ -2,11 +2,9 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
 
   import {
-    finishMusic,
     setMusicPaused,
     setMusicPhase,
     sfxBlip,
-    sfxGameOver,
     sfxMilestone,
     sfxPlace,
     sfxSlice,
@@ -46,8 +44,8 @@
     type Particle,
     type Popup,
   } from "$lib/arcade/art";
-  import { trapFocus } from "$lib/arcade/focus";
-  import { firstVisit, readBest, recordScore } from "$lib/arcade/scores";
+  import { firstVisit, readBest } from "$lib/arcade/scores";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import Mark from "$lib/components/Mark.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import HudButtons from "./HudButtons.svelte";
@@ -58,7 +56,7 @@
   // whatever hangs over the edge is sliced off and falls. The tower is a
   // column of drinks, each a different flavour, so a tall one is a rainbow.
 
-  const dispatch = createEventDispatcher<{ close: null; menu: null }>();
+  const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
   const CUP_ROWS = 10;
   const HALO = "rgba(253, 248, 243, 0.8)";
@@ -168,21 +166,11 @@
   let raf = 0;
   let active = true;
   let lastDrop = 0;
-  let endTimer: ReturnType<typeof setTimeout> | null = null;
+  const timers = createTimers();
 
   const screenX = (units: number) => viewW / 2 + units * unit;
   /** Screen y of the top of cup level `level` (0 = the first cup). */
   const levelTop = (level: number) => groundY - (level + 1) * cupH + camera;
-
-  function exit() {
-    sfxBlip();
-    dispatch("close");
-  }
-
-  function toMenu() {
-    sfxBlip();
-    dispatch("menu");
-  }
 
   // --- Drawing -------------------------------------------------------------
 
@@ -346,7 +334,7 @@
 
     if (result.kind === "miss" || !result.placed) {
       breakOff({ left: snapped, width: slider.width }, snapped, level, true);
-      void topple();
+      topple();
       return;
     }
 
@@ -396,13 +384,13 @@
     nextSlider();
   }
 
-  async function topple() {
+  function topple() {
     playing = false;
     streak = 0;
     sfxTopple();
     liveMessage = `The cup missed. ${stacked} cups high.`;
     // Let the last cup fall and the camera pull back before the slip.
-    endTimer = setTimeout(() => void endGame(), reduceMotion ? 300 : 1300);
+    timers.later(() => void endGame(), reduceMotion ? 300 : 1300);
   }
 
   function frame(timestamp: number) {
@@ -486,9 +474,7 @@
   async function endGame() {
     if (gameOver) return;
     gameOver = true;
-    finishMusic();
-    sfxGameOver("hearts");
-    const result = recordScore("stack", stacked);
+    const result = concludeRun("stack", stacked);
     localBest = result.best;
     newBest = result.newBest;
     liveMessage = `Timber. ${stacked} cups high.`;
@@ -521,7 +507,7 @@
 
   function restart() {
     stopMusic();
-    if (endTimer) clearTimeout(endTimer);
+    timers.clear();
     begin();
     liveMessage = "New tower. Drop the first cup.";
   }
@@ -549,60 +535,33 @@
   onMount(() => {
     popupFont = arcadeFont();
     labelFont = arcadeFont(12, 400);
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncMotion = () => (reduceMotion = motion.matches);
-    syncMotion();
-    motion.addEventListener("change", syncMotion);
+    const unmountShell = mountShell({
+      isOver: () => gameOver,
+      isPaused: () => paused,
+      pause: () => void pauseGame(),
+      togglePause,
+      playScope: () => hudRow.closest(".boba-hud"),
+      onKey: (event) => {
+        // A focused control keeps Space and Enter for itself.
+        if (!DROP_KEYS.has(event.key) || isOnControl(event)) return;
+        event.preventDefault();
+        drop();
+      },
+      onResize: sizeCanvas,
+      observe: hudRow,
+      onReduceMotion: (reduce) => (reduceMotion = reduce),
+    });
     sizeCanvas();
     tipVisible = firstVisit("stack");
     begin();
-
-    const onResize = () => sizeCanvas();
-    const onBlur = () => {
-      if (!gameOver && !paused && playing) void pauseGame();
-    };
-    const onVisibility = () => {
-      if (document.hidden) onBlur();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Tab") {
-        if (gameOver) trapFocus(event, document.querySelector(".boba-over-card"));
-        else if (paused) trapFocus(event, document.querySelector(".boba-pause-card"));
-        else trapFocus(event, hudRow.closest(".boba-hud"));
-        return;
-      }
-      if (event.repeat || gameOver) return;
-      if (event.key.toLowerCase() === "p") {
-        event.preventDefault();
-        togglePause();
-        return;
-      }
-      if (!DROP_KEYS.has(event.key)) return;
-      // A focused control keeps Space and Enter for itself.
-      if (event.target instanceof HTMLElement && event.target.closest("button, input")) return;
-      event.preventDefault();
-      drop();
-    };
-
-    const resizeObserver = new ResizeObserver(() => sizeCanvas());
-    resizeObserver.observe(hudRow);
-    window.addEventListener("resize", onResize);
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("visibilitychange", onVisibility);
     raf = requestAnimationFrame(frame);
 
     return () => {
       active = false;
       cancelAnimationFrame(raf);
-      if (endTimer) clearTimeout(endTimer);
+      timers.clear();
       stopMusic();
-      resizeObserver.disconnect();
-      motion.removeEventListener("change", syncMotion);
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("visibilitychange", onVisibility);
+      unmountShell();
     };
   });
 </script>

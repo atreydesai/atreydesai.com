@@ -21,7 +21,7 @@
 		label: string;
 		/** "card" is the thumbnail; "stage" adds the step chips (lightbox). */
 		size?: "card" | "stage";
-		/** Held by the parent: the card's pause control, or an open lightbox. */
+		/** Held by the parent while the lightbox is open. */
 		paused?: boolean;
 		/** Another card is being pointed at or focused: rest on the first frame. */
 		resting?: boolean;
@@ -97,7 +97,7 @@
 				onUpdate: () => (time = timeline.time()),
 			});
 			for (const beat of scene.beats) timeline.addLabel(beat.id, beat.at);
-			scene.build(gsap, timeline, svg);
+			scene.build(timeline, svg);
 			// Pad to the declared length so every loop is the same duration.
 			if (timeline.duration() < scene.duration) {
 				timeline.set({}, {}, scene.duration);
@@ -270,7 +270,6 @@
 		--xp-soft: #515151; /* ink-600 */
 		--xp-faint: #a4a4a4; /* ink-300, decorative */
 		--xp-rule: #c8c8c8; /* ink-200 */
-		--xp-wash: #faf0e6; /* cream-200 */
 		--xp-accent: #e85d4c;
 		--xp-accent-text: #c9462f;
 		--xp-human: #3a6a91;
@@ -287,7 +286,6 @@
 		--xp-soft: #e8d5c4; /* cream-400 */
 		--xp-faint: #818181;
 		--xp-rule: #515151; /* ink-600 */
-		--xp-wash: #434343;
 		--xp-accent: #e85d4c;
 		--xp-accent-text: #f18272;
 		--xp-human: #779bbe;

@@ -15,6 +15,21 @@
       "source": "/blog/media-list",
       "destination": "https://atreydesai.com/bookshelf/",
       "permanent": true
+    },
+    {
+      "source": "/resume",
+      "destination": "https://atreydesai.com/cv/",
+      "permanent": true
+    },
+    {
+      "source": "/resume/",
+      "destination": "https://atreydesai.com/cv/",
+      "permanent": true
+    },
+    {
+      "source": "/resume.pdf",
+      "destination": "https://atreydesai.com/cv.pdf",
+      "permanent": true
     }
   ],
   "headers": [

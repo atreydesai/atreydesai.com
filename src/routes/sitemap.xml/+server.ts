@@ -68,12 +68,6 @@ const pages: SitemapPage[] = [
         ],
     },
     {
-        path: '/resume/',
-        changefreq: 'monthly',
-        priority: '0.6',
-        sources: ['src/routes/resume/+page.svelte', 'static/resume.pdf'],
-    },
-    {
         path: '/cv/',
         changefreq: 'monthly',
         priority: '0.6',

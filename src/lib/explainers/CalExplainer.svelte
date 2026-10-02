@@ -20,34 +20,34 @@
 	// within 0.01%). The last bar is 2020–26, a partial period (to June 2026).
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "levels", label: "levels", at: 0 },
 		{ id: "properties", label: "properties", at: 2.6 },
 		{ id: "pipeline", label: "pipeline", at: 5.6 },
 		{ id: "papers", label: "papers", at: 9.8 },
 		{ id: "evidence", label: "evidence", at: 13.8, hold: 17.4 },
 	];
-	export const DURATION = 18.4;
+	const DURATION = 18.4;
 
 	// Table 1: each level, its number of features, and its first-listed feature.
-	export const LEVELS = [
+	const LEVELS = [
 		{ n: "I", name: "signal", count: 2, example: "turn-taking" },
 		{ n: "II", name: "token", count: 4, example: "reference" },
 		{ n: "III", name: "message", count: 4, example: "syntax" },
 		{ n: "IV", name: "language", count: 3, example: "openness" },
 	].map((level, i) => ({ ...level, y: 64 + i * 33 }));
 
-	export const STAGES = [
+	const STAGES = [
 		"data collection",
 		"preprocessing",
 		"sequence representation",
 		"meaning identification",
 		"generation",
 	].map((name, i) => ({ name, y: 34 + i * 26 }));
-	export const EVAL_Y = 166;
+	const EVAL_Y = 166;
 
 	// Papers by decade, in thousands: biological, and computational or hybrid.
-	export const DECADES = [
+	const DECADES = [
 		{ label: "≤79", span: "≤1979", bio: 2.07, comp: 0.34 },
 		{ label: "80s", span: "1980s", bio: 2.4, comp: 0.52 },
 		{ label: "90s", span: "1990s", bio: 3.61, comp: 1.05 },
@@ -55,21 +55,16 @@
 		{ label: "10s", span: "2010s", bio: 12.16, comp: 6.02 },
 		{ label: "20s", span: "2020–26", bio: 10.29, comp: 7.38 },
 	].map((d, i) => ({ ...d, x: 23 + i * 34 }));
-	export const BASE = 164;
-	export const PER_K = 5.6;
-	export const COL_W = 24;
+	const BASE = 164;
+	const PER_K = 5.6;
+	const COL_W = 24;
 </script>
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { T, barBox, draw, enter, exit, restore, rise, swap, type Scene } from "./motion";
+	import { T, barBox, draw, enter, exit, restore, rise, swap, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const uid = $props.id();
 	const NUM_OFF = "color: var(--xp-soft)";
@@ -78,7 +73,7 @@
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl) {
+		build(tl) {
 			const poster = [".c-kicker", ".c-level", ".c-count", ".c-cap-q"];
 
 			// 2 · one feature per level: row by row, top to bottom, the count

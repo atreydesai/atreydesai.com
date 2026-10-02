@@ -11,13 +11,13 @@
 	// the RL trial run is illustrative only.
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "task", label: "task", at: 0 },
 		{ id: "tap", label: "rules", at: 2.4 },
 		{ id: "rl", label: "goal", at: 7.2 },
 		{ id: "takeaway", label: "takeaway", at: 12.0 },
 	];
-	export const DURATION = 16.6;
+	const DURATION = 16.6;
 
 	// Fig. 3 is 510 x 430 px; map it onto the plate, centred above the caption.
 	const S = 0.39;
@@ -92,14 +92,9 @@
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { T, draw, enter, exit, restore, type Scene } from "./motion";
+	import { T, draw, enter, exit, restore, swap, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const uid = $props.id();
 	const to = (p: { x: number; y: number }) => ({ x: p.x - START.x, y: p.y - START.y });
@@ -107,7 +102,7 @@
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl) {
+		build(tl) {
 			const poster = [".t-plan", ".t-robot", ".t-flag", ".t-cap-q"];
 			const pulse = (t: number) =>
 				tl.fromTo(
@@ -127,8 +122,7 @@
 			// 2 · trigger-action: each rule's trigger room lights as it shows.
 			// Text that replaces text in place waits for it to leave, so the two
 			// never cross-fade over each other.
-			exit(tl, ".t-cap-q", 2.4);
-			enter(tl, ".t-cap-tap", 2.7);
+			swap(tl, ".t-cap-q", ".t-cap-tap", 2.4);
 			enter(tl, ".t-rule-1", 3.0);
 			restore(tl, ".t-tint-entry", 3.0);
 			tl.to(".t-robot", { ...to(KITCHEN), duration: 0.75, ease: "power2.inOut" }, 3.55);

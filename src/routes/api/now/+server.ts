@@ -1,10 +1,8 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
-// This route hits external APIs at request time, so it must NOT be prerendered
-// (the root +layout.ts sets prerender = true for the rest of the site). Vercel
-// serves it as a serverless function and caches the response at the edge.
-export const prerender = false;
+// This route hits external APIs at request time, so it is never prerendered.
+// Vercel serves it as a serverless function and caches the response at the edge.
 export const trailingSlash = 'ignore';
 
 const MANIFOLD_USERNAME = 'prismatic';
@@ -16,13 +14,13 @@ const GOODREADS_USER_ID = '72859295';
 
 const TIMEOUT_MS = 8000;
 
-interface ReadingBook {
+export interface ReadingBook {
 	title: string;
 	author: string | null;
 	url: string | null;
 }
 
-interface ManifoldNow {
+export interface ManifoldNow {
 	netWorth: number;
 	rank: number | null;
 	market: { question: string; url: string } | null;

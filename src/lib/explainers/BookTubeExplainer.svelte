@@ -11,13 +11,13 @@
 	// 4.38 ± 1.23 -> 7.31 ± 1.93). The averages beat is Table 1.
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "early", label: "early", at: 0 },
 		{ id: "late", label: "late", at: 2.6 },
 		{ id: "averages", label: "averages", at: 7.4 },
 		{ id: "takeaway", label: "takeaway", at: 11.4 },
 	];
-	export const DURATION = 14.6;
+	const DURATION = 14.6;
 
 	// [creator, early fry %, late fry %, early engagement, late engagement]
 	const CREATORS: [string, number, number, number, number][] = [
@@ -40,12 +40,12 @@
 	// come from the same videos). Dots sit with their outer edge on the
 	// panel's edge, at the ends of the axis rule; each line stops the same
 	// small gap short of its two dots, so no line runs under any dot.
-	export const R = 4;
+	const R = 4;
 	const GAP = R + 1.5;
 	const TOP = 46;
 	const BOT = 152;
-	export const AXIS_Y = 162;
-	export const PANELS = [
+	const AXIS_Y = 162;
+	const PANELS = [
 		{ key: "fry", label: "vocal fry", x0: 14, x1: 106, lo: 0, hi: 30, col: 1, unit: (v: number) => `${v}% vocal fry` },
 		{ key: "eng", label: "engagement", x0: 134, x1: 226, lo: 2, hi: 11, col: 3, unit: (v: number) => `engagement rate ${v}` },
 	].map((p) => {
@@ -78,31 +78,26 @@
 
 	// Table 1: labels carry the units, early values sit on the margin, the
 	// arrows share one column and the late values the next.
-	export const STATS = [
+	const STATS = [
 		{ name: "vocal fry (%)", from: "15.0", to: "8.7", y: 62 },
 		{ name: "pitch range (Hz)", from: "290.9", to: "319.3", y: 122 },
 		{ name: "engagement rate", from: "4.38", to: "7.31", y: 182 },
 	];
-	export const VALUE_DY = 27;
-	export const COL_ARROW = 88;
-	export const COL_TO = 124;
+	const VALUE_DY = 27;
+	const COL_ARROW = 88;
+	const COL_TO = 124;
 </script>
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { T, draw, enter, exit, restore, swap, type Scene } from "./motion";
+	import { T, draw, enter, exit, restore, swap, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl) {
+		build(tl) {
 			const poster = [".k-chart", ".k-early", ".k-cap-q"];
 
 			// 2 · the same creators, late: one sweep from the early column to

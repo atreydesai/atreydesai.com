@@ -1,3 +1,5 @@
+// Frontmatter editing and text helpers shared by the bookshelf sync scripts.
+
 import yaml from "js-yaml";
 
 export function parseFrontmatter(text) {
@@ -118,7 +120,7 @@ export function slugify(value) {
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['’]/g, "")
+    .replace(/['‘’]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60)

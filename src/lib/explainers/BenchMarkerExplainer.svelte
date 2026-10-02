@@ -12,20 +12,20 @@
 	// the paper (Fig. 1's report card, Fig. 2's caption, the abstract).
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "checks", label: "checks", at: 0 },
 		{ id: "online", label: "online", at: 2.6 },
 		{ id: "written", label: "writing", at: 6.4 },
 		{ id: "ranks", label: "ranks", at: 10.2, hold: 14.2 },
 	];
-	export const DURATION = 15.6;
+	const DURATION = 15.6;
 
 	// Twelve bars on the 14..226 plate: pitch 17, a wider gap between groups.
-	export const BAR_W = 13;
+	const BAR_W = 13;
 	const PITCH = 17;
 	const GROUP_X = [14, 94];
 
-	export const DATASETS = [
+	const DATASETS = [
 		{ name: "AQuA", exam: true, online: 0.17, rules: 0.44 },
 		{ name: "ARC", exam: true, online: 0.39, rules: 0.43 },
 		{ name: "MMLU", exam: true, online: 0.45, rules: 0.64 },
@@ -40,13 +40,13 @@
 		{ name: "TruthfulQA", exam: false, online: 0.47, rules: 0.97 },
 	].map((d, i) => ({ ...d, x: d.exam ? GROUP_X[0] + i * PITCH : GROUP_X[1] + (i - 4) * PITCH }));
 
-	export const BASE = 160;
-	export const H = 100;
+	const BASE = 160;
+	const H = 100;
 	// The smallest visible bar, so a 0% dataset still reads as present.
-	export const MIN_H = 1.5;
+	const MIN_H = 1.5;
 
 	// Fig. 1's report card: "found online", "has a shortcut", writing errors.
-	export const CHECKS = [
+	const CHECKS = [
 		{ text: "found online?", y: 74 },
 		{ text: "has a shortcut?", y: 110 },
 		{ text: "writing errors?", y: 146 },
@@ -54,25 +54,20 @@
 
 	// Top four models; [rank on all items, rank once items with 2+ writing
 	// errors are removed].
-	export const RANKS = [
+	const RANKS = [
 		{ name: "GPT-5", from: 1, to: 2 },
 		{ name: "Claude 4.5 Sonnet", from: 2, to: 4 },
 		{ name: "Gemini 2.5 Pro", from: 3, to: 1, mover: true },
 		{ name: "GPT-5 Mini", from: 4, to: 3 },
 	];
-	export const rankY = (rank: number) => 58 + rank * 25;
+	const rankY = (rank: number) => 58 + rank * 25;
 </script>
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { DUR, EASE, T, barBox, draw, enter, exit, resize, restore, rise, type Scene } from "./motion";
+	import { DUR, EASE, T, barBox, draw, enter, exit, resize, restore, rise, swap, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const uid = $props.id();
 	const height = (v: number) => Math.max(MIN_H, v * H);
@@ -80,23 +75,17 @@
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl, root) {
+		build(tl, root) {
 			const bars = root.querySelectorAll<SVGRectElement>(".b-bar");
 			const rows = root.querySelectorAll<SVGTextElement>(".b-row");
 			const nums = root.querySelectorAll(".b-rank-n");
 			const rules = root.querySelectorAll(".b-rank-rule");
 			const poster = [".b-kicker", ".b-check", ".b-cap-q"];
-			// Text replaced in place leaves before its successor arrives, so two
-			// strings never share a spot mid-fade.
-			const handoff = (out: string | string[], into: string, at: number) => {
-				exit(tl, out, at);
-				enter(tl, into, at + DUR.exit);
-			};
 
 			// 2 · how many items are found online
 			exit(tl, ".b-check", "online");
-			handoff(".b-kicker", ".b-title-o", 2.6);
-			handoff(".b-cap-q", ".b-cap-o", 2.6);
+			swap(tl, ".b-kicker", ".b-title-o", 2.6);
+			swap(tl, ".b-cap-q", ".b-cap-o", 2.6);
 			// The axis draws, the groups are named, then the bars rise left to
 			// right from the axis; the one number comes after every bar is up.
 			tl.set(".b-base", { autoAlpha: 1 }, 2.95);
@@ -110,18 +99,18 @@
 
 			// 3 · how many have two or more writing errors
 			exit(tl, ".b-val-o", "written");
-			handoff(".b-title-o", ".b-title-w", 6.4);
-			handoff(".b-cap-o", ".b-cap-w", 6.4);
+			swap(tl, ".b-title-o", ".b-title-w", 6.4);
+			swap(tl, ".b-cap-o", ".b-cap-w", 6.4);
 			bars.forEach((bar, i) => resize(tl, bar, BASE, height(DATASETS[i].rules), 6.75 + i * 0.05));
 			enter(tl, ".b-val-w", 8.15);
 
 			// 4 · the leaderboard, with and without items with 2+ writing errors
 			exit(tl, [".b-val-w", ".b-bar", ".b-groups", ".b-base", ".b-cap-w"], "ranks");
-			handoff(".b-title-w", ".b-title-r", 10.2);
+			swap(tl, ".b-title-w", ".b-title-r", 10.2);
 			enter(tl, ".b-sub-all", 10.6);
 			// Row by row, top to bottom: rank, name and rule together.
 			RANKS.forEach((_, i) => enter(tl, [nums[i], rows[i], rules[i]], 10.7 + i * 0.08));
-			handoff(".b-sub-all", ".b-sub-clean", 11.7);
+			swap(tl, ".b-sub-all", ".b-sub-clean", 11.7);
 
 			// The reshuffle, with no row ever passing over another: the two
 			// models that drop sink out of their rows, the risers climb into the

@@ -54,7 +54,7 @@ export interface BoardEntry {
   me?: boolean;
 }
 
-export interface Board {
+interface Board {
   available: boolean;
   scores: BoardEntry[];
 }
@@ -72,7 +72,7 @@ export async function fetchBoard(game: GameId): Promise<Board> {
   }
 }
 
-export type SubmitResult =
+type SubmitResult =
   | { ok: true; rank: number | null; scores: BoardEntry[] }
   | { ok: false; reason: string };
 

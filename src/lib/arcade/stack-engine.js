@@ -6,11 +6,11 @@
 
 export const START_WIDTH = 14;
 /** How far off (in units) a drop can land and still count as perfect. */
-export const PERFECT_TOLERANCE = 0.75;
+const PERFECT_TOLERANCE = 0.75;
 /** Perfect drops in a row before each cup starts growing back. */
 export const GROW_AFTER = 3;
 /** How far either side of the tower a cup slides. */
-export const TRACK_SPAN = 16;
+const TRACK_SPAN = 16;
 
 /** @typedef {{ left: number, width: number }} Span */
 /** @typedef {"opening" | "steady" | "rush"} Phase */

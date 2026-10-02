@@ -1,7 +1,6 @@
 export const GAME_DURATION_SECONDS = 60;
-export const COUNTDOWN_SECONDS = 3;
-export const GOLDEN_EVERY = 10;
-export const PERFECT_RADIUS = 12;
+const GOLDEN_EVERY = 10;
+const PERFECT_RADIUS = 12;
 export const PLAYFIELD_TOP = 86;
 export const PLAYFIELD_EDGE = 8;
 

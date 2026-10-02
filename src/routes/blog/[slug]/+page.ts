@@ -2,8 +2,6 @@ import { posts, unlistedPosts, draftPosts } from '$lib/content';
 import { error, redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
-export const prerender = false;
-
 export const load: PageLoad = ({ params }) => {
     const index = posts.findIndex((p) => p.id === params.slug);
     if (index === -1) {

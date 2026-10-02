@@ -1,9 +1,6 @@
-#!/usr/bin/env node
-
-/**
- * Generate optimized thumbnails for photography page
- * Run with: node scripts/optimize-photos.mjs
- */
+// Build step for the photography page and the homepage portrait: responsive
+// WebP thumbnails, an EXIF/caption manifest bundled into the app, and the
+// profile.webp hero image. Runs before every production build.
 
 import sharp from 'sharp';
 import { readdir, mkdir, stat, readFile, writeFile } from 'fs/promises';
@@ -50,6 +47,23 @@ async function needsUpdate(srcPath, destPath) {
     }
 }
 
+// Resize + webp conversion for a single source file.
+// width: target width (won't enlarge); quality: webp quality 0-100.
+async function toWebp(srcPath, destPath, width, quality) {
+    if (!(await needsUpdate(srcPath, destPath))) {
+        return { src: srcPath, status: 'skipped' };
+    }
+    try {
+        await sharp(srcPath)
+            .resize(width, null, { withoutEnlargement: true, fit: 'inside' })
+            .webp({ quality })
+            .toFile(destPath);
+        return { src: srcPath, status: 'optimized' };
+    } catch (err) {
+        return { src: srcPath, status: 'error', error: err.message };
+    }
+}
+
 async function optimizePhoto(filename) {
     const srcPath = join(PHOTOS_DIR, filename);
     const { name } = parse(filename);
@@ -66,36 +80,11 @@ async function optimizePhoto(filename) {
 
     let optimized = 0;
     for (const { dest, width } of targets) {
-        if (!(await needsUpdate(srcPath, dest))) continue;
-        try {
-            await sharp(srcPath)
-                .resize(width, null, { withoutEnlargement: true, fit: 'inside' })
-                .webp({ quality: THUMB_QUALITY })
-                .toFile(dest);
-            optimized++;
-        } catch (err) {
-            return { filename, status: 'error', error: err.message };
-        }
+        const result = await toWebp(srcPath, dest, width, THUMB_QUALITY);
+        if (result.status === 'error') return { filename, ...result };
+        if (result.status === 'optimized') optimized++;
     }
-
     return { filename, status: optimized > 0 ? 'optimized' : 'skipped' };
-}
-
-// Resize + webp conversion for a single source file.
-// width: target width (won't enlarge); quality: webp quality 0-100.
-async function toWebp(srcPath, destPath, width, quality) {
-    if (!(await needsUpdate(srcPath, destPath))) {
-        return { src: srcPath, status: 'skipped' };
-    }
-    try {
-        await sharp(srcPath)
-            .resize(width, null, { withoutEnlargement: true, fit: 'inside' })
-            .webp({ quality })
-            .toFile(destPath);
-        return { src: srcPath, status: 'optimized' };
-    } catch (err) {
-        return { src: srcPath, status: 'error', error: err.message };
-    }
 }
 
 async function optimizePhotography() {
@@ -115,23 +104,6 @@ async function optimizeProfile() {
     const dest = 'static/images/profile.webp';
     const result = await toWebp(src, dest, 500, 82);
     summarize([{ filename: 'profile.webp', ...result }]);
-}
-
-async function optimizePapers() {
-    console.log('\n📄 Optimizing paper preview images...');
-    const PAPERS_DIR = 'static/images/papers';
-    const files = await readdir(PAPERS_DIR);
-    const imageFiles = files.filter(f =>
-        /\.(jpg|jpeg|png)$/i.test(f) && !f.startsWith('.')
-    );
-    const results = await Promise.all(imageFiles.map(async (filename) => {
-        const srcPath = join(PAPERS_DIR, filename);
-        const { name } = parse(filename);
-        const destPath = join(PAPERS_DIR, `${name}.webp`);
-        const r = await toWebp(srcPath, destPath, 800, 70);
-        return { filename, ...r };
-    }));
-    summarize(results);
 }
 
 async function extractMetadata() {
@@ -234,7 +206,6 @@ async function main() {
     await optimizePhotography();
     await extractMetadata();
     await optimizeProfile();
-    await optimizePapers();
     console.log('\n✨ Done!');
 }
 

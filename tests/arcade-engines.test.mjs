@@ -22,7 +22,6 @@ import {
   MAX_TICKETS,
   SHIFT_SECONDS,
   TOPPINGS,
-  couldBecome,
   makeOrder,
   paceForElapsed,
   phaseForElapsed,
@@ -42,6 +41,7 @@ import {
   trackFor,
   widthAfterPerfect,
 } from "../src/lib/arcade/stack-engine.js";
+import { COUNTDOWN_SECONDS, stepCountdown } from "../src/lib/arcade/countdown.js";
 
 /** A repeatable stand-in for Math.random. */
 function seeded(seed = 7) {
@@ -159,8 +159,6 @@ test("a drink matches only its exact order", () => {
   assert.equal(sameDrink({ tea: "taro", toppings: ["foam", "pearls"] }, order), true);
   assert.equal(sameDrink({ tea: "taro", toppings: ["pearls"] }, order), false);
   assert.equal(sameDrink({ tea: "matcha", toppings: ["pearls", "foam"] }, order), false);
-  assert.equal(couldBecome({ tea: null, toppings: ["pearls"] }, order), true);
-  assert.equal(couldBecome({ tea: "taro", toppings: ["jelly"] }, order), false);
 });
 
 test("a served drink goes to the most impatient matching ticket", () => {
@@ -245,4 +243,34 @@ test("the stack speeds up and its music builds", () => {
   assert.equal(phaseForHeight(0), "opening");
   assert.equal(phaseForHeight(20), "steady");
   assert.equal(phaseForHeight(40), "rush");
+});
+
+// --- Countdown --------------------------------------------------------------
+
+/** Runs the countdown at a fixed frame length; returns the numbers it beeps. */
+function runCountdown(dt) {
+  let state = { elapsed: 0, count: COUNTDOWN_SECONDS, done: false };
+  const beeps = [];
+  let frames = 0;
+  while (!state.done) {
+    state = stepCountdown(state.elapsed, state.count, dt);
+    if (state.beep) beeps.push(state.count);
+    frames += 1;
+  }
+  return { beeps, frames, elapsed: state.elapsed };
+}
+
+test("the countdown beeps each number once, then finishes", () => {
+  const smooth = runCountdown(1 / 60);
+  assert.deepEqual(smooth.beeps, [2, 1]);
+  assert.ok(smooth.elapsed >= COUNTDOWN_SECONDS);
+  assert.ok(smooth.elapsed < COUNTDOWN_SECONDS + 1 / 60);
+
+  // A long stall skips straight to the right number rather than replaying.
+  assert.deepEqual(runCountdown(0.25 * 9).beeps, [1]);
+  // A frame that crosses the end begins the run with no last beep.
+  const last = stepCountdown(2.9, 1, 0.2);
+  assert.equal(last.done, true);
+  assert.equal(last.beep, false);
+  assert.equal(last.count, 1);
 });

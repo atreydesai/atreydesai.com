@@ -5,9 +5,9 @@ import { writable } from "svelte/store";
 // open it through this store.
 
 export type GameId = "catch" | "stab" | "orders" | "stack";
-export type ArcadeScreen = "menu" | GameId;
+type ArcadeScreen = "menu" | GameId;
 
-export interface GameInfo {
+interface GameInfo {
   id: GameId;
   /** Lowercase display name, in the site's voice. */
   name: string;
@@ -15,8 +15,6 @@ export interface GameInfo {
   blurb: string;
   /** Menu shortcut. */
   key: string;
-  /** What the score counts, for the results slip and the menu. */
-  unit: string;
   /** Catch steers a basket with the mouse, so it needs a fine pointer. */
   desktopOnly: boolean;
 }
@@ -27,7 +25,6 @@ export const GAMES: GameInfo[] = [
     name: "boba catch",
     blurb: "Cups fly out of the page’s links. Catch them in the basket.",
     key: "1",
-    unit: "points",
     desktopOnly: true,
   },
   {
@@ -35,7 +32,6 @@ export const GAMES: GameInfo[] = [
     name: "straw stab",
     blurb: "Punch a straw into every cup, right on the beat.",
     key: "2",
-    unit: "points",
     desktopOnly: false,
   },
   {
@@ -43,7 +39,6 @@ export const GAMES: GameInfo[] = [
     name: "order up",
     blurb: "Read the tickets, build the drinks, serve them before anyone gives up.",
     key: "3",
-    unit: "points",
     desktopOnly: false,
   },
   {
@@ -51,12 +46,11 @@ export const GAMES: GameInfo[] = [
     name: "cup stack",
     blurb: "Drop each cup on the last. Whatever hangs over gets sliced off.",
     key: "4",
-    unit: "cups",
     desktopOnly: false,
   },
 ];
 
-export function gameInfo(id: GameId) {
+function gameInfo(id: GameId) {
   return GAMES.find((game) => game.id === id) ?? GAMES[0];
 }
 

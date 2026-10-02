@@ -5,7 +5,6 @@
   export let value: number;
   export let caption = "shift starts in";
   export let goCaption = "catch the rush";
-  export let goLabel = "go";
 
   $: loop = LOOPS[value % LOOPS.length];
 </script>
@@ -25,7 +24,7 @@
         <path class="fill" d={loop} />
         <path class="stroke" pathLength="1" d={loop} />
       </svg>
-      <span class="boba-count-num">{value > 0 ? value : goLabel}</span>
+      <span class="boba-count-num">{value > 0 ? value : "go"}</span>
     </div>
   {/key}
   <span class="boba-count-caption">{value > 0 ? caption : goCaption}</span>

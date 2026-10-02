@@ -1,6 +1,9 @@
 import { dev } from '$app/environment';
+import { validateFrontmatter } from '$lib/frontmatter';
 
-// Content loader utilities for markdown and YAML files
+// Content loader utilities for markdown and YAML files. Bookshelf entries are
+// deliberately not here: every page that imports this module ships it, so they
+// live in $lib/books (types) and $lib/server/books (the entries).
 
 // Type definitions
 export interface Paper {
@@ -17,41 +20,13 @@ export interface Paper {
     blog: string | null;
     tags: string[];
     tldr: string | null;
-    abstract?: string;
     awards: string[];
     preprint: boolean;
     featured: boolean;
     highlight: boolean;  // Special emphasis styling
     priority: number;    // Lower number = higher priority for featured ordering
-    image: string | null;
-    imageAnimated: string | null;  // For hover effect - gif/mp4 version
     imageDescription: string | null;
     classProject?: boolean;  // Distinguishes class projects from regular papers
-    content?: string;
-}
-
-export interface Book {
-    id: string;
-    title: string;
-    author: string;
-    category: string;
-    subcategory?: string | string[];
-    enjoyment?: number | null;  // 1-10 scale, optional
-    importance?: number | null; // 1-10 scale, optional
-    medium?: string;            // "essay", "book", "video", "article", "paper", "podcast", "short story"
-    tags?: string[];            // For tag filtering
-    quotes?: string[];          // Notable quotes from the work
-    url?: string;               // Source link
-    letterboxdUrl?: string;     // Canonical Letterboxd film/collection link
-    letterboxdYear?: number;    // Release year used for exact feed matching
-    letterboxdId?: string;      // Namespaced Letterboxd object identity
-    tmdbId?: string;            // True TMDB identity from Letterboxd RSS only
-    tmdbType?: 'movie' | 'tv';
-    dateAdded: string;
-    favorite: boolean;
-    status?: 'shelved' | 'current' | 'done'; // shelved = planned; current = reading/watching; absent = done
-    notes?: string;
-    content?: string;
 }
 
 export interface Talk {
@@ -63,12 +38,6 @@ export interface Talk {
     slides?: string | null;
     video?: string | null;
 }
-
-export interface Category {
-    id: string;
-    name: string;
-}
-
 
 export interface Post {
     id: string;
@@ -136,25 +105,6 @@ export interface AboutData {
     thoughts: string[];
 }
 
-// Frontmatter validation: malformed content files should fail the build
-// (these modules are imported by prerendered routes, so throwing here aborts
-// `vite build` with the offending file named) instead of rendering broken.
-type FieldType = 'string' | 'number' | 'array' | 'string|null';
-
-function validateFrontmatter(path: string, mod: unknown, required: Record<string, FieldType>): void {
-    const data = mod as Record<string, unknown>;
-    for (const [field, type] of Object.entries(required)) {
-        const value = data[field];
-        const ok =
-            type === 'array' ? Array.isArray(value)
-            : type === 'string|null' ? value === null || typeof value === 'string'
-            : typeof value === type;
-        if (!ok) {
-            throw new Error(`Invalid frontmatter in ${path}: "${field}" missing or not a ${type}`);
-        }
-    }
-}
-
 // Import all paper markdown files
 const paperModules = import.meta.glob<Paper>('/src/content/papers/*.md', { eager: true });
 export const papers: Paper[] = Object.entries(paperModules)
@@ -168,26 +118,6 @@ export const papers: Paper[] = Object.entries(paperModules)
         if (a.year !== b.year) return b.year - a.year;
         return (a.priority ?? 99) - (b.priority ?? 99);  // Secondary sort by priority (lower = higher priority)
     });
-
-// Import all book markdown files
-const bookModules = import.meta.glob<Book>('/src/content/books/*.md', { eager: true });
-export const books: Book[] = Object.entries(bookModules).map(([path, mod]) => {
-    validateFrontmatter(path, mod, {
-        id: 'string', title: 'string', author: 'string', category: 'string', dateAdded: 'string',
-    });
-    const data = mod as unknown as Book;
-    // Normalize subcategory to string[] (accepts an array or comma-separated string);
-    // fall back to markdown content for notes when notes aren't set.
-    const subcategory = Array.isArray(data.subcategory)
-        ? data.subcategory
-        : (data.subcategory ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-    return {
-        ...data,
-        subcategory,
-        status: data.status === 'shelved' || data.status === 'current' ? data.status : 'done',
-        notes: data.notes || data.content || undefined,
-    };
-});
 
 // Import all post markdown files
 const postModules = import.meta.glob<Post>('/src/content/posts/*.md', { eager: true });
@@ -212,11 +142,9 @@ export const draftPosts: Post[] = dev
 
 // Import YAML files
 import talksYaml from '../content/talks.yaml';
-import categoriesYaml from '../content/categories.yaml';
 import aboutYaml from '../content/about.yaml';
 import homepageYaml from '../content/homepage.yaml';
 
 export const talks: Talk[] = talksYaml as unknown as Talk[];
-export const categories: Category[] = categoriesYaml as unknown as Category[];
 export const aboutData: AboutData = aboutYaml as unknown as AboutData;
 export const homepageData: HomepageData = homepageYaml as unknown as HomepageData;

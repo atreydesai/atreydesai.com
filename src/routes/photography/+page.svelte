@@ -1,11 +1,15 @@
 <script lang="ts">
+    import { onDestroy } from "svelte";
     import PageShell from "$lib/components/PageShell.svelte";
     import OptimizedImage from "$lib/components/OptimizedImage.svelte";
     import Mark from "$lib/components/Mark.svelte";
+    import { trapFocus } from "$lib/focus-trap";
+    import { lockScroll, unlockScroll } from "$lib/scroll-lock";
     import { formatLongDate } from "$lib/utils/date";
     import { X, ChevronLeft, ChevronRight, ArrowUpRight } from "@jis3r/icons";
+    import type { PageData } from "./$types";
     // Photos are bundled into a generated manifest during the build.
-    export let data;
+    export let data: PageData;
     $: photos = data.photos;
 
     type MosaicVariant = "feature" | "tall" | "standard" | "compact";
@@ -53,7 +57,6 @@
     let lightboxImageLoaded = false;
     let triggerElement: HTMLElement | null = null;
     let dialogElement: HTMLElement | null = null;
-    let lockedScrollY = 0;
 
     // Warm the neighbours so arrowing/swiping doesn't re-show the placeholder
     // for a photo the viewer is about to reach.
@@ -64,28 +67,6 @@
                 photos[(index + offset + photos.length) % photos.length];
             if (neighbour) new Image().src = neighbour.src;
         }
-    }
-
-    // `overflow: hidden` on <body> doesn't hold on iOS Safari, so pin the body
-    // at the current offset instead and restore it on close.
-    function lockScroll() {
-        if (typeof document === "undefined") return;
-        lockedScrollY = window.scrollY;
-        document.body.style.position = "fixed";
-        document.body.style.top = `-${lockedScrollY}px`;
-        document.body.style.left = "0";
-        document.body.style.right = "0";
-        document.body.style.overflow = "hidden";
-    }
-
-    function unlockScroll() {
-        if (typeof document === "undefined") return;
-        document.body.style.position = "";
-        document.body.style.top = "";
-        document.body.style.left = "";
-        document.body.style.right = "";
-        document.body.style.overflow = "";
-        window.scrollTo(0, lockedScrollY);
     }
 
     function openLightbox(index: number, trigger: HTMLElement) {
@@ -107,24 +88,9 @@
         triggerElement = null;
     }
 
-    function trapFocus(e: KeyboardEvent) {
-        if (!dialogElement) return;
-        const focusable = Array.from(
-            dialogElement.querySelectorAll<HTMLElement>(
-                'button, [href], input, [tabindex]:not([tabindex="-1"])'
-            )
-        ).filter(el => !el.hasAttribute('disabled'));
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.key === "Tab") {
-            if (e.shiftKey) {
-                if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-            } else {
-                if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-            }
-        }
-    }
+    // Leaving the page with the lightbox open must not leave the next page
+    // pinned in place.
+    onDestroy(unlockScroll);
 
     function nextPhoto() {
         lightboxImageLoaded = false;
@@ -227,12 +193,12 @@
 
 <!-- Lightbox -->
 {#if lightboxOpen && currentPhoto}
-    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
         bind:this={dialogElement}
         class="layer-modal fixed inset-0 flex items-center justify-center bg-ink-900/95"
         on:click={closeLightbox}
-        on:keydown={(e) => { trapFocus(e); if (e.key === "Escape") closeLightbox(); if (e.key === "ArrowRight") nextPhoto(); if (e.key === "ArrowLeft") prevPhoto(); }}
+        on:keydown={(e) => { trapFocus(e, dialogElement); if (e.key === "Escape") closeLightbox(); if (e.key === "ArrowRight") nextPhoto(); if (e.key === "ArrowLeft") prevPhoto(); }}
         role="dialog"
         aria-modal="true"
         aria-label="Photo lightbox"
@@ -277,7 +243,7 @@
         {/if}
 
         <!-- Photo container -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
             class="max-w-5xl max-h-[85vh] flex flex-col items-center px-4"
@@ -328,7 +294,7 @@
                             {#each [currentPhoto.exif.camera, currentPhoto.exif.lens].filter(Boolean) as part, i}{#if i}{" "}<Mark kind="dot" />{" "}{/if}{part}{/each}
                         </p>
                     {/if}
-                    {#if currentPhoto.exif.aperture || currentPhoto.exif.shutter || currentPhoto.exif.iso}
+                    {#if currentPhoto.exif.focalLength || currentPhoto.exif.aperture || currentPhoto.exif.shutter || currentPhoto.exif.iso}
                         <p class="text-cream-400">
                             {#each [currentPhoto.exif.focalLength, currentPhoto.exif.aperture, currentPhoto.exif.shutter, currentPhoto.exif.iso].filter(Boolean) as part, i}{#if i}{" "}<Mark kind="dot" />{" "}{/if}{part}{/each}
                         </p>

@@ -3,12 +3,10 @@
 
   import {
     audioClock,
-    finishMusic,
     resumeAudio,
     setMusicPhase,
     sfxBlip,
     sfxCountdown,
-    sfxGameOver,
     sfxMilestone,
     sfxMiss,
     sfxStab,
@@ -19,6 +17,7 @@
     stopMusic,
     suspendAudio,
   } from "$lib/sfx";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import {
     BEATS_PER_BAR,
     LIVES,
@@ -56,8 +55,8 @@
     type Particle,
     type Popup,
   } from "$lib/arcade/art";
-  import { trapFocus } from "$lib/arcade/focus";
-  import { firstVisit, recordScore } from "$lib/arcade/scores";
+  import { firstVisit } from "$lib/arcade/scores";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import Mark from "$lib/components/Mark.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
@@ -71,12 +70,11 @@
   // soundtrack's beats. The belt is drawn against the audio clock itself,
   // so what you see lines up with what you hear, pauses included.
 
-  const dispatch = createEventDispatcher<{ close: null; menu: null }>();
+  const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
   // Slowest song first, so the tempo climbs through each loop.
   const PLAYLIST = [1, 0, 2, 3];
   const TEMPOS = songTempos(PLAYLIST);
-  const COUNTDOWN_SECONDS = 3;
   const PLUNGE_SECONDS = 0.05;
   const RELOAD_SECONDS = 0.1;
   const TUMBLE_SECONDS = 0.45;
@@ -210,29 +208,12 @@
   let last = 0;
   let raf = 0;
   let active = true;
-  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const timers = createTimers();
+  const { later } = timers;
 
   const clamp = (value: number, low: number, high: number) =>
     Math.max(low, Math.min(high, value));
   const perfSeconds = () => performance.now() / 1000;
-
-  function later(callback: () => void, delay: number) {
-    const timer = setTimeout(() => {
-      timers.delete(timer);
-      callback();
-    }, delay);
-    timers.add(timer);
-  }
-
-  function exit() {
-    sfxBlip();
-    dispatch("close");
-  }
-
-  function toMenu() {
-    sfxBlip();
-    dispatch("menu");
-  }
 
   function clockNow() {
     const perf = perfSeconds();
@@ -537,13 +518,13 @@
     }
 
     if (!running) {
-      countdownElapsed += Math.min(rawDt, 0.25);
-      const next = Math.max(1, COUNTDOWN_SECONDS - Math.floor(countdownElapsed));
-      if (next !== countdown && countdownElapsed < COUNTDOWN_SECONDS) {
-        countdown = next;
+      const step = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
+      countdownElapsed = step.elapsed;
+      if (step.beep) {
+        countdown = step.count;
         sfxCountdown(countdown);
       }
-      if (countdownElapsed >= COUNTDOWN_SECONDS) beginRun();
+      if (step.done) beginRun();
       draw(0);
       raf = requestAnimationFrame(frame);
       return;
@@ -630,9 +611,7 @@
     running = false;
     active = false;
     cancelAnimationFrame(raf);
-    finishMusic();
-    sfxGameOver("hearts");
-    const result = recordScore("stab", score);
+    const result = concludeRun("stab", score);
     localBest = result.best;
     newBest = result.newBest;
     liveMessage = `Last call. Final score ${score}.`;
@@ -718,50 +697,28 @@
 
   onMount(() => {
     popupFont = arcadeFont();
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncMotion = () => (reduceMotion = motion.matches);
-    syncMotion();
-    motion.addEventListener("change", syncMotion);
+    const unmountShell = mountShell({
+      isOver: () => gameOver,
+      isPaused: () => paused,
+      pause: () => void pauseGame(),
+      togglePause,
+      playScope: () => hud,
+      onKey: (event) => {
+        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+        // A focused control keeps Space and Enter for itself.
+        if (!STAB_KEYS.has(key) || isOnControl(event)) return;
+        event.preventDefault();
+        stab();
+      },
+      onResize: sizeCanvas,
+      // The ticket row can change height (a font loading, a narrow screen
+      // wrapping it), and the belt sits below it.
+      observe: hudRow,
+      onReduceMotion: (reduce) => (reduceMotion = reduce),
+    });
     sizeCanvas();
     tipVisible = firstVisit("stab");
     sfxCountdown(COUNTDOWN_SECONDS);
-
-    const onResize = () => sizeCanvas();
-    const onBlur = () => {
-      if (!gameOver && !paused) void pauseGame();
-    };
-    const onVisibility = () => {
-      if (document.hidden) onBlur();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Tab") {
-        if (gameOver) trapFocus(event, document.querySelector(".boba-over-card"));
-        else if (paused) trapFocus(event, document.querySelector(".boba-pause-card"));
-        else trapFocus(event, hud);
-        return;
-      }
-      if (event.repeat || gameOver) return;
-      if (event.key.toLowerCase() === "p") {
-        event.preventDefault();
-        togglePause();
-        return;
-      }
-      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-      if (!STAB_KEYS.has(key)) return;
-      // A focused control keeps Space and Enter for itself.
-      if (event.target instanceof HTMLElement && event.target.closest("button, input")) return;
-      event.preventDefault();
-      stab();
-    };
-
-    // The ticket row can change height (a font loading, a narrow screen
-    // wrapping it), and the belt sits below it.
-    const resizeObserver = new ResizeObserver(() => sizeCanvas());
-    resizeObserver.observe(hudRow);
-    window.addEventListener("resize", onResize);
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("visibilitychange", onVisibility);
     raf = requestAnimationFrame(frame);
 
     return () => {
@@ -770,14 +727,8 @@
       // Never leave the shared audio clock frozen behind a closed game.
       resumeAudio();
       stopMusic();
-      for (const timer of timers) clearTimeout(timer);
       timers.clear();
-      resizeObserver.disconnect();
-      motion.removeEventListener("change", syncMotion);
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("visibilitychange", onVisibility);
+      unmountShell();
     };
   });
 </script>

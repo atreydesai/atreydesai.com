@@ -20,7 +20,7 @@ function parseDateInputUtc(input: string): Date {
     return new Date(input);
 }
 
-export function formatDate(
+function formatDate(
     input: string,
     options: Intl.DateTimeFormatOptions,
     locale = "en-US",

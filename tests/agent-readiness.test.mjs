@@ -181,7 +181,9 @@ test("Person JSON-LD exposes required identity fields and type-appropriate links
   assert.equal(data.url, "https://atreydesai.com/");
   assert.ok(data.sameAs.length >= 3);
   assert.ok(
-    data.affiliation.some((entry) => entry.name === "University of Maryland"),
+    data.affiliation.some(
+      (entry) => entry.name === "University of Maryland, College Park",
+    ),
   );
 });
 

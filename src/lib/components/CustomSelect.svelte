@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
-    import { browser } from "$app/environment";
     import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import { ChevronDown, Search } from "@jis3r/icons";
@@ -23,7 +22,6 @@
     // A filter field at the top of the menu, for lists too long to scan.
     export let searchable = false;
     export let searchPlaceholder = "filter";
-    export let fastScroll = false;
     export let animateOptions = true;
     export let cascadeDuration = 300;
     export let cascadeDelayStep = 24;
@@ -178,12 +176,6 @@
         }
     }
 
-    function onDropdownWheel(e: WheelEvent) {
-        if (!fastScroll || !dropdownRef) return;
-        e.preventDefault();
-        dropdownRef.scrollTop += e.deltaY * 2.1;
-    }
-
     function focusOption(index: number) {
         const n = visibleOptions.length;
         if (n === 0) return;
@@ -319,11 +311,8 @@
     }
 
     onMount(() => {
-        if (browser) {
-            document.addEventListener("click", handleClickOutside);
-            return () =>
-                document.removeEventListener("click", handleClickOutside);
-        }
+        document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
     });
 </script>
 
@@ -355,9 +344,7 @@
         <div
             class="select-dropdown"
             class:align-end={alignEnd}
-            class:fast-scroll={fastScroll}
             bind:this={dropdownRef}
-            on:wheel={onDropdownWheel}
             out:fly={{ y: -4, duration: 120, easing: cubicOut }}
         >
             {#if searchable || excludable}
@@ -517,10 +504,6 @@
     .select-dropdown.align-end {
         left: auto;
         right: 0;
-    }
-
-    .select-dropdown.fast-scroll {
-        max-height: 20rem;
     }
 
     :global(.dark) .select-dropdown {

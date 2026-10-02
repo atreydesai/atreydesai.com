@@ -2,26 +2,20 @@
 //
 // `parseInline` is the single source of truth for the lightweight markdown-ish
 // syntax used in YAML/Markdown content (homepage intro, about page, banner).
-// Each call site opts into exactly the transforms it needs, so the rendered
-// HTML stays identical to the per-page functions this replaced.
+// Each call site opts into exactly the transforms it needs.
 
 export interface ParseInlineOptions {
 	/** Class string for `<strong>` (empty = naked `<strong>`). */
 	strongClass?: string;
 	/** Enable `*italic*` → accent span. */
 	italic?: boolean;
-	/** Enable `[label]()` (empty parens) → copy button. */
-	copyButton?: boolean;
 	/** Enable `[^N]` → footnote reference marker. */
 	footnotes?: boolean;
 }
 
-// Transform order is significant: it mirrors the original per-page functions
-// so output is byte-for-byte identical: strong → italic → copyButton → link →
-// footnote. (`copyButton` matches empty `()`, `link` matches non-empty `(url)`,
-// so they never collide, but copyButton runs first to match the old banner code.)
+// Transforms run in a fixed order: strong → italic → link → footnote.
 export function parseInline(text: string, options: ParseInlineOptions = {}): string {
-	const { strongClass = "", italic = false, copyButton = false, footnotes = false } = options;
+	const { strongClass = "", italic = false, footnotes = false } = options;
 
 	text = text.replace(
 		/\*\*([^*]+)\*\*/g,
@@ -32,13 +26,6 @@ export function parseInline(text: string, options: ParseInlineOptions = {}): str
 		text = text.replace(
 			/\*([^*]+)\*/g,
 			'<span class="text-ink-900 dark:text-cream-100">$1</span>',
-		);
-	}
-
-	if (copyButton) {
-		text = text.replace(
-			/\[([^\]]+)\]\(\)/g,
-			'<button type="button" data-banner-copy class="link banner-copy-btn">$1</button>',
 		);
 	}
 
@@ -57,7 +44,7 @@ export function parseInline(text: string, options: ParseInlineOptions = {}): str
 	return text;
 }
 
-// Escape the five characters unsafe in HTML text/attribute context.
+// Escape the four characters unsafe in HTML text and double-quoted attributes.
 // (Note: RSS uses its own escapeXml which also escapes `'` for XML.)
 export function escapeHtml(s: string): string {
 	return s

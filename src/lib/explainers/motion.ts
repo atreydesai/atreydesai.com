@@ -3,7 +3,7 @@
 // Every explainer is a GSAP timeline over hand-written inline SVG. The SVG is
 // server-rendered in its poster state (the first beat), so the card is
 // complete before any script loads; GSAP is imported only once an explainer
-// scrolls into view. These helpers keep the three scenes speaking one motion
+// scrolls into view. These helpers keep every scene speaking one motion
 // language: things arrive with a short rise on the emphasized ease, leave with
 // a quicker fade, and lines draw rather than pop.
 
@@ -26,29 +26,29 @@ export interface Beat {
 
 // Type scale, in plate units (the plate is 240 wide; at the 144px card one
 // unit is 0.6px). Nothing drops below LABEL, about 8px on the card. Captions
-// on the bottom band stay under CAPTION_MAX wide, clear of the card's pause
-// control in the bottom-right corner.
+// take their size from the frame's .xp-caption style.
 export const T = {
 	hero: 36,
 	body: 21,
 	stem: 19.5,
 	head: 20,
-	caption: 20,
 	label: 13.5,
 } as const;
-export const CAPTION_MAX = 170;
 
 export interface Scene {
 	beats: Beat[];
 	/** Loop length in seconds; the loop always ends back on the poster. */
 	duration: number;
-	build: (gsap: Gsap, tl: Timeline, root: SVGSVGElement) => void;
+	build: (tl: Timeline, root: SVGSVGElement) => void;
 }
+
+/** The props every explainer takes and hands on to ExplainerFrame. */
+export type ExplainerProps = { size?: "card" | "stage"; paused?: boolean; resting?: boolean; label: string };
 
 // The emphasized site ease, cubic-bezier(0.16, 1, 0.3, 1), is closest to
 // power3.out among GSAP's built-ins.
 export const EASE = { enter: "power3.out", exit: "power2.in", move: "power2.inOut" } as const;
-export const DUR = { enter: 0.45, exit: 0.3, move: 0.6 } as const;
+export const DUR = { enter: 0.45, exit: 0.3 } as const;
 
 let loader: Promise<Gsap> | null = null;
 
@@ -63,11 +63,12 @@ export function loadGsap(): Promise<Gsap> {
 }
 
 /** Fade and rise in. Starts from whatever the markup says (hidden by default).
- *  Captions fade in place: a rise would carry their lower line onto the rail. */
+ *  Captions fade in place: a rise would carry their lower line onto the rail.
+ *  An explicit `y` in vars is where the targets fade in, with no rise. */
 export function enter(tl: Timeline, targets: Targets, at: number | string, vars: gsap.TweenVars = {}) {
 	return tl.fromTo(
 		targets,
-		{ autoAlpha: 0, y: (_: number, el: Element) => (el.classList?.contains("xp-caption") ? 0 : 4) },
+		{ autoAlpha: 0, y: vars.y ?? ((_: number, el: Element) => (el.classList?.contains("xp-caption") ? 0 : 4)) },
 		{ autoAlpha: 1, y: 0, duration: DUR.enter, ease: EASE.enter, immediateRender: false, ...vars },
 		at,
 	);
@@ -110,33 +111,10 @@ export function draw(tl: Timeline, path: Targets, at: number | string, duration 
 	);
 }
 
-/** Count a text node up to a number, e.g. "56%". */
-export function count(
-	tl: Timeline,
-	el: Element | null,
-	to: number,
-	at: number | string,
-	format: (n: number) => string,
-	duration = 0.8,
-) {
-	if (!el) return tl;
-	const state = { n: 0 };
-	return tl.to(
-		state,
-		{
-			n: to,
-			duration,
-			ease: "power2.out",
-			onUpdate: () => (el.textContent = format(state.n)),
-		},
-		at,
-	);
-}
-
 // Bars stand on their axis. Each bar runs TUCK units below the baseline and
 // sits in a group clipped just above the axis line, so its top corners round,
 // its foot is square, and the axis (drawn after the bars) is never covered.
-export const TUCK = 3;
+const TUCK = 3;
 
 /** Markup geometry for a bar of height `h` standing on `base`. */
 export function barBox(base: number, h: number) {

@@ -16,36 +16,36 @@
 	// Sec. 3.1); random is 0.25.
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "question", label: "hidden", at: 0 },
 		{ id: "reason", label: "inferred", at: 2.2 },
 		{ id: "accuracy", label: "accuracy", at: 7.0 },
 		{ id: "takeaway", label: "takeaway", at: 10.8 },
 	];
-	export const DURATION = 14;
+	const DURATION = 14;
 
 	// Question bar: 14..60, two lines of the inferred question.
-	export const QBAR = { y: 14, height: 46 };
-	export const QLINES = [
+	const QBAR = { y: 14, height: 46 };
+	const QLINES = [
 		{ text: "which of the following", y: 33, clip: { x: 30, y: 14, height: 25, width: 180 } },
 		{ text: "is a renewable resource?", y: 54, clip: { x: 22, y: 39, height: 21, width: 196 } },
 	];
 
 	// Rows 27 apart; each rule sits 8 under its row's baseline.
-	export const CHOICES = [
+	const CHOICES = [
 		{ letter: "A", text: "oil", tag: "finite", y: 88 },
 		{ letter: "B", text: "coal", tag: "finite", y: 115 },
 		{ letter: "C", text: "trees", tag: "renewable", y: 142, gold: true },
 		{ letter: "D", text: "aluminum", tag: "finite", y: 169 },
 	];
-	export const RULE = 8;
+	const RULE = 8;
 
 	// Bars: 100% accuracy would stand 120 units tall on a baseline at y=178.
 	// The pair is centred on the plate (48..108, 132..192).
-	export const BASE = 178;
-	export const SCALE = 1.2;
-	export const BAR_W = 60;
-	export const BARS = [
+	const BASE = 178;
+	const SCALE = 1.2;
+	const BAR_W = 60;
+	const BARS = [
 		{ name: "random", value: 25, x: 48 },
 		{ name: "GPT-5", value: 55.7, x: 132 },
 	];
@@ -53,14 +53,9 @@
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { DUR, EASE, T, barBox, draw, enter, exit, restore, rise, write, type Scene } from "./motion";
+	import { T, barBox, draw, enter, exit, restore, rise, swap, write, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const uid = $props.id();
 	const gold = CHOICES.find((c) => c.gold)!;
@@ -72,31 +67,16 @@
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl, root) {
+		build(tl, root) {
 			const wipes = [...root.querySelectorAll(".r-wipe")];
 			const poster = [".r-qbar", ".r-hidden", ".r-row", ".r-cap-q"];
 
-			// Captions hand over in sequence: the next one starts only once the
-			// last has gone, so two captions never share the band. It fades in
-			// place rather than rising, since a rise would carry the second
-			// line's descenders (the g and q of "original question") across
-			// the card's progress rail.
-			const handover = (out: string, into: string, at: number) => {
-				exit(tl, out, at);
-				tl.fromTo(
-					into,
-					{ autoAlpha: 0 },
-					{ autoAlpha: 1, duration: DUR.enter, ease: EASE.enter, immediateRender: false },
-					at + 0.3,
-				);
-			};
-
 			// 2 · it names properties of the choices, top to bottom ...
-			handover(".r-cap-q", ".r-cap-p", 2.2);
+			swap(tl, ".r-cap-q", ".r-cap-p", 2.2);
 			enter(tl, ".r-tag", 2.75, { stagger: 0.28 });
 			// ... infers the original question, one line at a time ...
 			exit(tl, ".r-hidden", 4.1);
-			handover(".r-cap-p", ".r-cap-i", 4.1);
+			swap(tl, ".r-cap-p", ".r-cap-i", 4.1);
 			tl.set(".r-guess", { autoAlpha: 1 }, 4.5);
 			write(tl, wipes[0], QLINES[0].clip.width, 4.5, 0.5);
 			write(tl, wipes[1], QLINES[1].clip.width, 5.0, 0.55);

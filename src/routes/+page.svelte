@@ -8,7 +8,7 @@
   import HyperText from "$lib/components/HyperText.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Mark from "$lib/components/Mark.svelte";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { arcadeScreen, openArcade } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
 
@@ -55,7 +55,7 @@
     return () => window.removeEventListener("pointerdown", unlock);
   });
 
-  const parseBanner = (text: string) => parseInline(text, { copyButton: true });
+  const parseBanner = (text: string) => parseInline(text);
 
   let projectsOpen = false;
 
@@ -66,7 +66,7 @@
     ? { pre: bannerLeadMatch[1], label: bannerLeadMatch[2], post: bannerLeadMatch[3] }
     : { pre: homepageData.banner?.lead ?? "", label: "ongoing projects", post: "" };
 
-  $: featuredPapers = papers
+  const featuredPapers = papers
     .filter((p) => p.featured)
     .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
     .slice(0, 3);
@@ -108,9 +108,9 @@
   //
   // A drag that selects text in the row also ends in a click on it, and that
   // shouldn't toggle. It's told apart by how far the press travelled, not by
-  // whether the page has a selection: a selection left anywhere on the page
-  // (and one Safari keeps while you click the non-selectable marker) used to
-  // swallow the click, so a row could open and then refuse to close.
+  // whether the page has a selection: a selection can linger anywhere on the
+  // page (Safari keeps one while you click the non-selectable marker), so
+  // checking for one would swallow clicks and leave a row stuck open.
   let pressX = 0;
   let pressY = 0;
 
@@ -157,6 +157,11 @@
     clearTimeout(cookTimeout);
     cookTimeout = setTimeout(() => (cookKey = null), 1000);
   }
+
+  onDestroy(() => {
+    clearTimeout(copyTimeout);
+    clearTimeout(cookTimeout);
+  });
 
   const socialLinks = [
     { name: "Google Scholar", href: homepageData.social.scholar },
@@ -257,7 +262,7 @@
   </section>
 
   {#if homepageData.banner}
-    <ScrollReveal animation="fade-up" delay={40}>
+    <ScrollReveal delay={40}>
       <section class="section-gap">
         <!-- Filter regions are widened so the displaced edges never clip
              against the default 110% filter box on a short banner. -->
@@ -321,7 +326,7 @@
     </ScrollReveal>
   {/if}
 
-  <ScrollReveal animation="fade-up" delay={60}>
+  <ScrollReveal delay={60}>
     <section class="section-gap">
       <div class="section-rule mb-6">
         <h2 class="section-heading mb-0">
@@ -342,14 +347,18 @@
               class="research-toggle"
               aria-expanded={researchExpanded}
               aria-controls="research-interest-list"
-              aria-label={researchExpanded
-                ? "Show concise research summaries"
-                : "Show full research questions"}
               on:click={toggleResearchDetails}
             >
               <Mark kind="caret" />
               <span>{researchExpanded ? "want a summary?" : "want more detail?"}</span>
             </button>
+            <!-- Every row's buttons toggle all rows at once. This hint says so
+                 to screen readers without replacing each button's visible text. -->
+            <span id="research-interest-hint" class="sr-only">
+              {researchExpanded
+                ? "Shows concise summaries for all research interests."
+                : "Shows full research questions for all research interests."}
+            </span>
           </div>
 
           <!-- Roughening filter for the interest markers, gentler than the
@@ -362,7 +371,7 @@
           </svg>
           <ol id="research-interest-list">
             {#each interestRows as item, i}
-              <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+              <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
               <li
                 class="research-interest-row py-3"
                 class:research-interest-row-expanded={researchExpanded}
@@ -394,7 +403,7 @@
                       class="research-interest-title"
                       aria-expanded={researchExpanded}
                       aria-controls="research-interest-list"
-                      aria-label={`${researchExpanded ? "Show concise summary for" : "Show full details for"} all research interests`}
+                      aria-describedby="research-interest-hint"
                       on:click={toggleResearchDetails}
                     >
                       {item.title}
@@ -413,7 +422,7 @@
                           tabindex={researchExpanded ? -1 : 0}
                           aria-expanded={researchExpanded}
                           aria-controls="research-interest-list"
-                          aria-label="Show full details for all research interests"
+                          aria-describedby="research-interest-hint"
                           on:click={toggleResearchDetails}
                         >
                           {item.summary}
@@ -434,7 +443,7 @@
                           class="research-interest-summary"
                           aria-expanded={researchExpanded}
                           aria-controls="research-interest-list"
-                          aria-label="Show concise summaries for all research interests"
+                          aria-describedby="research-interest-hint"
                           on:click={toggleResearchDetails}
                         >
                           {@html parseInterestText(item.question)}
@@ -457,7 +466,7 @@
                                   class="cursor-pointer font-[inherit] text-[length:inherit] leading-none transition-colors duration-150 hover:text-accent dark:hover:text-accent-light"
                                 >[{citation.label}]</button>
                                 {#if cookKey === `${i}-${ci}`}
-                                  <span class="copied-tooltip cook-tooltip">
+                                  <span class="copied-tooltip">
                                     <span class="copied-triangle"></span>
                                     let me cook :)
                                   </span>
@@ -483,7 +492,7 @@
     </section>
   </ScrollReveal>
 
-  <ScrollReveal animation="fade-up" delay={60}>
+  <ScrollReveal delay={60}>
     <section>
       <div class="section-rule mb-6">
         <h2 class="section-heading mb-0">
@@ -667,9 +676,6 @@
    * Let the active panel use normal document flow on small screens instead.
    */
   @media (max-width: 767px) {
-    .research-interest-row {
-      align-items: start;
-    }
     .interest-summary-shell,
     .interest-question-shell,
     .research-interest-row-expanded .interest-summary-shell,
@@ -749,11 +755,6 @@
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-inline);
     animation: tooltip-pop var(--motion-base) var(--ease-emphasized) forwards;
-  }
-
-  /* Cook tooltip lives among the mono citation labels: match that font. */
-  .cook-tooltip {
-    font-family: var(--font-mono);
   }
 
   .copied-triangle {
@@ -880,7 +881,7 @@
 
   /* Darker selection inside the banner so it stands out from the blush bg.
      Use :global so selection applies to all descendants: including @html-rendered
-     <strong>/<a>/<button> which don't carry Svelte's scoping hash. */
+     <strong>/<a> which don't carry Svelte's scoping hash. */
   :global(.banner-box *::selection),
   :global(.banner-box::selection) {
     background: #E8B8A8;

@@ -22,7 +22,7 @@ import {
   runLetterboxdSync,
   updateExistingEntry,
 } from "../scripts/sync-letterboxd.mjs";
-import { parseFrontmatter } from "../scripts/letterboxd-utils.mjs";
+import { parseFrontmatter } from "../scripts/bookshelf-utils.mjs";
 
 const feed = `<?xml version="1.0"?>
 <rss xmlns:letterboxd="https://letterboxd.com" xmlns:tmdb="https://themoviedb.org">

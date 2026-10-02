@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import DarkModeToggle from "./DarkModeToggle.svelte";
 
   const links = [
@@ -10,8 +10,6 @@
     { name: "photography", href: "/photography/" },
     { name: "bookshelf", href: "/bookshelf/" },
   ];
-
-  $: currentPath = $page.url.pathname;
 
   function isActive(href: string, pathname: string): boolean {
     const normalizedHref = href === "/" ? href : href.replace(/\/$/, "");
@@ -26,8 +24,7 @@
 <header class="page-shell-standard w-full pt-7 md:pt-8" data-sveltekit-preload-code="eager">
   <div class="flex flex-col gap-2 md:flex-row md:items-baseline md:justify-between md:gap-6">
     <!-- Just the wordmark: the page's own title and the highlighted nav item
-         already say where you are, so a "/ page" crumb here only repeated
-         the heading directly beneath it. -->
+         already say where you are. -->
     <a
       href="/"
       class="w-fit shrink-0 font-display text-base font-bold leading-none text-ink-900 transition-colors duration-200 hover:text-accent-dark dark:text-cream-100 dark:hover:text-accent"
@@ -41,7 +38,7 @@
         class="type-meta flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1"
       >
         {#each links as link (link.href)}
-          {@const active = isActive(link.href, currentPath)}
+          {@const active = isActive(link.href, page.url.pathname)}
           <a
             href={link.href}
             aria-current={active ? "page" : undefined}

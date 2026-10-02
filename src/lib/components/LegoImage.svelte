@@ -7,7 +7,6 @@
     export let blockSize: number = 12; // Size of each "lego" block
 
     let canvas: HTMLCanvasElement;
-    let container: HTMLDivElement;
     let isHovering = false;
     let animationProgress = 0; // 0 = normal, 1 = fully pixelated
     let animationFrame: number;
@@ -146,7 +145,6 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="lego-image-container"
-    bind:this={container}
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
 >

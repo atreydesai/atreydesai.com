@@ -4,13 +4,11 @@
   import { cubicOut } from "svelte/easing";
 
   import {
-    finishMusic,
     setMusicPaused,
     setMusicPhase,
     sfxBlip,
     sfxCountdown,
     sfxDump,
-    sfxGameOver,
     sfxMiss,
     sfxPlop,
     sfxPour,
@@ -21,6 +19,7 @@
     startMusic,
     stopMusic,
   } from "$lib/sfx";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import {
     LIVES,
     MAX_TICKETS,
@@ -37,8 +36,8 @@
   } from "$lib/arcade/orders-engine.js";
   import type { Cup, Order, Phase, Tea, Topping } from "$lib/arcade/orders-engine.js";
   import { MENU_ICONS, PEARL } from "$lib/arcade/art";
-  import { trapFocus } from "$lib/arcade/focus";
-  import { fetchBoard, firstVisit, recordScore } from "$lib/arcade/scores";
+  import { fetchBoard, firstVisit } from "$lib/arcade/scores";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import Mark from "$lib/components/Mark.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
@@ -52,9 +51,8 @@
   // toppings. Build the drink, serve it; it goes to whoever ordered it. The
   // whole game is ordinary buttons, so it plays by mouse, touch, or keys.
 
-  const dispatch = createEventDispatcher<{ close: null; menu: null }>();
+  const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
-  const COUNTDOWN_SECONDS = 3;
   const EMPTY_CUP: Cup = { tea: null, toppings: [] };
 
   const TEA_NAMES: Record<Tea, string> = {
@@ -233,7 +231,8 @@
   let last = 0;
   let raf = 0;
   let active = true;
-  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const timers = createTimers();
+  const { later } = timers;
 
   $: grid = cupGrid(cup);
   $: palette = cupPalette(cup);
@@ -241,24 +240,6 @@
 
   const phaseLabel = (value: Phase) =>
     value === "rush" ? "lunch rush" : value === "steady" ? "steady trade" : "doors open";
-
-  function later(callback: () => void, delay: number) {
-    const timer = setTimeout(() => {
-      timers.delete(timer);
-      callback();
-    }, delay);
-    timers.add(timer);
-  }
-
-  function exit() {
-    sfxBlip();
-    dispatch("close");
-  }
-
-  function toMenu() {
-    sfxBlip();
-    dispatch("menu");
-  }
 
   // Clicking a counter button shouldn't take focus from the page, or Space
   // would press that button again instead of serving.
@@ -417,13 +398,13 @@
     }
 
     if (!running) {
-      countdownElapsed += clockDt;
-      const next = Math.max(1, COUNTDOWN_SECONDS - Math.floor(countdownElapsed));
-      if (next !== countdown && countdownElapsed < COUNTDOWN_SECONDS) {
-        countdown = next;
+      const step = stepCountdown(countdownElapsed, countdown, clockDt);
+      countdownElapsed = step.elapsed;
+      if (step.beep) {
+        countdown = step.count;
         sfxCountdown(countdown);
       }
-      if (countdownElapsed >= COUNTDOWN_SECONDS) beginShift();
+      if (step.done) beginShift();
       raf = requestAnimationFrame(frame);
       return;
     }
@@ -498,9 +479,7 @@
     active = false;
     endReason = reason;
     cancelAnimationFrame(raf);
-    finishMusic();
-    sfxGameOver(reason);
-    const result = recordScore("orders", score);
+    const result = concludeRun("orders", score, reason);
     localBest = result.best;
     newBest = result.newBest;
     liveMessage =
@@ -542,10 +521,6 @@
   }
 
   onMount(() => {
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncMotion = () => (reduceMotion = motion.matches);
-    syncMotion();
-    motion.addEventListener("change", syncMotion);
     tipVisible = firstVisit("orders");
     sfxCountdown(COUNTDOWN_SECONDS);
 
@@ -560,67 +535,43 @@
       cupPx = window.innerWidth < 640 ? 5 : 6;
     };
     measure();
-    const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(hud);
 
-    const onBlur = () => {
-      if (!gameOver && !paused) void pauseGame();
-    };
-    const onVisibility = () => {
-      if (document.hidden) onBlur();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Tab") {
-        if (gameOver) trapFocus(event, document.querySelector(".boba-over-card"));
-        else if (paused) trapFocus(event, document.querySelector(".boba-pause-card"));
-        else trapFocus(event, document.querySelector(".orders-game"));
-        return;
-      }
-      if (event.repeat || gameOver) return;
-      const key = event.key.toLowerCase();
-      if (key === "p") {
-        event.preventDefault();
-        togglePause();
-        return;
-      }
-      if (paused) return;
-      const onControl =
-        event.target instanceof HTMLElement && !!event.target.closest("button, input");
-      const number = Number(event.key);
-      if (number >= 1 && number <= TEAS.length) {
-        event.preventDefault();
-        pour(TEAS[number - 1]);
-      } else if (number > TEAS.length && number <= TEAS.length + TOPPINGS.length) {
-        event.preventDefault();
-        toggle(TOPPINGS[number - TEAS.length - 1]);
-      } else if ((event.key === " " || event.key === "Enter") && !onControl) {
-        // A focused control keeps Space and Enter for itself.
-        event.preventDefault();
-        serve();
-      } else if (event.key === "Backspace" || event.key === "Delete") {
-        event.preventDefault();
-        dump();
-      }
-    };
-
-    window.addEventListener("resize", measure);
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("visibilitychange", onVisibility);
+    const unmountShell = mountShell({
+      isOver: () => gameOver,
+      isPaused: () => paused,
+      pause: () => void pauseGame(),
+      togglePause,
+      playScope: () => document.querySelector(".orders-game"),
+      onKey: (event) => {
+        if (paused) return;
+        const number = Number(event.key);
+        if (number >= 1 && number <= TEAS.length) {
+          event.preventDefault();
+          pour(TEAS[number - 1]);
+        } else if (number > TEAS.length && number <= TEAS.length + TOPPINGS.length) {
+          event.preventDefault();
+          toggle(TOPPINGS[number - TEAS.length - 1]);
+        } else if ((event.key === " " || event.key === "Enter") && !isOnControl(event)) {
+          // A focused control keeps Space and Enter for itself.
+          event.preventDefault();
+          serve();
+        } else if (event.key === "Backspace" || event.key === "Delete") {
+          event.preventDefault();
+          dump();
+        }
+      },
+      onResize: measure,
+      observe: hud,
+      onReduceMotion: (reduce) => (reduceMotion = reduce),
+    });
     raf = requestAnimationFrame(frame);
 
     return () => {
       active = false;
       cancelAnimationFrame(raf);
       stopMusic();
-      for (const timer of timers) clearTimeout(timer);
       timers.clear();
-      resizeObserver.disconnect();
-      motion.removeEventListener("change", syncMotion);
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("visibilitychange", onVisibility);
+      unmountShell();
     };
   });
 </script>

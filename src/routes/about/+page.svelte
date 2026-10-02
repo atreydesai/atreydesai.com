@@ -4,6 +4,7 @@
     import Seo from "$lib/components/Seo.svelte";
     import { aboutData } from "$lib/content";
     import { parseInline, escapeHtml } from "$lib/utils/text";
+    import type { ManifoldNow, ReadingBook } from "../api/now/+server";
 
     // Sidenote layout: each footnote floats in the right margin beside its
     // marker, faint until you hover the note or the marker.
@@ -20,18 +21,7 @@
     let wideNotes = false;
 
     // Live "now" data (Manifold + Goodreads) from the /api/now endpoint.
-    interface ReadingBook {
-        title: string;
-        author: string | null;
-        url: string | null;
-    }
-    interface Manifold {
-        netWorth: number;
-        rank: number | null;
-        market: { question: string; url: string } | null;
-        profileUrl: string;
-    }
-    let manifoldNow: Manifold | null = null;
+    let manifoldNow: ManifoldNow | null = null;
     let readingNow: ReadingBook[] | null = null;
 
     // 302847 -> "Ṁ303k", 840 -> "Ṁ840"
@@ -76,7 +66,7 @@
     // enough that none overlap (classic Tufte-style margin note stacking).
     function layoutNotes() {
         if (!containerEl) return;
-        if (!window.matchMedia("(min-width: 1280px)").matches) return;
+        if (!window.matchMedia(SIDENOTE_QUERY).matches) return;
 
         const containerTop =
             containerEl.getBoundingClientRect().top + window.scrollY;
@@ -133,7 +123,7 @@
 
         // Small delay to ensure all dynamic content is rendered (including
         // from parseLinks), then position the sidenotes.
-        setTimeout(() => {
+        const setupTimeout = setTimeout(() => {
             layoutNotes();
 
             // Pointing at or focusing a marker brightens its note. Markers
@@ -157,6 +147,7 @@
         window.addEventListener("resize", scheduleLayout);
 
         return () => {
+            clearTimeout(setupTimeout);
             ro.disconnect();
             window.removeEventListener("resize", scheduleLayout);
             cancelAnimationFrame(layoutRaf);
@@ -203,7 +194,7 @@
     <aside class="about-sidenotes layer-raised hidden xl:block">
         <div class="relative h-full">
             {#each aboutData.footnotes as footnote (footnote.id)}
-                <!-- svelte-ignore a11y-no-static-element-interactions -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                     class="sidenote footnote-item text-xs text-ink-500 dark:text-cream-500 leading-relaxed"
                     class:fn-ready={notesReady}
@@ -529,10 +520,6 @@
     /* Marker echo: while its sidenote is hovered, the in-text marker warms. */
     :global(.footnote-ref.fn-hot) {
         color: theme("colors.accent.dark");
-    }
-
-    .footnote-item {
-        padding-left: 0;
     }
 
     /* The Manifold footnote pair [6][7]: hovering either one makes them

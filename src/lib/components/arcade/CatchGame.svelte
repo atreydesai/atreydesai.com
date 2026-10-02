@@ -2,13 +2,11 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
 
   import {
-    finishMusic,
     setMusicPaused,
     setMusicPhase,
     sfxBlip,
     sfxCatch,
     sfxCountdown,
-    sfxGameOver,
     sfxGolden,
     sfxMilestone,
     sfxMiss,
@@ -17,7 +15,6 @@
     stopMusic,
   } from "$lib/sfx";
   import {
-    COUNTDOWN_SECONDS,
     GAME_DURATION_SECONDS,
     PLAYFIELD_TOP,
     bounceHorizontal,
@@ -46,8 +43,9 @@
     type Particle,
     type Popup,
   } from "$lib/arcade/art";
-  import { trapFocus } from "$lib/arcade/focus";
-  import { firstVisit, recordScore } from "$lib/arcade/scores";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
+  import { firstVisit } from "$lib/arcade/scores";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import Mark from "$lib/components/Mark.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
@@ -58,7 +56,7 @@
   import ResultsSlip from "./ResultsSlip.svelte";
   import TrackFlag from "./TrackFlag.svelte";
 
-  const dispatch = createEventDispatcher<{ close: null; menu: null }>();
+  const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
   type GamePhase = "opening" | "steady" | "rush";
 
   // --- Pixel sprites -------------------------------------------------------
@@ -188,7 +186,8 @@
   let last = 0;
   let raf = 0;
   let active = true;
-  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const timers = createTimers();
+  const { later } = timers;
 
   const clamp = (value: number, low: number, high: number) =>
     Math.max(low, Math.min(high, value));
@@ -199,29 +198,10 @@
     return "opening shift";
   };
 
-  function later(callback: () => void, delay: number) {
-    const timer = setTimeout(() => {
-      timers.delete(timer);
-      callback();
-    }, delay);
-    timers.add(timer);
-    return timer;
-  }
-
-  function exit() {
-    sfxBlip();
-    dispatch("close");
-  }
-
   // The stage sits over the page: nothing it receives should reach the page.
   function swallow(event: Event) {
     event.stopPropagation();
     event.preventDefault();
-  }
-
-  function toMenu() {
-    sfxBlip();
-    dispatch("menu");
   }
 
   // --- Drawing -------------------------------------------------------------
@@ -468,13 +448,13 @@
     }
 
     if (countdown > 0) {
-      countdownElapsed += clockDt;
-      const nextCountdown = Math.max(1, COUNTDOWN_SECONDS - Math.floor(countdownElapsed));
-      if (nextCountdown !== countdown && countdownElapsed < COUNTDOWN_SECONDS) {
-        countdown = nextCountdown;
+      const step = stepCountdown(countdownElapsed, countdown, clockDt);
+      countdownElapsed = step.elapsed;
+      if (step.beep) {
+        countdown = step.count;
         sfxCountdown(countdown);
       }
-      if (countdownElapsed >= COUNTDOWN_SECONDS) beginRound();
+      if (step.done) beginRound();
       drawScene();
       raf = requestAnimationFrame(frame);
       return;
@@ -557,9 +537,6 @@
   // --- Pause, restart, and finish -----------------------------------------
 
   function clearSpawnSources() {
-    for (const spawn of pendingSpawns) {
-      spawn.source?.classList.remove("boba-source", "boba-source-gold");
-    }
     document
       .querySelectorAll(".boba-source, .boba-source-gold")
       .forEach((element) => element.classList.remove("boba-source", "boba-source-gold"));
@@ -597,9 +574,7 @@
     endReason = reason;
     cancelAnimationFrame(raf);
     clearSpawnSources();
-    finishMusic();
-    sfxGameOver(reason);
-    const result = recordScore("catch", score);
+    const result = concludeRun("catch", score, reason);
     localBest = result.best;
     newBest = result.newBest;
     liveMessage =
@@ -670,33 +645,23 @@
     const onMove = (event: MouseEvent) => {
       pointerX = event.clientX;
     };
-    const onResize = () => sizeCanvas();
-    const onBlur = () => {
-      if (!gameOver && active && !paused) void pauseGame();
-    };
-    const onVisibility = () => {
-      if (document.hidden) onBlur();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Tab") {
-        if (gameOver) trapFocus(event, document.querySelector(".boba-over-card"));
-        else if (paused) trapFocus(event, document.querySelector(".boba-pause-card"));
-        else trapFocus(event, document.querySelector(".boba-hud"));
-        return;
-      }
-
-      if (!gameOver && (event.key.toLowerCase() === "p" || event.key === " ")) {
-        event.preventDefault();
-        togglePause();
-      }
-    };
-
+    const unmountShell = mountShell({
+      isOver: () => gameOver,
+      isPaused: () => paused,
+      pause: () => void pauseGame(),
+      togglePause,
+      playScope: () => document.querySelector(".boba-hud"),
+      onKey: (event) => {
+        // Space pauses too, unless a focused control keeps it for itself.
+        if (event.key === " " && !isOnControl(event)) {
+          event.preventDefault();
+          togglePause();
+        }
+      },
+      onResize: sizeCanvas,
+      pauseOnPointerLeave: true,
+    });
     window.addEventListener("mousemove", onMove, { passive: true });
-    window.addEventListener("resize", onResize);
-    window.addEventListener("blur", onBlur);
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("visibilitychange", onVisibility);
-    document.documentElement.addEventListener("mouseleave", onBlur);
     raf = requestAnimationFrame(frame);
 
     return () => {
@@ -704,14 +669,9 @@
       cancelAnimationFrame(raf);
       clearSpawnSources();
       stopMusic();
-      for (const timer of timers) clearTimeout(timer);
       timers.clear();
+      unmountShell();
       window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("blur", onBlur);
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("visibilitychange", onVisibility);
-      document.documentElement.removeEventListener("mouseleave", onBlur);
     };
   });
 </script>

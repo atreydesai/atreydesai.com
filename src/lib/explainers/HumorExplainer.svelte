@@ -15,15 +15,15 @@
 	// says 31.8%, so the table is followed.
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "bit", label: "the bit", at: 0 },
 		{ id: "model", label: "model", at: 2.6 },
 		{ id: "missed", label: "missed", at: 6.4 },
 		{ id: "size", label: "size", at: 10.4, hold: 13.8 },
 	];
-	export const DURATION = 15;
+	const DURATION = 15;
 
-	export const LINES = [
+	const LINES = [
 		{ w: 118, human: "context", model: "context", y: 60 },
 		{ w: 98, human: "context", model: "context", y: 92 },
 		{ w: 40, human: "timing", model: "context", y: 124 },
@@ -33,7 +33,7 @@
 	// 10 x 10: three of a hundred punchlines found. Ring ink (r 4 + half the
 	// 1.5 stroke) starts on the x=14 margin.
 	const RING = 4.75;
-	export const GRID = Array.from({ length: 100 }, (_, i) => ({
+	const GRID = Array.from({ length: 100 }, (_, i) => ({
 		x: 14 + RING + (i % 10) * 13,
 		y: 50 + Math.floor(i / 10) * 13,
 		found: i === 23 || i === 58 || i === 86,
@@ -41,7 +41,7 @@
 
 	// Seven bars across the full 14-226 axis: 30-unit slots, 22-wide bars,
 	// inset 5 at each end so the 32B numbers stay inside the margin.
-	export const MODELS = [
+	const MODELS = [
 		{ name: "OLMo 3 7B", acc: 0.0 },
 		{ name: "Apertus 8B", acc: 0.031 },
 		{ name: "Ministral 8B", acc: 0.0 },
@@ -50,22 +50,17 @@
 		{ name: "OLMo 3.1 32B", acc: 0.266 },
 		{ name: "Qwen3 32B", acc: 0.308 },
 	].map((m, i) => ({ ...m, x: 19 + i * 30, big: m.name.includes("32B") }));
-	export const BAR_W = 22;
-	export const BASE = 162;
-	export const SCALE = 280;
-	export const barH = (acc: number) => Math.max(1.5, acc * SCALE);
+	const BAR_W = 22;
+	const BASE = 162;
+	const SCALE = 280;
+	const barH = (acc: number) => Math.max(1.5, acc * SCALE);
 </script>
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { T, barBox, draw, enter, exit, restore, rise, type Scene } from "./motion";
+	import { T, barBox, draw, enter, exit, restore, rise, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const uid = $props.id();
 	// How far a mark pushes a wrong label in from the right margin: the mark's
@@ -75,7 +70,7 @@
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl, root) {
+		build(tl, root) {
 			const poster = [".h-kicker", ".h-line", ".h-human", ".h-cap-q"];
 			// Words that replace each other in place: the old one is gone
 			// before the new one arrives, so the two never cross-fade.

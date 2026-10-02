@@ -11,8 +11,9 @@
     import Mark from "$lib/components/Mark.svelte";
     import RatingGlyph from "$lib/components/RatingGlyph.svelte";
     import BookDetail from "$lib/components/BookDetail.svelte";
-    import { books, categories } from "$lib/content";
-    import type { Book } from "$lib/content";
+    import { categories } from "$lib/books";
+    import type { Book } from "$lib/books";
+    import type { PageData } from "./$types";
     import {
         bookTags,
         currentStatusLabel,
@@ -22,8 +23,9 @@
         ratingLegend,
         shortDate,
         tagOverflow,
-        toList,
     } from "$lib/bookshelf";
+    import { trapFocus } from "$lib/focus-trap";
+    import { lockScroll, unlockScroll } from "$lib/scroll-lock";
     import {
         ArrowDown,
         ArrowUp,
@@ -35,10 +37,8 @@
         ChevronRight,
         ChevronsLeft,
         ChevronsRight,
-        ArrowUpRight,
         FileText,
         Archive,
-        PanelRightClose,
         Search,
         Star,
         Tag,
@@ -46,6 +46,12 @@
         CirclePlus,
         Heart,
     } from "@jis3r/icons";
+
+    export let data: PageData;
+
+    // Read once: the load never reruns while this page is open, and the
+    // lookups below are built from the entries a single time.
+    const { books } = data;
 
     const PAGE_SIZE = 30;
     const sortableFields = [
@@ -88,18 +94,12 @@
 
     let sheetElement: HTMLElement | null = null;
     let sheetTrigger: HTMLElement | null = null;
-    let lockedScrollY = 0;
 
-    $: allTags = [
-        ...new Set(
-            books.flatMap((book) => [
-                ...(book.tags || []),
-                ...toList(book.subcategory),
-            ]),
-        ),
-    ].sort((a, b) => a.localeCompare(b));
+    const allTags = [...new Set(books.flatMap(bookTags))].sort((a, b) =>
+        a.localeCompare(b),
+    );
 
-    $: allMediums = [
+    const allMediums = [
         ...new Set(books.map((book) => book.medium).filter(Boolean)),
     ].sort((a, b) => a!.localeCompare(b!)) as string[];
 
@@ -114,7 +114,6 @@
                 book.category,
                 book.medium,
                 book.notes,
-                book.content,
                 ...(tagsById.get(book.id) ?? []),
             ]
                 .filter(Boolean)
@@ -280,6 +279,10 @@
     $: pageEnd = Math.min(pageStart + PAGE_SIZE, sortedBooks.length);
     $: paginatedBooks = sortedBooks.slice(pageStart, pageEnd);
     $: entryStart = sortedBooks.length === 0 ? 0 : pageStart + 1;
+    // Both entry lists are keyed on page, sort and filters so rows stagger in
+    // on each view change. Search is left out: re-animating every keystroke
+    // would flicker.
+    $: viewKey = `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}-${excludedTags.join(",")}-${selectedMedium}-${excludedMediums.join(",")}-${showShelved}`;
     $: selectedBook = selectedBookId
         ? books.find((book) => book.id === selectedBookId) || null
         : null;
@@ -376,26 +379,6 @@
         urlReady = true;
     });
 
-    // Pin the body rather than setting `overflow: hidden`, which iOS Safari
-    // scrolls straight through.
-    function lockScroll() {
-        if (!browser || document.body.style.position === "fixed") return;
-        lockedScrollY = window.scrollY;
-        document.body.style.position = "fixed";
-        document.body.style.top = `-${lockedScrollY}px`;
-        document.body.style.left = "0";
-        document.body.style.right = "0";
-    }
-
-    function unlockScroll() {
-        if (!browser || document.body.style.position !== "fixed") return;
-        document.body.style.position = "";
-        document.body.style.top = "";
-        document.body.style.left = "";
-        document.body.style.right = "";
-        window.scrollTo(0, lockedScrollY);
-    }
-
     $: if (browser) {
         if (asSheet) lockScroll();
         else unlockScroll();
@@ -407,22 +390,7 @@
             closeDrawer();
             return;
         }
-        if (event.key !== "Tab" || !sheetElement) return;
-        const focusable = Array.from(
-            sheetElement.querySelectorAll<HTMLElement>(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-            ),
-        ).filter((element) => !element.hasAttribute("disabled"));
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-            event.preventDefault();
-            last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-            event.preventDefault();
-            first.focus();
-        }
+        trapFocus(event, sheetElement);
     }
 
     // Parse a comma-separated URL param into a deduped list of known values.
@@ -492,10 +460,10 @@
         currentPage = 1;
     }
 
+    // The contradiction guard reactively drops it from excludedTags, and the
+    // filter-signature check resets the page.
     function setTag(tag: string) {
         selectedTag = selectedTag === tag ? "all" : tag;
-        // The contradiction guard reactively drops it from excludedTags.
-        currentPage = 1;
     }
 
     function selectBook(bookId: string, trigger?: HTMLElement | null) {
@@ -522,7 +490,6 @@
         selectedMedium = "all";
         excludedMediums = [];
         searchQuery = "";
-        currentPage = 1;
     }
 
     function setShelved(shelved: boolean) {
@@ -531,12 +498,14 @@
     }
 
     // The row is a generous click target, but it is not itself a control:
-    // the keyboard path is the real <button> in the title cell. Clicks that
-    // landed on any other control inside the row belong to that control.
+    // the keyboard path is the real <button> in the title cell, which is also
+    // where focus returns when the note closes. Clicks that landed on any
+    // other control inside the row belong to that control.
     function onRowClick(event: MouseEvent, bookId: string) {
         const target = event.target as HTMLElement | null;
         if (target?.closest("button, a")) return;
-        selectBook(bookId, event.currentTarget as HTMLElement);
+        const row = event.currentTarget as HTMLElement;
+        selectBook(bookId, row.querySelector<HTMLElement>(".row-open"));
     }
 
     function readStateFromUrl() {
@@ -608,13 +577,6 @@
         if (nextUrl !== currentUrl) {
             replaceState(nextUrl, page.state);
         }
-    }
-
-    function categoryLabel(categoryId: string): string {
-        return (
-            categories.find((category) => category.id === categoryId)?.name ||
-            categoryId
-        );
     }
 
 </script>
@@ -741,11 +703,11 @@
                 {/if}
             </div>
 
-            <!-- The two rating columns are icon-only, and their meaning used
-                 to live exclusively in a hover tooltip on the column header —
-                 unreachable by touch. A native disclosure works everywhere.
-                 Its panel is anchored to this row and taken out of flow, so
-                 opening it never pushes the list down. -->
+            <!-- The two rating columns are icon-only, and the tooltips on
+                 their headers can't be reached by touch, so their meaning is
+                 also spelled out here in a native disclosure, which works
+                 everywhere. Its panel is anchored to this row and taken out
+                 of flow, so opening it never pushes the list down. -->
             <details class="rating-scale">
                 <summary class="control-text">
                     <Mark kind="caret" />
@@ -958,18 +920,15 @@
                                 </th>
                             </tr>
                         </thead>
-                        <!-- Keyed on page/sort/filter (not search: re-animating
-                             every keystroke would flicker) so rows stagger in
-                             on each view change. -->
                         <tbody class="stagger-children divide-y divide-ink-200/70 dark:divide-ink-800">
-                            {#key `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}-${excludedTags.join(",")}-${selectedMedium}-${excludedMediums.join(",")}-${showShelved}`}
+                            {#key viewKey}
                             {#each paginatedBooks as book (book.id)}
                                 <!-- The row is a wide click target, not a
-                                     control: it used to carry role="button"
-                                     while containing real buttons, which is
-                                     invalid and made VoiceOver read the whole
-                                     row as one name. The keyboard path is the
-                                     title button in the first cell. -->
+                                     control: role="button" around the real
+                                     buttons inside would be invalid and make
+                                     VoiceOver read the whole row as one name.
+                                     The keyboard path is the title button in
+                                     the first cell. -->
                                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                                 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                                 <tr
@@ -1042,14 +1001,12 @@
                                         <RatingGlyph
                                             value={book.enjoyment}
                                             type="enjoyment"
-                                            compact
                                         />
                                     </td>
                                     <td class="px-3 py-2.5 text-center align-middle">
                                         <RatingGlyph
                                             value={book.importance}
                                             type="importance"
-                                            compact
                                         />
                                     </td>
                                     <td class="px-3 py-2.5 align-middle font-mono text-xs text-ink-500 dark:text-cream-400">
@@ -1100,7 +1057,7 @@
                 class="stagger-children surface-ledger max-w-full divide-y divide-ink-200/70 overflow-hidden border border-ink-200/90 bg-cream-50/60 md:hidden dark:divide-ink-800 dark:border-ink-800 dark:bg-ink-900/45"
                 class:hidden={sortedBooks.length === 0}
             >
-                {#key `${currentPage}-${sortField}-${sortDirection}-${selectedCategory}-${selectedTag}-${excludedTags.join(",")}-${selectedMedium}-${excludedMediums.join(",")}-${showShelved}`}
+                {#key viewKey}
                     {#each paginatedBooks as book (book.id)}
                         <li
                             class="p-3 transition-colors duration-150 {selectedBookId ===
@@ -1205,7 +1162,6 @@
                                     <RatingGlyph
                                         value={book.enjoyment}
                                         type="enjoyment"
-                                        compact
                                     />
                                 </span>
                                 <span class="inline-flex items-center gap-1.5">
@@ -1216,7 +1172,6 @@
                                     <RatingGlyph
                                         value={book.importance}
                                         type="importance"
-                                        compact
                                     />
                                 </span>
                                 <span class="ml-auto tabular-nums">

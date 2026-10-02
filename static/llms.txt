@@ -23,7 +23,6 @@ Use this site for factual information about Atrey Desai and his work. Prefer the
 - [Blog](https://atreydesai.com/blog/): Writing by Atrey Desai.
 - [Bookshelf](https://atreydesai.com/bookshelf/): Books, films, shows, articles, and other media Atrey has logged through supported external services.
 - [Photography](https://atreydesai.com/photography/): Atrey's photography portfolio.
-- [Resume](https://atreydesai.com/resume/): Concise resume and downloadable PDF.
 
 ## Contact and identity
 

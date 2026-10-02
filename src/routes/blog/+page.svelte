@@ -95,10 +95,6 @@
         background: rgba(245, 230, 211, 0.05);
     }
 
-    /* Optima ships only Regular and Bold, so type-item-heading's 600 silently
-       resolves to full Bold: too heavy for an index row. Drop to Regular and
-       synthesize the missing middle weight with a hairline stroke. currentColor
-       keeps it in step with the accent shift on hover and with dark mode. */
     .blog-row-heading {
         display: flex;
         flex: 1 1 auto;
@@ -108,6 +104,10 @@
         min-width: 0;
     }
 
+    /* Optima ships only Regular and Bold, so type-item-heading's 600 silently
+       resolves to full Bold: too heavy for an index row. Drop to Regular and
+       synthesize the missing middle weight with a hairline stroke. currentColor
+       keeps it in step with the accent shift on hover and with dark mode. */
     .blog-row-title {
         font-weight: 400;
         -webkit-text-stroke: 0.5px currentColor;

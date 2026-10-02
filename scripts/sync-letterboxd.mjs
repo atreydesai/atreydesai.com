@@ -26,7 +26,7 @@ import {
   upsertScalar,
   upsertStringList,
   yamlString,
-} from "./letterboxd-utils.mjs";
+} from "./bookshelf-utils.mjs";
 import { cleanTags, yamlListLines } from "./tag-sources.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");

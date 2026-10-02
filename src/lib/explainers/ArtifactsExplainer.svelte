@@ -15,15 +15,15 @@
 	// (Fig. 2, left).
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "question", label: "question", at: 0 },
 		{ id: "struck", label: "choices only", at: 2.8 },
 		{ id: "accuracy", label: "accuracy", at: 6.6 },
 		{ id: "takeaway", label: "takeaway", at: 10.6 },
 	];
-	export const DURATION = 13.8;
+	const DURATION = 13.8;
 
-	export const CHOICES = [
+	const CHOICES = [
 		{ letter: "A", text: "∃x (P(x) ∧ Q(x))", y: 104 },
 		{ letter: "B", text: "∀x (P(x) ∧ Q(x))", y: 130 },
 		{ letter: "C", text: "∀x (P(x) → Q(x))", y: 156, gold: true },
@@ -32,27 +32,22 @@
 
 	// Bars: 100% would stand H units tall on the axis at y=BASE. Two groups of
 	// two bars span the plate margins exactly (14 to 110, 130 to 226).
-	export const BASE = 158;
-	export const H = 80;
-	export const BAR_W = 44;
-	export const BAR_GAP = 8;
-	export const GROUPS = [
+	const BASE = 158;
+	const H = 80;
+	const BAR_W = 44;
+	const BAR_GAP = 8;
+	const GROUPS = [
 		{ name: "human-written", x: 14, bars: [0.8, 0.38] },
 		{ name: "LLM-generated", x: 130, bars: [0.96, 0.96] },
 	];
-	export const CONDITIONS = ["with", "no Q"];
+	const CONDITIONS = ["with", "no Q"];
 </script>
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { T, barBox, draw, enter, exit, restore, rise, swap, type Scene } from "./motion";
+	import { T, barBox, draw, enter, exit, restore, rise, swap, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const uid = $props.id();
 	const gold = CHOICES.find((c) => c.gold)!;
@@ -75,7 +70,7 @@
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl, root) {
+		build(tl, root) {
 			const poster = [".a-kicker", ".a-stem", ".a-choice", ".a-gold", ".a-cap-q"];
 
 			// Fit each strike to its line: from the margin to the end of the

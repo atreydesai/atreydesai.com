@@ -15,6 +15,7 @@
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { decodeEntities, slugify, yamlString } from './bookshelf-utils.mjs';
 import { categoryFromTags, fetchGoodreadsGenreTags, yamlListLines } from './tag-sources.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -33,16 +34,6 @@ const overrides = existsSync(OVERRIDES_PATH)
     : { include: [], exclude: [] };
 const forceInclude = new Set((overrides.include ?? []).map(String));
 const forceExclude = new Set((overrides.exclude ?? []).map(String));
-
-function decodeEntities(s) {
-    return s
-        .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-        .replace(/&apos;/g, "'")
-        .replace(/&quot;/g, '"')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&');
-}
 
 function tag(item, name) {
     const m = item.match(new RegExp(`<${name}>(?:<!\\[CDATA\\[)?([\\s\\S]*?)(?:\\]\\]>)?</${name}>`));
@@ -70,22 +61,6 @@ function parseDate(s) {
 
 function isoDate(d) {
     return d.toISOString().slice(0, 10);
-}
-
-function slugify(s) {
-    return s
-        .toLowerCase()
-        .normalize('NFKD')
-        .replace(/[̀-ͯ]/g, '')
-        .replace(/[''']/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 60)
-        .replace(/-+$/, '');
-}
-
-function yamlString(s) {
-    return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 function existingGoodreadsFiles() {

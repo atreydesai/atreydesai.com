@@ -38,7 +38,7 @@
   });
 
   function onNameInput() {
-    nameError = playerName.trim().length > MAX_NAME ? `too long (${MAX_NAME} max)` : "";
+    nameError = "";
   }
 
   async function submit() {

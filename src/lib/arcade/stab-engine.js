@@ -10,7 +10,7 @@ export const BEATS_PER_BAR = 4;
 /** Empty bars before the first cup, so the beat can be felt first. */
 export const INTRO_BARS = 2;
 export const LIVES = 3;
-export const GOLDEN_EVERY = 12;
+const GOLDEN_EVERY = 12;
 
 /** Seconds either side of a beat that still count, best rating first. */
 export const WINDOWS = Object.freeze({ perfect: 0.05, good: 0.1, graze: 0.15 });

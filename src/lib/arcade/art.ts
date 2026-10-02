@@ -3,8 +3,8 @@
 // drawn as a riso mark reads its colors from `risoColors()` so it follows the
 // theme.
 
-export type Palette = Record<string, string>;
-export type Grid = string[];
+type Palette = Record<string, string>;
+type Grid = string[];
 
 export const INK = "#2b2320";
 export const PEARL = "#2b1a12";
@@ -30,7 +30,7 @@ export const LOOPS = [
   "M5.5 10.4C7.2 9.5 11.6 6.1 15.6 5.1C19.5 4.2 25.7 3.8 29.3 4.5C33.0 5.1 35.6 7.0 37.4 9.2C39.1 11.4 40.8 15.4 39.8 17.9C38.9 20.4 35.4 23.3 31.7 24.1C27.9 24.9 21.7 23.5 17.4 22.6C13.0 21.7 8.0 20.6 5.7 18.6C3.5 16.6 2.8 12.5 3.9 10.6C5.0 8.6 10.9 7.4 12.3 6.8",
   "M6.8 10.0C8.1 9.2 11.1 6.2 14.6 5.1C18.1 4.1 24.1 3.0 27.9 3.7C31.8 4.3 35.6 7.0 37.6 9.3C39.5 11.5 41.2 14.9 39.8 17.0C38.4 19.1 33.1 20.5 29.3 21.8C25.5 23.0 20.8 24.7 16.9 24.3C13.0 23.9 7.6 21.3 5.9 19.3C4.1 17.3 5.3 15.0 6.3 12.5C7.2 10.0 10.8 5.4 11.8 4.0",
 ];
-export const LOOP_BOX = { width: 44, height: 28 };
+const LOOP_BOX = { width: 44, height: 28 };
 
 // --- HUD icons ------------------------------------------------------------
 
@@ -214,7 +214,7 @@ export function drawSprite(
   }
 }
 
-export function drawSilhouette(
+function drawSilhouette(
   ctx: CanvasRenderingContext2D,
   grid: Grid,
   x: number,
@@ -297,7 +297,7 @@ export function cachedSprite(
   return sprite;
 }
 
-export function isDarkTheme() {
+function isDarkTheme() {
   return (
     typeof document !== "undefined" &&
     document.documentElement.classList.contains("dark")
@@ -307,8 +307,8 @@ export function isDarkTheme() {
 /** Theme colors for marks drawn on canvas in the riso style. */
 export function risoColors(dark = isDarkTheme()) {
   return dark
-    ? { ink: "#fdf8f3", paper: "#2a2422", slab: "#f07563", muted: "#e8d5c4", halo: "rgba(26, 26, 26, 0.7)" }
-    : { ink: "#1a1a1a", paper: "#fbf2e8", slab: "#e85d4c", muted: "#666666", halo: "rgba(253, 248, 243, 0.8)" };
+    ? { ink: "#fdf8f3", paper: "#2a2422", slab: "#f07563", muted: "#e8d5c4" }
+    : { ink: "#1a1a1a", paper: "#fbf2e8", slab: "#e85d4c", muted: "#666666" };
 }
 
 export function arcadeFont(size = 13, weight = 500) {
@@ -426,7 +426,7 @@ export function drawParticles(ctx: CanvasRenderingContext2D, list: Particle[]) {
   }
 }
 
-export type PopupKind = "plain" | "perfect" | "gold" | "miss";
+type PopupKind = "plain" | "perfect" | "gold" | "miss";
 
 export interface Popup {
   x: number;

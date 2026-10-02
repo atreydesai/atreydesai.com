@@ -13,14 +13,14 @@
 	// change; only direction is read off.
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "question", label: "question", at: 0 },
 		{ id: "humans", label: "humans", at: 2.4 },
 		{ id: "llm", label: "LLMs", at: 5.2 },
 		{ id: "scored", label: "scored", at: 7.4 },
 		{ id: "takeaway", label: "takeaway", at: 12.4 },
 	];
-	export const DURATION = 16.1;
+	const DURATION = 16.1;
 
 	type Set = { gen: string; data: string; diff: number; disc: number; wq: number };
 	const SETS: Set[] = [
@@ -76,21 +76,21 @@
 		return { label, y, dots };
 	};
 
-	export const AXES = [
+	const AXES = [
 		axis("diff", "difficulty", 72),
 		axis("disc", "discriminability", 116),
 		axis("wq", "writing quality", 160),
 	];
 
-	export const ROWS = [
+	const ROWS = [
 		{ letter: "A", y: 74 },
 		{ letter: "B", y: 104 },
 		{ letter: "C", y: 134 },
 		{ letter: "D", y: 164 },
 	];
-	export const HUMAN = ["stiff", "brittle", "hard"];
+	const HUMAN = ["stiff", "brittle", "hard"];
 	// Widths of streamed "token" dashes for each LLM-written distractor.
-	export const TOKENS = [
+	const TOKENS = [
 		[30, 20, 24],
 		[38, 22],
 		[24, 34, 16],
@@ -99,33 +99,21 @@
 
 <script lang="ts">
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { T, enter, exit, restore, write, type Scene } from "./motion";
+	import { T, enter, exit, restore, swap, write, type ExplainerProps, type Scene } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	const uid = $props.id();
 
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl, root) {
+		build(tl, root) {
 			const q = (sel: string) => root.querySelectorAll(sel);
 			const poster = [".d-stem", ".d-row", ".d-answer", ".d-blank", ".d-cap-q"];
 
-			// Captions hand over in sequence: the old one is gone before the new
-			// one arrives, so two captions never share the band.
-			const handover = (out: string, into: string, at: number) => {
-				exit(tl, out, at);
-				enter(tl, into, at + 0.3);
-			};
-
 			// 2 · humans write them, one blank at a time, top to bottom
-			handover(".d-cap-q", ".d-cap-h", 2.4);
+			swap(tl, ".d-cap-q", ".d-cap-h", 2.4);
 			const blanks = q(".d-blank");
 			const clips = q(".d-human-clip rect");
 			q(".d-human").forEach((word, i) => {
@@ -142,7 +130,7 @@
 
 			// 3 · LLMs create them: distractors stream in as tokens, fast
 			exit(tl, ".d-human", "llm");
-			handover(".d-cap-h", ".d-cap-l", 5.2);
+			swap(tl, ".d-cap-h", ".d-cap-l", 5.2);
 			tl.fromTo(
 				".d-token",
 				{ autoAlpha: 0, x: -3 },

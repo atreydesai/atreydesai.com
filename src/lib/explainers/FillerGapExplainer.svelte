@@ -22,13 +22,13 @@
 	// (Sec. 6).
 	import type { Beat } from "./motion";
 
-	export const BEATS: Beat[] = [
+	const BEATS: Beat[] = [
 		{ id: "dependency", label: "dependency", at: 0 },
 		{ id: "inject", label: "inject", at: 2.4 },
 		{ id: "emerge", label: "emerges", at: 7.6 },
 		{ id: "takeaway", label: "takeaway", at: 12.6 },
 	];
-	export const DURATION = 16;
+	const DURATION = 16;
 
 	// [training tokens in millions, MAX ODDS]
 	const WH_WH: [number, number][] = [
@@ -39,14 +39,14 @@
 
 	// The y axis sits on the plate margin; the data run from 1M, whose label
 	// starts on that margin, to 100M, whose label ends on the right margin.
-	export const AXIS_X = 14;
-	export const X0 = 22;
-	export const X1 = 210;
-	export const Y0 = 162;
+	const AXIS_X = 14;
+	const X0 = 22;
+	const X1 = 210;
+	const Y0 = 162;
 	const YTOP = 48;
 	const VMAX = 11;
-	export const px = (millions: number) => X0 + (Math.log10(millions) / 2) * (X1 - X0);
-	export const py = (odds: number) => Y0 - (odds / VMAX) * (Y0 - YTOP);
+	const px = (millions: number) => X0 + (Math.log10(millions) / 2) * (X1 - X0);
+	const py = (odds: number) => Y0 - (odds / VMAX) * (Y0 - YTOP);
 
 	type Pt = [number, number];
 	const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -54,8 +54,7 @@
 	// Smooth the checkpoints with a monotone cubic in x (Steffen's method, as
 	// in d3's curveMonotoneX) so the line reads as a trajectory: it passes
 	// through every measured point, never overshoots one, and never doubles
-	// back, even where the log axis packs 9M and 10M 4 units apart. (A
-	// Catmull-Rom spline looped just before the 10M point.)
+	// back, even where the log axis packs 9M and 10M 4 units apart.
 	const points: Pt[] = WH_WH.map(([t, v]) => [r1(px(t)), r1(py(v))]);
 	const h = points.slice(1).map((p, k) => p[0] - points[k][0]);
 	const secant = points.slice(1).map((p, k) => (p[1] - points[k][1]) / h[k]);
@@ -77,7 +76,7 @@
 		const c2: Pt = [r1(p[0] - third), r1(p[1] - slopes[k + 1] * third)];
 		return [p1, c1, c2, p] as const;
 	});
-	export const CURVE =
+	const CURVE =
 		`M${points[0][0]} ${points[0][1]} ` +
 		segments.map(([, c1, c2, p]) => `C${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${p[0]} ${p[1]}`).join(" ");
 
@@ -100,13 +99,13 @@
 	const lengths = segments.map(cubicLength);
 	const TEN = WH_WH.findIndex(([t]) => t === 10);
 	/** Share of the line's length from 1M to the 10M checkpoint, in percent. */
-	export const TO_10M =
+	const TO_10M =
 		(100 * lengths.slice(0, TEN).reduce((a, b) => a + b, 0)) / lengths.reduce((a, b) => a + b, 0);
 
-	export const END = points[points.length - 1];
-	export const AT_10M = points[TEN];
+	const END = points[points.length - 1];
+	const AT_10M = points[TEN];
 
-	export const NEURONS = [40, 80, 120, 160, 200];
+	const NEURONS = [40, 80, 120, 160, 200];
 	// A learned direction loads on every unit, not one: each unit is tinted by
 	// its share of the injected feature.
 	const LOADINGS = [0.4, 0.75, 1, 0.55, 0.85];
@@ -115,14 +114,9 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import ExplainerFrame from "./ExplainerFrame.svelte";
-	import { EASE, T, draw, enter, exit, restore, type Scene, type Timeline } from "./motion";
+	import { EASE, T, draw, enter, exit, restore, type ExplainerProps, type Scene, type Timeline } from "./motion";
 
-	let { size = "card", paused = false, resting = false, label }: {
-		size?: "card" | "stage";
-		paused?: boolean;
-		resting?: boolean;
-		label: string;
-	} = $props();
+	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 
 	// The poster sentence is laid out from measured word widths so the arc
 	// leaves "Who" and lands in the gap. These are Optima's widths at 17 units;
@@ -134,10 +128,8 @@
 	const GAP = 18;
 	let whoWidth = $state(35.9);
 	let midWidth = $state(140.5);
-	let markWidth = $state(6.6);
 	let whoEl: SVGTextElement;
 	let midEl: SVGTextElement;
-	let markEl: SVGTextElement;
 
 	const layout = $derived.by(() => {
 		const x0 = 14;
@@ -176,13 +168,18 @@
 	});
 
 	onMount(() => {
+		// Fonts can settle after the plate is gone, when its text refs are empty.
+		let destroyed = false;
 		const measure = () => {
+			if (destroyed) return;
 			whoWidth = whoEl.getComputedTextLength() || whoWidth;
 			midWidth = midEl.getComputedTextLength() || midWidth;
-			markWidth = markEl.getComputedTextLength() || markWidth;
 		};
 		measure();
 		document.fonts?.ready.then(measure);
+		return () => {
+			destroyed = true;
+		};
 	});
 
 	// Captions sit just above the progress rail, so they fade in place: a
@@ -198,7 +195,7 @@
 	const scene: Scene = {
 		beats: BEATS,
 		duration: DURATION,
-		build(gsap, tl) {
+		build(tl) {
 			// 2 · inject the learned filler-gap feature into a sentence without a filler
 			exit(tl, [".f-sentence", ".f-arc", ".f-labels", ".f-cap-q"], "inject");
 			fadeIn(tl, ".f-cap-i", 2.7);
@@ -254,7 +251,7 @@
 		<text bind:this={whoEl} class="xp-prose" x={layout.x0} y={SENTENCE_Y} font-size={SENTENCE} style="color: var(--xp-human)">Who</text>
 		<text bind:this={midEl} class="xp-prose" x={layout.mid} y={SENTENCE_Y} font-size={SENTENCE}>did the teacher like</text>
 		<line x1={layout.gap} x2={layout.gap + GAP} y1={SENTENCE_Y + 2} y2={SENTENCE_Y + 2} stroke="var(--xp-soft)" stroke-width="1.6" />
-		<text bind:this={markEl} class="xp-prose" x={layout.gap + GAP + 1} y={SENTENCE_Y} font-size={SENTENCE}>?</text>
+		<text class="xp-prose" x={layout.gap + GAP + 1} y={SENTENCE_Y} font-size={SENTENCE}>?</text>
 	</g>
 	<g class="f-arc">
 		<path d={layout.arc} fill="none" stroke="var(--xp-accent)" stroke-width="2.2" stroke-linecap="round" />

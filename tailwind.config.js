@@ -6,8 +6,8 @@ export default {
   theme: {
     extend: {
       fontSize: {
-        // Smallest documented step — labels, footnotes, captions, and all the
-        // mono detail text standardize on this (replaces the old 0.7/0.72rem one-offs).
+        // Smallest documented step: labels, footnotes, captions, and all the
+        // mono detail text.
         xs: ["0.75rem", { lineHeight: "1rem" }],
         sm: ["0.95rem", { lineHeight: "1.4rem" }],
         base: ["1rem", { lineHeight: "1.5rem" }],
@@ -47,9 +47,8 @@ export default {
         // Bright orange — primary accent (keep)
         accent: {
           DEFAULT: "#E85D4C",
-          // Lightened from #F07563, which was 6.16:1 on the ink-900 page but
-          // only 4.15:1 on raised dark surfaces (dropdowns, the sheet), where
-          // it carries the selected/active state. Dark theme only.
+          // Dark theme only. Clears 4.5:1 on raised dark surfaces (dropdowns,
+          // the sheet) as well as the page, since it carries the selected state.
           light: "#F18272",
           dark: "#C9462F",
           muted: "#D4847A",
@@ -67,9 +66,8 @@ export default {
         },
         wine: {
           DEFAULT: "#8A3251",
-          // Lightened from #B96481, which was only 4.31:1 on ink-900 and
-          // 3.46:1 on the neutral pill fill. The -light shades are dark-theme
-          // only, so this doesn't touch any light-theme surface.
+          // The -light shades are dark-theme only, chosen to clear 4.5:1 on
+          // ink-900 and on the neutral pill fill.
           light: "#C68098",
           dark: "#5E1F37",
         },
@@ -80,17 +78,8 @@ export default {
         },
         plum: {
           DEFAULT: "#6F4476",
-          // Lightened from #A07CA8 (3.96:1 on the neutral pill fill).
           light: "#AA89B1",
           dark: "#4A2A50",
-        },
-        // Purple-gray for code blocks & secondary surfaces (future use)
-        mist: {
-          50: "#F5F5F7",
-          100: "#EDEDF0",
-          200: "#E7E7EB",
-          300: "#DCDCE2",
-          400: "#C5C5CD",
         },
       },
       // Three roles, defined once as CSS vars in app.css (:root). Keep these in
@@ -104,9 +93,8 @@ export default {
         mono: ["var(--font-mono)"],
       },
       // Tailwind's stock `ring-*`/`ring-offset-*` default to blue-500 and
-      // white. Nothing in the design system should use a ring — focus is a
-      // single `:focus-visible` outline in app.css — but if a stray `ring-2`
-      // ever appears, it lands on palette colours instead of off-brand blue.
+      // white. Focus is a single `:focus-visible` outline in app.css, never a
+      // ring; these defaults keep any ring that does appear on palette colours.
       ringColor: {
         DEFAULT: "#C9462F",
       },

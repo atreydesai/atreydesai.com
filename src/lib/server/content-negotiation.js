@@ -13,7 +13,7 @@ const AGENT_GUIDE_LINK = `<${SITE_URL}/llms.txt>; rel="describedby"; type="text/
  * @param {string} header
  * @returns {AcceptEntry[]}
  */
-export function parseAccept(header) {
+function parseAccept(header) {
   return header
     .split(",")
     .map((raw, position) => {
@@ -180,7 +180,7 @@ export function htmlToMarkdown(html, canonical) {
 }
 
 /** @param {URL | string} requested */
-export function markdownNotFound(requested) {
+function markdownNotFound(requested) {
   const requestedUrl =
     requested instanceof URL ? requested : new URL(requested, SITE_URL);
   return `# 404: Page not found

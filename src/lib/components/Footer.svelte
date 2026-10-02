@@ -22,7 +22,7 @@
     return () => clearInterval(interval);
   });
 
-  $: buildDate = new Date(__BUILD_DATE__)
+  const buildDate = new Date(__BUILD_DATE__)
     .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     .toLowerCase();
 
@@ -63,6 +63,18 @@
     return nextIndex;
   }
 
+  // play() rejects when the browser blocks playback before a user gesture.
+  function playAudio(audio: HTMLAudioElement) {
+    audio.play()
+      .then(() => {
+        isPlaying = true;
+      })
+      .catch(() => {
+        isPlaying = false;
+        console.log("Audio playback requires user interaction first");
+      });
+  }
+
   function skipMusic() {
     const nextIndex = getNextSampleIndex();
     currentSampleIndex = nextIndex;
@@ -77,14 +89,7 @@
       audioElement.currentTime = 0;
     }
 
-    audioElement.play()
-      .then(() => {
-        isPlaying = true;
-      })
-      .catch(() => {
-        isPlaying = false;
-        console.log("Audio playback requires user interaction first");
-      });
+    playAudio(audioElement);
   }
 
   function toggleMusic() {
@@ -99,14 +104,7 @@
       return;
     }
 
-    audioElement.play()
-      .then(() => {
-        isPlaying = true;
-      })
-      .catch(() => {
-        isPlaying = false;
-        console.log("Audio playback requires user interaction first");
-      });
+    playAudio(audioElement);
   }
 
 </script>

@@ -1,6 +1,5 @@
 <script lang="ts">
-    import { Binary, PenLine, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight, MessageCircle } from "@jis3r/icons";
-    import FileText from "$lib/components/icons/FileText.svelte";
+    import { Binary, PenLine, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight, MessageCircle, FileText } from "@jis3r/icons";
 
     export let paper: {
         arxiv: string | null;
@@ -115,7 +114,7 @@
                 on:mouseenter={() => (hoveredLink = 'twitter')}
                 on:mouseleave={() => (hoveredLink = null)}
             >
-                <MessageCircle size={14} />
+                <MessageCircle size={14} animate={hoveredLink === 'twitter'} />
                 twitter
             </a>
         {/if}

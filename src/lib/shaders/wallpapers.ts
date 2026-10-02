@@ -1,5 +1,4 @@
 // WebGL shader sources for the noisemorphism wallpaper demos.
-// Shader bodies copied verbatim from the original shaders.js.
 
 export const VS = `
     attribute vec2 a_pos;
@@ -15,21 +14,14 @@ const COMMON = `
     varying vec2 v_uv;
     uniform vec2  u_res;
     uniform vec2  u_mouse;
-    uniform vec2  u_mouseRaw;
     uniform float u_time;
     uniform float u_click;
-    uniform float u_dpr;
 
     // hash: classic fast float hash
     float hash(vec2 p) {
       p = fract(p * vec2(234.34, 435.345));
       p += dot(p, p + 34.23);
       return fract(p.x * p.y);
-    }
-    float hash3(vec3 p) {
-      p = fract(p * vec3(123.34, 456.21, 789.12));
-      p += dot(p, p + 45.32);
-      return fract(p.x * p.y * p.z);
     }
 
     // value noise
@@ -43,16 +35,7 @@ const COMMON = `
       );
     }
 
-    // fractal brownian motion
-    float fbm(vec2 p) {
-      float s = 0.0, a = 0.5;
-      for (int i = 0; i < 6; i++) {
-        s += a * vnoise(p);
-        p *= 2.02; p += 17.0;
-        a *= 0.5;
-      }
-      return s;
-    }
+    // fractal brownian motion, 4 octaves
     float fbm4(vec2 p) {
       float s = 0.0, a = 0.5;
       for (int i = 0; i < 4; i++) {
@@ -61,13 +44,6 @@ const COMMON = `
         a *= 0.5;
       }
       return s;
-    }
-
-    // domain warp: take p, offset by fbm of p
-    vec2 warp(vec2 p, float amt, float t) {
-      float nx = fbm4(p + vec2(0.0, t*0.05));
-      float ny = fbm4(p + vec2(5.2, t*0.05 + 1.3));
-      return p + amt * vec2(nx - 0.5, ny - 0.5);
     }
 
     // grain: per-pixel bluenoise-ish dither
@@ -83,12 +59,6 @@ const COMMON = `
     vec3 tonemap(vec3 c) {
       c = clamp(c, 0.0, 1.0);
       return pow(c, vec3(0.95));
-    }
-
-    // smooth falloff 0..1 around dist
-    float bump(float d, float r) {
-      float x = clamp(1.0 - d / r, 0.0, 1.0);
-      return x * x * (3.0 - 2.0 * x);
     }
 
     // aspect-corrected uv. returns uv in screen-units where 1 == short axis

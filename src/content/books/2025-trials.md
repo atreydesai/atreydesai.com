@@ -2,7 +2,7 @@
 id: 2025-trials
 title: "5 clinical trials to watch in 2026"
 author: Samuel Hume
-category: blog post
+category: science
 subcategory: medicine
 dateAdded: "2026-01-14"
 favorite: false

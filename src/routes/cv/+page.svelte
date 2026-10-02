@@ -208,23 +208,7 @@
             <h2 class="section-heading">professional responsibilities</h2>
             <div class="space-y-4 text-ink-700 dark:text-cream-300">
                 {#each cv.responsibilities.positions as position}
-                    {#if position.note}
-                        <div>
-                            <div
-                                class="flex flex-col sm:flex-row sm:justify-between"
-                            >
-                                <span>{@html position.role_html}</span>
-                                <span class="text-ink-500 dark:text-cream-500"
-                                    >{position.dates}</span
-                                >
-                            </div>
-                            <p
-                                class="text-sm text-ink-500 dark:text-cream-500 italic ml-4"
-                            >
-                                {position.note}
-                            </p>
-                        </div>
-                    {:else}
+                    <div>
                         <div
                             class="flex flex-col sm:flex-row sm:justify-between"
                         >
@@ -233,7 +217,14 @@
                                 >{position.dates}</span
                             >
                         </div>
-                    {/if}
+                        {#if position.note}
+                            <p
+                                class="text-sm text-ink-500 dark:text-cream-500 italic ml-4"
+                            >
+                                {position.note}
+                            </p>
+                        {/if}
+                    </div>
                 {/each}
                 <div>
                     <p class="font-medium text-ink-900 dark:text-cream-100">

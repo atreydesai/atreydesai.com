@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import Seo from "$lib/components/Seo.svelte";
   import { House, ArrowLeft } from "@jis3r/icons";
 
@@ -10,7 +10,7 @@
 <Seo
   title="Page Not Found | Atrey Desai"
   description="The page you're looking for doesn't exist."
-  url={$page.url.href}
+  url={page.url.href}
   noindex={true}
 />
 
@@ -66,8 +66,8 @@
     </nav>
   </div>
 
-  <!-- Fun decorative element -->
-  <div class="mt-16 text-ink-200 dark:text-cream-500 text-sm">
+  <!-- Contact link for reporting a broken link -->
+  <div class="mt-16 text-ink-500 dark:text-cream-500 text-sm">
     <p>
       If you think this is an error, feel free to
       <a href="mailto:adesai10@umd.edu" class="link">reach out</a>.

@@ -8,7 +8,6 @@
   export let showFps: boolean = true;
 
   let canvas: HTMLCanvasElement;
-  let container: HTMLElement;
   let raf: number;
   let gl: WebGLRenderingContext | null = null;
   let cleanup: (() => void) | null = null;
@@ -46,8 +45,12 @@
       return sh;
     }
 
-    const vs = compile(gl.VERTEX_SHADER, VS)!;
-    const fs = compile(gl.FRAGMENT_SHADER, spec.fs)!;
+    const vs = compile(gl.VERTEX_SHADER, VS);
+    const fs = compile(gl.FRAGMENT_SHADER, spec.fs);
+    if (!vs || !fs) {
+      failed = true;
+      return;
+    }
     const prog = gl.createProgram()!;
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
@@ -70,10 +73,8 @@
       a_pos: gl.getAttribLocation(prog, "a_pos"),
       u_res: gl.getUniformLocation(prog, "u_res"),
       u_mouse: gl.getUniformLocation(prog, "u_mouse"),
-      u_mouseRaw: gl.getUniformLocation(prog, "u_mouseRaw"),
       u_time: gl.getUniformLocation(prog, "u_time"),
       u_click: gl.getUniformLocation(prog, "u_click"),
-      u_dpr: gl.getUniformLocation(prog, "u_dpr"),
     };
 
     const mouse = { x: 0.5, y: 0.5, sx: 0.5, sy: 0.5, down: 0, downSmooth: 0 };
@@ -159,13 +160,8 @@
 
       gl.uniform2f(loc.u_res, canvas.width, canvas.height);
       gl.uniform2f(loc.u_mouse, mouse.sx, mouse.sy);
-      gl.uniform2f(loc.u_mouseRaw, mouse.x, mouse.y);
       gl.uniform1f(loc.u_time, t);
       gl.uniform1f(loc.u_click, mouse.downSmooth);
-      gl.uniform1f(
-        loc.u_dpr,
-        Math.min(window.devicePixelRatio || 1, 2)
-      );
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -202,7 +198,7 @@
   });
 </script>
 
-<figure class="shader-figure" bind:this={container} style="--shader-h: {height}">
+<figure class="shader-figure" style="--shader-h: {height}">
   {#if failed}
     <div class="shader-fallback">
       WebGL is not available on this device.

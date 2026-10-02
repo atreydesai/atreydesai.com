@@ -47,7 +47,7 @@ export function paceForElapsed(elapsed) {
  * Toppings in shelf order, so equal sets compare and display the same way.
  * @param {Topping[]} toppings
  */
-export function sortToppings(toppings) {
+function sortToppings(toppings) {
   return [...toppings].sort((a, b) => TOPPINGS.indexOf(a) - TOPPINGS.indexOf(b));
 }
 
@@ -80,18 +80,6 @@ export function sameDrink(cup, order) {
     cup.tea === order.tea &&
     cup.toppings.length === order.toppings.length &&
     order.toppings.every((topping) => cup.toppings.includes(topping))
-  );
-}
-
-/**
- * Whether adding to this cup could still make the order.
- * @param {Cup} cup
- * @param {Order} order
- */
-export function couldBecome(cup, order) {
-  return (
-    (cup.tea === null || cup.tea === order.tea) &&
-    cup.toppings.every((topping) => order.toppings.includes(topping))
   );
 }
 

@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { browser } from "$app/environment";
 
     let cursorX = 0;
     let cursorY = 0;
@@ -22,14 +21,18 @@
         let lastHitX = -1;
         let lastHitY = -1;
 
+        // The cursor jumps straight to the pointer, so a frame is only needed
+        // after the pointer moves: at most one per frame, none while idle.
+        let animationId = 0;
+
         const handleMouseMove = (e: MouseEvent) => {
             targetX = e.clientX;
             targetY = e.clientY;
+            if (!animationId) animationId = requestAnimationFrame(animate);
         };
 
-        // Animation loop: one layout read per frame at most.
-        let animationId: number;
         const animate = () => {
+            animationId = 0;
             cursorX = targetX;
             cursorY = targetY;
 
@@ -44,12 +47,11 @@
                 lastHitX = cursorX;
                 lastHitY = cursorY;
             }
-
-            animationId = requestAnimationFrame(animate);
         };
 
         document.addEventListener("mousemove", handleMouseMove, { passive: true });
-        animate();
+        // First frame places the cursor once it has rendered.
+        animationId = requestAnimationFrame(animate);
 
         return () => {
             document.removeEventListener("mousemove", handleMouseMove);

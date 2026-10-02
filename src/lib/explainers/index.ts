@@ -1,5 +1,6 @@
 // Live explainers for research papers, keyed by paper id. PaperMedia renders
-// one of these in place of the paper's static image whenever an entry exists.
+// the paper's explainer as its card media and lightbox; a paper without an
+// entry shows no media.
 import type { Component } from "svelte";
 import ArtifactsExplainer from "./ArtifactsExplainer.svelte";
 import BenchMarkerExplainer from "./BenchMarkerExplainer.svelte";
@@ -10,8 +11,9 @@ import FillerGapExplainer from "./FillerGapExplainer.svelte";
 import HumorExplainer from "./HumorExplainer.svelte";
 import ReasonersExplainer from "./ReasonersExplainer.svelte";
 import RlTapExplainer from "./RlTapExplainer.svelte";
+import type { ExplainerProps } from "./motion";
 
-export type ExplainerProps = { size?: "card" | "stage"; paused?: boolean; resting?: boolean; label: string };
+export type { ExplainerProps };
 export type ExplainerComponent = Component<ExplainerProps>;
 
 export const explainers: Partial<Record<string, ExplainerComponent>> = {
