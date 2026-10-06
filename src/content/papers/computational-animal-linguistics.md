@@ -12,7 +12,7 @@ authors:
 year: 2026
 venue: ACM Computing Surveys
 arxiv: null
-pdf: /papers/CAL_CSUR.pdf
+pdf: https://doi.org/10.1145/3850160
 code: null
 demo: null
 twitter: null
