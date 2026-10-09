@@ -15,41 +15,46 @@ banner:
     - "Detection of out-of-context video misinformation using VLMs."
 
 researchInterests:
-  intro: "Language models are increasingly deployed as agents in open-ended, real-world environments; however, our ability to know when to trust these systems has not kept pace. I study how humans and AI systems can build calibrated trust in the world and in each other, namely:"
+  # Each item's `quadrant` draws a 2×2 glyph beside its title, filling the
+  # listed cells (see QuadrantCell in src/lib/content.ts); it and
+  # `quadrantLabel` appear only when details are expanded.
+  # IP labels follow the banner's project order: IP1 AutoFiction, IP2 QANTA,
+  # IP3 out-of-context video.
+  intro: "Some tasks have clear answers and stay static. Others are uncertain and shift as the world around them adapts. Language models are increasingly deployed as agents in these open-ended environments, where it is hard to know when to trust them. I study how humans and agents can build calibrated trust there, namely:"
   items:
     - title: "Calibrate"
-      summary: "Calibrate model confidence under incomplete, uncertain, and excessive information."
-      question: "How do we improve how models form and update calibrated beliefs about the world and about their partners under uncertainty (insufficient information, excessive information, and long-tail settings)?"
+      quadrant: ["se", "ce"]
+      quadrantLabel: "uncertain"
+      summary: "Calibrate agents' confidence under incomplete, uncertain, and excessive information."
+      question: "How do agents form and update calibrated beliefs about the world, their partners, and their own work under uncertainty (insufficient information, long-tail settings, self-graded writing)?"
       citations:
         - label: "ttr"
           url: "/research/#test-time-reasoners"
+        - label: "IP3"
+          url: null
         - label: "IP1"
           url: null
+    - title: "Coordinate"
+      quadrant: ["cc", "ce"]
+      quadrantLabel: "adapting"
+      summary: "Study how people and agents adapt to each other over time."
+      question: "How do humans and agents form accurate expectations of one another and adapt to each other over repeated interaction (human-AI quizbowl, collaborative writing, multi-agent systems)?"
+      citations:
         - label: "IP2"
           url: null
-    - title: "Act"
-      summary: "Build systems for open-ended work without clear ground truth."
-      question: "How should agents use calibrated uncertainty to act in live and open-ended environments (forecasting, long-form text generation, AI for science) where there is no ground truth?"
+    - title: "Verify"
+      quadrant: ["ce"]
+      quadrantLabel: "both"
+      summary: "Build feedback that stays useful as the world adapts to it."
+      question: "How should agents judge open-ended work when there is no ground truth and the world adapts to them in turn (forecasting, long-form writing)?"
       citations:
         - label: "benchmarker"
           url: "/research/#benchmarker"
-        - label: "quick"
-          url: "/research/#llm-distractors"
         - label: "artifacts"
           url: "/research/#mcq-artifacts"
-        - label: "IP2"
-          url: null
-        - label: "IP3"
-          url: null
-    - title: "Coordinate"
-      summary: "Study how people rely on and adopt agents in open-ended settings."
-      question: "How do humans and agents form accurate expectations of one another and adapt to each other over repeated interaction (collaborative writing, human-AI teams, multi-agent systems)?"
-      citations:
         - label: "quick"
           url: "/research/#llm-distractors"
-        - label: "IP2"
-          url: null
-        - label: "IP3"
+        - label: "IP1"
           url: null
 
 social:

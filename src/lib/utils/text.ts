@@ -37,7 +37,7 @@ export function parseInline(text: string, options: ParseInlineOptions = {}): str
 	if (footnotes) {
 		text = text.replace(
 			/\[\^(\d+)\]/g,
-			'<a href="#fn-$1" class="footnote-ref" data-footnote="$1">[$1]</a>',
+			'<a id="fnref-$1" href="#fn-$1" class="footnote-ref" data-footnote="$1" aria-label="Footnote $1">[$1]</a>',
 		);
 	}
 

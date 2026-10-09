@@ -7,6 +7,8 @@ dateAdded: "2026-09-10T12:00:00-04:00"
 favorite: false
 medium: "report"
 url: "https://www.anthropic.com/threat-intelligence-report-september-2026"
+enjoyment: 5
+importance: 5
 tags: ["ai", "security", "distillation", "surveillance"]
 status: "done"
 notes: "What is the point of using Haiku for this kind of activity (bar the decoding encrypted CoT)"

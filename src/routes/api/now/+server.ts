@@ -6,10 +6,12 @@ import type { RequestHandler } from './$types';
 export const trailingSlash = 'ignore';
 
 const MANIFOLD_USERNAME = 'prismatic';
-// Stable Manifold user id for `prismatic`. Hardcoding it lets us fan out the
-// portfolio / leagues / markets calls in parallel instead of waiting on the
-// username lookup first.
+// Stable Manifold user ids for `prismatic` and the bot `chromatic_`.
+// Hardcoding them lets us fan out the portfolio / leagues / markets calls in
+// parallel instead of waiting on the username lookups first.
 const MANIFOLD_USER_ID = 'vbWl1dKRklRmZQoN6uJBJEosFYx2';
+const MANIFOLD_BOT_USERNAME = 'chromatic_';
+const MANIFOLD_BOT_ID = 'NMyTWRxNlyU3FXC36RNiVXN1w3R2';
 const GOODREADS_USER_ID = '72859295';
 
 const TIMEOUT_MS = 8000;
@@ -20,11 +22,22 @@ export interface ReadingBook {
 	url: string | null;
 }
 
-export interface ManifoldNow {
+export interface ReadingNow {
+	books: ReadingBook[];
+	/** Epoch ms of the latest reading activity on Goodreads, if any. */
+	updatedAt: number | null;
+}
+
+export interface ManifoldStanding {
 	netWorth: number;
 	rank: number | null;
-	market: { question: string; url: string } | null;
 	profileUrl: string;
+}
+
+export interface ManifoldNow extends ManifoldStanding {
+	market: { question: string; url: string } | null;
+	/** The bot account's standing; null if its lookup failed. */
+	bot: ManifoldStanding | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -35,11 +48,10 @@ function fetchJson(url: string): Promise<any> {
 	});
 }
 
-async function getManifold(): Promise<ManifoldNow> {
-	const [portfolio, leagues, markets] = await Promise.all([
-		fetchJson(`https://api.manifold.markets/v0/get-user-portfolio?userId=${MANIFOLD_USER_ID}`),
-		fetchJson(`https://api.manifold.markets/v0/leagues?userId=${MANIFOLD_USER_ID}`),
-		fetchJson(`https://api.manifold.markets/v0/markets?userId=${MANIFOLD_USER_ID}&limit=100`)
+async function getStanding(userId: string, username: string): Promise<ManifoldStanding> {
+	const [portfolio, leagues] = await Promise.all([
+		fetchJson(`https://api.manifold.markets/v0/get-user-portfolio?userId=${userId}`),
+		fetchJson(`https://api.manifold.markets/v0/leagues?userId=${userId}`)
 	]);
 
 	// Net worth = cash balance + value of all open positions.
@@ -52,6 +64,21 @@ async function getManifold(): Promise<ManifoldNow> {
 		if (typeof latest.rankSnapshot === 'number') rank = latest.rankSnapshot;
 	}
 
+	return {
+		netWorth: Math.round(netWorth),
+		rank,
+		profileUrl: `https://manifold.markets/${username}`
+	};
+}
+
+async function getManifold(): Promise<ManifoldNow> {
+	const [standing, markets, bot] = await Promise.all([
+		getStanding(MANIFOLD_USER_ID, MANIFOLD_USERNAME),
+		fetchJson(`https://api.manifold.markets/v0/markets?userId=${MANIFOLD_USER_ID}&limit=100`),
+		// The bot's line is optional: a failed lookup only drops that sentence.
+		getStanding(MANIFOLD_BOT_ID, MANIFOLD_BOT_USERNAME).catch(() => null)
+	]);
+
 	// The most recent monthly "... AI model releases" market this user created.
 	let market: ManifoldNow['market'] = null;
 	if (Array.isArray(markets)) {
@@ -63,32 +90,55 @@ async function getManifold(): Promise<ManifoldNow> {
 		}
 	}
 
-	return {
-		netWorth: Math.round(netWorth),
-		rank,
-		market,
-		profileUrl: `https://manifold.markets/${MANIFOLD_USERNAME}`
-	};
+	return { ...standing, market, bot };
 }
 
 // Pull a tag's inner text out of an RSS <item>, unwrapping CDATA if present.
 function tag(item: string, name: string): string | null {
-	const m = item.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`));
+	const m = item.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`));
 	if (!m) return null;
 	const inner = m[1].replace(/^\s*<!\[CDATA\[/, '').replace(/\]\]>\s*$/, '').trim();
 	return inner || null;
 }
 
-async function getReading(): Promise<ReadingBook[]> {
-	const res = await fetch(
-		`https://www.goodreads.com/review/list_rss/${GOODREADS_USER_ID}?shelf=currently-reading`,
-		{
-			signal: AbortSignal.timeout(TIMEOUT_MS),
-			headers: { 'User-Agent': 'Mozilla/5.0 (compatible; atreydesai.com)' }
-		}
-	);
-	if (!res.ok) throw new Error(`goodreads -> ${res.status}`);
-	const xml = await res.text();
+function fetchGoodreads(url: string): Promise<string> {
+	return fetch(url, {
+		signal: AbortSignal.timeout(TIMEOUT_MS),
+		headers: { 'User-Agent': 'Mozilla/5.0 (compatible; atreydesai.com)' }
+	}).then((r) => {
+		if (!r.ok) throw new Error(`goodreads -> ${r.status}`);
+		return r.text();
+	});
+}
+
+// Latest reading progress in the updates feed: page/percent updates
+// (UserStatus) and started/finished reads (ReadStatus). "Wants to read" is
+// shelving, not progress, so it doesn't count.
+function latestProgress(xml: string): number {
+	let latest = 0;
+	for (const it of xml.match(/<item>[\s\S]*?<\/item>/g) ?? []) {
+		const guid = tag(it, 'guid') ?? '';
+		const title = tag(it, 'title') ?? '';
+		const progress =
+			guid.startsWith('UserStatus') ||
+			(guid.startsWith('ReadStatus') && !/wants to read/i.test(title));
+		if (!progress) continue;
+		const at = Date.parse(tag(it, 'pubDate') ?? '');
+		if (at > latest) latest = at;
+	}
+	return latest;
+}
+
+async function getReading(): Promise<ReadingNow> {
+	const [xml, updates] = await Promise.all([
+		fetchGoodreads(
+			`https://www.goodreads.com/review/list_rss/${GOODREADS_USER_ID}?shelf=currently-reading`
+		),
+		// Optional: without it, the shelf's own dates still give a timestamp.
+		fetchGoodreads(`https://www.goodreads.com/user/updates_rss/${GOODREADS_USER_ID}`).catch(
+			() => ''
+		)
+	]);
 
 	const items = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
 	const books: Array<ReadingBook & { added: number }> = [];
@@ -110,10 +160,16 @@ async function getReading(): Promise<ReadingBook[]> {
 		});
 	}
 
-	return books
-		.sort((a, b) => b.added - a.added)
-		.slice(0, 2)
-		.map(({ added: _added, ...rest }) => rest);
+	// Starting a book (adding it to currently-reading) is progress too.
+	const updatedAt = Math.max(latestProgress(updates), ...books.map((b) => b.added));
+
+	return {
+		books: books
+			.sort((a, b) => b.added - a.added)
+			.slice(0, 2)
+			.map(({ added: _added, ...rest }) => rest),
+		updatedAt: updatedAt > 0 ? updatedAt : null
+	};
 }
 
 export const GET: RequestHandler = async ({ setHeaders }) => {

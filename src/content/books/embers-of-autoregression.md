@@ -7,6 +7,8 @@ dateAdded: "2026-09-10T12:00:00-04:00"
 favorite: false
 medium: "paper"
 url: "https://www.pnas.org/doi/abs/10.1073/pnas.2322420121"
+enjoyment: 5
+importance: 5
 tags: ["ai", "cognitive science", "language models"]
 status: "done"
 ---

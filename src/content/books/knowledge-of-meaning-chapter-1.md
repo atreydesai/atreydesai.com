@@ -7,6 +7,8 @@ dateAdded: "2026-09-10T12:00:00-04:00"
 favorite: false
 medium: "chapter"
 url: "https://www.goodreads.com/book/show/1107724"
+enjoyment: 6
+importance: 6
 tags: ["linguistics", "semantics"]
 status: "done"
 notes: "Chapter 1 of Knowledge of Meaning: An Introduction to Semantic Theory (1995)."

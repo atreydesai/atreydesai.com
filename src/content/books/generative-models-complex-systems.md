@@ -7,6 +7,8 @@ dateAdded: "2026-09-10T12:00:00-04:00"
 favorite: false
 medium: "paper"
 url: "https://ieeexplore.ieee.org/abstract/document/11060600"
+enjoyment: 5
+importance: 5
 tags: ["ai", "complex systems", "interpretability"]
 status: "done"
 ---

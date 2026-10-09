@@ -40,6 +40,10 @@ const BLOCKED_TAGS = new Set([
 const FORWARDED_EVENTS = ["mouseenter", "mouseleave", "focus", "blur"] as const;
 // Below this a column is too narrow to justify well even with hyphenation.
 const MIN_WIDTH = 200;
+// Hyphens are cheap here: a break is preferred over visibly loose spacing.
+// Justice's default penultimate-line cost (200) all but forbids a hyphen in a
+// two-line paragraph, which then stretches its first line instead.
+const POLICY = { hyphenPenalty: 10, finalHyphenPenalty: 20, consecutiveHyphenPenalty: 100 };
 const MIN_WORDS = 8;
 const WS = /[ \t\n\r\f]/;
 const WS_ALL = /[ \t\n\r\f]/g;
@@ -251,7 +255,7 @@ function flush() {
 		block.marker = markerWidth(block);
 		const inset = block.marker || model.textIndent;
 		const layouts = model.paragraphs.map((paragraph, index) =>
-			solve(paragraph.prepared, index === 0 && inset ? [width - inset, width] : width).lines,
+			solve(paragraph.prepared, index === 0 && inset ? [width - inset, width] : width, POLICY).lines,
 		);
 		// A block that fits on one line has nothing to justify — unless it only
 		// fits because its final punctuation hangs, which native layout would

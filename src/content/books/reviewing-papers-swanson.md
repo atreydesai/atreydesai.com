@@ -7,6 +7,8 @@ dateAdded: "2026-09-10T12:00:00-04:00"
 favorite: false
 medium: "article"
 url: "https://cseweb.ucsd.edu/~swanson/ReviewingPapers.html"
+enjoyment: 6
+importance: 5
 tags: ["research", "peer review", "academic writing"]
 status: "done"
 ---

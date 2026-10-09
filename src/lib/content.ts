@@ -57,10 +57,17 @@ export interface ResearchInterestCitation {
     url: string | null;
 }
 
+// A cell of the homepage's 2×2 of research settings. First letter is the row:
+// s(tatic) or c(o-evolving, i.e. adapting). Second is the column: c(lear) or
+// e (uncertain, expensive to verify). "ce" is uncertain and adapting.
+export type QuadrantCell = "sc" | "se" | "cc" | "ce";
+
 export interface ResearchInterestItem {
     title: string;
     summary: string;
     question: string;
+    quadrant?: QuadrantCell[];
+    quadrantLabel?: string;
     citations?: ResearchInterestCitation[];
 }
 

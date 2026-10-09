@@ -30,11 +30,6 @@ experience:
         require significantly more data than humans to acquire general
         syntactic representations, revealing heightened sensitivity to
         item-level and construction-level variation.
-      - >-
-        Developed an oracle-free framework for estimating process reward
-        annotation quality without ground truth using behavioral signals,
-        inducing better step-by-step reasoning in Process Reward Models (PRMs)
-        for RL in non-verifiable tasks.
 
   - organization: The University of Texas at Arlington
     dates: Feb 2024 – present

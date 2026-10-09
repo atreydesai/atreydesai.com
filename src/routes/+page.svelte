@@ -8,6 +8,7 @@
   import HyperText from "$lib/components/HyperText.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Mark from "$lib/components/Mark.svelte";
+  import QuadrantGlyph from "$lib/components/QuadrantGlyph.svelte";
   import { onDestroy, onMount } from "svelte";
   import { arcadeScreen, openArcade } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
@@ -92,6 +93,7 @@
 
   const interestRows = homepageData.researchInterests.items.map((item) => ({
     ...item,
+    quadrant: item.quadrant ?? [],
     citations: item.citations ?? [],
   }));
 
@@ -121,6 +123,9 @@
 
   function handleInterestRowClick(e: MouseEvent) {
     if ((e.target as Element).closest("a, button")) return;
+    // The second and third clicks of a double/triple-click are word and
+    // paragraph selection, not toggles.
+    if (e.detail > 1) return;
     if (Math.hypot(e.clientX - pressX, e.clientY - pressY) > 4) return;
     toggleResearchDetails();
   }
@@ -188,8 +193,10 @@
           hi, i'm <HyperText class="ml-[0.18em]" text="atrey desai" />
         </h1>
 
-        <!-- No hyphenation in the intro: it reads better with whole words. -->
-        <div class="type-deck flow-prose hyphens-none text-ink-700 dark:text-cream-300">
+        <!-- No hyphenation in the intro on wide screens: it reads better with
+             whole words. A phone column is too narrow to justify whole words
+             without wide rivers, so hyphenation stays on there. -->
+        <div class="type-deck flow-prose md:hyphens-none text-ink-700 dark:text-cream-300">
           {#each homepageData.intro as paragraph}
             <p>
               {@html parseLinks(paragraph)}
@@ -197,7 +204,7 @@
           {/each}
         </div>
 
-        <div class="mt-4 flex flex-wrap items-center gap-x-4 text-sm">
+        <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {#each socialLinks as link}
             <a
               href={link.href}
@@ -408,6 +415,21 @@
                     >
                       {item.title}
                     </button>
+                    {#if item.quadrant.length}
+                      <!-- Shown only with the full questions, like the citations. -->
+                      <span
+                        class="interest-quadrant"
+                        class:interest-grid-shown={researchExpanded}
+                        aria-hidden={!researchExpanded}
+                      >
+                        <span class="interest-quadrant-inner">
+                          <QuadrantGlyph cells={item.quadrant} />
+                          {#if item.quadrantLabel}
+                            <span>{item.quadrantLabel}</span>
+                          {/if}
+                        </span>
+                      </span>
+                    {/if}
                   </p>
 
                   <div
@@ -415,18 +437,11 @@
                     aria-hidden={researchExpanded}
                   >
                     <div class="interest-copy-inner">
+                      <!-- Plain text, not a button: browsers won't start a
+                           selection inside a button. The row's click handler
+                           still toggles on a click here. -->
                       <p class="mt-0.5 text-sm leading-snug text-ink-500 dark:text-cream-400">
-                        <button
-                          type="button"
-                          class="research-interest-summary"
-                          tabindex={researchExpanded ? -1 : 0}
-                          aria-expanded={researchExpanded}
-                          aria-controls="research-interest-list"
-                          aria-describedby="research-interest-hint"
-                          on:click={toggleResearchDetails}
-                        >
-                          {item.summary}
-                        </button>
+                        {item.summary}
                       </p>
                     </div>
                   </div>
@@ -438,16 +453,7 @@
                   >
                     <div class="interest-copy-inner">
                       <p class="mt-0.5 text-sm leading-relaxed text-ink-600 dark:text-cream-300">
-                        <button
-                          type="button"
-                          class="research-interest-summary"
-                          aria-expanded={researchExpanded}
-                          aria-controls="research-interest-list"
-                          aria-describedby="research-interest-hint"
-                          on:click={toggleResearchDetails}
-                        >
-                          {@html parseInterestText(item.question)}
-                        </button>
+                        {@html parseInterestText(item.question)}
                       </p>
                       {#if item.citations.length > 0}
                         <div class="mt-1.5 flex flex-wrap gap-1.5 font-mono text-xs leading-none text-ink-400 dark:text-cream-500">
@@ -606,12 +612,49 @@
     color: #fdf8f3;
   }
 
-  .research-interest-summary {
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
+  /* The 2×2 glyph beside each title. It stays collapsed to zero width until
+     the full questions are shown, then eases open the same way the question
+     shells do. */
+  .interest-quadrant {
+    display: inline-grid;
+    grid-template-columns: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-columns var(--motion-reveal) var(--ease-emphasized),
+      opacity var(--motion-base) var(--ease-standard),
+      margin-left var(--motion-reveal) var(--ease-emphasized);
   }
+  .interest-quadrant-inner {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .interest-grid-shown {
+    grid-template-columns: 1fr;
+    opacity: 1;
+  }
+  .interest-quadrant {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: theme("colors.ink.400");
+    transition-delay: var(--interest-delay, 0ms);
+    /* Cancels the title line's gap while collapsed, so no sliver of space
+       trails the title. */
+    margin-left: -0.55rem;
+  }
+  .interest-quadrant.interest-grid-shown {
+    margin-left: 0;
+  }
+  .interest-quadrant-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  :global(.dark) .interest-quadrant {
+    color: theme("colors.cream.500");
+  }
+
   .research-interest-row {
     cursor: pointer;
   }

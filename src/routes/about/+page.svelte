@@ -4,7 +4,7 @@
     import Seo from "$lib/components/Seo.svelte";
     import { aboutData } from "$lib/content";
     import { parseInline, escapeHtml } from "$lib/utils/text";
-    import type { ManifoldNow, ReadingBook } from "../api/now/+server";
+    import type { ManifoldNow, ReadingNow } from "../api/now/+server";
 
     // Sidenote layout: each footnote floats in the right margin beside its
     // marker, faint until you hover the note or the marker.
@@ -22,7 +22,11 @@
 
     // Live "now" data (Manifold + Goodreads) from the /api/now endpoint.
     let manifoldNow: ManifoldNow | null = null;
-    let readingNow: ReadingBook[] | null = null;
+    let readingNow: ReadingNow | null = null;
+
+    // Footnotes whose text is replaced with live data from /api/now.
+    const READING_FN = 4;
+    const MANIFOLD_FN = 6;
 
     // 302847 -> "Ṁ303k", 840 -> "Ṁ840"
     function mana(n: number): string {
@@ -38,20 +42,43 @@
                 readingNow = data.reading ?? null;
             }
         } catch {
-            // Network/API hiccup: footnote 7 keeps its static fallback and
-            // the "currently reading" line simply doesn't render.
+            // Network/API hiccup: the Manifold footnote keeps its static
+            // fallback and the "currently reading" line simply doesn't render.
         }
     }
 
-    // Footnote 7's HTML: live Manifold standing when available, else the
+    function fallbackHtml(id: number): string {
+        const f = aboutData.footnotes.find((x) => x.id === id);
+        return f ? escapeHtml(f.content) : "";
+    }
+
+    // "3 hours ago" under a day, "110 days ago" after.
+    function sinceHtml(at: number): string {
+        const hours = Math.floor(Math.max(0, Date.now() - at) / 3_600_000);
+        if (hours < 1) return "less than an hour ago";
+        const [n, unit] = hours < 24 ? [hours, "hour"] : [Math.floor(hours / 24), "day"];
+        return `<span class="fn-stat">${n}</span> ${unit}${n === 1 ? "" : "s"} ago`;
+    }
+
+    $: readingBooks = readingNow?.books ?? [];
+
+    // The reading footnote only exists alongside the live "currently reading"
+    // line, so it's left out of both footnote lists when that line is.
+    $: footnotes = aboutData.footnotes.filter(
+        (f) => f.id !== READING_FN || readingBooks.length > 0,
+    );
+
+    // The reading footnote's HTML: how long since the last Goodreads progress.
+    $: readingFnHtml = readingNow?.updatedAt
+        ? `Though this may be outdated, my last progress update was ${sinceHtml(readingNow.updatedAt)}.`
+        : fallbackHtml(READING_FN);
+
+    // The Manifold footnote's HTML: live standing when available, else the
     // static YAML fallback. Built as a string so both footnote render sites
     // (sidebar + mobile) can share it via {@html}.
-    $: fn7Html = (() => {
+    $: manifoldFnHtml = (() => {
         const m = manifoldNow;
-        if (!m) {
-            const f = aboutData.footnotes.find((x) => x.id === 7);
-            return f ? escapeHtml(f.content) : "";
-        }
+        if (!m) return fallbackHtml(MANIFOLD_FN);
         const market = m.market
             ? `<a href="${escapeHtml(m.market.url)}" target="_blank" rel="noopener noreferrer" class="link">${escapeHtml(m.market.question)}</a>`
             : "AI model releases";
@@ -59,7 +86,14 @@
             m.rank != null
                 ? `currently <span class="fn-stat">#${m.rank}</span> in the world with a <span class="fn-stat">${mana(m.netWorth)}</span> net worth`
                 : `a <span class="fn-stat">${mana(m.netWorth)}</span> net worth`;
-        return `I run a monthly ${market} market on Manifold, ${standing}.`;
+        const b = m.bot;
+        const bot = b
+            ? " My bot " +
+              (b.rank != null
+                  ? `is currently <span class="fn-stat">#${b.rank}</span> in the world with a <span class="fn-stat">${mana(b.netWorth)}</span> net worth.`
+                  : `has a <span class="fn-stat">${mana(b.netWorth)}</span> net worth.`)
+            : "";
+        return `I run a monthly ${market} market on Manifold, ${standing}.${bot}`;
     })();
 
     // Place each sidenote level with its marker, then push notes down just
@@ -168,9 +202,14 @@
         }
     }
 
-    // Footnote 7's content swaps in live data after load: re-stack since
-    // its height may change.
-    $: if (browser && fn7Html) tick().then(scheduleLayout);
+    // Live footnotes and the reading line swap in after load: re-stack since
+    // markers move and note heights change.
+    $: if (browser && (manifoldFnHtml || readingFnHtml || readingBooks))
+        tick().then(scheduleLayout);
+
+    // Reactive so the template re-renders when either live note lands.
+    $: liveHtml = (id: number, content: string) =>
+        id === MANIFOLD_FN ? manifoldFnHtml : id === READING_FN ? readingFnHtml : escapeHtml(content);
 
     // Parse markdown-style links, emphasis, and footnote markers in about-page text.
     const parseLinks = (text: string) =>
@@ -193,7 +232,7 @@
          its marker, faint until hovered. -->
     <aside class="about-sidenotes layer-raised hidden xl:block">
         <div class="relative h-full">
-            {#each aboutData.footnotes as footnote (footnote.id)}
+            {#each footnotes as footnote (footnote.id)}
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                     class="sidenote footnote-item text-xs text-ink-500 dark:text-cream-500 leading-relaxed"
@@ -211,7 +250,7 @@
                         on:focus={() => (hovered = footnote.id)}
                         on:blur={() => (hovered = null)}>{footnote.id}.</a
                     >
-                    {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
+                    {@html liveHtml(footnote.id, footnote.content)}
                 </div>
             {/each}
         </div>
@@ -273,14 +312,25 @@
 
                 <!-- Live "currently reading" from Goodreads (via /api/now),
                      rendered as a normal full-size paragraph. -->
-                {#if readingNow && readingNow.length > 0}
+                {#if readingBooks.length > 0}
                     <p>
-                        Currently reading {#each readingNow as b, i}{#if i > 0}{i === readingNow.length - 1 ? " and " : ", "}{/if}{#if b.url}<a
+                        I'm currently reading {#each readingBooks as b, i}{#if i > 0}{i === readingBooks.length - 1 ? " and " : ", "}{/if}{#if b.url}<a
                                     href={b.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="link">{b.title}</a
-                                >{:else}{b.title}{/if}{/each}.
+                                >{:else}{b.title}{/if}{/each}.<a
+                            id="fnref-{READING_FN}"
+                            href="#fn-{READING_FN}"
+                            class="footnote-ref"
+                            data-footnote={READING_FN}
+                            aria-label="Footnote {READING_FN}"
+                            on:mouseenter={() => (hovered = READING_FN)}
+                            on:mouseleave={() => (hovered = null)}
+                            on:focus={() => (hovered = READING_FN)}
+                            on:blur={() => (hovered = null)}
+                            >[{READING_FN}]</a
+                        >
                     </p>
                 {/if}
 
@@ -311,8 +361,6 @@
             </div>
         </section>
 
-        <hr class="border-dotted border-ink-200 dark:border-ink-700 my-8" />
-
         <!-- Where are you from -->
         <section class="mb-12">
             <h2 class="section-heading">where are you from?</h2>
@@ -323,8 +371,6 @@
                 </p>
             </div>
         </section>
-
-        <hr class="border-dotted border-ink-200 dark:border-ink-700 my-8" />
 
         <!-- Why does this website look like this -->
         <section class="mb-12">
@@ -341,7 +387,7 @@
                 </p>
 
                 {#if aboutData.website.inspirationList.length > 0}
-                    <ul class="space-y-2 text-sm">
+                    <ul class="space-y-0.5 text-sm">
                         {#each aboutData.website.inspirationList as site}
                             <li>
                                 <a
@@ -349,8 +395,7 @@
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="link font-medium">{site.name}</a
-                                >
-                                :
+                                >:
                                 <span class="text-ink-500 dark:text-cream-500"
                                     >{site.description}</span
                                 >
@@ -367,8 +412,6 @@
                 </p>
             </div>
         </section>
-
-        <hr class="border-dotted border-ink-200 dark:border-ink-700 my-8" />
 
         <!-- Things I'm thinking about -->
         <section class="mb-12">
@@ -387,7 +430,7 @@
         <div class="xl:hidden mt-12 pt-8">
             <h3 class="type-label mb-4 text-ink-500 dark:text-cream-400">footnotes</h3>
             <div class="space-y-4">
-                {#each aboutData.footnotes as footnote}
+                {#each footnotes as footnote}
                     <div
                         class="text-xs text-ink-500 dark:text-cream-500 leading-relaxed"
                         id={wideNotes ? undefined : `fn-${footnote.id}`}
@@ -398,7 +441,7 @@
                             aria-label="Back to reference {footnote.id}"
                             >{footnote.id}.</a
                         >
-                        {#if footnote.id === 7}{@html fn7Html}{:else}{footnote.content}{/if}
+                        {@html liveHtml(footnote.id, footnote.content)}
                     </div>
                 {/each}
             </div>
