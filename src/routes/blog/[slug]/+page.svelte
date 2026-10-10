@@ -2,6 +2,7 @@
     import Seo from "$lib/components/Seo.svelte";
     import FruitStudies from "$lib/components/FruitStudies.svelte";
     import ShaderCanvas from "$lib/components/ShaderCanvas.svelte";
+    import ProseDiff from "$lib/components/ProseDiff.svelte";
     import { formatLongDate } from "$lib/utils/date";
     import { marked } from "marked";
     import { withMarks } from "$lib/marks";
@@ -19,10 +20,11 @@
         | { type: "html"; content: string }
         | { type: "shader"; variant: "mound" | "nebula" }
         | { type: "fruits" }
+        | { type: "prose-diff" }
         | { type: "image"; src: string; caption: string };
 
     function parseSegments(src: string): Segment[] {
-        const re = /\[\[fruits\]\]|\[\[shader:(mound|nebula)\]\]|\[\[image:([^\]|]+)\|([^\]]+)\]\]/g;
+        const re = /\[\[fruits\]\]|\[\[prose-diff\]\]|\[\[shader:(mound|nebula)\]\]|\[\[image:([^\]|]+)\|([^\]]+)\]\]/g;
         const out: Segment[] = [];
         let last = 0;
         let match: RegExpExecArray | null;
@@ -32,6 +34,8 @@
             }
             if (match[0] === "[[fruits]]") {
                 out.push({ type: "fruits" });
+            } else if (match[0] === "[[prose-diff]]") {
+                out.push({ type: "prose-diff" });
             } else if (match[1]) {
                 out.push({ type: "shader", variant: match[1] as "mound" | "nebula" });
             } else {
@@ -62,58 +66,71 @@
     noindex={post.unlisted === true || post.published === false}
 />
 
-<div class="page-shell page-shell-standard">
-    <!-- Back link -->
-    <a
-        href="/blog/"
-        class="type-meta inline-flex items-center gap-1 text-ink-500 dark:text-cream-500 hover:text-accent-dark dark:hover:text-accent-light transition-colors mb-8"
-    >
-        <ArrowLeft size={14} />
-        Back to blog
-    </a>
+<!-- The shell is wide so a tool can break out to the bookshelf's width;
+     everything else sits in the standard column, exactly where it would in
+     a standard shell. -->
+<div class="page-shell page-shell-wide">
+    <div class="post-column">
+        <!-- Back link -->
+        <a
+            href="/blog/"
+            class="type-meta inline-flex items-center gap-1 text-ink-500 dark:text-cream-500 hover:text-accent-dark dark:hover:text-accent-light transition-colors mb-8"
+        >
+            <ArrowLeft size={14} />
+            Back to blog
+        </a>
 
-    {#if post.published === false}
-        <span class="pill mb-4">Draft</span>
-    {/if}
+        {#if post.published === false}
+            <span class="pill mb-4">Draft</span>
+        {/if}
 
-    <!-- Post header -->
-    <header class="page-header page-header-meta">
-        <h1 class="type-article-title mb-3 text-ink-900 dark:text-cream-100">
-            {post.title}
-        </h1>
+        <!-- Post header -->
+        <header class="page-header page-header-meta">
+            <h1 class="type-article-title mb-3 text-ink-900 dark:text-cream-100">
+                {post.title}
+            </h1>
 
-        <div class="type-meta flex flex-wrap items-center gap-4">
-            <span class="flex items-center gap-1 text-ink-500 dark:text-cream-500">
-                <CalendarDays size={14} class="translate-y-[0.5px]" />
-                {formatLongDate(post.date)}
-            </span>
+            <div class="type-meta flex flex-wrap items-center gap-4">
+                <span class="flex items-center gap-1 text-ink-500 dark:text-cream-500">
+                    <CalendarDays size={14} class="translate-y-[0.5px]" />
+                    {formatLongDate(post.date)}
+                </span>
 
-            <span class="text-ink-400 dark:text-cream-500">
-                {readingTime(post.content)}
-            </span>
+                <span class="text-ink-400 dark:text-cream-500">
+                    {readingTime(post.content)}
+                </span>
 
-            <div class="flex gap-2">
-                {#each post.tags as tag}
-                    <span class="pill">{tag}</span>
-                {/each}
+                <div class="flex gap-2">
+                    {#each post.tags as tag}
+                        <span class="pill">{tag}</span>
+                    {/each}
+                </div>
             </div>
-        </div>
-    </header>
+        </header>
+    </div>
 
     <!-- Post content -->
-    <article class="prose-custom type-longform measure-reading">
+    <article class="prose-custom type-longform">
         {#each segments as seg}
-            {#if seg.type === "html"}
-                {@html seg.content}
-            {:else if seg.type === "shader"}
-                <ShaderCanvas variant={seg.variant} />
-            {:else if seg.type === "fruits"}
-                <FruitStudies />
+            {#if seg.type === "prose-diff"}
+                <ProseDiff />
             {:else}
-                <figure class="blog-figure">
-                    <img src={seg.src} alt={seg.caption} />
-                    <figcaption>{seg.caption}</figcaption>
-                </figure>
+                <div class="post-column">
+                    <div class="measure-reading">
+                        {#if seg.type === "html"}
+                            {@html seg.content}
+                        {:else if seg.type === "shader"}
+                            <ShaderCanvas variant={seg.variant} />
+                        {:else if seg.type === "fruits"}
+                            <FruitStudies />
+                        {:else}
+                            <figure class="blog-figure">
+                                <img src={seg.src} alt={seg.caption} />
+                                <figcaption>{seg.caption}</figcaption>
+                            </figure>
+                        {/if}
+                    </div>
+                </div>
             {/if}
         {/each}
     </article>
@@ -121,7 +138,7 @@
     <!-- Prev/next navigation -->
     {#if prevPost || nextPost}
         <nav
-            class="mt-12 pt-6 border-t border-ink-100 dark:border-ink-800 flex items-start justify-between gap-4"
+            class="post-column mt-12 pt-6 border-t border-ink-100 dark:border-ink-800 flex items-start justify-between gap-4"
             aria-label="Post navigation"
         >
             <div class="flex-1">
@@ -156,6 +173,13 @@
 </div>
 
 <style>
+    /* The standard column inside the wide shell: 820px less the standard
+       gutters, matching `.page-shell-wide > .page-header` in app.css. */
+    .post-column {
+        max-width: calc(820px - 2 * var(--space-6));
+        margin-inline: auto;
+    }
+
     /* Italic prose headings to match the site-wide `section-heading` voice
        (every other page uses the italic Optima prose face for in-content headings). */
     .prose-custom :global(h2) {

@@ -50,8 +50,12 @@
     let optionRefs: HTMLButtonElement[] = [];
     let activeIndex = -1;
 
+    // A plain picker rather than a filter: every option is an ordinary value,
+    // so the first one shows its own label and nothing reads as filtering.
+    export let resettable = true;
+
     // First option doubles as the "no filter" reset (e.g. "All tags").
-    $: resetValue = options[0]?.value ?? "";
+    $: resetValue = resettable ? (options[0]?.value ?? "") : null;
     $: normalizedQuery = query.trim().toLowerCase();
     // While filtering, the reset row drops out: it would otherwise sit on top
     // of every result and take the Enter-to-pick-first slot.
@@ -66,7 +70,7 @@
         animateOptions &&
         options.length <= MAX_CASCADE_OPTIONS &&
         !normalizedQuery;
-    $: isFiltered = value !== resetValue || excluded.length > 0;
+    $: isFiltered = resettable && (value !== resetValue || excluded.length > 0);
     // Every way of closing (pick, Escape, click away, tab out) starts the next
     // open from the full list.
     $: if (!isOpen) query = "";
@@ -80,7 +84,7 @@
         val: string,
         excl: string[],
         fallback: string,
-        reset: string,
+        reset: string | null,
     ): string[] {
         const parts: string[] = [];
         if (val !== reset) {
@@ -108,7 +112,7 @@
         mode: boolean,
         val: string,
         excl: string[],
-        reset: string,
+        reset: string | null,
     ): "selected" | "excluded" | "none" {
         if (mode) {
             if (option.value === reset) {
