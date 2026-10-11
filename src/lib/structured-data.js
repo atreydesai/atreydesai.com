@@ -58,6 +58,9 @@ export function personStructuredData({ imageUrl }) {
     ],
     knowsLanguage: ["English", "Gujarati", "Spanish", "Korean"],
     award: [
+      "CRA NSF CISE Student Funding Program (2026)",
+      "ACL D&I Award (2026)",
+      "Department of Computer Science Professional Development Fund (2026)",
       "SPIRE Research Grant (2025)",
       "Omicron Delta Kappa Top 10 Freshman (2024)",
       "CMSC & ARHU Dean's List (2023–2026)",

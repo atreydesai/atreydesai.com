@@ -30,7 +30,7 @@ body.boba-active .custom-cursor {
   --b-btn-text: #fdf8f3;
 
   color: var(--b-text);
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-variant-numeric: lining-nums tabular-nums;
   -webkit-user-select: none;
   user-select: none;

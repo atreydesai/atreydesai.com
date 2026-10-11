@@ -6,8 +6,8 @@ export default {
   theme: {
     extend: {
       fontSize: {
-        // Smallest documented step: labels, footnotes, captions, and all the
-        // mono detail text.
+        // Smallest documented step: labels, footnotes, captions, and detail
+        // text.
         xs: ["0.75rem", { lineHeight: "1rem" }],
         sm: ["0.95rem", { lineHeight: "1.4rem" }],
         base: ["1rem", { lineHeight: "1.5rem" }],
@@ -82,15 +82,18 @@ export default {
           dark: "#4A2A50",
         },
       },
-      // Three roles, defined once as CSS vars in app.css (:root). Keep these in
-      // sync with that block — both resolve to the same stacks.
-      //   display → Neue Haas Grotesk  (headlines / big headers)
-      //   serif   → Optima             (subheads + body / reading text)
-      //   mono    → system monospace   (nav, buttons, controls, labels, details)
+      // Three roles, defined once as CSS vars in app.css (:root). Keep these
+      // in sync with that block — all resolve to the same stacks. Serif for
+      // what you read, sans for what you scan or click. No monospace.
+      //   display → NHG Display  (big titles: page, article, hero)
+      //   ui      → NHG Text     (item headings and titles, nav, controls,
+      //                           labels, meta, dates, captions)
+      //   serif   → Optima       (body and reading text, decks, blurbs,
+      //                           footnotes, the italic section-heading)
       fontFamily: {
         display: ["var(--font-display)"],
+        ui: ["var(--font-ui)"],
         serif: ["var(--font-prose)"],
-        mono: ["var(--font-mono)"],
       },
       // Tailwind's stock `ring-*`/`ring-offset-*` default to blue-500 and
       // white. Focus is a single `:focus-visible` outline in app.css, never a

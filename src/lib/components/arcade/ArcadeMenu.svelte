@@ -160,12 +160,14 @@
     gap: var(--space-2);
   }
 
+  /* The site's item-heading recipe (type-item-heading): NHG Text, regular. */
   .name {
     color: var(--b-strong);
-    font-family: var(--font-prose);
-    font-size: 1.25rem;
-    font-weight: 600;
-    line-height: 1.375;
+    font-family: var(--font-ui);
+    font-size: 1.125rem;
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: -0.005em;
     white-space: nowrap;
   }
 

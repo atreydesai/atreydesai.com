@@ -96,7 +96,7 @@
         </svg>
         <!-- Value in center -->
         <span
-            class="absolute text-xs font-semibold {textColor}"
+            class="absolute text-xs {textColor}"
             aria-label="{type} rating: {displayValue} out of {maxValue}"
         >
             {displayValue}

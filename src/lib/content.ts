@@ -109,6 +109,7 @@ export interface AboutData {
         inspirationList: Array<{ name: string; url: string; description: string }>;
         builtWith: string;
     };
+    friends: Array<{ name: string; url: string }>;
     thoughts: string[];
 }
 

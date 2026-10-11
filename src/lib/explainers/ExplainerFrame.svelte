@@ -305,11 +305,14 @@
 	}
 
 	/* Type roles inside the plate (user units; the plate is 240 wide, so at
-	   the 144px card one unit is 0.6px). Nothing is set below 13 units. */
+	   the 144px card one unit is 0.6px). Nothing is set below 13 units.
+	   Content and the caption are Optima (read); letters, labels, and ticks
+	   (`.xp-mono`, a legacy name: there is no monospace) are NHG Text (scan). */
 	/* Text is coloured with `color` so a stroke in the same colour, painted
 	   under the fill, can thicken the glyphs: Optima has no medium weight, and
-	   its regular reads thin at card size. Dark text on the light plate gets a
-	   touch more than light text on the dark one. */
+	   its regular reads thin at card size; the small labels get a lighter
+	   touch. Dark text on the light plate gets a touch more than light text
+	   on the dark one. */
 	.xp {
 		--xp-weight: 1;
 	}
@@ -334,7 +337,7 @@
 		font-size: 20px;
 	}
 	.xp :global(.xp-mono) {
-		font-family: var(--font-mono);
+		font-family: var(--font-ui);
 		color: var(--xp-soft);
 		--xp-stroke: 0.45px;
 	}
@@ -383,7 +386,7 @@
 		margin: 0;
 		padding: 0;
 		list-style: none;
-		font-family: var(--font-mono);
+		font-family: var(--font-ui);
 		font-size: 0.75rem;
 	}
 	.xp-steps li {

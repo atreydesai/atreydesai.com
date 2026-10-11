@@ -37,7 +37,7 @@
             cursorY = targetY;
 
             if (cursorElement) {
-                cursorElement.style.transform = `translate(${cursorX - 10}px, ${cursorY - 10}px)`;
+                cursorElement.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
             }
 
             // Hit-test at most once per frame, and only when the cursor moved.

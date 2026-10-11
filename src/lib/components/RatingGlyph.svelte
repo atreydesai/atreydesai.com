@@ -35,7 +35,7 @@
     </span>
 {:else}
     <span
-        class="inline-flex h-5 min-w-7 items-center justify-center font-mono text-xs text-ink-400 dark:text-ink-300"
+        class="inline-flex h-5 min-w-7 items-center justify-center font-ui text-xs text-ink-400 dark:text-ink-300"
         aria-label="{label} rating not set"
         title="{label}: not set"
     >

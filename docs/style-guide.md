@@ -61,16 +61,82 @@ Rules:
 
 ### Font families
 
-| Role      | Stack                                                                                                            | Use                                                  |
-| --------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Display   | `"neue-haas-grotesk-display"`, metric-matched Helvetica/Arial fallback, sans-serif                               | Page and hero titles above 20px                      |
-| Prose     | `Optima`, `Candara`, `"URW Classico"`, sans-serif                                                                | Body copy, decks, section headings, card titles      |
-| Interface | `ui-monospace`, `SFMono-Regular`, `Menlo`, `Monaco`, `Consolas`, `"Liberation Mono"`, `"Courier New"`, monospace | Navigation, buttons, filters, metadata, labels, data |
+Three typefaces, three roles, and no monospace. The rule, borrowed from
+anthropic.com: **serif for what you read, sans for what you scan or click.**
+Optima carries the reading text (a humanist face with serif-like stroke
+contrast, it plays the serif part); Neue Haas Grotesk carries everything that
+is scanned or clicked, at two optical sizes.
 
-Neue Haas Grotesk Display is normally reserved for digital type above `20px`,
-following the [MIT typography guidance](https://brand.mit.edu/typography).
-The 16px header wordmark is an approved brand-mark exception and must be tested
-against the fallback font.
+| Role      | Token                                | Stack                                                                                | Use                                                                                                          |
+| --------- | ------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Display   | `--font-display` / `font-display`    | `"neue-haas-grotesk-display"`, metric-matched Helvetica Neue fallback, sans-serif    | Page, article, and hero titles; long-form `h2`                                                               |
+| Interface | `--font-ui` / `font-ui`              | `"neue-haas-grotesk-text"`, metric-matched Helvetica Neue fallback, sans-serif       | Item headings and titles, long-form `h3`, navigation, buttons, controls, labels, metadata, dates, captions, tooltips, data |
+| Prose     | `--font-prose` / `font-serif`        | `Optima`, `Candara`, `"URW Classico"`, sans-serif                                    | Body and long-form text, decks, blurbs and summaries, footnotes, quotes, the italic `section-heading`       |
+
+The CSS variables in `app.css` (`:root`) are the single source; the Tailwind
+`fontFamily` keys point at them.
+
+Choosing a role:
+
+- **Read it as sentences → Prose.** Paragraphs, decks, card blurbs, book notes,
+  footnotes, quotes, explainer captions, empty-state sentences.
+- **Scan it or click it → Interface.** Titles of items in a list, navigation,
+  buttons and text controls, filters, pills, table headers and cells, dates,
+  counts, labels, captions, tooltips, footer metadata.
+- **Headings split the same way.** Big titles are Display. Titles of items and
+  long-form subsections are Interface (or Display at `24px` for a long-form
+  `h2`). The one serif heading is `section-heading`: an italic Optima accent
+  for editorial section labels.
+- **Figures woven into a sentence** (a live stat, a diff count) are Interface
+  spans inside the prose, with lining tabular figures.
+- **There is no monospace face**, for code, data, or labels. Do not add a
+  `font-mono` class or a mono stack; interface text that used to be mono is
+  NHG Text.
+
+Weights are a hard constraint:
+
+- Typekit kit `nsg3mxc` serves NHG Display at 500, 500 italic, 600, and 700,
+  and NHG Text at 400, 400 italic, 500, and 700. NHG Text has no 600: a `600`
+  request renders Bold.
+- macOS Optima has only Regular (400), Bold (700), and ExtraBlack: `500`
+  renders as Regular and `600` as Bold. Never ask Optima for a middle weight.
+- **The site is unbolded.** Only display titles carry weight: `600` for page,
+  article, and long-form `h2` titles, `700` only for `type-hero-title`.
+  Everything in the Interface face is `400`: item headings, long-form `h3`,
+  navigation, buttons, labels, tooltips, captions, and the CV. Hierarchy comes
+  from family, size, and colour (`ink-900`/`cream-100` against the secondary
+  tones), never from a heavier weight. Your own name in author lists is marked
+  by colour alone. Bold is for emphasis inside prose (`<strong>`) only.
+  The one exception is the drawn wordmark (NHG Text `500` outlines), which is
+  a logo, not text.
+
+Neue Haas Grotesk Display is drawn for digital type above `20px`, following the
+[MIT typography guidance](https://brand.mit.edu/typography); below that, use
+NHG Text. The 16px header wordmark is set in NHG Text at `500` for this reason
+and must be tested against the fallback font.
+
+Both Typekit families have a metric-matched local fallback
+(`neue-haas-grotesk-fallback`, `neue-haas-grotesk-text-fallback`: Helvetica
+Neue, Helvetica, or Arial with `size-adjust` and ascent/descent overrides) so
+text does not shift when the kit loads. The NHG Text values were measured
+in-browser against Helvetica Neue.
+
+The wordmark is drawn, not typeset: `src/lib/wordmark.ts` holds "atrey desai"
+as vector outlines (NHG Text `500` at `-0.01em`, rendered large and traced) and
+the AD monogram (the favicon trace; source in `static/brand/ad-monogram.svg`)
+in the same coordinate space. Invisible live text in the same NHG Text recipe
+sits under the drawing to give the link its baseline. Regenerate the outlines
+if the wordmark's face, weight, or tracking ever changes; never hand-edit them.
+
+It has two states. Every page loads on the full name; once the page scrolls
+past `15px` it morphs into the monogram, and back when it returns to the top.
+On phones (below `md`) it morphs to the monogram `400ms` after load. The morph
+is a true shape morph (GSAP MorphSVG, loaded after the page): the a bends into
+the A and the d into the D, the d travelling left as it goes, while "trey" and
+"esai" ride into their anchor letter and squeeze to nothing. It runs `0.46s`
+on `power3.inOut`, reverses from wherever it is, and jumps straight to the end
+state under reduced motion. From `md` up the header is sticky so the morph is
+visible.
 
 Optima is a system font rather than a served web font. Cross-platform visual QA
 is required because the fallback changes metrics and character across Apple,
@@ -83,26 +149,34 @@ and the `body` size that unclassed text inherits, is expressed in `rem`, so text
 scales with the reader’s browser font-size preference. Never set a text size in
 `px`: it silently opts that text out of the reader’s setting.
 
-| Token                  | Family       |                                       Size | Line height | Weight |   Tracking | Use                                        |
-| ---------------------- | ------------ | -----------------------------------------: | ----------: | -----: | ---------: | ------------------------------------------ |
-| `type-hero-title`      | Display      |      `clamp(3.75rem, 2.25rem + 6vw, 6rem)` |       `0.9` |    700 | `-0.025em` | Rare landing or error display              |
-| `type-page-title`      | Display      |                          `1.875rem` / 30px |         `1` |    700 | `-0.015em` | Ordinary page titles                       |
-| `type-article-title`   | Display      | `clamp(1.875rem, 1.6rem + 1.1vw, 2.25rem)` |      `1.05` |    700 | `-0.015em` | Titles likely to wrap                      |
-| `section-heading`      | Prose italic |                          `1.2rem` / 19.2px |       `1.4` |    400 |        `0` | Editorial section labels                   |
-| `type-item-heading`    | Prose        |                           `1.25rem` / 20px |     `1.375` |    600 |        `0` | Research, book, and list titles            |
-| `type-deck`            | Prose        |                          `1.125rem` / 18px |       `1.5` |    400 |        `0` | Introductory copy up to two paragraphs     |
-| `type-body`            | Prose        |                         `1.0625rem` / 17px |      `1.55` |    400 |        `0` | Default body copy                          |
-| `type-longform`        | Prose        |                          `1.125rem` / 18px |       `1.7` |    400 |        `0` | Blog posts and sustained essays            |
-| `type-body-small`      | Prose        |                         `0.95rem` / 15.2px |      `1.47` |    400 |        `0` | Secondary descriptions and compact records |
-| `type-meta`            | Interface    |                           `0.75rem` / 12px |     `1.333` |    400 |        `0` | Dates, counts, captions, table metadata    |
-| `type-label`           | Interface    |                           `0.75rem` / 12px |      `1.25` |    500 |   `0.12em` | Short uppercase labels only                |
+| Token                  | Family       |                                       Size | Line height | Weight |    Tracking | Use                                                    |
+| ---------------------- | ------------ | -----------------------------------------: | ----------: | -----: | ----------: | ------------------------------------------------------ |
+| `type-hero-title`      | Display      |      `clamp(3.75rem, 2.25rem + 6vw, 6rem)` |       `0.9` |    700 |  `-0.025em` | Rare landing or error display                          |
+| `type-page-title`      | Display      |                          `1.875rem` / 30px |      `1.05` |    600 |  `-0.015em` | Ordinary page titles                                   |
+| `type-article-title`   | Display      | `clamp(1.875rem, 1.6rem + 1.1vw, 2.25rem)` |       `1.1` |    600 |  `-0.015em` | Titles likely to wrap                                  |
+| Long-form `h2`         | Display      |                            `1.5rem` / 24px |       `1.2` |    600 |   `-0.01em` | Blog sections; `48px` above, `16px` below              |
+| `section-heading`      | Prose italic |                          `1.2rem` / 19.2px |       `1.4` |    400 |         `0` | Editorial section labels; the one serif heading        |
+| `type-item-heading`    | Interface    |                          `1.125rem` / 18px |       `1.3` |    400 |  `-0.005em` | Research, talk, post, and list titles                  |
+| Long-form `h3`         | Interface    |                         `1.1875rem` / 19px |       `1.3` |    400 |         `0` | Blog subsections; `32px` above, `8px` below            |
+| `type-deck`            | Prose        |                          `1.125rem` / 18px |       `1.5` |    400 |         `0` | Introductory copy up to two paragraphs                 |
+| `type-body`            | Prose        |                         `1.0625rem` / 17px |      `1.55` |    400 |         `0` | Default body copy                                      |
+| `type-longform`        | Prose        |                          `1.125rem` / 18px |      `1.65` |    400 |         `0` | Blog posts and sustained essays; paragraphs `1.1em` apart |
+| `type-body-small`      | Prose        |                         `0.95rem` / 15.2px |      `1.47` |    400 |         `0` | Secondary descriptions and compact records             |
+| `type-nav`             | Interface    |                         `0.8125rem` / 13px |       `1.4` |    400 |         `0` | Site navigation                                        |
+| Figure caption         | Interface    |                         `0.8125rem` / 13px |       `1.4` |    400 |   `0.005em` | Image and figure captions: left-aligned, max `45ch`    |
+| `type-meta`            | Interface    |                           `0.75rem` / 12px |     `1.333` |    400 |    `0.01em` | Dates, counts, table metadata, tooltips                |
+| `type-label`           | Interface    |                           `0.75rem` / 12px |      `1.25` |    400 |    `0.06em` | Short uppercase labels only                            |
+
+Interface text at `12–13px` (`type-meta`, pills, `control-text`, the page
+header aside, captions) uses lining tabular figures, so dates and counts line
+up and do not wobble as they change.
 
 ### Leading rules
 
-- Large display type uses `0.95–1.05`, depending on expected wrapping.
+- Large display type uses `0.9–1.1`, depending on size and expected wrapping.
 - Short headings use `1.3–1.4`.
 - Body copy uses `1.5–1.6`.
-- Sustained long-form copy uses `1.65–1.7`.
+- Sustained long-form copy uses `1.65`.
 - Metadata uses `1.25–1.35`.
 - Single-line controls may use `1`, but target height comes from padding or
   `min-height`, not exaggerated line-height.
@@ -110,8 +184,8 @@ scales with the reader’s browser font-size preference. Never set a text size i
   baseline grid.
 
 The body and long-form values intentionally exceed MIT’s NHG body guidance
-because the site uses Optima for prose and follows the longer-text guidance in
-[USWDS Typography](https://designsystem.digital.gov/components/typography/).
+because the site uses Optima, not NHG, for prose and follows the longer-text
+guidance in [USWDS Typography](https://designsystem.digital.gov/components/typography/).
 
 ### Measure
 
@@ -150,7 +224,24 @@ limits should stay local until they have more than one consumer.
 - Acronyms retain conventional capitalization: “PDF,” “CV,” “TLDR,” “AI.”
 - Uppercase is limited to short metadata labels and always uses positive
   tracking.
-- Use `500` and `600` to create hierarchy before reaching for `700`.
+
+### Tracking and kerning
+
+Pair kerning is always on (`font-kerning: normal` on `body`); the browser's
+`auto` can drop it at small sizes, which is where the interface face lives.
+Tracking follows size and case, never decoration:
+
+- Display titles tighten as they grow: `-0.015em` at `600` for page and
+  article titles, `-0.025em` for the hero, `-0.01em` for long-form `h2`.
+- NHG Text at reading-to-title sizes is close to neutral: `-0.005em` for item
+  headings (`18px`), `-0.01em` for the drawn wordmark.
+- Small interface text is never tightened: `0` for navigation (`13px`),
+  `+0.005em` for captions, `+0.01em` for `12px` meta, pills, and controls.
+- Uppercase labels open up to `+0.06em`.
+- Optima is set at its default spacing everywhere (`0`), italic included.
+- Create hierarchy with family, size, and colour before weight. Weight is
+  reserved for display titles (`600`, hero `700`); see the weight rule under
+  Font families.
 - Do not use long passages of bold, italic, uppercase, or centered text.
 - Avoid title case for every heading.
 
@@ -528,8 +619,10 @@ No component should invent a z-index above this scale.
 - Preserve source aspect ratio unless the component is explicitly a cropped
   thumbnail.
 - Standard media radius is `8px`.
-- Captions use `type-meta` or `type-body-small`, `text-secondary`, and a maximum
-  `45ch` measure.
+- Captions are interface text, not prose: NHG Text at `13px / 1.4`, `400`,
+  `0.005em` tracking, `text-secondary` (`ink-500`, `cream-500` in dark),
+  left-aligned under the media's edge, and a maximum `45ch` measure. A bare
+  `figcaption` gets the interface face from the base styles.
 - Every meaningful image needs descriptive alt text.
 - A filename is never alt text and never a caption. An image with no
   human-written description is presentational: give it `alt=""`, render no
@@ -631,8 +724,8 @@ Variants:
 - Secondary: transparent or subtle surface, one-pixel strong border.
 - Tertiary: text link with an icon; no container.
 - Text control (`control-text`): the interface-font text button used for
-  filters, sort, tabs, pagination steps, and header actions. `12px` mono at
-  `400`, `28px` minimum height, `6px` horizontal padding, no border. Hover is a
+  filters, sort, tabs, pagination steps, and header actions. `12px` NHG Text
+  at `400` with `0.01em` tracking and tabular figures, `28px` minimum height, `6px` horizontal padding, no border. Hover is a
   4% ink fill; the pressed state (`aria-pressed="true"`) is a 7% fill with ink
   text, so a row of tabs reads like the navigation rather than like a set of
   boxes. `control-label` sets the dimension a control acts on ("year", "tag",
@@ -655,7 +748,7 @@ Rules:
 - Toolbars and tables may use Dense or Compact.
 - Pointer targets are at least `24 × 24px` or have WCAG-compliant separation.
 - All buttons have default, hover, focus-visible, active, and disabled states.
-- Buttons use the interface font at `500`.
+- Buttons and text controls use the interface font (NHG Text) at `400`.
 - Icon and label gaps are `6–8px`.
 
 ### Form controls
@@ -683,8 +776,9 @@ Rules:
 ### Pills and tags
 
 - Pills are metadata, not primary actions.
-- Use interface `12px / 1.1–1.25`, `6px` horizontal and `2px` vertical padding,
-  `4px` internal gap, and `2px` radius.
+- Use interface type (NHG Text) at `12px / 1.333`, `400`, `0.01em` tracking,
+  lining tabular figures, `6px` horizontal and `2px` vertical padding, `4px`
+  internal gap, and `2px` radius.
 - Neutral pills use a 5–8% ink/cream fill and secondary text.
 - Status pills use one approved support family.
 - Interactive pills must meet the same focus and target-spacing rules as other
@@ -720,6 +814,9 @@ Rules:
   uppercase.
 - Cell padding: `12px` horizontal and `10px` vertical.
 - Row boundaries use `border-hairline`.
+- Row titles (the Bookshelf's title and author) are scanned, so they use the
+  interface face at the row's size, `400`, with the author in the secondary
+  colour.
 - Numeric columns use lining tabular figures.
 - Sort state uses `aria-sort`, text, and an icon.
 - Hover, selected, and keyboard-focus states remain distinct.
@@ -861,9 +958,14 @@ through `<Mark kind="caret|dot" />`.
 - Standard container.
 - `28px` top padding on mobile, `32px` from `md`.
 - Mobile layout may wrap into two rows with an `8–12px` gap.
-- Wordmark uses the documented small-size display exception. It stands alone:
-  no breadcrumb segment after it.
-- Navigation uses interface metadata type.
+- Wordmark is drawn from NHG Text `500` outlines (Display is not drawn for
+  `16px`) and morphs into the AD monogram on scroll; see Typography. It stands
+  alone: no breadcrumb segment after it.
+- From `md` up the header is sticky with the page colour behind it and no rule
+  under it. It sticks at `top: -1.25rem`, so the first `20px` of its top
+  padding scrolls away and the pinned bar is slimmer than the resting header
+  without any layout shift.
+- Navigation uses `type-nav` (NHG Text, `13px / 1.4`, `400`, `0` tracking).
 - Navigation destinations are separated by a `16px` horizontal gap rather
   than punctuation.
 - Active navigation uses both color and `aria-current`; add an underline or
@@ -1090,10 +1192,12 @@ arcade look, so every game reads as part of the site:
   tapioca pearls, and a dropped one becomes a dashed ring.
 - **Stages.** Catch plays on the page itself, lightly dimmed. The others lay
   paper over the page at 93%, so the site stays faintly visible underneath.
-- **Type.** The site's three roles, not an arcade face: Neue Haas Grotesk for
-  scores, clocks, countdowns, and titles; Optima for menu names, and Optima
-  italic for phases, decks, and section labels; mono `12px` at `400`/`500` for
-  labels, stats, and controls. No uppercase outside the stamps.
+- **Type.** The site's three roles, not an arcade face: NHG Display for
+  scores, clocks, countdowns, and titles; NHG Text for menu names (the
+  `type-item-heading` recipe, `400`) and, at `12px` `400`/`500`, for labels, stats,
+  controls, and canvas popups (`arcadeFont()` reads `--font-ui`); Optima
+  italic for phases, decks, tips, and section labels. No uppercase outside the
+  stamps.
 - **Hand-drawn marks.** Countdowns and final scores are circled with the same
   unclosed pen loops as the homepage interest markers, drawn on with a
   stroke-dash reveal; straw stab rings the spot on its belt the same way. A
@@ -1151,13 +1255,14 @@ reads as one system.
   theme. Tints use `fill-opacity`, never `opacity`, because the timeline owns
   opacity.
 - **Type.** Optima for content, Optima italic for the caption (the site's
-  section-heading voice), system mono for letters, labels, and ticks, and Neue
-  Haas Grotesk only for a hero number. The scale is `T` in `motion.ts`: content
+  section-heading voice), NHG Text for letters, labels, and ticks (the
+  `.xp-mono` class; the name is historical, there is no monospace), and NHG
+  Display only for a hero number. The scale is `T` in `motion.ts`: content
   21 units (about 14px on the 160px card), captions 20, and nothing below 13.5
   (about 9px). Glyphs are thickened with a same-colour stroke painted under the
-  fill (Optima has no medium weight), so text is coloured with `color`, never
-  `fill`. If a label will not fit at that size, cut the label rather than
-  shrink it. Captions are at most two lines of about 170 units.
+  fill (Optima has no medium weight; labels take a lighter stroke), so text is
+  coloured with `color`, never `fill`. If a label will not fit at that size,
+  cut the label rather than shrink it. Captions are at most two lines of about 170 units.
 - **Shapes.** Ledger rows with hairline rules rather than boxes; dashed means
   blank or unknown; a filled dot is a model, a ring is the human baseline;
   `2`-unit corners.

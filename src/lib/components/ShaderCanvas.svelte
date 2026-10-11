@@ -247,7 +247,7 @@
     right: var(--space-3);
     padding: var(--space-1) var(--space-2);
     border-radius: var(--radius-control);
-    font-family: var(--font-mono);
+    font-family: var(--font-ui);
     font-size: 0.6875rem;
     line-height: 1.3;
     letter-spacing: 0.04em;
@@ -273,16 +273,20 @@
     padding: var(--space-2-5) var(--space-4);
     border-top: 1px solid theme("colors.ink.100");
     background: theme("colors.cream.50");
-    font-size: 0.75rem;
-    line-height: 1.35;
+    font-family: var(--font-ui);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0.005em;
   }
   :global(.dark) figcaption {
     background: theme("colors.ink.900");
     border-color: theme("colors.ink.700");
   }
   .cap-name {
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: theme("colors.ink.700");
   }
@@ -293,6 +297,6 @@
     color: theme("colors.ink.500");
   }
   :global(.dark) .cap-desc {
-    color: theme("colors.ink.400");
+    color: theme("colors.cream.500");
   }
 </style>

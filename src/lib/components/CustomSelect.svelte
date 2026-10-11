@@ -554,7 +554,7 @@
         color: theme("colors.ink.900");
         background: transparent;
         border: 0;
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }
@@ -584,7 +584,7 @@
         gap: var(--space-2);
         min-height: 1.75rem;
         padding: 0 var(--space-2-5);
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
         text-align: left;
@@ -677,7 +677,7 @@
         width: 100%;
         min-height: 1.75rem;
         padding: var(--space-1) var(--space-2-5) var(--space-1) var(--space-1);
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         font-weight: 400;
         line-height: 1.333;
@@ -755,7 +755,7 @@
     .select-empty {
         padding: var(--space-1-5) var(--space-2-5);
         color: theme("colors.ink.500");
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }

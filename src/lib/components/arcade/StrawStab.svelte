@@ -166,7 +166,7 @@
   let hudButtons: HudButtons;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
-  let popupFont = "500 13px monospace";
+  let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
   let reduceMotion = false;
 
   let viewW = 0;

@@ -94,7 +94,7 @@
                     <span class="inline-block whitespace-nowrap align-baseline">
                         {#each group.chars as item}
                             <span
-                                class="{item.i < visibleCharCount ? '' : 'char-reveal'} {item.bold ? 'font-semibold text-ink-900 dark:text-cream-100' : ''}"
+                                class="{item.i < visibleCharCount ? '' : 'char-reveal'} {item.bold ? 'text-ink-900 dark:text-cream-100' : ''}"
                                 style="animation-delay: {(item.i - visibleCharCount) * 8}ms"
                             >{item.c}</span>
                         {/each}

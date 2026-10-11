@@ -180,33 +180,36 @@
         margin-inline: auto;
     }
 
-    /* Italic prose headings to match the site-wide `section-heading` voice
-       (every other page uses the italic Optima prose face for in-content headings). */
+    /* In-post headings are sans and upright, so they read as structure you
+       scan against the Optima body: h2 in NHG Display at SemiBold, h3 in NHG
+       Text at Medium. Space above is at least three times the space below,
+       tying each heading to the text it introduces. */
     .prose-custom :global(h2) {
-        font-family: var(--font-prose);
-        font-style: italic;
+        font-family: var(--font-display);
+        font-style: normal;
         font-size: 1.5rem;
         font-weight: 600;
-        line-height: 1.25;
-        margin-top: var(--space-8);
-        margin-bottom: var(--space-3);
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+        margin-top: var(--space-12);
+        margin-bottom: var(--space-4);
         text-wrap: pretty;
     }
 
     .prose-custom :global(h3) {
-        font-family: var(--font-prose);
-        font-style: italic;
-        font-size: 1.25rem;
-        font-weight: 600;
+        font-family: var(--font-ui);
+        font-style: normal;
+        font-size: 1.1875rem;
+        font-weight: 400;
         line-height: 1.3;
-        margin-top: var(--space-6);
+        margin-top: var(--space-8);
         margin-bottom: var(--space-2);
         text-wrap: pretty;
     }
 
+    /* Leading comes from type-longform; paragraphs part by an em of space. */
     .prose-custom :global(p) {
-        margin-bottom: var(--space-6);
-        line-height: 1.7;
+        margin-bottom: 1.1em;
     }
 
     .prose-custom :global(a) {
@@ -227,7 +230,6 @@
 
     .prose-custom :global(li) {
         margin-bottom: var(--space-1);
-        line-height: 1.7;
     }
 
     .prose-custom :global(ul) {
@@ -289,15 +291,21 @@
         border-radius: var(--radius-media);
     }
 
+    /* Captions are interface text: NHG Text, left-aligned under the image's
+       edge, held to the caption measure. */
     .blog-figure figcaption {
+        max-width: 45ch;
         margin-top: var(--space-2);
-        font-size: 0.875rem;
-        font-style: italic;
         color: theme("colors.ink.500");
-        text-align: center;
+        font-family: var(--font-ui);
+        font-size: 0.8125rem;
+        font-weight: 400;
+        line-height: 1.4;
+        letter-spacing: 0.005em;
+        text-align: left;
     }
 
     :global(.dark) .blog-figure figcaption {
-        color: theme("colors.ink.400");
+        color: theme("colors.cream.500");
     }
 </style>

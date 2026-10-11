@@ -28,7 +28,7 @@
 
 {#if hasLinks || paper.tldr}
     <div
-        class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs"
+        class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 font-ui text-xs"
     >
         {#if paper.tldr}
             <button

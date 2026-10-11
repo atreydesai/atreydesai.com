@@ -40,7 +40,7 @@
     amp = Math.round(AMP_CSS * dpr);
     step = Math.max(1, Math.round(STEP_CSS * dpr));
     shOff = Math.max(1, Math.round(2 * dpr));
-    const font = `${f}px ui-monospace, "Courier New", monospace`;
+    const font = `${f}px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif`;
 
     const m = document.createElement("canvas").getContext("2d");
     if (!m) return;

@@ -89,6 +89,11 @@ website:
       description: "For the blog section, the old one was quite cluttered."
   builtWith: "Uses SvelteKit, Tailwind CSS, and is deployed on Vercel. Largely maintained these days by Claude Code."
 
+# Friends of Atrey: personal sites of friends
+friends:
+  - name: "Yuval Amit"
+    url: "https://yuvalamit2.github.io/"
+
 # Things you're thinking about
 thoughts:
   - "what to focus on in my phd"

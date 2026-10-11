@@ -7,7 +7,7 @@
     function syncTheme() {
         const style = getComputedStyle(document.documentElement);
         const tokens = Object.fromEntries(
-            ["--font-prose", "--font-mono", "--radius-control", "--radius-media", "--motion-fast", "--focus-ring"]
+            ["--font-prose", "--font-ui", "--radius-control", "--radius-media", "--motion-fast", "--focus-ring"]
                 .map((name) => [name, style.getPropertyValue(name).trim()])
         );
         frame?.contentWindow?.postMessage({

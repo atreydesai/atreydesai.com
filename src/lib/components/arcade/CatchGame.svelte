@@ -165,7 +165,7 @@
 
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D | null = null;
-  let popupFont = "500 13px monospace";
+  let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
   let hudButtons: HudButtons;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;

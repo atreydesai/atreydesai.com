@@ -691,14 +691,14 @@
 
     .pdv-step-label {
         padding-inline-start: var(--space-1-5);
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }
 
     .pdv-note {
         color: theme("colors.ink.500");
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }
@@ -715,7 +715,7 @@
     }
 
     .pdv-fig {
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.85em;
         font-variant-numeric: lining-nums tabular-nums;
     }
@@ -834,7 +834,7 @@
     }
 
     .pdv-kind {
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
         color: theme("colors.ink.500");
@@ -875,7 +875,7 @@
         min-width: 7ch;
         text-align: center;
         color: theme("colors.ink.500");
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
         font-variant-numeric: lining-nums tabular-nums;
@@ -902,7 +902,7 @@
         display: flex;
         flex-direction: column;
         gap: var(--space-1-5);
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }
@@ -916,7 +916,7 @@
         background: theme("colors.cream.50");
         border: 1px solid theme("colors.ink.200");
         border-radius: var(--radius-control);
-        font-family: var(--font-prose);
+        font-family: var(--font-ui);
         font-size: 0.95rem;
         line-height: 1.47;
         transition: border-color var(--motion-fast) var(--ease-standard);

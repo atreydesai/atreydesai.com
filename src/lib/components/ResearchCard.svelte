@@ -109,7 +109,7 @@
                                  louder than the neutral tag pills. -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <span
-                                class="pill bg-ochre/15 font-medium text-ochre-dark dark:bg-ochre-dark/30 dark:text-ochre-light"
+                                class="pill bg-ochre/15 text-ochre-dark dark:bg-ochre-dark/30 dark:text-ochre-light"
                                 on:mouseenter={() => (hoveredLink = `award-${i}`)}
                                 on:mouseleave={() => (hoveredLink = null)}
                             >

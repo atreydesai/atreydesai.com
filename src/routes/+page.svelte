@@ -204,14 +204,14 @@
           {/each}
         </div>
 
-        <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-ui text-sm">
           {#each socialLinks as link}
             <a
               href={link.href}
               target="_blank"
               rel="noopener noreferrer"
               title={link.name}
-              class="link font-medium"
+              class="link"
             >
               {link.name}
             </a>
@@ -222,7 +222,7 @@
               type="button"
               on:click={copyEmail}
               title="Copy email"
-              class="link font-[inherit] text-[length:inherit] font-medium cursor-pointer"
+              class="link font-[inherit] text-[length:inherit] cursor-pointer"
             >
               Email
             </button>
@@ -293,7 +293,7 @@
             <p class="type-body-small relative z-10">
               {@html parseBanner(bannerLead.pre)}<button
                 type="button"
-                class="banner-toggle link font-[inherit] text-[length:inherit] font-medium cursor-pointer select-none"
+                class="banner-toggle link font-[inherit] text-[length:inherit] cursor-pointer select-none"
                 aria-expanded={projectsOpen}
                 aria-controls="banner-projects-list"
                 on:click={() => (projectsOpen = !projectsOpen)}
@@ -318,7 +318,7 @@
                       style="--project-delay: {i * 40}ms"
                     >
                       <span
-                        class="font-mono text-xs text-ink-400 dark:text-cream-500 select-none"
+                        class="font-ui text-xs tabular-nums text-ink-400 dark:text-cream-500 select-none"
                         aria-hidden="true">{String(i + 1).padStart(2, "0")}</span
                       >
                       <span>{@html parseBanner(project)}</span>
@@ -387,7 +387,7 @@
                 on:click={handleInterestRowClick}
               >
                 <div class="min-w-0">
-                  <p class="interest-title-line font-medium text-ink-900 dark:text-cream-100">
+                  <p class="interest-title-line font-ui font-normal text-ink-900 dark:text-cream-100">
                     <span class="interest-mark select-none" aria-hidden="true">
                       <svg class="interest-loop" viewBox="0 0 44 28">
                         <path
@@ -456,7 +456,7 @@
                         {@html parseInterestText(item.question)}
                       </p>
                       {#if item.citations.length > 0}
-                        <div class="mt-1.5 flex flex-wrap gap-1.5 font-mono text-xs leading-none text-ink-400 dark:text-cream-500">
+                        <div class="mt-1.5 flex flex-wrap gap-1.5 font-ui text-xs leading-none text-ink-400 dark:text-cream-500">
                           <span class="text-ink-300 dark:text-cream-500">↳</span>
                           {#each item.citations as citation, ci}
                             {#if citation.url}
@@ -483,7 +483,7 @@
                         </div>
                       {/if}
                       {#if i === interestRows.length - 1}
-                        <p class="mt-2 font-mono text-xs leading-tight text-ink-400 dark:text-cream-500">
+                        <p class="mt-2 font-ui text-xs leading-tight text-ink-400 dark:text-cream-500">
                           [IP] = in progress
                         </p>
                       {/if}
@@ -524,9 +524,10 @@
     gap: var(--space-1-5);
     border-radius: var(--radius-control);
     color: theme("colors.ink.500");
-    font-family: var(--font-mono);
+    font-family: var(--font-ui);
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 400;
+    letter-spacing: 0.01em;
     line-height: 1;
     cursor: pointer;
     transition: color var(--motion-base) var(--ease-standard);
@@ -564,7 +565,7 @@
     flex: none;
     width: 44px;
     height: 28px;
-    font-family: var(--font-mono);
+    font-family: var(--font-ui);
     font-size: 0.75rem;
     line-height: 1;
   }
@@ -634,7 +635,7 @@
     opacity: 1;
   }
   .interest-quadrant {
-    font-family: var(--font-mono);
+    font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 400;
     color: theme("colors.ink.400");
@@ -789,7 +790,7 @@
     transform: translateX(-50%);
     top: calc(100% + 3px);
     z-index: var(--layer-tooltip);
-    font-family: var(--font-mono);
+    font-family: var(--font-ui);
     font-size: 0.75rem;
     white-space: nowrap;
     pointer-events: none;

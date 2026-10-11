@@ -53,14 +53,23 @@
     "/audio/Two%20Door%20Cinema%20Club%20-%20What%20You%20Know%20%5B_Ys8gLkfW6M%5D.mp3",
   ];
 
+  // Shuffle play: tracks come off a shuffled queue, so every song plays once
+  // before any repeats. A fresh shuffle never opens with the song that just
+  // ended.
+  let shuffleQueue: number[] = [];
+
   function getNextSampleIndex() {
     if (musicSamples.length <= 1) return 0;
 
-    let nextIndex = currentSampleIndex;
-    while (nextIndex === currentSampleIndex) {
-      nextIndex = Math.floor(Math.random() * musicSamples.length);
+    if (shuffleQueue.length === 0) {
+      shuffleQueue = musicSamples.map((_, i) => i);
+      for (let i = shuffleQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffleQueue[i], shuffleQueue[j]] = [shuffleQueue[j], shuffleQueue[i]];
+      }
+      if (shuffleQueue[0] === currentSampleIndex) shuffleQueue.push(shuffleQueue.shift()!);
     }
-    return nextIndex;
+    return shuffleQueue.shift()!;
   }
 
   // play() rejects when the browser blocks playback before a user gesture.
@@ -82,7 +91,8 @@
     if (!audioElement) {
       audioElement = new Audio(musicSamples[nextIndex]);
       audioElement.volume = 0.3;
-      audioElement.loop = true;
+      // When a song ends, shuffle on to the next one.
+      audioElement.addEventListener("ended", skipMusic);
     } else {
       audioElement.pause();
       audioElement.src = musicSamples[nextIndex];
@@ -115,13 +125,13 @@
       class="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-y-4"
     >
       <!-- Left side - DC Time -->
-      <div class="space-y-1 text-center font-mono text-xs lowercase text-ink-500 dark:text-cream-500 sm:text-left">
+      <div class="space-y-1 text-center font-ui text-xs lowercase text-ink-500 dark:text-cream-500 sm:text-left">
         <div class="tabular-nums">{dcTime.toLowerCase()}</div>
         <div>washington, dc</div>
       </div>
 
       <!-- Right side - Last updated + Music player -->
-      <div class="flex flex-col items-center space-y-1 font-mono text-xs lowercase text-ink-500 dark:text-cream-500 sm:items-end">
+      <div class="flex flex-col items-center space-y-1 font-ui text-xs lowercase text-ink-500 dark:text-cream-500 sm:items-end">
         <div>
           updated {buildDate}
         </div>

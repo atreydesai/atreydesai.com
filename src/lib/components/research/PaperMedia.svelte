@@ -130,7 +130,7 @@
                 </div>
 
                 <div class="mt-4 max-w-xl text-center text-sm text-cream-300">
-                    <p class="mb-1 font-medium text-cream-100">{paper.title}</p>
+                    <p class="mb-1 text-cream-100">{paper.title}</p>
                     {#if paper.imageDescription}
                         <p>{paper.imageDescription}</p>
                     {/if}

@@ -196,7 +196,7 @@
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
         bind:this={dialogElement}
-        class="layer-modal fixed inset-0 flex items-center justify-center bg-ink-900/95"
+        class="photo-lightbox layer-modal fixed inset-0 flex items-center justify-center bg-ink-900/95"
         on:click={closeLightbox}
         on:keydown={(e) => { trapFocus(e, dialogElement); if (e.key === "Escape") closeLightbox(); if (e.key === "ArrowRight") nextPhoto(); if (e.key === "ArrowLeft") prevPhoto(); }}
         role="dialog"
@@ -264,9 +264,12 @@
                     "portrait"}
                 class:lightbox-square={currentPhoto.orientation === "square"}
             >
-                <!-- Loading placeholder -->
+                <!-- Loading placeholder. The pulse is dropped once the photo
+                     lands: a running opacity animation beats `opacity-0`, so
+                     leaving it on kept the placeholder flashing over the photo. -->
                 <div
-                    class="absolute inset-0 animate-pulse bg-ink-700 transition-opacity duration-300"
+                    class="pointer-events-none absolute inset-0 bg-ink-700 transition-opacity duration-300"
+                    class:animate-pulse={!lightboxImageLoaded}
                     class:opacity-0={lightboxImageLoaded}
                 ></div>
 
@@ -285,7 +288,7 @@
             {#if currentPhoto.exif}
                 <div class="photo-exif mt-4 text-cream-300 text-sm text-center space-y-1">
                     {#if currentPhoto.caption}
-                        <p class="font-medium text-cream-100">
+                        <p class="text-cream-100">
                             {currentPhoto.caption}
                         </p>
                     {/if}
@@ -311,7 +314,7 @@
         <!-- Photo counter -->
         {#if photos.length > 1}
             <div
-                class="absolute bottom-4 left-1/2 -translate-x-1/2 text-cream-400 text-sm"
+                class="absolute bottom-4 left-1/2 -translate-x-1/2 font-ui text-cream-400 text-sm tabular-nums"
                 aria-hidden="true"
             >
                 {currentPhotoIndex + 1} / {photos.length}
@@ -322,10 +325,16 @@
 
 <style>
     /* The lightbox is dark in both themes, so the drawn separators in its
-       caption take a dark paper and the lighter plate. */
+       caption take a dark paper and the lighter plate. The caption and
+       settings are interface text, with lining figures for the numbers. */
     .photo-exif {
         --mark-paper: theme("colors.ink.900");
         --mark-plate: #f07563;
+    }
+
+    .photo-exif p {
+        font-family: var(--font-ui);
+        font-variant-numeric: lining-nums tabular-nums;
     }
 
     .photo-tile {

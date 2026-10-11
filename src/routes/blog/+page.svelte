@@ -28,7 +28,7 @@
                 >
                     <div class="blog-row-heading">
                     <h2
-                        class="blog-row-title type-item-heading text-ink-900 transition-colors duration-200 group-hover:text-accent-dark dark:text-cream-100 dark:group-hover:text-accent-light"
+                        class="type-item-heading text-ink-900 transition-colors duration-200 group-hover:text-accent-dark dark:text-cream-100 dark:group-hover:text-accent-light"
                     >{post.title}{#if post.externalUrl}<span
                             class="external-post-indicator text-ink-400 transition-colors duration-200 group-hover:text-accent-dark dark:text-ink-400 dark:group-hover:text-accent-light"
                         ><span class="external-post-icon" aria-hidden="true"
@@ -102,15 +102,6 @@
         align-items: center;
         gap: var(--space-2);
         min-width: 0;
-    }
-
-    /* Optima ships only Regular and Bold, so type-item-heading's 600 silently
-       resolves to full Bold: too heavy for an index row. Drop to Regular and
-       synthesize the missing middle weight with a hairline stroke. currentColor
-       keeps it in step with the accent shift on hover and with dark mode. */
-    .blog-row-title {
-        font-weight: 400;
-        -webkit-text-stroke: 0.5px currentColor;
     }
 
     .blog-row-meta {

@@ -315,8 +315,8 @@ export function arcadeFont(size = 13, weight = 500) {
   const family =
     typeof document === "undefined"
       ? ""
-      : getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim();
-  return `${weight} ${size}px ${family || "monospace"}`;
+      : getComputedStyle(document.documentElement).getPropertyValue("--font-ui").trim();
+  return `${weight} ${size}px ${family || '"neue-haas-grotesk-text", Helvetica, Arial, sans-serif'}`;
 }
 
 const loopPaths = new Map<number, Path2D>();

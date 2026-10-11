@@ -245,7 +245,7 @@
                 >
                     <a
                         href="#fnref-{footnote.id}"
-                        class="footnote-backref font-medium text-accent-dark dark:text-accent-light"
+                        class="footnote-backref text-accent-dark dark:text-accent-light"
                         aria-label="Back to reference {footnote.id}"
                         on:focus={() => (hovered = footnote.id)}
                         on:blur={() => (hovered = null)}>{footnote.id}.</a
@@ -394,7 +394,7 @@
                                     href={site.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    class="link font-medium">{site.name}</a
+                                    class="link">{site.name}</a
                                 >:
                                 <span class="text-ink-500 dark:text-cream-500"
                                     >{site.description}</span
@@ -412,6 +412,28 @@
                 </p>
             </div>
         </section>
+
+        <!-- Friends of Atrey -->
+        {#if aboutData.friends?.length}
+            <section class="mb-12">
+                <h2 class="section-heading">friends of atrey</h2>
+
+                <div class="measure-reading text-ink-700 dark:text-cream-300">
+                    <ul class="space-y-0.5 text-sm">
+                        {#each aboutData.friends as friend}
+                            <li>
+                                <a
+                                    href={friend.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="link">{friend.name}</a
+                                >
+                            </li>
+                        {/each}
+                    </ul>
+                </div>
+            </section>
+        {/if}
 
         <!-- Things I'm thinking about -->
         <section class="mb-12">
@@ -437,7 +459,7 @@
                     >
                         <a
                             href="#fnref-{footnote.id}"
-                            class="footnote-backref font-medium text-accent-dark dark:text-accent-light"
+                            class="footnote-backref text-accent-dark dark:text-accent-light"
                             aria-label="Back to reference {footnote.id}"
                             >{footnote.id}.</a
                         >
@@ -525,7 +547,7 @@
 
     /* Live figures inside footnote 7 (injected via @html). */
     :global(.fn-stat) {
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         letter-spacing: -0.01em;
         color: theme("colors.accent.DEFAULT");
     }

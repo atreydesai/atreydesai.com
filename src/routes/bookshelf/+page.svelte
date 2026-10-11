@@ -466,7 +466,13 @@
         selectedTag = selectedTag === tag ? "all" : tag;
     }
 
+    // Selecting the open entry again closes it, so a second click on the
+    // same row puts the shelf back the way it was.
     function selectBook(bookId: string, trigger?: HTMLElement | null) {
+        if (selectedBookId === bookId) {
+            closeDrawer();
+            return;
+        }
         selectedBookId = bookId;
         if (trigger) sheetTrigger = trigger;
     }
@@ -589,7 +595,7 @@
     heading="bookshelf"
 >
     <svelte:fragment slot="deck">
-        What I've read and watched, plus a shelf of what I haven't gotten to
+        What I've read and watched, plus what I haven't gotten to
         yet.
     </svelte:fragment>
 
@@ -762,7 +768,7 @@
             <div class="surface-ledger hidden max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 md:block dark:border-ink-800 dark:bg-ink-900/45">
                 <div class="w-full max-w-full overflow-x-auto">
                     <table class="w-full min-w-[1080px] table-fixed text-sm">
-                        <thead class="border-b border-ink-200/90 bg-cream-200/60 font-mono text-xs font-normal text-ink-500 [&_th]:font-normal dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
+                        <thead class="border-b border-ink-200/90 bg-cream-200/60 font-ui text-xs font-normal text-ink-500 [&_th]:font-normal dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
                             <tr>
                                 <th class="w-[35%] px-3 py-2 text-left" aria-sort={ariaSort("title")}>
                                     <button
@@ -844,13 +850,13 @@
                                         </button>
                                         {#if hoveredRatingLegend === "enjoyment"}
                                             <div
-                                                class="surface-tooltip layer-tooltip pointer-events-none absolute left-[7px] top-full mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 dark:border-ink-700 dark:bg-ink-900"
+                                                class="surface-tooltip layer-tooltip pointer-events-none absolute left-[7px] top-full mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-ui text-xs font-normal leading-5 dark:border-ink-700 dark:bg-ink-900"
                                                 role="tooltip"
                                             >
-                                                <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">
+                                                <div class="text-ink-900 dark:text-cream-100">
                                                     {ratingLegend.enjoyment.title}
                                                 </div>
-                                                <div class="mt-1 font-mono font-normal text-ink-600 dark:text-cream-400">
+                                                <div class="mt-1 font-normal text-ink-600 dark:text-cream-400">
                                                     {ratingLegend.enjoyment.body}
                                                 </div>
                                             </div>
@@ -880,13 +886,13 @@
                                         </button>
                                         {#if hoveredRatingLegend === "importance"}
                                             <div
-                                                class="surface-tooltip layer-tooltip pointer-events-none absolute left-[7px] top-full mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-mono text-xs font-normal leading-5 dark:border-ink-700 dark:bg-ink-900"
+                                                class="surface-tooltip layer-tooltip pointer-events-none absolute left-[7px] top-full mt-2 w-64 -translate-x-1/2 border border-ink-200 bg-cream-50 p-3 text-left font-ui text-xs font-normal leading-5 dark:border-ink-700 dark:bg-ink-900"
                                                 role="tooltip"
                                             >
-                                                <div class="font-mono font-semibold text-ink-900 dark:text-cream-100">
+                                                <div class="text-ink-900 dark:text-cream-100">
                                                     {ratingLegend.importance.title}
                                                 </div>
-                                                <div class="mt-1 font-mono font-normal text-ink-600 dark:text-cream-400">
+                                                <div class="mt-1 font-normal text-ink-600 dark:text-cream-400">
                                                     {ratingLegend.importance.body}
                                                 </div>
                                             </div>
@@ -994,7 +1000,7 @@
                                                 {book.medium}
                                             </span>
                                         {:else}
-                                            <span class="font-mono text-xs text-ink-400 dark:text-ink-300">--</span>
+                                            <span class="font-ui text-xs text-ink-400 dark:text-ink-300">--</span>
                                         {/if}
                                     </td>
                                     <td class="px-3 py-2.5 text-center align-middle">
@@ -1009,7 +1015,7 @@
                                             type="importance"
                                         />
                                     </td>
-                                    <td class="px-3 py-2.5 align-middle font-mono text-xs text-ink-500 dark:text-cream-400">
+                                    <td class="px-3 py-2.5 align-middle font-ui text-xs tabular-nums text-ink-500 dark:text-cream-400">
                                         {shortDate(book.dateAdded)}
                                     </td>
                                     <td class="px-3 py-2.5 align-middle">
@@ -1311,10 +1317,12 @@
     }
 
     /* The title is a real button so the row has a keyboard path, but it should
-       still read as the row's text, not as a control. */
+       still read as the row's text, not as a control. Titles are scanned, not
+       read, so they take the interface face at the row's size, regular. */
     .row-open,
     .card-open {
         font: inherit;
+        font-family: var(--font-ui);
         color: inherit;
         background: none;
         border: 0;
@@ -1395,7 +1403,7 @@
         color: theme("colors.ink.900");
         background: transparent;
         border: 0;
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }
@@ -1453,7 +1461,7 @@
         gap: var(--space-2) var(--space-4);
         margin-top: var(--space-3);
         color: theme("colors.ink.500");
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
         font-variant-numeric: lining-nums tabular-nums;
