@@ -40,6 +40,8 @@ researchInterests:
       summary: "Study how people and agents adapt to each other over time."
       question: "How do humans and agents form accurate expectations of one another and adapt to each other over repeated interaction (human-AI quizbowl, collaborative writing, multi-agent systems)?"
       citations:
+        - label: "authoring"
+          url: "/research/#adversarial-multimodal-questions"
         - label: "IP2"
           url: null
     - title: "Verify"
@@ -54,6 +56,8 @@ researchInterests:
           url: "/research/#mcq-artifacts"
         - label: "distractors"
           url: "/research/#llm-distractors"
+        - label: "authoring"
+          url: "/research/#adversarial-multimodal-questions"
         - label: "IP1"
           url: null
 
