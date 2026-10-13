@@ -1,6 +1,6 @@
 ---
 id: llm-distractors
-title: "Quick, Create a Distractor! Evaluating LLM Distractors for Multiple-Choice Benchmarks"
+title: "Harder Benchmarks Are Not Always Better: Evaluating LLM Distractors for Multiple-Choice Benchmarks"
 authors:
   - Atrey Desai
   - Nishant Balepur
@@ -16,7 +16,7 @@ blog: null
 tags:
   - NLP
   - Evaluation
-tldr: "Researchers use LLMs to create wrong answers (i.e., distractors) for multiple-choice question answering (MCQA) datasets, but whether LLM distractors can replace human-guided ones is unclear. We test this in three strong LLMs and three MCQA benchmarks under two tasks: distractor generation from question-answer pairs and distractor extension from MCQs. We score MCQs via metrics in education research, showing: 1) LLM distractors have trade-offs in how well they challenge test-taker models, discern model ranks, and adhere to writing quality; 2) LLM distractors rarely match the original MCQA benchmark items, so benefits are unlikely from contamination alone; and 3) LLMs struggle to balance plausibility, option length, and simulated mistakes, which humans can help monitor. From these analyses, we outline steps for rigorously using LLMs to scale MCQA benchmarks."
+tldr: "LLM-generated distractors often make multiple-choice benchmarks harder, but difficulty alone does not make them better evaluations. Across three LLMs and three benchmarks, generated distractors rarely improve discrimination between models and can sacrifice writing quality. Adding distractors can lower accuracy without better separating model ranks. We outline best practices for monitoring plausibility, option length, and simulated mistakes when using LLMs to construct benchmarks."
 awards: []
 preprint: true
 featured: true

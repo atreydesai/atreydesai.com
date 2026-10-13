@@ -1,6 +1,6 @@
 // Live explainers for research papers, keyed by paper id. PaperMedia renders
 // the paper's explainer as its card media and lightbox; a paper without an
-// entry shows no media.
+// entry falls back to its static figure when one is available.
 import type { Component } from "svelte";
 import ArtifactsExplainer from "./ArtifactsExplainer.svelte";
 import BenchMarkerExplainer from "./BenchMarkerExplainer.svelte";

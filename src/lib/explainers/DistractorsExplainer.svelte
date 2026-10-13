@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	// Quick, Create a Distractor! (Desai, Balepur & Rudinger 2026)
+	// Harder Benchmarks Are Not Always Better (Desai, Balepur & Rudinger 2026)
 	//
 	// Beats: the question -> humans write the wrong answers -> LLMs create
 	// them, fast -> both scored on the paper's three metrics -> takeaway.

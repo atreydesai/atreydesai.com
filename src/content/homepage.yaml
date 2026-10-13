@@ -52,7 +52,7 @@ researchInterests:
           url: "/research/#benchmarker"
         - label: "artifacts"
           url: "/research/#mcq-artifacts"
-        - label: "quick"
+        - label: "distractors"
           url: "/research/#llm-distractors"
         - label: "IP1"
           url: null

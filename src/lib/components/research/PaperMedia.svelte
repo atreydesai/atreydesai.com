@@ -11,6 +11,7 @@
         id: string;
         title: string;
         imageDescription: string | null;
+        image?: string | null;
     };
 
     export let isPreview = false;
@@ -68,7 +69,7 @@
 
 <svelte:window on:keydown={(e) => lightboxOpen && e.key === "Escape" && closeLightbox()} />
 
-{#if Explainer}
+{#if Explainer || paper.image}
     <div
         class={`relative w-full md:flex-shrink-0 ${isPreview ? "md:w-40 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-40"}`}
     >
@@ -76,8 +77,9 @@
             type="button"
             on:click={(e) => openLightbox(e.currentTarget)}
             class={`relative block aspect-square w-full overflow-hidden rounded-lg border border-ink-200/80 bg-cream-50 transition-transform duration-300 hover:scale-[1.01] dark:border-ink-700 dark:bg-ink-800 ${isPreview ? "md:mt-1" : ""}`}
-            aria-label={`Open the animated explainer for ${paper.title}`}
+            aria-label={`Open the ${Explainer ? "animated explainer" : "figure"} for ${paper.title}`}
         >
+            {#if Explainer}
             <svelte:component
                 this={Explainer}
                 size="card"
@@ -88,11 +90,14 @@
             <!-- While another card has the viewer's attention, this one
                  rests on its first frame, very faintly darkened. -->
             <span class="explainer-dim" class:explainer-dim-on={resting} aria-hidden="true"></span>
+            {:else if paper.image}
+                <img src={paper.image} alt={paper.imageDescription ?? paper.title} class="h-full w-full object-contain bg-white p-1" loading="lazy" />
+            {/if}
         </button>
     </div>
 {/if}
 
-{#if lightboxOpen && Explainer && browser}
+{#if lightboxOpen && (Explainer || paper.image) && browser}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div class="lightbox-portal" use:portal>
         <div
@@ -102,7 +107,7 @@
             on:keydown={(e) => { trapFocus(e, dialogElement); if (e.key === "Escape") closeLightbox(); }}
             role="dialog"
             aria-modal="true"
-            aria-label="Explainer lightbox"
+            aria-label={Explainer ? "Explainer lightbox" : "Paper figure lightbox"}
             tabindex="-1"
         >
             <button
@@ -122,11 +127,15 @@
             >
                 <!-- Sized to leave room for its controls within 80vh. -->
                 <div class="w-[min(560px,90vw,62vh)]">
+                    {#if Explainer}
                     <svelte:component
                         this={Explainer}
                         size="stage"
                         label={paper.imageDescription ?? paper.title}
                     />
+                    {:else if paper.image}
+                        <img src={paper.image} alt={paper.imageDescription ?? paper.title} class="w-full rounded-lg bg-white" />
+                    {/if}
                 </div>
 
                 <div class="mt-4 max-w-xl text-center text-sm text-cream-300">

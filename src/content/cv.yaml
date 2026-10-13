@@ -57,7 +57,8 @@ publications:
   groups:
     - heading: Under Submission
       items:
-        - '<span class="cv-title">Quick, Create a Distractor! Evaluating LLM Distractors for Multiple-Choice Benchmarks</span><br />Under review at ACL Rolling Review (ARR)<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Nishant Balepur & Rachel Rudinger.'
+        - '<span class="cv-title">Harder Benchmarks Are Not Always Better: Evaluating LLM Distractors for Multiple-Choice Benchmarks</span><br />Under review at ACL Rolling Review (ARR)<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Nishant Balepur & Rachel Rudinger.'
+        - '<a href="/papers/adversarial-multimodal-questions.pdf" class="link"><span class="cv-title">Asking About Occluded Content Marks Adversarial Multimodal Questions</span></a><br />Under review at ACL Rolling Review (ARR)<br />HyoJung Han*, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>*, Ishan Upadhyay, Tianyi Zheng, Eve Fleisig, Aparna Garimella, Marine Carpuat & Jordan Boyd-Graber.'
     - heading: Peer-reviewed Proceedings
       items:
         - '<a href="https://doi.org/10.1145/3850160" class="link"><span class="cv-title">A Preview of Computational Animal Linguistics</span></a>.<br />ACM Computing Surveys<br />Tuan Dang*, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>*, Hridayesh Lekhak*, Tirza Panunto*, Lindsay Pike*, Theron Wang* & Kenny Zhu*.'

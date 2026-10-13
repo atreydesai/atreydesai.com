@@ -72,7 +72,7 @@
         {/if}
 
         <div
-            class={`flex flex-col gap-4 ${explainers[paper.id] ? "md:flex-row md:items-start md:gap-5" : ""}`}
+            class={`flex flex-col gap-4 ${explainers[paper.id] || paper.image ? "md:flex-row md:items-start md:gap-5" : ""}`}
         >
             <div class="min-w-0 flex-1">
                 <h3

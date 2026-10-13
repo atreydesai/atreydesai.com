@@ -26,6 +26,7 @@ export interface Paper {
     highlight: boolean;  // Special emphasis styling
     priority: number;    // Lower number = higher priority for featured ordering
     imageDescription: string | null;
+    image?: string | null;
     classProject?: boolean;  // Distinguishes class projects from regular papers
 }
 
