@@ -178,7 +178,7 @@
 
 <Seo
   title="Atrey Desai"
-  description="CS & Linguistics undergraduate at the University of Maryland studying calibrated trust in language-model agents, LLM evaluation, and multimodal reasoning."
+  description="I am a final-year undergraduate studying computer science and linguistics at the University of Maryland. I am fortunate to be advised by Professors Rachel Rudinger, Jordan Boyd-Graber, and Mohit Iyyer."
   url="https://atreydesai.com/"
   pageType="ProfilePage"
   about={true}

@@ -14,7 +14,7 @@
 
   export let title = "Atrey Desai";
   export let description =
-    "CS & Linguistics undergraduate at the University of Maryland studying calibrated trust in language-model agents, LLM evaluation, and multimodal reasoning.";
+    "I am a final-year undergraduate studying computer science and linguistics at the University of Maryland. I am fortunate to be advised by Professors Rachel Rudinger, Jordan Boyd-Graber, and Mohit Iyyer.";
   // Social cards use a 1.91:1 crop of the portrait; the square original is the
   // Person's own image in structured data.
   export let image = "/og-image-wide.jpg";
