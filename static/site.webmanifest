@@ -1,0 +1,13 @@
+{
+  "name": "Atrey Desai",
+  "short_name": "Atrey Desai",
+  "description": "Personal site of Atrey Desai: research, publications, CV, writing, photography, and bookshelf.",
+  "start_url": "/",
+  "display": "browser",
+  "background_color": "#FDF8F3",
+  "theme_color": "#FDF8F3",
+  "icons": [
+    { "src": "/favicon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/favicon-256.png", "sizes": "256x256", "type": "image/png" }
+  ]
+}

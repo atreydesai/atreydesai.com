@@ -1,9 +1,29 @@
 # robots.txt for atreydesai.com
+#
+# Public pages are open to search engines and AI agents alike. Agent-oriented
+# guidance lives in /llms.txt, and every page serves Markdown on request
+# (Accept: text/markdown).
+
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /dev/
 
-# Sitemap location
+# Named AI crawlers and assistants. A named group replaces the * group for that
+# crawler, so the Disallow rules are repeated here.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-User
+User-agent: Claude-SearchBot
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+Allow: /
+Disallow: /api/
+Disallow: /dev/
+
 Sitemap: https://atreydesai.com/sitemap.xml
-
-# Crawl-delay (optional, for polite crawlers)
-Crawl-delay: 1

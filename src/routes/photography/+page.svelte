@@ -133,8 +133,9 @@
 
 <PageShell
     title="Photography | Atrey Desai"
-    description="Photography portfolio by Atrey Desai. Follow @framedbyatrey on Instagram for more."
+    description="Photography by Atrey Desai. More on Instagram at @framedbyatrey."
     url="https://atreydesai.com/photography/"
+    pageType="CollectionPage"
     width="wide"
     heading="photography"
     headerVariant="title-only"

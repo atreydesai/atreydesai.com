@@ -222,8 +222,10 @@
 
 <Seo
     title="About | Atrey Desai"
-    description="Learn about Atrey Desai - CS & Linguistics student at University of Maryland, researching NLP at CLIP Lab under Prof. Rudinger and Prof. Boyd-Graber."
+    description="About Atrey Desai: a CS & Linguistics undergraduate at the University of Maryland (CLIP Lab), advised by Rachel Rudinger, Jordan Boyd-Graber, and Mohit Iyyer."
     url="https://atreydesai.com/about/"
+    pageType="AboutPage"
+    about={true}
 />
 
 <!-- Centered layout container with footnotes on the side -->

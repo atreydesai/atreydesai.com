@@ -42,10 +42,20 @@
   });
 </script>
 
-<div class="boba-scrim boba-ui" role="dialog" aria-modal="true" aria-labelledby="boba-menu-title">
+<!-- Clicking the scrim (outside the card) dismisses the menu; Esc and the
+     Close button do the same for keyboard users. -->
+<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-noninteractive-element-interactions -->
+<div
+  class="boba-scrim boba-ui"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="boba-menu-title"
+  on:click={(event) => {
+    if (event.target === event.currentTarget) dispatch("close");
+  }}
+>
   <div bind:this={card} class="boba-card boba-riso menu" tabindex="-1" style="--tilt: -1deg">
     <h2 id="boba-menu-title" class="boba-title">today’s menu</h2>
-    <p class="boba-deck">Four small games about boba. Pick your poison.</p>
 
     <!-- Priced like a menu board: each game's best score sits where the
          price would be. -->
@@ -68,16 +78,13 @@
             <span class="text">
               <span class="line">
                 <span class="name">{game.name}</span>
-                <span class="leader" aria-hidden="true"></span>
                 <span class="best">
-                  {bests[game.id] ? `best ${bests[game.id]}` : "not played yet"}
+                  {bests[game.id] ? `best ${bests[game.id]}` : ""}
                 </span>
               </span>
-              <span class="blurb">
-                {playable[game.id] === false
-                  ? "Needs a mouse, so it only opens on a computer."
-                  : game.blurb}
-              </span>
+              {#if playable[game.id] === false}
+                <span class="blurb">Needs a mouse, so it only opens on a computer.</span>
+              {/if}
             </span>
             <kbd class="key" aria-hidden="true">{game.key}</kbd>
           </button>
@@ -90,7 +97,6 @@
         Close
       </button>
     </div>
-    <p class="boba-keys boba-keys-row"><kbd>1</kbd>–<kbd>4</kbd> pick <kbd>Esc</kbd> close</p>
   </div>
 </div>
 
@@ -100,7 +106,7 @@
   }
 
   .list {
-    margin: var(--space-6) 0 0;
+    margin: var(--space-4) 0 0;
     padding: 0;
     list-style: none;
     border-top: 1px dashed var(--b-rule);
@@ -171,14 +177,8 @@
     white-space: nowrap;
   }
 
-  .leader {
-    flex: 1;
-    min-width: var(--space-4);
-    border-bottom: 1px dotted var(--b-muted);
-    opacity: 0.6;
-  }
-
   .best {
+    margin-left: auto;
     color: var(--b-muted);
     font-size: 0.75rem;
     line-height: 1.25;

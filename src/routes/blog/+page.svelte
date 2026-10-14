@@ -8,14 +8,15 @@
 
 <PageShell
     title="Blog | Atrey Desai"
-    description="Blog posts and writings by Atrey Desai on AI, research, and more."
+    description="Essays and notes by Atrey Desai on research, language models, and interactive experiments."
     url="https://atreydesai.com/blog/"
+    pageType="CollectionPage"
     heading="blog"
 >
     <!-- Blog posts -->
     <ul class="stagger-children">
         {#each posts as post (post.id)}
-            {@const classification = post.tags.find((tag) => tag === "fun" || tag === "academic")}
+            {@const classification = post.tags.find((tag) => tag === "fun" || tag === "academic" || tag === "tools")}
             <li class="blog-row">
                 <a
                     href={post.externalUrl ?? `/blog/${post.id}/`}

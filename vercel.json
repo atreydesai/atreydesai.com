@@ -27,8 +27,13 @@
       "permanent": true
     },
     {
+      "source": "/cv.pdf",
+      "destination": "https://atreydesai.com/atreydesai_cv.pdf",
+      "permanent": true
+    },
+    {
       "source": "/resume.pdf",
-      "destination": "https://atreydesai.com/cv.pdf",
+      "destination": "https://atreydesai.com/atreydesai_cv.pdf",
       "permanent": true
     }
   ],

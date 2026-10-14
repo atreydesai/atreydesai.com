@@ -49,9 +49,10 @@
 </script>
 
 <PageShell
-    title="CV | Atrey Desai"
-    description="Curriculum Vitae of Atrey Desai - undergraduate researcher at UMD with experience at Learn Prompting, CLIP Lab, Brown University, and UT Arlington."
+    title="Curriculum Vitae | Atrey Desai"
+    description="CV of Atrey Desai: education at UMD; research at CLIP Lab, UT Arlington, Learn Prompting, and Brown; plus publications, talks, awards, and service."
     url="https://atreydesai.com/cv/"
+    pageType="ProfilePage"
     heading="curriculum vitae"
 >
     <svelte:fragment slot="aside">
@@ -59,7 +60,7 @@
             <span>updated {data.cvLastUpdated}</span>
         {/if}
         <a
-            href="/cv.pdf"
+            href="/atreydesai_cv.pdf"
             download="Atrey_Desai_CV.pdf"
             class="control-text control-accent"
             on:mouseenter={() => (hoveredDownload = true)}
@@ -75,7 +76,7 @@
         class="surface-document w-full border border-cream-200 dark:border-ink-700"
     >
         <iframe
-            src="/cv.pdf"
+            src="/atreydesai_cv.pdf"
             class="w-full h-[80vh] min-h-[600px]"
             title="Atrey Desai CV"
         ></iframe>

@@ -6,6 +6,8 @@
   export let description: string;
   export let url: string;
   export let type: string = "website";
+  export let pageType: string = "WebPage";
+  export let jsonLd: object[] = [];
 
   // Standard page geometry and header rhythm. Wide is reserved for visual
   // collections; standard is the editorial reading column. The header itself
@@ -29,7 +31,7 @@
     ($$slots.deck ? "deck" : $$slots.aside ? "action" : "title-only");
 </script>
 
-<Seo {title} {description} {url} {type} />
+<Seo {title} {description} {url} {type} {pageType} {jsonLd} />
 
 <div class="page-shell {widthClass}">
   {#if $$slots.header}

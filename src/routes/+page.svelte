@@ -178,8 +178,10 @@
 
 <Seo
   title="Atrey Desai"
-  description="Atrey Desai - undergraduate researcher at University of Maryland studying NLP, AI safety, and computational linguistics. Research on benchmark evaluation and multimodal reasoning."
+  description="CS & Linguistics undergraduate at the University of Maryland studying calibrated trust in language-model agents, LLM evaluation, and multimodal reasoning."
   url="https://atreydesai.com/"
+  pageType="ProfilePage"
+  about={true}
 />
 
 <div class="page-shell page-shell-standard">
@@ -188,7 +190,7 @@
     <div
       class="flex flex-col gap-8 md:grid md:grid-cols-[1fr_minmax(0,250px)]"
     >
-      <div class="md:col-start-1">
+      <div class="md:col-start-1 md:flex md:flex-col">
         <h1 class="type-page-title mb-4 text-ink-900 dark:text-cream-100">
           hi, i'm <HyperText class="ml-[0.18em]" text="atrey desai" />
         </h1>
@@ -204,7 +206,7 @@
           {/each}
         </div>
 
-        <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 font-ui text-sm">
+        <div class="mt-16 md:mt-auto md:pt-6 flex flex-wrap items-center gap-x-4 gap-y-1 font-ui text-sm">
           {#each socialLinks as link}
             <a
               href={link.href}
@@ -545,6 +547,7 @@
     border-radius: var(--radius-control);
     color: inherit;
     font: inherit;
+    font-family: var(--font-prose);
     cursor: pointer;
     transition: color var(--motion-base) var(--ease-standard);
   }

@@ -7,6 +7,8 @@
     import { marked } from "marked";
     import { withMarks } from "$lib/marks";
     import { ArrowLeft, CalendarDays } from "@jis3r/icons";
+    import { SITE_URL } from "$lib/seo";
+    import { blogPostingStructuredData } from "$lib/structured-data";
     import type { PageData } from "./$types";
 
     export let data: PageData;
@@ -63,6 +65,24 @@
     description={post.excerpt}
     url="https://atreydesai.com/blog/{post.id}/"
     type="article"
+    pageType="WebPage"
+    breadcrumbs={[
+        { name: "Home", url: `${SITE_URL}/` },
+        { name: "Blog", url: `${SITE_URL}/blog/` },
+        { name: post.title, url: `${SITE_URL}/blog/${post.id}/` },
+    ]}
+    published={post.date}
+    tags={post.tags}
+    jsonLd={[
+        blogPostingStructuredData({
+            url: `${SITE_URL}/blog/${post.id}/`,
+            title: post.title,
+            description: post.excerpt,
+            imageUrl: `${SITE_URL}/og-image-wide.jpg`,
+            datePublished: post.date,
+            tags: post.tags,
+        }),
+    ]}
     noindex={post.unlisted === true || post.published === false}
 />
 

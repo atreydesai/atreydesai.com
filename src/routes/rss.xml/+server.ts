@@ -16,18 +16,22 @@ export const GET: RequestHandler = () => {
       <guid isPermaLink="true">${escapeXml(url)}</guid>
       <description>${escapeXml(post.excerpt)}</description>
       <pubDate>${formatUtcDate(post.date)}</pubDate>
+      <dc:creator>Atrey Desai</dc:creator>
       ${post.tags.map((tag) => `<category>${escapeXml(tag)}</category>`).join('\n      ')}
     </item>`;
         })
         .join('');
 
+    const lastBuildDate = posts.length > 0 ? formatUtcDate(posts[0].date) : new Date().toUTCString();
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>Atrey Desai - Blog</title>
     <link>${SITE_URL}/blog/</link>
-    <description>Blog posts and writings by Atrey Desai on AI, research, and more.</description>
+    <description>Essays and notes by Atrey Desai on research, language models, and interactive experiments.</description>
     <language>en-us</language>
+    <lastBuildDate>${lastBuildDate}</lastBuildDate>
     <atom:link href="${SITE_URL}/rss.xml" rel="self" type="application/rss+xml" />
     ${items}
   </channel>

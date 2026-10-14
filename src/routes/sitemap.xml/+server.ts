@@ -7,8 +7,6 @@ export const prerender = true;
 
 type SitemapPage = {
     path: string;
-    changefreq: string;
-    priority: string;
     sources: string[];
 };
 
@@ -19,38 +17,28 @@ const postSourcesById = Object.fromEntries(
     Object.entries(postModules).map(([path, mod]) => [String(mod.id), toGitPath(path)])
 );
 
-// Static pages with their crawl hints. `sources` lists the files/directories
-// that materially change each page's rendered content, so <lastmod> is not just
-// the deploy/build date.
+// Static pages. `sources` lists the files/directories that materially change
+// each page's rendered content, so <lastmod> is not just the deploy/build date.
+// <changefreq> and <priority> are omitted: Google ignores both.
 const pages: SitemapPage[] = [
     {
         path: '/',
-        changefreq: 'weekly',
-        priority: '1.0',
         sources: ['src/routes/+page.svelte', 'src/content/homepage.yaml', 'src/content/papers'],
     },
     {
         path: '/about/',
-        changefreq: 'monthly',
-        priority: '0.8',
         sources: ['src/routes/about/+page.svelte', 'src/content/about.yaml'],
     },
     {
         path: '/research/',
-        changefreq: 'weekly',
-        priority: '0.9',
         sources: ['src/routes/research/+page.svelte', 'src/content/papers', 'src/content/talks.yaml'],
     },
     {
         path: '/blog/',
-        changefreq: 'weekly',
-        priority: '0.8',
         sources: ['src/routes/blog/+page.svelte', 'src/content/posts'],
     },
     {
         path: '/photography/',
-        changefreq: 'monthly',
-        priority: '0.7',
         sources: [
             'src/routes/photography/+page.svelte',
             'src/routes/photography/+page.server.ts',
@@ -59,8 +47,6 @@ const pages: SitemapPage[] = [
     },
     {
         path: '/bookshelf/',
-        changefreq: 'weekly',
-        priority: '0.7',
         sources: [
             'src/routes/bookshelf/+page.svelte',
             'src/content/books',
@@ -68,14 +54,16 @@ const pages: SitemapPage[] = [
         ],
     },
     {
+        path: '/atreydesai_cv.pdf',
+        sources: ['static/atreydesai_cv.pdf'],
+    },
+    {
         path: '/cv/',
-        changefreq: 'monthly',
-        priority: '0.6',
         sources: [
             'src/routes/cv/+page.svelte',
             'src/routes/cv/+page.server.ts',
             'src/content/cv.yaml',
-            'static/cv.pdf',
+            'static/atreydesai_cv.pdf',
         ],
     },
 ];
@@ -86,8 +74,6 @@ export const GET: RequestHandler = () => {
   <url>
     <loc>${SITE_URL}${page.path}</loc>
     <lastmod>${lastModified(page.sources)}</lastmod>
-    <changefreq>${page.changefreq}</changefreq>
-    <priority>${page.priority}</priority>
   </url>`
     );
 
@@ -96,8 +82,6 @@ export const GET: RequestHandler = () => {
   <url>
     <loc>${SITE_URL}/blog/${post.id}/</loc>
     <lastmod>${lastModified([postSourcesById[post.id]].filter(Boolean), post.date)}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
   </url>`
     );
 

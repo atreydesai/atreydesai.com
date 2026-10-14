@@ -11,7 +11,7 @@ let cvDate: string;
 try {
   gitDate = execSync("git log -1 --format=%cI").toString().trim();
   cvDate =
-    execSync("git log -1 --format=%cI -- static/cv.pdf").toString().trim() ||
+    execSync("git log -1 --format=%cI -- static/atreydesai_cv.pdf").toString().trim() ||
     gitDate;
 } catch {
   gitDate = new Date().toISOString();

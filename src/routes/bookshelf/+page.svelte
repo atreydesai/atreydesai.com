@@ -589,8 +589,9 @@
 
 <PageShell
     title="Bookshelf | Atrey Desai"
-    description="Curated reading list and book recommendations by Atrey Desai - science, philosophy, fiction, and essays with personal notes and ratings."
+    description="Books, films, and Asian dramas Atrey Desai has read and watched, synced from Goodreads, Letterboxd, and MyDramaList, with ratings and a backlog."
     url="https://atreydesai.com/bookshelf/"
+    pageType="CollectionPage"
     width="wide"
     heading="bookshelf"
 >

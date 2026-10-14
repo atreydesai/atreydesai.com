@@ -10,6 +10,9 @@
         PAGE_TRANSITION_SCROLL_BUFFER_MS,
     } from "$lib/motion";
     import { formatMonthYear } from "$lib/utils/date";
+    import { paperListStructuredData } from "$lib/structured-data";
+
+    const paperJsonLd = paperListStructuredData(papers);
 
     let selectedYear: string = "all";
     let selectedTag: string = "all";
@@ -200,9 +203,11 @@
 </script>
 
 <PageShell
-    title="Research | Atrey Desai"
-    description="Publications and preprints by Atrey Desai on NLP benchmarks, multimodal reasoning, and computational animal linguistics. Research from UMD CLIP Lab, UT Arlington ACL2 Lab, and Brown University."
+    title="Research & Publications | Atrey Desai"
+    description="Papers and preprints by Atrey Desai on LLM evaluation, benchmark quality, multimodal reasoning, interpretability, and computational animal linguistics."
     url="https://atreydesai.com/research/"
+    pageType="CollectionPage"
+    jsonLd={paperJsonLd}
     heading="research"
 >
     <!-- One line of text controls on the title's baseline. "clear" comes
