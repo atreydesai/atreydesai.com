@@ -22,6 +22,7 @@ User-agent: Perplexity-User
 User-agent: Google-Extended
 User-agent: Applebot-Extended
 User-agent: CCBot
+User-agent: meta-webindexer
 Allow: /
 Disallow: /api/
 Disallow: /dev/

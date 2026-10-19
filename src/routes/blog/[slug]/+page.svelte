@@ -72,6 +72,7 @@
         { name: post.title, url: `${SITE_URL}/blog/${post.id}/` },
     ]}
     published={post.date}
+    modified={post.updated}
     tags={post.tags}
     jsonLd={[
         blogPostingStructuredData({
@@ -80,6 +81,7 @@
             description: post.excerpt,
             imageUrl: `${SITE_URL}/og-image-wide.jpg`,
             datePublished: post.date,
+            dateModified: post.updated,
             tags: post.tags,
         }),
     ]}
@@ -113,8 +115,15 @@
             <div class="type-meta flex flex-wrap items-center gap-4">
                 <span class="flex items-center gap-1 text-ink-500 dark:text-cream-500">
                     <CalendarDays size={14} class="translate-y-[0.5px]" />
-                    {formatLongDate(post.date)}
+                    <time datetime={post.date}>{formatLongDate(post.date)}</time>
                 </span>
+
+                {#if post.updated}
+                    <span class="text-ink-500 dark:text-cream-500">
+                        updated
+                        <time datetime={post.updated}>{formatLongDate(post.updated)}</time>
+                    </span>
+                {/if}
 
                 <span class="text-ink-400 dark:text-cream-500">
                     {readingTime(post.content)}

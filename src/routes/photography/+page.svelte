@@ -42,12 +42,12 @@
         return mosaicPattern[index % mosaicPattern.length];
     }
 
-    // An untitled photo is presentational: the grid <img> carries an empty
-    // alt, so the button needs its own name for screen readers and Voice
-    // Control. Captioned photos are announced by their caption.
+    // The button's name is what screen readers and Voice Control use, so it
+    // carries the photo's description; a photo with none falls back to its
+    // position.
     function tileLabel(photo: (typeof photos)[number], index: number): string {
-        return photo.caption
-            ? `View photo: ${photo.caption}`
+        return photo.alt
+            ? `View photo: ${photo.alt}`
             : `View photo ${index + 1} of ${photos.length}`;
     }
 

@@ -17,6 +17,10 @@ const MANIFEST_PATH = join(GENERATED_DIR, 'photo-manifest.json');
 // Hand-written captions, keyed by filename. Photos with no IPTC/XMP title and
 // no entry here stay untitled rather than falling back to their filename.
 const CAPTIONS_PATH = 'scripts/photo-captions.json';
+// Plain descriptions of what each photo shows, keyed by filename. These are the
+// alt text only (what a screen reader or an AI agent gets); unlike a caption
+// they never appear as a visible title.
+const ALTS_PATH = 'scripts/photo-alts.json';
 // Bump when extractPhotoMeta's output shape changes so the mtime-keyed cache
 // re-extracts instead of serving stale fields.
 const META_VERSION = 2;
@@ -134,6 +138,14 @@ async function extractMetadata() {
         // no overrides file — captions come from embedded metadata only
     }
 
+    /** @type {Record<string, string>} */
+    let altDescriptions = {};
+    try {
+        altDescriptions = JSON.parse(await readFile(ALTS_PATH, 'utf-8'));
+    } catch {
+        // no descriptions file — alt text falls back to the caption, if any
+    }
+
     /** @type {typeof cache} */
     const meta = {};
     let extracted = 0;
@@ -161,9 +173,13 @@ async function extractMetadata() {
         const { name } = parse(filename);
         const { mtimeMs: _mtimeMs, caption: embedded, ...photoMeta } = meta[filename];
         // Precedence: hand-written override > embedded IPTC/XMP title > none.
-        // A missing caption means the photo is presentational: it gets an empty
-        // alt and no visible title, rather than a filename dressed up as one.
+        // A missing caption means no visible title, rather than a filename
+        // dressed up as one.
         const caption = (captionOverrides[filename] ?? embedded ?? '').trim();
+        // Alt text is the description of what the photo shows; the caption is
+        // a title, so it is only the fallback. A photo with neither is
+        // presentational and gets an empty alt.
+        const alt = (altDescriptions[filename] ?? caption).trim();
 
         return {
             src: `/images/photography/${filename}`,
@@ -174,7 +190,7 @@ async function extractMetadata() {
                 `/images/photography/thumbs/${name}-1200.webp 1200w`,
             ].join(', '),
             caption: caption || undefined,
-            alt: caption,
+            alt,
             filename,
             ...photoMeta,
         };

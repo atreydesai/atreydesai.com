@@ -44,6 +44,9 @@ export interface Post {
     id: string;
     title: string;
     date: string;
+    // Set when a post is substantially revised; shown beside the date and sent
+    // to search and AI crawlers as dateModified.
+    updated?: string;
     tags: string[];
     excerpt: string;
     published: boolean;

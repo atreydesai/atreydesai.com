@@ -8,9 +8,9 @@ interface PhotoData {
     // Human-written title, from a photo-captions.json entry or the photo's
     // IPTC/XMP Title. Absent when the photo has neither.
     caption?: string;
-    // Mirrors `caption`, or "" when there is none: an untitled photo is
-    // presentational and shouldn't have its filename read out as a
-    // description.
+    // A plain description of what the photo shows (photo-alts.json), else the
+    // caption, else "": a photo with neither is presentational and shouldn't
+    // have its filename read out as a description.
     alt: string;
     filename: string;
     orientation: "landscape" | "portrait" | "square";

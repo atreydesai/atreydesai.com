@@ -38,7 +38,7 @@ export function personStructuredData({ imageUrl }) {
       {
         "@type": "Organization",
         name: "CLIP Lab",
-        url: "https://clip.umd.edu",
+        url: "https://clip.umiacs.umd.edu",
       },
       {
         "@type": "CollegeOrUniversity",
