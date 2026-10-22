@@ -2,7 +2,12 @@
 
 Source code for my [personal website](https://atreydesai.com/), hosted on Vercel.
 
+Use Node.js 26.12.1 (recorded in `.node-version`) and npm. The `engines.node`
+field in `package.json` lists supported patched Node releases. Leave an active
+Conda environment with `conda deactivate` before running the site.
+
 ```sh
+npm ci          # install the committed dependency lock
 npm run dev     # local dev server
 npm run build   # sync the bookshelf, optimize photos, build
 npm test        # node tests for the sync scripts, game engines, and agent endpoints
