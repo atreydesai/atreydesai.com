@@ -20,12 +20,12 @@ researchInterests:
   # `quadrantLabel` appear only when details are expanded.
   # IP labels follow the banner's project order: IP1 AutoFiction, IP2 QANTA,
   # IP3 out-of-context video.
-  intro: "Some tasks have clear answers and stay static. Others are uncertain and shift as the world around them adapts. Language models are increasingly deployed as agents in these open-ended environments, where it is hard to know when to trust them. I study how humans and agents can build calibrated trust there, namely:"
+  intro: "Language models are increasingly deployed as agents and judges in open-ended environments, where there is no answer key and the prescriptive standard for good work shifts as people adapt. However, our ability to know when to trust them has not kept pace. I study how humans and models can build calibrated trust there, namely:"
   items:
     - title: "Calibrate"
       quadrant: ["se", "ce"]
       quadrantLabel: "uncertain"
-      summary: "Calibrate agents' confidence under incomplete, uncertain, and excessive information."
+      summary: "Calibrate models’ confidence when information is missing, long-tail, or self-generated."
       question: "How do agents form and update calibrated beliefs about the world, their partners, and their own work under uncertainty (insufficient information, long-tail settings, self-graded writing)?"
       citations:
         - label: "ttr"
@@ -37,8 +37,8 @@ researchInterests:
     - title: "Coordinate"
       quadrant: ["cc", "ce"]
       quadrantLabel: "adapting"
-      summary: "Study how people and agents adapt to each other over time."
-      question: "How do humans and agents form accurate expectations of one another and adapt to each other over repeated interaction (human-AI quizbowl, collaborative writing, multi-agent systems)?"
+      summary: "Study when people trust, delegate to, or override agents."
+      question: "How do humans and agents form accurate expectations of one another and adapt over repeated interaction (human-AI quizbowl, collaborative writing)?"
       citations:
         - label: "authoring"
           url: "/research/#adversarial-multimodal-questions"
@@ -47,8 +47,8 @@ researchInterests:
     - title: "Verify"
       quadrant: ["ce"]
       quadrantLabel: "both"
-      summary: "Build feedback that stays useful as the world adapts to it."
-      question: "How should agents judge open-ended work when there is no ground truth and the world adapts to them in turn (forecasting, long-form writing)?"
+      summary: "Build judges that stay calibrated to people as standards shift."
+      question: "How should LLM judges evaluate open-ended work, and decide which synthetic data is worth training on, when there is no ground truth and the prescriptive standard adapts to them, so that the models trained on their picks stay aligned with human intent (benchmarks, long-form writing, forecasting)?"
       citations:
         - label: "benchmarker"
           url: "/research/#benchmarker"
