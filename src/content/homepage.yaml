@@ -48,7 +48,7 @@ researchInterests:
       quadrant: ["ce"]
       quadrantLabel: "both"
       summary: "Build judges that stay calibrated to people as standards shift."
-      question: "How should LLM judges evaluate open-ended work, and decide which synthetic data is worth training on, when there is no ground truth and the prescriptive standard adapts to them, so that the models trained on their picks stay aligned with human intent (benchmarks, long-form writing, forecasting)?"
+      question: "How should LLM judges evaluate open-ended work, and decide which synthetic data is worth training on, so that the models trained on their own choices stay aligned with human intent (benchmarks, long-form writing, forecasting)?"
       citations:
         - label: "benchmarker"
           url: "/research/#benchmarker"
