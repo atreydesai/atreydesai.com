@@ -130,6 +130,11 @@ if the wordmark's face, weight, or tracking ever changes; never hand-edit them.
 
 It has two states. Every page loads on the full name; once the page scrolls
 past `15px` it morphs into the monogram, and back when it returns to the top.
+The home page is the exception: its heading already says "hi, i'm atrey
+desai", so it loads on the monogram (server-rendered, so the name never
+flashes) and stays there; leaving it morphs the monogram back into the name.
+The monogram is taller than the nav's capitals, so as it collapses it also
+drops `0.105em`, centring it on the nav's cap height like the theme toggle.
 On phones (below `md`) it morphs to the monogram `400ms` after load. The morph
 is a true shape morph (GSAP MorphSVG, loaded after the page): the a bends into
 the A and the d into the D, the d travelling left as it goes, while "trey" and

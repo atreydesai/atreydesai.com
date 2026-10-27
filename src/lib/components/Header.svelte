@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { afterNavigate } from "$app/navigation";
   import { page } from "$app/state";
   import DarkModeToggle from "./DarkModeToggle.svelte";
   import {
@@ -31,7 +32,8 @@
   // The wordmark spells the full name at the top of every page and morphs
   // into the AD monogram once the page scrolls. Modelled on anthropic.com's
   // ANTHROPIC -> A\ header: same 15px threshold, and phones settle on the
-  // monogram shortly after load.
+  // monogram shortly after load. The home page opens with "hi, i'm atrey
+  // desai" right under it, so there it stays on the monogram throughout.
   const COLLAPSE_AT_PX = 15;
   const PHONE_QUERY = "(max-width: 767px)";
   const PHONE_COLLAPSE_DELAY_MS = 400;
@@ -51,14 +53,22 @@
   const EXPAND_SPEED = 1.15; // a touch quicker on the way back out
   const A_INDEX = 0;
   const D_INDEX = WORDMARK_SPLIT;
+  // The monogram is traced standing on the baseline, but it is taller than
+  // the nav's capitals, so there it rode high. Collapsing lowers it by this
+  // much (1/100 em, the outline units) to centre it on the nav's cap height,
+  // the line the theme toggle's icon is centred on too.
+  const MARK_DROP = 10.5;
 
   let scrollY = 0;
   let phoneCollapsed = false;
   let svgEl: SVGSVGElement;
   let timeline: gsap.core.Timeline | null = null;
   let reduceMotion = false;
+  // Tracked by hand: a legacy `$:` statement does not see page changes.
+  let pathname = page.url.pathname;
+  afterNavigate(() => (pathname = page.url.pathname));
 
-  $: collapsed = phoneCollapsed || scrollY > COLLAPSE_AT_PX;
+  $: collapsed = pathname === "/" || phoneCollapsed || scrollY > COLLAPSE_AT_PX;
   $: if (timeline) play(collapsed);
 
   function play(collapse: boolean) {
@@ -77,7 +87,8 @@
     let disposed = false;
 
     // GSAP only loads after the page is up; until then (and without script)
-    // the SVG simply shows the full name.
+    // the SVG shows the full name, or the still monogram where the header
+    // starts collapsed.
     Promise.all([import("gsap"), import("gsap/MorphSVGPlugin")]).then(
       ([{ gsap }, { MorphSVGPlugin }]) => {
         if (disposed) return;
@@ -120,6 +131,7 @@
             );
           }
         });
+        tl.to(svgEl, { "--mark-drop": 1, ...morph }, MORPH_DELAY_S);
         tl.set(letters, { autoAlpha: 0 }).set(marks, { autoAlpha: 1 }, "<");
         timeline = tl;
         // A page that loads already scrolled starts collapsed, without playing.
@@ -174,13 +186,24 @@
           viewBox={WORDMARK_VIEWBOX}
           aria-hidden="true"
           focusable="false"
+          class:wordmark-still-mark={collapsed && !timeline}
+          style="--mark-shift: {MARK_DROP / 100}em"
           bind:this={svgEl}
         >
-          {#each WORDMARK_LETTERS as d}
-            <path class="wordmark-letter" {d} />
-          {/each}
+          <g class="wordmark-letters">
+            {#each WORDMARK_LETTERS as d}
+              <path class="wordmark-letter" {d} />
+            {/each}
+          </g>
           <path class="wordmark-mark" d={MONOGRAM_A} />
           <path class="wordmark-mark" d={MONOGRAM_D} />
+          <!-- The monogram before GSAP arrives, for a header that starts
+               collapsed (the home page). Kept apart from the morph's own paths
+               so the timeline reads their true resting state. -->
+          <g class="wordmark-still" transform="translate(0 {MARK_DROP})">
+            <path d={MONOGRAM_A} />
+            <path d={MONOGRAM_D} />
+          </g>
         </svg>
       </a>
 
@@ -242,15 +265,31 @@
   /* 1em tall to match the line box the outlines were traced in; the
      descender of the y hangs just below it. */
   .wordmark-svg {
+    --mark-drop: 0;
     align-self: start;
     height: 1em;
     width: auto;
     overflow: visible;
     fill: currentColor;
+    /* The morph carries --mark-drop from 0 to 1, lowering the monogram onto
+       the nav's centre line (MARK_DROP). */
+    transform: translateY(calc(var(--mark-drop) * var(--mark-shift)));
   }
 
-  .wordmark-mark {
+  .wordmark-mark,
+  .wordmark-still {
     opacity: 0;
     visibility: hidden;
+  }
+
+  /* Only until the timeline takes over; it then sets the collapsed state on
+     the morph's own paths. */
+  .wordmark-still-mark .wordmark-letters {
+    opacity: 0;
+  }
+
+  .wordmark-still-mark .wordmark-still {
+    opacity: 1;
+    visibility: visible;
   }
 </style>
