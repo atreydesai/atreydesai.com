@@ -3,7 +3,8 @@
   // the bottom of the screen, drawn as a grid of small rounded cells: a leaf's
   // interior is solid squares, its ragged edge is set in characters by how
   // much of each cell it covers, and its stem is a single stroke glyph. Each
-  // leaf turns from one autumn colour at the stem toward another at the tip.
+  // leaf turns from one autumn colour at the stem toward another at the tip,
+  // and some are still green at the stem.
   //
   // A falling leaf sways and tumbles (a flip squashes it across its midrib and
   // shows the paler underside). The pointer stirs falling leaves along, and a
@@ -69,8 +70,7 @@
    *  already started on load. */
   const HEAD_START_S = 40;
 
-  // Autumn, weighted toward reds and oranges, with some browns, a few golds,
-  // and the odd leaf that hasn't turned yet.
+  // Autumn, weighted toward reds and oranges, with some browns and a few golds.
   const PALETTE: [string, number][] = [
     ["#b8322a", 3], // crimson
     ["#d9472b", 3], // scarlet
@@ -82,8 +82,17 @@
     ["#8a5a33", 2], // brown
     ["#d99a2b", 1], // amber
     ["#e2b33a", 1], // gold
-    ["#7d8a3a", 1], // olive
   ];
+  // About one leaf in five hasn't finished turning: green at the stem,
+  // reddening toward the tip. A leaf turns from its tip in, so these only
+  // ever sit at the stem end, never at the tip.
+  const GREENS: [string, number][] = [
+    ["#7d8a3a", 2], // olive
+    ["#5f7a34", 1], // moss
+    ["#6a8f3a", 1], // leaf green
+    ["#a3a83a", 2], // yellow-green
+  ];
+  const STEMS = [...PALETTE, ...GREENS];
   const GINKGO = ["#e2b33a", "#d99a2b", "#a9a53c"];
   type Shape = "ovate" | "oak" | "maple" | "ginkgo";
   const SHAPES: [Shape, number][] = [
@@ -392,7 +401,7 @@
     function makeLeaf(scattered: boolean): Leaf {
       const shape = weighted(SHAPES);
       const len = rand(40, 60) * (shape === "maple" ? 1.1 : 1);
-      const base = shape === "ginkgo" ? pick(GINKGO) : weighted(PALETTE);
+      const base = shape === "ginkgo" ? pick(GINKGO) : weighted(STEMS);
       return {
         shape,
         rgb: hex(base),

@@ -1248,11 +1248,12 @@ text, and only from `1080px` up, where that margin can hold a leaf. Each leaf is
 drawn on a screen-aligned `6px` grid: rounded squares where the blade covers a
 cell, NHG Text density glyphs (`.:-=+*#%`) where it only partly covers one, and
 a stroke glyph for the stem. They are drawn faint (50% light, 42% dark) from
-an autumn palette weighted toward reds and oranges (with browns, a few golds,
-and the odd unturned green), each leaf turning from one colour at its stem
-toward another at its tip. A passing pointer stirs them and a click in the
-margin gusts them, but soft walls keep them in the margin and speed is capped,
-so nothing flies.
+an autumn palette weighted toward reds and oranges (with browns and a few
+golds), each leaf turning from one colour at its stem toward another at its
+tip. About one in five is still turning: green at the stem, warm at the tip
+(tips turn first, so green never sits at the tip). A passing pointer stirs them
+and a click in the margin gusts them, but soft walls keep them in the margin
+and speed is capped, so nothing flies.
 
 They pile up at the bottom of the screen. A leaf picks its resting spot a
 couple of lengths above the pile and keeps falling exactly as before, steering
