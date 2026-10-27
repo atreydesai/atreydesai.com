@@ -9,6 +9,7 @@
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Mark from "$lib/components/Mark.svelte";
   import QuadrantGlyph from "$lib/components/QuadrantGlyph.svelte";
+  import FallingLeaves from "$lib/components/FallingLeaves.svelte";
   import { onDestroy, onMount } from "svelte";
   import { arcadeScreen, openArcade } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
@@ -183,6 +184,8 @@
   pageType="ProfilePage"
   about={true}
 />
+
+<FallingLeaves />
 
 <div class="page-shell page-shell-standard">
   <section class="section-gap">

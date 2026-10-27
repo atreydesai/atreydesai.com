@@ -1242,6 +1242,32 @@ Canvas shaders, LEGO image treatment, and pixel sprites may use internal
 rendering values. Their surrounding controls, captions, and states use the
 website system.
 
+The homepage's falling leaves (`FallingLeaves.svelte`) are the one ambient
+animation. They stay in the margin right of the content column, never under
+text, and only from `1080px` up, where that margin can hold a leaf. Each leaf is
+drawn on a screen-aligned `6px` grid: rounded squares where the blade covers a
+cell, NHG Text density glyphs (`.:-=+*#%`) where it only partly covers one, and
+a stroke glyph for the stem. They are drawn faint (50% light, 42% dark) from
+an autumn palette weighted toward reds and oranges (with browns, a few golds,
+and the odd unturned green), each leaf turning from one colour at its stem
+toward another at its tip. A passing pointer stirs them and a click in the
+margin gusts them, but soft walls keep them in the margin and speed is capped,
+so nothing flies.
+
+They pile up at the bottom of the screen. A leaf picks its resting spot a
+couple of lengths above the pile and keeps falling exactly as before, steering
+toward it no faster than its own drift; on the way it stops tumbling, lies
+down, foreshortens, and crumples (its blade ripples, its tip curls in, a
+maple's lobes pull together), and it lands exactly on its spot, so baking it
+into the pile changes nothing on screen. Its spot is where its footprint comes
+to rest: down slopes, and off any side it overhangs until its centre is over
+what holds it up; above `16%` of the screen's height it takes the lowest spot
+in reach instead. The pile is solved by events, never by a running loop, so a
+resting leaf never jitters. Leaves only move again when ones under them leave,
+by being kicked up or by slipping out under the screen once the pile holds more
+than 4.5 leaves per `100px` of margin, and then they fall the same way, never
+glide as an image. Reduce Motion leaves one still frame, pile included.
+
 ### Research explainers
 
 Every paper carries a live explainer: hand-written inline SVG animated by a
