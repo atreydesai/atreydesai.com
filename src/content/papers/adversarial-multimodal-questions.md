@@ -29,5 +29,5 @@ featured: true
 highlight: false
 priority: 3
 image: /papers/adversarial-multimodal-questions-figure1.png
-imageDescription: "Figure 1: A quizbowl question asks for the hidden color in a Barnett Newman painting (yellow). During authoring, Qwen3-VL instead answers red with 85% confidence. In tournament play, humans answer correctly in 3 of 5 games, while none of the 14 AI systems do."
+imageDescription: "A multimodal quizbowl clue shows a Barnett Newman painting with its right side masked and asks for \"this color, which has been obscured\" (answer: yellow). While the question is written, the author probes Qwen3-VL, which answers red, the color it can see, with 85% confidence. In tournament play, humans answer correctly in 3 of 5 games, while 0 of 14 AI systems do, and 10 of the 14 answer red. When authors edit an image and probe again, 35% of the model's 227 correct answers turn wrong, even when the needed clues remain. Not what an image shows... but what the question asks!"
 ---

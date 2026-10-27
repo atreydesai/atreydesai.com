@@ -9,6 +9,7 @@ import CalExplainer from "./CalExplainer.svelte";
 import DistractorsExplainer from "./DistractorsExplainer.svelte";
 import FillerGapExplainer from "./FillerGapExplainer.svelte";
 import HumorExplainer from "./HumorExplainer.svelte";
+import OccludedExplainer from "./OccludedExplainer.svelte";
 import ReasonersExplainer from "./ReasonersExplainer.svelte";
 import RlTapExplainer from "./RlTapExplainer.svelte";
 import type { ExplainerProps } from "./motion";
@@ -26,4 +27,5 @@ export const explainers: Partial<Record<string, ExplainerComponent>> = {
 	"rl-trigger-action": RlTapExplainer,
 	"booktube-phonetic": BookTubeExplainer,
 	"lol-to-llm-humor": HumorExplainer,
+	"adversarial-multimodal-questions": OccludedExplainer,
 };
