@@ -13,6 +13,7 @@
   import Footer from "$lib/components/Footer.svelte";
   import CustomCursor from "$lib/components/CustomCursor.svelte";
   import { startJustify } from "$lib/justify";
+  import { startClickTracking } from "$lib/analytics";
   import { BOBA_DESKTOP_QUERY, arcadeScreen, openArcade } from "$lib/boba";
   import {
     PAGE_TRANSITIONS_ENABLED,
@@ -49,6 +50,7 @@
   onMount(() => {
     // Knuth–Plass justification for running prose, site-wide.
     const stopJustify = startJustify();
+    const stopClickTracking = startClickTracking();
 
     // Catch needs a mouse; if the pointer stops qualifying mid-game (a
     // window squeezed narrow, a tablet undocked), fall back to the menu.
@@ -132,6 +134,7 @@
 
     return () => {
       stopJustify();
+      stopClickTracking();
       window.removeEventListener("keydown", onKey);
       bobaMedia.removeEventListener("change", syncBobaDesktop);
       touchMedia.removeEventListener("change", syncTouch);

@@ -81,6 +81,9 @@
                     {#if paper.arxiv}
                         <a
                             href={paper.arxiv}
+                            data-track="paper_link"
+                            data-track-paper={paper.id}
+                            data-track-kind="title"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="transition-colors duration-200 hover:text-accent dark:hover:text-accent-light"

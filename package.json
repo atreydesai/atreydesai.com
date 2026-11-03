@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite dev",
     "optimize-photos": "node scripts/optimize-photos.mjs",
+    "og": "node scripts/og.mjs",
     "sync:goodreads": "node scripts/sync-goodreads.mjs",
     "sync:mdl": "node scripts/sync-mdl.mjs",
     "sync:letterboxd": "node scripts/sync-letterboxd.mjs",

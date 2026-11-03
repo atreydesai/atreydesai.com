@@ -9,6 +9,7 @@
     import { ArrowLeft, CalendarDays } from "@jis3r/icons";
     import { SITE_URL } from "$lib/seo";
     import { blogPostingStructuredData } from "$lib/structured-data";
+    import PostFooter from "$lib/components/blog/PostFooter.svelte";
     import type { PageData } from "./$types";
 
     export let data: PageData;
@@ -61,8 +62,10 @@
 </script>
 
 <Seo
-    title="{post.title} | Atrey Desai"
-    description={post.excerpt}
+    title="{post.seoTitle ?? post.title} | Atrey Desai"
+    description={post.seoDescription ?? post.excerpt}
+    image={post.image}
+    imageAlt={post.imageAlt}
     url="https://atreydesai.com/blog/{post.id}/"
     type="article"
     pageType="WebPage"
@@ -77,9 +80,9 @@
     jsonLd={[
         blogPostingStructuredData({
             url: `${SITE_URL}/blog/${post.id}/`,
-            title: post.title,
-            description: post.excerpt,
-            imageUrl: `${SITE_URL}/og-image-wide.jpg`,
+            title: post.seoTitle ?? post.title,
+            description: post.seoDescription ?? post.excerpt,
+            imageUrl: `${SITE_URL}${post.image ?? "/og-image-wide.jpg"}`,
             datePublished: post.date,
             dateModified: post.updated,
             tags: post.tags,
@@ -157,6 +160,14 @@
             {/if}
         {/each}
     </article>
+
+    {#if post.published !== false && !post.unlisted}
+        <div class="post-column">
+            <div class="measure-reading">
+                <PostFooter postId={post.id} />
+            </div>
+        </div>
+    {/if}
 
     <!-- Prev/next navigation -->
     {#if prevPost || nextPost}

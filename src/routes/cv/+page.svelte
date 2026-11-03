@@ -62,6 +62,7 @@
         <a
             href="/atreydesai_cv.pdf"
             download="Atrey_Desai_CV.pdf"
+            data-track="cv_download"
             class="control-text control-accent"
             on:mouseenter={() => (hoveredDownload = true)}
             on:mouseleave={() => (hoveredDownload = false)}

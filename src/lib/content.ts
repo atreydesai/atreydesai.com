@@ -54,6 +54,14 @@ export interface Post {
     content: string;
     externalUrl?: string;
     externalSite?: string;
+    // Search and share copy, for when the on-page title is too terse to mean
+    // anything in a result list or a link preview. Both fall back to the
+    // title and excerpt.
+    seoTitle?: string;
+    seoDescription?: string;
+    // A 1200×630 share card (`npm run og`) and its alt text.
+    image?: string;
+    imageAlt?: string;
 }
 
 export interface ResearchInterestCitation {

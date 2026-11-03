@@ -1269,6 +1269,38 @@ by being kicked up or by slipping out under the screen once the pile holds more
 than 4.5 leaves per `100px` of margin, and then they fall the same way, never
 glide as an image. Reduce Motion leaves one still frame, pile included.
 
+### Share cards
+
+Every post with artwork gets a 1200×630 share card, so a link pasted into X,
+Slack, or iMessage previews the work rather than the portrait. The card is a
+figure plate: the post's own art in a rounded media frame
+above a caption line, with the title in NHG Display, the excerpt in
+Optima italic, and the name and domain in NHG Text at the right.
+
+`npm run og` (dev server running, local Chrome) crops the art from the post's
+live page into `static/images/og/art/`, retrying until a late-drawing piece
+has actually painted, then lays the card out on the dev-only `/dev/og/<id>`
+route. Point the post's `image` (and `imageAlt`) at the result. Cards are
+fixed-size images, so their type is set in `px`. Art that would lose its
+subject to the wide crop is fitted whole on its own flat ground, and
+text-heavy art crops from its top left; both live in `$lib/og-art`.
+
+### Lately
+
+The homepage's last section, after selected works: research leads the page,
+and this gives a reader who stayed somewhere to go next. It shows the three
+newest posts, each led by the art `npm run og` cropped (a post without art
+gets a quiet plate naming where it lives), in three columns from `sm` and as
+compact rows with a small plate on phones. Thumbnails keep a hairline edge so
+pale art holds its shape on the paper; hover changes the title's colour and
+warms the art slightly, with no lift.
+
+### Post footer
+
+One `type-meta` line after a post's last paragraph, above the older/newer
+links: follow along on RSS or X, or write by email. It asks the reader back;
+the older/newer links move sideways through the archive.
+
 ### Research explainers
 
 Every paper carries a live explainer: hand-written inline SVG animated by a

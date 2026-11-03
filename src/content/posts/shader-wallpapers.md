@@ -5,6 +5,10 @@ date: "2026-04-18"
 tags: [fun, graphics, experiments]
 excerpt: "Playing around with shaders"
 published: true
+seoTitle: "wallpapers: two shader backgrounds from a shader beginner"
+seoDescription: "Mound and Nebula, two animated grain-and-gradient wallpapers made while trying to recreate a shader from Twitter. Both run live in the post."
+imageAlt: "A grainy gradient wallpaper fading from gold through pink to violet, above the title wallpapers."
+image: "/images/og/shader-wallpapers.jpg"
 ---
 
 I came across this [post](https://x.com/cifilter/status/2021206681560961444) on Twitter and got inspired to replicate it. Given my complete lack of experience with shaders, that didn't really work out. But, in the process and somewhat augmented by the newly released [Claude Design](https://www.anthropic.com/news/claude-design-anthropic-labs), I created these two wallpapers I find quite quaint.

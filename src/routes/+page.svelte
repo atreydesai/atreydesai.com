@@ -13,6 +13,11 @@
   import { onDestroy, onMount } from "svelte";
   import { arcadeScreen, openArcade } from "$lib/boba";
   import { sfxBoba, unlockAudio } from "$lib/sfx";
+  import { track } from "$lib/analytics";
+  import Lately from "$lib/components/home/Lately.svelte";
+  import type { PageData } from "./$types";
+
+  export let data: PageData;
 
   // Little pixel boba tucked in the photo corner: a random drink + straw
   // orientation on each page load. Click to open the boba arcade.
@@ -131,28 +136,37 @@
     toggleResearchDetails();
   }
 
-  let emailCopied = false;
+  // Which copy button was last pressed, so only its tooltip shows, and
+  // whether the copy worked: when it didn't, the tooltip shows the address
+  // itself so the press still gives a sighted reader something.
+  let emailCopied: string | null = null;
+  let copyFailed = false;
   let copyTimeout: ReturnType<typeof setTimeout>;
   // Announced politely: the "copied!" tooltip is a purely visual confirmation,
   // so without this the button appears to do nothing to a screen reader.
   let copyAnnouncement = "";
 
-  async function copyEmail() {
+  async function copyEmail(from = "home_links") {
     // writeText rejects in insecure contexts and when permission is denied.
     // Claiming success there would be a lie, so report what actually happened.
     try {
       await navigator.clipboard.writeText(homepageData.social.email);
-      emailCopied = true;
+      emailCopied = from;
+      copyFailed = false;
+      track("email_copy", { from });
       copyAnnouncement = `Copied ${homepageData.social.email} to the clipboard.`;
     } catch {
-      emailCopied = false;
+      emailCopied = from;
+      copyFailed = true;
+      track("email_reveal", { from });
       copyAnnouncement = `Couldn't copy automatically. My email is ${homepageData.social.email}.`;
     }
     clearTimeout(copyTimeout);
+    // An address shown in place of a copy stays long enough to select.
     copyTimeout = setTimeout(() => {
-      emailCopied = false;
+      emailCopied = null;
       copyAnnouncement = "";
-    }, 4000);
+    }, copyFailed ? 10000 : 4000);
   }
 
   let cookKey: string | null = null;
@@ -216,6 +230,8 @@
               target="_blank"
               rel="noopener noreferrer"
               title={link.name}
+              data-track="social_click"
+              data-track-network={link.name}
               class="link"
             >
               {link.name}
@@ -225,16 +241,16 @@
           <div class="relative inline-flex">
             <button
               type="button"
-              on:click={copyEmail}
+              on:click={() => copyEmail()}
               title="Copy email"
               class="link font-[inherit] text-[length:inherit] cursor-pointer"
             >
               Email
             </button>
-            {#if emailCopied}
-              <span class="copied-tooltip" aria-hidden="true">
+            {#if emailCopied === "home_links"}
+              <span class="copied-tooltip" class:is-address={copyFailed} aria-hidden="true">
                 <span class="copied-triangle"></span>
-                copied!
+                {copyFailed ? homepageData.social.email : "copied!"}
               </span>
             {/if}
           </div>
@@ -293,18 +309,29 @@
           <div
             class="banner-box banner-riso-front relative select-text px-5 py-4 md:px-6 text-ink-800 dark:text-cream-100"
           >
-            <!-- One-line banner: the "{label}" token in banner.lead becomes
-                 the click-to-expand projects toggle, inline in the sentence. -->
+            <!-- The "{label}" token in banner.lead becomes the click-to-expand
+                 projects toggle, inline in the sentence. A second sentence
+                 carries the three things a recruiting reader reaches for. -->
             <p class="type-body-small relative z-10">
               {@html parseBanner(bannerLead.pre)}<button
                 type="button"
                 class="banner-toggle link font-[inherit] text-[length:inherit] cursor-pointer select-none"
                 aria-expanded={projectsOpen}
                 aria-controls="banner-projects-list"
+                data-track="banner_projects_toggle"
                 on:click={() => (projectsOpen = !projectsOpen)}
               ><span class="banner-toggle-label">{bannerLead.label}</span><Mark
                   kind="caret"
-                /></button>{@html parseBanner(bannerLead.post)}
+                /></button>{@html parseBanner(bannerLead.post)}.
+              <span class="relative"><button
+                  type="button"
+                  class="link font-[inherit] text-[length:inherit] cursor-pointer"
+                  on:click={() => copyEmail("banner")}
+                >Copy my email</button>{#if emailCopied === "banner"}<span class="copied-tooltip" class:is-address={copyFailed} aria-hidden="true"
+                    ><span class="copied-triangle"></span>{copyFailed ? homepageData.social.email : "copied!"}</span
+                  >{/if}</span>,
+              <a href="/cv/" class="link" data-track="banner_cv">read my CV</a>, or
+              <a href="/research/" class="link" data-track="banner_research">see my research</a>.
             </p>
             <div
               id="banner-projects-list"
@@ -353,6 +380,7 @@
             <button
               type="button"
               class="research-toggle"
+              data-track="interests_detail_toggle"
               aria-expanded={researchExpanded}
               aria-controls="research-interest-list"
               on:click={toggleResearchDetails}
@@ -500,7 +528,7 @@
   </ScrollReveal>
 
   <ScrollReveal delay={60}>
-    <section>
+    <section class="section-gap">
       <div class="section-rule mb-6">
         <h2 class="section-heading mb-0">
           <a href="/research/" class="hover:text-accent dark:hover:text-accent-light transition-colors duration-200">selected works</a>
@@ -514,6 +542,13 @@
         {/each}
       </div>
     </section>
+  </ScrollReveal>
+
+  <!-- Research leads the page; this is where a reader who stayed goes next. -->
+  <ScrollReveal delay={60}>
+    <div>
+      <Lately posts={data.lately} />
+    </div>
   </ScrollReveal>
 </div>
 
@@ -812,6 +847,25 @@
     background: #E85D4C;
     border-radius: 2px;
     transform: translateX(-50%) rotate(45deg);
+  }
+
+  /* When the copy fails, the tooltip carries the address itself: information
+     someone has to read and select, so it takes the primary-button pairing
+     (ink on cream, inverted in dark) rather than small cream text on accent,
+     and accepts the pointer. */
+  .copied-tooltip.is-address {
+    background: theme("colors.ink.900");
+    color: theme("colors.cream.100");
+    pointer-events: auto;
+    user-select: all;
+  }
+  .copied-tooltip.is-address .copied-triangle {
+    background: theme("colors.ink.900");
+  }
+  :global(.dark) .copied-tooltip.is-address,
+  :global(.dark) .copied-tooltip.is-address .copied-triangle {
+    background: theme("colors.cream.100");
+    color: theme("colors.ink.900");
   }
 
   /* Riso + sketchy combo: a wobbly accent slab sits offset behind a wobbly

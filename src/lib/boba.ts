@@ -1,4 +1,5 @@
 import { writable } from "svelte/store";
+import { track } from "$lib/analytics";
 
 // The boba arcade: a menu of small games behind the pixel boba on the
 // homepage (and the Konami code). The layout owns the render; anything can
@@ -74,7 +75,9 @@ export function canPlay(id: GameId) {
  */
 export function openArcade(screen: ArcadeScreen = "menu") {
   if (typeof window === "undefined") return;
-  arcadeScreen.set(screen !== "menu" && !canPlay(screen) ? "menu" : screen);
+  const opened = screen !== "menu" && !canPlay(screen) ? "menu" : screen;
+  arcadeScreen.set(opened);
+  track("arcade_open", { screen: opened });
 }
 
 export function closeArcade() {

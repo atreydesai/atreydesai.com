@@ -2,6 +2,7 @@
     import { Binary, PenLine, ChevronsUpDown, ChevronsDownUp, CircleArrowOutUpRight, MessageCircle, FileText } from "@jis3r/icons";
 
     export let paper: {
+        id: string;
         arxiv: string | null;
         pdf: string | null;
         code: string | null;
@@ -52,6 +53,9 @@
         {#if paper.arxiv}
             <a
                 href={paper.arxiv}
+                data-track="paper_link"
+                data-track-paper={paper.id}
+                data-track-kind="arxiv"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="link-subtle inline-flex items-center gap-1.5"
@@ -66,6 +70,9 @@
         {#if paper.pdf}
             <a
                 href={paper.pdf}
+                data-track="paper_link"
+                data-track-paper={paper.id}
+                data-track-kind="pdf"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="link-subtle inline-flex items-center gap-1.5"
@@ -80,6 +87,9 @@
         {#if paper.code}
             <a
                 href={paper.code}
+                data-track="paper_link"
+                data-track-paper={paper.id}
+                data-track-kind="code"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="link-subtle inline-flex items-center gap-1.5"
@@ -94,6 +104,9 @@
         {#if paper.demo}
             <a
                 href={paper.demo}
+                data-track="paper_link"
+                data-track-paper={paper.id}
+                data-track-kind="demo"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="link-subtle inline-flex items-center gap-1.5"
@@ -108,6 +121,9 @@
         {#if paper.twitter}
             <a
                 href={paper.twitter}
+                data-track="paper_link"
+                data-track-paper={paper.id}
+                data-track-kind="twitter"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="link-subtle inline-flex items-center gap-1.5"
@@ -122,6 +138,9 @@
         {#if paper.blog}
             <a
                 href={paper.blog}
+                data-track="paper_link"
+                data-track-paper={paper.id}
+                data-track-kind="blog"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="link-subtle inline-flex items-center gap-1.5"

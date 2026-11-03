@@ -12,6 +12,7 @@ npm run dev     # local dev server
 npm run build   # sync the bookshelf, optimize photos, build
 npm test        # node tests for the sync scripts, game engines, and agent endpoints
 npm run check   # svelte-check
+npm run og      # share cards for posts (needs `npm run dev` and Chrome)
 ```
 
 ## Bookshelf sources

@@ -20,7 +20,7 @@ researchInterests:
   # `quadrantLabel` appear only when details are expanded.
   # IP labels follow the banner's project order: IP1 AutoFiction, IP2 QANTA,
   # IP3 out-of-context video.
-  intro: "Language models are increasingly deployed as agents and judges in open-ended environments, where there is no answer key and the prescriptive standard for good work shifts as people adapt. However, our ability to know when to trust them has not kept pace. I study how humans and models can build calibrated trust there, namely:"
+  intro: "When an agent writes a novel or grades an essay, there is no answer key, and what counts as good work keeps shifting as people adapt to it. So how do we know when to trust it? I study how humans and models build calibrated trust in open-ended work:"
   items:
     - title: "Calibrate"
       quadrant: ["se", "ce"]

@@ -17,8 +17,8 @@
     "I am a final-year undergraduate studying computer science and linguistics at the University of Maryland. I am fortunate to be advised by Professors Rachel Rudinger, Jordan Boyd-Graber, and Mohit Iyyer.";
   // Social cards use a 1.91:1 crop of the portrait; the square original is the
   // Person's own image in structured data.
-  export let image = "/og-image-wide.jpg";
-  export let imageAlt = "Atrey Desai smiling in front of a blurred city skyline at night";
+  export let image: string | undefined = undefined;
+  export let imageAlt: string | undefined = undefined;
   export let url = SITE_URL;
   export let type = "website";
   export let noindex = false;
@@ -38,7 +38,16 @@
   export let tags: string[] = [];
 
   $: canonicalUrl = toCanonicalUrl(url);
-  $: imageUrl = absoluteSiteUrl(image);
+  // `undefined` (an optional post field passed straight through) falls back
+  // to the portrait card, alt text included.
+  $: cardImage = image ?? "/og-image-wide.jpg";
+  $: cardAlt =
+    (image && imageAlt) ||
+    "Atrey Desai smiling in front of a blurred city skyline at night";
+  $: imageUrl = absoluteSiteUrl(cardImage);
+  // Both the portrait and the generated post cards are 1200×630.
+  $: cardType = cardImage.endsWith(".png") ? "image/png" : "image/jpeg";
+  $: cardSized = cardImage === "/og-image-wide.jpg" || cardImage.startsWith("/images/og/");
   $: pageName = title.replace(/\s*\|\s*Atrey Desai$/, "");
   $: isHome = canonicalUrl === `${SITE_URL}/`;
   $: crumbs =
@@ -95,9 +104,9 @@
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:image" content={imageUrl} />
-  <meta property="og:image:alt" content={imageAlt} />
-  {#if image === "/og-image-wide.jpg"}
-    <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:alt" content={cardAlt} />
+  {#if cardSized}
+    <meta property="og:image:type" content={cardType} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
   {/if}
@@ -120,7 +129,7 @@
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
   <meta name="twitter:image" content={imageUrl} />
-  <meta name="twitter:image:alt" content={imageAlt} />
+  <meta name="twitter:image:alt" content={cardAlt} />
   <meta name="twitter:site" content="@atreydesai" />
   <meta name="twitter:creator" content="@atreydesai" />
 
