@@ -105,8 +105,6 @@
                             <span class="pill bg-accent/10 text-accent-dark dark:bg-accent/15 dark:text-accent-light">preprint</span>
                         {/if}
                         {#each paper.awards as award, i}
-                            <!-- Status pills get a tinted fill so they read
-                                 louder than the neutral tag pills. -->
                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                             <span
                                 class="pill bg-ochre/15 text-ochre-dark dark:bg-ochre-dark/30 dark:text-ochre-light"
@@ -128,14 +126,6 @@
                     >
                         {paper.tldr}
                     </p>
-                {/if}
-
-                {#if !isPreview && paper.tags.length > 0}
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        {#each paper.tags as tag}
-                            <span class="pill">{tag}</span>
-                        {/each}
-                    </div>
                 {/if}
             </div>
 

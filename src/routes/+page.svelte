@@ -319,14 +319,10 @@
                 >
                   {#each homepageData.banner.projects as project, i}
                     <li
-                      class="banner-project-item flex items-baseline gap-2.5"
+                      class="banner-project-item"
                       style="--project-delay: {i * 40}ms"
                     >
-                      <span
-                        class="font-ui text-xs tabular-nums text-ink-400 dark:text-cream-500 select-none"
-                        aria-hidden="true">{String(i + 1).padStart(2, "0")}</span
-                      >
-                      <span>{@html parseBanner(project)}</span>
+                      {@html parseBanner(project)}
                     </li>
                   {/each}
                 </ol>

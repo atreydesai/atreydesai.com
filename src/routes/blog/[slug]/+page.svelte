@@ -128,12 +128,6 @@
                 <span class="text-ink-400 dark:text-cream-500">
                     {readingTime(post.content)}
                 </span>
-
-                <div class="flex gap-2">
-                    {#each post.tags as tag}
-                        <span class="pill">{tag}</span>
-                    {/each}
-                </div>
             </div>
         </header>
     </div>

@@ -120,7 +120,7 @@
 </script>
 
 <footer class="page-shell-standard w-full mt-4 pb-8">
-  <div class="border-t border-ink-200 dark:border-ink-700 pt-6">
+  <div class="pt-6">
     <div
       class="flex flex-col sm:flex-row items-center sm:items-end justify-between gap-y-4"
     >
