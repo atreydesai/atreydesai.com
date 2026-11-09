@@ -93,6 +93,108 @@ test("opcodes match difflib's longest-match recursion", () => {
   ]);
 });
 
+// Smart mode and comments go beyond the Python tool, so these expectations
+// are this engine's own.
+
+test("smart mode folds fragments stranded between rewrites", () => {
+  const oldText = "Models preferred one label and underperformed against trained detectors in every test.";
+  const newText = "Chatbots favored a single label and lagged far behind trained classifiers in every test.";
+  assert.equal(
+    diffDocuments(oldText, newText).html,
+    '<div class="change" id="chg-1"><p><del>Models preferred one</del> <ins>Chatbots favored a single</ins> label and <del>underperformed against</del> <ins>lagged far behind</ins> trained <del>detectors</del> <ins>classifiers</ins> in every test.</p></div>',
+  );
+  const smart = diffDocuments(oldText, newText, { mode: "smart" });
+  assert.equal(
+    smart.html,
+    '<div class="change" id="chg-1"><p><del>Models preferred one label and underperformed against trained detectors</del> <ins>Chatbots favored a single label and lagged far behind trained classifiers</ins> in every test.</p></div>',
+  );
+  // Counts come from the matcher, not the folding, so they don't change with the mode.
+  assert.equal(smart.wordsAdded, 8);
+  assert.equal(smart.wordsRemoved, 6);
+});
+
+test("smart mode keeps light edits word by word, and anchors at sentence edges", () => {
+  const light = ["It was a *dark* night, and the rain fell.", "It was a *dark and stormy* night, and the rain fell hard."];
+  assert.equal(diffDocuments(...light, { mode: "smart" }).html, diffDocuments(...light).html);
+
+  const anchored = diffDocuments(
+    "They recall more. At the default threshold they flag text.",
+    "They recall more. Users prefer fewer false alarms. At the default cutoff they flag text.",
+    { mode: "smart" },
+  );
+  assert.equal(
+    anchored.html,
+    '<div class="change" id="chg-1"><p>They recall more. <ins>Users prefer fewer false alarms.</ins> At the default <del>threshold</del> <ins>cutoff</ins> they flag text.</p></div>',
+  );
+});
+
+test("smart mode makes each changed paragraph its own change", () => {
+  const oldText = "Intro stays.\n\nFirst para old words here.\n\nMiddle kept.\nWrapped.";
+  const newText = "Intro stays!\n\nFirst para new words here.\n\nMiddle kept. Wrapped.";
+  const result = diffDocuments(oldText, newText, { mode: "smart" });
+  assert.equal(
+    result.html,
+    [
+      '<div class="change" id="chg-1"><p>Intro <del>stays.</del> <ins>stays!</ins></p></div>',
+      '<div class="change" id="chg-2"><p>First para <del>old</del> <ins>new</ins> words here.</p></div>',
+      "<p>Middle kept. Wrapped.</p>",
+    ].join("\n"),
+  );
+  // Hiding deletions leaves the same stops to step through.
+  const clean = diffDocuments(oldText, newText, { mode: "smart", showDeletions: false });
+  assert.deepEqual(clean.changes, result.changes);
+});
+
+test("smart mode keeps a reworded heading a heading", () => {
+  const result = diffDocuments("# Chapter One\n\nShe left at dawn.", "# Chapter 1\n\nShe left before dawn.", {
+    mode: "smart",
+  });
+  assert.equal(
+    result.html,
+    [
+      '<div class="change" id="chg-1"><h1>Chapter <del>One</del> <ins>1</ins></h1></div>',
+      '<div class="change" id="chg-2"><p>She left <del>at</del> <ins>before</ins> dawn.</p></div>',
+    ].join("\n"),
+  );
+});
+
+test("LaTeX comments and reviewer macros are set apart from the prose", () => {
+  const oldText = [
+    "\\section{Results}",
+    "\\mohit{this reads as a numbers dump}",
+    "Models achieve 94\\% accuracy. % TODO check this",
+    "They are cheap.\\hg{why?} See \\hg{what does that mean?}",
+  ].join("\n");
+  const newText = "\\section{Results}\nModels achieve 94\\% accuracy.\nThey are cheap. See";
+  const result = diffDocuments(oldText, newText);
+  assert.equal(
+    result.html,
+    '<div class="change" id="chg-1"><p>\\section{Results} <del class="note"><span class="note-by">mohit</span> this reads as a numbers dump</del> Models achieve 94\\% accuracy. <del class="note"><span class="note-by">%</span> TODO check this</del> They are cheap. <del class="note"><span class="note-by">hg</span> why?</del> See <del class="note"><span class="note-by">hg</span> what does that mean?</del></p></div>',
+  );
+  // A one-word \hg is caught because \hg holds a sentence elsewhere; the
+  // escaped \% isn't a comment.
+  assert.deepEqual(result.changes, [{ id: "chg-1", excerpt: "mohit: this reads as a numbers dump %: TODO check this hg:…", kind: "comment" }]);
+  assert.equal(result.wordsRemoved, 0);
+  assert.equal(result.notesRemoved, 4);
+});
+
+test("an unchanged comment renders as a note, and markdown keeps its percent signs", () => {
+  assert.equal(
+    renderDocument("Text.\n\n% a note to self\n\\todo{fix}"),
+    '<p>Text.</p>\n<p><span class="note"><span class="note-by">%</span> a note to self</span> <span class="note"><span class="note-by">todo</span> fix</span></p>',
+  );
+  const markdown = diffDocuments("About 50% of it. <!-- fix -->", "About 50% of it.");
+  assert.equal(
+    markdown.html,
+    '<div class="change" id="chg-1"><p>About 50% of it. <del class="note"><span class="note-by">note</span> fix</del></p></div>',
+  );
+  assert.equal(markdown.changes[0].kind, "comment");
+});
+
+test("underscores inside a word aren't emphasis", () => {
+  assert.equal(renderDocument("see sec:ai_vs_human and _this_"), "<p>see sec:ai_vs_human and <em>this</em></p>");
+});
+
 test("revision snapshots group by document, in time order, with the working copy last", () => {
   const docs = groupDocuments([
     "book/revision_snapshots/chapter_01/chapter_01.0002.20260705T101500Z.after_revise.md",

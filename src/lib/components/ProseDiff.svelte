@@ -17,8 +17,11 @@
     type Picked = { path: string; file: File };
 
     const SOURCES: Source[] = ["sample", "paste", "files"];
+    // Set on the first visit, which shows the sample; every visit after that
+    // opens straight on paste, ready for the reader's own drafts.
+    const VISITED_KEY = "prose-diff:visited";
     const IGNORED_DIR = /^(\.|node_modules$|__MACOSX$)/;
-    const KIND_LABEL = { edited: "edited", added: "added", removed: "removed" };
+    const KIND_LABEL = { edited: "edited", added: "added", removed: "removed", comment: "comment" };
 
     let source: Source = "sample";
     let mounted = false;
@@ -44,6 +47,9 @@
     let baseId = "";
     let compareId = "";
     let cleanRead = false;
+    // Smart diff folds stranded fragments into the edits around them and
+    // steps paragraph by paragraph; off, every matched word is kept.
+    let smart = true;
 
     let result: DiffResult | null = null;
     let message = "";
@@ -81,7 +87,7 @@
     // Pasted text waits for a pause in typing.
     let timer: ReturnType<typeof setTimeout> | undefined;
     let runToken = 0;
-    $: if (mounted) schedule(source, doc, baseId, compareId, before, after, cleanRead);
+    $: if (mounted) schedule(source, doc, baseId, compareId, before, after, cleanRead, smart);
 
     // Only typing waits; switching source, versions or mode redraws at once,
     // so the previous diff never lingers under the new controls.
@@ -99,7 +105,8 @@
     }
 
     // Steps through the same changes survive a switch into or out of clean
-    // read; a different pair starts again from the top.
+    // read; a different pair, or the other diff mode (which lists different
+    // changes), starts again from the top.
     let pairKey = "";
 
     async function run(
@@ -110,6 +117,7 @@
         oldPaste: string,
         newPaste: string,
         clean: boolean,
+        smartDiff: boolean,
     ) {
         const token = ++runToken;
         let oldText: string;
@@ -144,12 +152,16 @@
         }
         if (token !== runToken) return;
 
-        const key = `${src}\0${current?.id}\0${base}\0${compare}\0${oldPaste}\0${newPaste}`;
+        const key = `${src}\0${current?.id}\0${base}\0${compare}\0${oldPaste}\0${newPaste}\0${smartDiff}`;
         if (key !== pairKey) {
             pairKey = key;
             focusIdx = -1;
         }
-        result = diffDocuments(oldText, newText, { showDeletions: !clean, headingShift: 1 });
+        result = diffDocuments(oldText, newText, {
+            showDeletions: !clean,
+            headingShift: 1,
+            mode: smartDiff ? "smart" : "exact",
+        });
         message = "";
         await tick();
         drawQuietSquiggles();
@@ -324,11 +336,22 @@
         return excerpt.replace(/[*`]+|(?<!\w)_+|_+(?!\w)/g, "");
     }
 
+    function wordCount(text: string) {
+        return text.match(/\S+/g)?.length ?? 0;
+    }
+
     function plural(n: number, word: string) {
         return `${n} ${word}${n === 1 ? "" : "s"}`;
     }
 
     onMount(() => {
+        // Before `mounted`, so the first diff runs for the right source.
+        try {
+            if (localStorage.getItem(VISITED_KEY)) source = "paste";
+            else localStorage.setItem(VISITED_KEY, "1");
+        } catch {
+            // Storage blocked: every visit is a first one.
+        }
         mounted = true;
         import("$lib/prose-diff/sample.json").then(({ default: sample }) => {
             sampleTexts = new Map(sample.versions.map((v) => [v.id, v.text] as [string, string]));
@@ -435,12 +458,29 @@
                         <span class="pdv-fig pdv-fig-del">{result.wordsRemoved}</span> removed, in
                         <span class="pdv-fig">{changes.length}</span>
                         {changes.length === 1 ? "place" : "places"}.
+                        {#if result.notesAdded && result.notesRemoved}
+                            <span class="pdv-fig pdv-fig-note">{result.notesAdded}</span>
+                            {result.notesAdded === 1 ? "comment" : "comments"} added and
+                            <span class="pdv-fig pdv-fig-note">{result.notesRemoved}</span> removed.
+                        {:else if result.notesAdded || result.notesRemoved}
+                            <span class="pdv-fig pdv-fig-note">{result.notesAdded || result.notesRemoved}</span>
+                            {(result.notesAdded || result.notesRemoved) === 1 ? "comment" : "comments"}
+                            {result.notesAdded ? "added" : "removed"}.
+                        {/if}
                     {:else}
                         No changes between these versions.
                     {/if}
                 </span>
                 {#if changes.length}
                     <div class="pdv-row">
+                        <button
+                            type="button"
+                            class="control-text"
+                            aria-pressed={smart}
+                            on:click={() => (smart = !smart)}
+                            title="Fold small unchanged fragments into the edits around them, and step through each changed paragraph"
+                            >smart diff</button
+                        >
                         <button
                             type="button"
                             class="control-text"
@@ -507,11 +547,17 @@
         {#if source === "paste"}
             <div class="pdv-paste" data-justify="off">
                 <label class="pdv-field">
-                    <span class="control-label">from</span>
+                    <span class="pdv-field-head">
+                        <span class="control-label">from</span>
+                        {#if before.trim()}<span class="pdv-field-count">{plural(wordCount(before), "word")}</span>{/if}
+                    </span>
                     <textarea bind:value={before} rows="9" placeholder="The earlier draft…" spellcheck="false"></textarea>
                 </label>
                 <label class="pdv-field">
-                    <span class="control-label">to</span>
+                    <span class="pdv-field-head">
+                        <span class="control-label">to</span>
+                        {#if after.trim()}<span class="pdv-field-count">{plural(wordCount(after), "word")}</span>{/if}
+                    </span>
                     <textarea bind:value={after} rows="9" placeholder="…and the later one." spellcheck="false"></textarea>
                 </label>
             </div>
@@ -601,35 +647,57 @@
 </section>
 
 <style>
-    /* One column on narrow screens, controls first. From lg the controls
-       become a sticky sidebar beside the text, as in the bookshelf's
-       companion panel, and the tool spans the bookshelf's wide measure. */
+    /* The text column is the post's own column (the standard column inside
+       the wide shell), so the diff reads in line with the prose above and
+       below it. Narrower than xl, the controls sit above it. From xl they
+       hang in the left margin as a sticky sidebar, the way About's sidenotes
+       hang in its right one: the pair is placed by its text column, never
+       recentred, so the text doesn't move. At 1280px that leaves the panel
+       about 38px clear of the window's edge. */
     .pdv {
+        --pdv-column: calc(820px - 2 * var(--space-6));
+        --pdv-side: 12rem;
+        --pdv-gap: var(--space-6);
         display: grid;
         grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-8);
-        margin: var(--space-10) 0;
+        gap: var(--space-6);
+        max-width: var(--pdv-column);
+        margin: var(--space-10) auto;
     }
 
     .pdv-defs {
         position: absolute;
     }
 
+    /* The controls are grouped on the subtle layer, a small value shift
+       rather than a card: no border or shadow. */
     .pdv-side {
         display: flex;
         flex-direction: column;
-        gap: var(--space-6);
+        gap: var(--space-5);
+        padding: var(--space-4);
+        background: theme("colors.cream.200");
+        border-radius: var(--radius-media);
+    }
+
+    :global(.dark) .pdv-side {
+        background: theme("colors.ink.800");
     }
 
     .pdv-main {
         min-width: 0;
     }
 
-    @media (min-width: 1024px) {
+    @media (min-width: 1280px) {
         .pdv {
-            grid-template-columns: 16rem minmax(0, 1fr);
-            gap: var(--space-12);
+            grid-template-columns: var(--pdv-side) minmax(0, 1fr);
+            column-gap: var(--pdv-gap);
             align-items: start;
+            max-width: calc(var(--pdv-side) + var(--pdv-gap) + var(--pdv-column));
+            /* Half the container less half the column is where the post's
+               column starts; the sidebar and its gap sit before it. */
+            margin-left: calc(50% - var(--pdv-column) / 2 - var(--pdv-side) - var(--pdv-gap));
+            margin-right: auto;
         }
 
         .pdv-side {
@@ -736,12 +804,20 @@
         color: theme("colors.wine.light");
     }
 
+    .pdv-fig-note {
+        color: theme("colors.ochre.DEFAULT");
+    }
+
+    :global(.dark) .pdv-fig-note {
+        color: theme("colors.ochre.light");
+    }
+
     /* ---- changes ---- */
     .pdv-changes {
         min-height: 0;
     }
 
-    @media (min-width: 1024px) {
+    @media (min-width: 1280px) {
         /* The list takes whatever height the sidebar has left. */
         .pdv-changes {
             flex: 1 1 auto;
@@ -775,7 +851,7 @@
         scrollbar-width: thin;
     }
 
-    @media (min-width: 1024px) {
+    @media (min-width: 1280px) {
         .pdv .pdv-change-list {
             max-height: none;
         }
@@ -860,6 +936,14 @@
         color: theme("colors.wine.light");
     }
 
+    .pdv-kind-comment {
+        color: theme("colors.ochre.DEFAULT");
+    }
+
+    :global(.dark) .pdv-kind-comment {
+        color: theme("colors.ochre.light");
+    }
+
     .pdv-excerpt {
         display: -webkit-box;
         overflow: hidden;
@@ -907,18 +991,65 @@
         line-height: 1.333;
     }
 
+    .pdv-field-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-2);
+    }
+
+    .pdv-field-count {
+        color: theme("colors.ink.500");
+        font-variant-numeric: lining-nums tabular-nums;
+    }
+
+    :global(.dark) .pdv-field-count {
+        color: theme("colors.cream.400");
+    }
+
+    /* Each paste box is a sheet of ruled notebook paper on the subtle
+       layer: set in Optima, since what goes in is prose, with a faint rule
+       under every line and a blush margin rule down the left. The rules are
+       drawn in rem so they stay on the lines at any text size, and they
+       scroll with the text. Decorative, so the rules sit under the 3:1
+       graphics threshold on purpose; the text clears 4.5:1 on the paper. */
     .pdv-field textarea {
+        --pdv-line: 1.5rem;
+        --pdv-margin: var(--space-6);
+        --pdv-rule: rgb(26 26 26 / 0.07);
+        --pdv-margin-rule: theme("colors.blush.400");
         width: 100%;
-        min-height: 12rem;
+        min-height: calc(8 * var(--pdv-line) + 2 * var(--space-3));
         resize: vertical;
-        padding: var(--space-2-5) var(--space-3);
+        padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--pdv-margin) + var(--space-2-5));
         color: theme("colors.ink.700");
-        background: theme("colors.cream.50");
+        background-color: theme("colors.cream.200");
+        background-image:
+            linear-gradient(
+                to right,
+                transparent var(--pdv-margin),
+                var(--pdv-margin-rule) var(--pdv-margin),
+                var(--pdv-margin-rule) calc(var(--pdv-margin) + 1px),
+                transparent calc(var(--pdv-margin) + 1px)
+            ),
+            repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent calc(var(--pdv-line) - 1px),
+                var(--pdv-rule) calc(var(--pdv-line) - 1px),
+                var(--pdv-rule) var(--pdv-line)
+            );
+        background-position:
+            0 0,
+            0 var(--space-3);
+        background-attachment: local;
         border: 1px solid theme("colors.ink.200");
-        border-radius: var(--radius-control);
-        font-family: var(--font-ui);
+        border-radius: var(--radius-inline);
+        caret-color: theme("colors.accent.dark");
+        font-family: var(--font-prose);
         font-size: 0.95rem;
-        line-height: 1.47;
+        line-height: var(--pdv-line);
+        scrollbar-width: thin;
         transition: border-color var(--motion-fast) var(--ease-standard);
     }
 
@@ -929,12 +1060,16 @@
 
     .pdv-field textarea::placeholder {
         color: theme("colors.ink.500");
+        font-style: italic;
     }
 
     :global(.dark) .pdv-field textarea {
+        --pdv-rule: rgb(253 248 243 / 0.07);
+        --pdv-margin-rule: rgb(241 130 114 / 0.4);
         color: theme("colors.cream.200");
-        background: theme("colors.ink.800");
+        background-color: theme("colors.ink.800");
         border-color: theme("colors.ink.700");
+        caret-color: theme("colors.accent.light");
     }
 
     :global(.dark) .pdv-field textarea:hover,
@@ -1085,6 +1220,31 @@
         padding: var(--space-0-5) var(--space-2);
     }
 
+    /* Comments (LaTeX `%` and reviewer macros, markdown <!-- -->) are set
+       apart from the prose as marginalia: the UI face, a size down, in ochre
+       on its own wash, led by who left them. A removed or added comment
+       keeps the strike or underline, so the marks still carry the change. */
+    .pdv-doc :global(.note) {
+        padding: 0 0.3em;
+        color: theme("colors.ochre.DEFAULT");
+        background: rgb(148 100 16 / 0.08);
+        font-family: var(--font-ui);
+        font-size: 0.8em;
+        font-style: normal;
+        border-radius: var(--radius-control);
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+    }
+
+    .pdv-doc :global(.note-by) {
+        font-weight: 600;
+    }
+
+    :global(.dark) .pdv-doc :global(.note) {
+        color: theme("colors.ochre.light");
+        background: rgb(112 74 5 / 0.35);
+    }
+
     /* Change bars in the margin, as the changebar package draws them, but
        drawn by hand: a pencil squiggle beside every changed passage, and the
        riso accent squiggle over it beside the one being stepped to. Both come
@@ -1183,7 +1343,7 @@
         pointer-events: none;
     }
 
-    @media (min-width: 1024px) {
+    @media (min-width: 1280px) {
         .pdv-nav-wrap {
             display: none;
         }
