@@ -47,6 +47,9 @@
   const ALPHA = { light: 0.5, dark: 0.42 };
   /** Falling leaves per 1000px of margin height. */
   const DENSITY = 7;
+  /** Leaves fall through the lower part of the screen only: they fade in
+   *  around this share of its height, so the top of the page stays clear. */
+  const START_SHARE = 0.5;
   /** Leaves the pile holds per 100px of margin width; past that, a leaf on
    *  the floor slips out under the screen. */
   const PILE_PER_100PX = 4.5;
@@ -373,9 +376,12 @@
       "pointer-events:none",
       "opacity:0",
       "transition:opacity 0.8s ease",
-      // Soften the edge nearest the text, so leaves fade rather than clip.
-      "mask-image:linear-gradient(to right,transparent,#000 22%)",
-      "-webkit-mask-image:linear-gradient(to right,transparent,#000 22%)",
+      // Soften the edge nearest the text, so leaves fade rather than clip,
+      // and fade them in around START_SHARE, so none appears out of thin air.
+      `mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,transparent ${START_SHARE * 100 - 8}%,#000 ${START_SHARE * 100 + 6}%)`,
+      "mask-composite:intersect",
+      `-webkit-mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,transparent ${START_SHARE * 100 - 8}%,#000 ${START_SHARE * 100 + 6}%)`,
+      "-webkit-mask-composite:source-in",
     ].join(";");
     document.body.appendChild(canvas);
     const ctx = canvas.getContext("2d")!;
@@ -409,7 +415,10 @@
         turn: rand(0.2, 0.75),
         len,
         x: rand(width * 0.32, width * 0.86),
-        y: scattered ? rand(-len, height * 0.6) : rand(-len * 3, -len),
+        // New leaves start just above where the fade-in begins.
+        y: scattered
+          ? rand(height * START_SHARE, height * 0.85)
+          : height * (START_SHARE - 0.08) - rand(0, len * 2),
         vx: 0,
         vy: 0,
         fall: rand(16, 30),
@@ -738,7 +747,8 @@
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      target = Math.max(3, Math.min(9, Math.round((height / 1000) * DENSITY)));
+      // Counted over the part of the screen the leaves fall through.
+      target = Math.max(3, Math.min(9, Math.round(((height * (1 - START_SHARE)) / 1000) * DENSITY * 1.4)));
       while (falling.filter((l) => !l.leaving).length < target) falling.push(makeLeaf(true));
       if (lastWidth && Math.abs(width - lastWidth) > 1) {
         // The pile is laid out on the old grid; start a new one.

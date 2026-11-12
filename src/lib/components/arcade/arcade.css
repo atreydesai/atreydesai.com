@@ -27,6 +27,7 @@ body.boba-active .custom-cursor {
   --b-tea: #e8b8a8; /* blush-400 */
   --b-tea-rush: #e85d4c; /* accent */
   --b-btn: #1a1a1a;
+  --b-btn-hover: #383838; /* ink-800; cream label 11.6:1 */
   --b-btn-text: #fdf8f3;
 
   color: var(--b-text);
@@ -53,7 +54,15 @@ body.boba-active .custom-cursor {
   --b-tea: #d4847a; /* accent-muted */
   --b-tea-rush: #f18272;
   --b-btn: #fdf8f3;
+  --b-btn-hover: #f5e6d3; /* cream-300; ink label 14:1 */
   --b-btn-text: #1a1a1a;
+}
+
+/* The site sets headings, paragraphs, and list items in the prose face with
+   old-style figures (a base-layer rule). The arcade is one family. */
+.boba-ui :where(h1, h2, h3, p, li) {
+  font-family: var(--font-ui);
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .boba-ui input {
@@ -105,17 +114,20 @@ body.boba-active .custom-cursor {
 }
 
 /* --- Riso sheet -------------------------------------------------------------
-   Paper and outline on ::after, the misregistered accent slab on ::before,
-   both behind the content and both roughened by the same filter. The slab
-   takes a small per-sheet tilt, so each one is printed a little off. */
+   Paper and the rough ink outline on ::after, behind the content. The
+   misregistered accent slab on ::before is opt-in, kept where it means
+   something: `.has-slab`, the score ticket (`.boba-ticket-start`, in every
+   game), and a ticket in a rush (`.is-rush`, where it also jitters). Paper
+   and slab share one filter so they wobble together; the slab takes the
+   sheet's small `--tilt`, so each one is printed a little off. */
 
 .boba-riso {
   position: relative;
   isolation: isolate;
 }
 
-.boba-riso::before,
-.boba-riso::after {
+.boba-riso::after,
+.boba-riso:is(.has-slab, .boba-ticket-start, .is-rush)::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -124,7 +136,7 @@ body.boba-active .custom-cursor {
   filter: url(#boba-rough);
 }
 
-.boba-riso::before {
+.boba-riso:is(.has-slab, .boba-ticket-start, .is-rush)::before {
   background: var(--b-slab);
   border-radius: 14px 5px 12px 7px;
   transform: translate(5px, 5px) rotate(var(--tilt, 0deg));
@@ -138,7 +150,7 @@ body.boba-active .custom-cursor {
 }
 
 /* A smaller print for slips that sit many to a row. */
-.boba-riso.is-small::before {
+.boba-riso.is-small:is(.has-slab, .boba-ticket-start, .is-rush)::before {
   transform: translate(3px, 3px) rotate(var(--tilt, 0deg));
 }
 
@@ -169,6 +181,11 @@ body.boba-active .custom-cursor {
 
 .dark .boba-hud::before {
   background: linear-gradient(rgb(26 26 26 / 0.94) 55%, rgb(26 26 26 / 0));
+}
+
+/* A game that paints its own full scene keeps its sky behind the tickets. */
+.boba-hud.is-bare::before {
+  display: none;
 }
 
 .boba-hud-row {
@@ -249,10 +266,11 @@ body.boba-active .custom-cursor {
 
 .boba-phase {
   color: var(--b-strong);
-  font-family: var(--font-prose);
-  font-size: 0.95rem;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
   font-style: italic;
-  line-height: 1.2;
+  font-weight: 400;
+  line-height: 1.25;
   white-space: nowrap;
 }
 
@@ -332,9 +350,10 @@ body.boba-active .custom-cursor {
 .boba-tip-label {
   margin-right: var(--space-1);
   color: var(--b-strong);
-  font-family: var(--font-prose);
-  font-size: 0.95rem;
+  font-family: var(--font-ui);
+  font-size: inherit;
   font-style: italic;
+  font-weight: 400;
 }
 
 .boba-keys {
@@ -385,11 +404,20 @@ body.boba-active .custom-cursor {
   backdrop-filter: blur(3px);
 }
 
+/* Dialog cards carry no slab; a soft shadow lifts them off the dimmed page
+   instead. It sits on the card itself, which is never filtered, and follows
+   the paper's radii so it is not mangled by the rough edge. */
 .boba-card {
   width: min(100%, 23rem);
   margin: auto;
   padding: var(--space-8);
+  border-radius: 12px 16px 11px 14px;
+  box-shadow: var(--shadow-dialog);
   animation: boba-card-in var(--motion-reveal) var(--ease-emphasized) both;
+}
+
+.dark .boba-card {
+  box-shadow: 0 0.75rem 2.25rem rgb(0 0 0 / 0.32);
 }
 
 .boba-title {
@@ -407,9 +435,10 @@ body.boba-active .custom-cursor {
   max-width: 58ch;
   margin: var(--space-3) 0 0;
   color: var(--b-text);
-  font-family: var(--font-prose);
-  font-size: 1.0625rem;
-  font-style: italic;
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  font-style: normal;
+  font-weight: 400;
   line-height: 1.5;
   text-wrap: pretty;
 }
@@ -427,11 +456,22 @@ body.boba-active .custom-cursor {
   margin-top: var(--space-6);
 }
 
-.boba-keys-row {
-  margin: var(--space-4) 0 0;
-}
+/* Buttons are hand-cut paper labels. The shape lives on the pseudo-elements,
+   so the filter roughens the paper and never the label: the face (paper and
+   a rough ink outline) on ::after, the primary's accent slab on ::before.
+   The <button> itself carries no paint; its radii only shape the focus ring.
 
+   Lift and press move the whole button, so the label travels with its face,
+   and the slab counter-moves to stay printed where it was. The face alone
+   takes the hand-placed lean (`--lean`) and the secondary's hover tip. */
 .boba-btn {
+  --lean: 0deg;
+  --lift: 0px;
+  --face: var(--b-btn);
+  --face-line: var(--b-line);
+
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -439,46 +479,119 @@ body.boba-active .custom-cursor {
   min-height: 2.5rem;
   padding: 0 var(--space-4);
   color: var(--b-btn-text);
-  background: var(--b-btn);
-  border: 1px solid var(--b-btn);
-  border-radius: var(--radius-control);
+  background: none;
+  border: 0;
+  border-radius: 9px 12px 8px 11px;
   cursor: pointer;
   font: inherit;
-  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-style: normal;
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
   touch-action: manipulation;
-  transition:
-    transform var(--motion-base) var(--ease-emphasized),
-    box-shadow var(--motion-base) var(--ease-emphasized);
+  transform: translate(var(--lift), var(--lift));
+  transition: transform var(--motion-base) var(--ease-emphasized);
 }
 
-/* Hover lifts the button off its own accent print, like the banner. */
+.boba-btn::before,
+.boba-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  filter: url(#boba-rough);
+  transition:
+    transform var(--motion-base) var(--ease-emphasized),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+/* The slab stays put on the sheet: 3px down-right, whatever the face does. */
+.boba-btn::before {
+  background: var(--b-slab);
+  border-radius: 11px 8px 12px 9px;
+  transform: translate(calc(3px - var(--lift)), calc(3px - var(--lift)));
+}
+
+.boba-btn::after {
+  background-color: var(--face);
+  border: 1.75px solid var(--face-line);
+  transform: rotate(var(--lean));
+}
+
+/* Neighbours sit a hair crooked, like labels placed by hand. */
+.boba-actions > .boba-btn:nth-child(odd) {
+  --lean: -0.6deg;
+}
+
+.boba-actions > .boba-btn:nth-child(even) {
+  --lean: 0.5deg;
+}
+
+/* Primary: the face lifts up-left off its slab, then presses down onto it. */
 @media (hover: hover) {
-  .boba-btn:hover {
-    box-shadow: 3px 3px 0 var(--b-slab);
-    transform: translate(-2px, -2px);
+  .boba-btn:not(.secondary, :disabled):hover {
+    --lift: -1.5px;
+    --face: var(--b-btn-hover);
   }
 }
 
-.boba-btn:active {
-  box-shadow: 0 0 0 var(--b-slab);
+.boba-btn:not(.secondary, :disabled):active {
+  --lift: 2px;
+  transition-duration: var(--motion-instant);
+}
+
+.boba-btn:not(.secondary, :disabled):active::before {
+  transition-duration: var(--motion-instant);
+}
+
+/* Secondary: paper one step off its card, an ink outline, no slab. */
+.boba-btn.secondary {
+  --face: var(--b-raised);
+
+  color: var(--b-strong);
+}
+
+.boba-btn.secondary::before {
+  display: none;
+}
+
+@media (hover: hover) {
+  .boba-btn.secondary:not(:disabled):hover::after {
+    background-image: linear-gradient(var(--b-wash), var(--b-wash));
+    transform: rotate(-1deg);
+  }
+}
+
+.boba-btn.secondary:not(:disabled):active {
   transform: translateY(1px);
   transition-duration: var(--motion-instant);
 }
 
-.boba-btn.secondary {
-  color: var(--b-strong);
-  background: transparent;
-  border-color: var(--b-muted);
-}
-
 .boba-btn:disabled {
-  box-shadow: none;
   cursor: default;
   opacity: 0.6;
-  transform: none;
+}
+
+/* A key hint rides inside its button as a small chip after the label. */
+.boba-btn kbd {
+  padding: 0.1875rem 0.3125rem;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 2px;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+/* Touch devices have no keys to hint at. */
+@media (hover: none) and (pointer: coarse) {
+  .boba-btn kbd {
+    display: none;
+  }
 }
 
 /* --- Feedback ----------------------------------------------------------------- */
@@ -616,12 +729,26 @@ body.boba-active .custom-cursor {
     animation: none;
   }
 
-  .boba-riso::before,
-  .boba-btn {
+  .boba-riso::before {
     transition: none;
   }
 
-  .boba-btn:hover {
+  /* Buttons keep their colour changes but lose the lift, tip, and press. */
+  .boba-btn {
+    --lift: 0px !important;
+  }
+
+  .boba-btn,
+  .boba-btn::before,
+  .boba-btn::after {
+    transition-property: background-color;
+  }
+
+  .boba-btn.secondary:not(:disabled):hover::after {
+    transform: rotate(var(--lean));
+  }
+
+  .boba-btn.secondary:not(:disabled):active {
     transform: none;
   }
 }

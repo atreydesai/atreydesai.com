@@ -19,26 +19,16 @@ import {
   tierForBar,
 } from "../src/lib/arcade/stab-engine.js";
 import {
-  MAX_TICKETS,
-  SHIFT_SECONDS,
-  TOPPINGS,
-  makeOrder,
-  paceForElapsed,
-  phaseForElapsed,
-  pointsForServe,
-  sameDrink,
-  ticketFor,
-  timeRemaining,
-  toggleTopping,
-} from "../src/lib/arcade/orders-engine.js";
-import {
   GROW_AFTER,
   START_WIDTH,
+  TRAY_MARGIN,
   dropCup,
   phaseForHeight,
+  sliderWidth,
   speedForHeight,
   stepSlide,
   trackFor,
+  traySpan,
   widthAfterPerfect,
 } from "../src/lib/arcade/stack-engine.js";
 import { COUNTDOWN_SECONDS, stepCountdown } from "../src/lib/arcade/countdown.js";
@@ -122,99 +112,109 @@ test("a stab goes to the closest waiting cup, and late cups are missed", () => {
   assert.equal(isGoldenCup(12), true);
 });
 
-// --- Order up -----------------------------------------------------------------
-
-test("the shift speeds up and customers get fussier", () => {
-  assert.equal(phaseForElapsed(0), "opening");
-  assert.equal(phaseForElapsed(30), "steady");
-  assert.equal(phaseForElapsed(SHIFT_SECONDS), "rush");
-  const opening = paceForElapsed(0);
-  const rush = paceForElapsed(80);
-  assert.ok(rush.arrivalEvery < opening.arrivalEvery);
-  assert.ok(rush.patience < opening.patience);
-  assert.ok(rush.maxToppings > opening.maxToppings);
-  assert.ok(MAX_TICKETS >= 3);
-});
-
-test("orders stay inside the pace's topping range, without repeats", () => {
-  const random = seeded(3);
-  for (const elapsed of [0, 30, 80]) {
-    const { minToppings, maxToppings } = paceForElapsed(elapsed);
-    for (let index = 0; index < 200; index++) {
-      const order = makeOrder(elapsed, random);
-      assert.ok(order.toppings.length >= minToppings);
-      assert.ok(order.toppings.length <= maxToppings);
-      assert.equal(new Set(order.toppings).size, order.toppings.length);
-      const sorted = [...order.toppings].sort(
-        (a, b) => TOPPINGS.indexOf(a) - TOPPINGS.indexOf(b),
-      );
-      assert.deepEqual(order.toppings, sorted);
-    }
-  }
-});
-
-test("a drink matches only its exact order", () => {
-  /** @type {import("../src/lib/arcade/orders-engine.js").Order} */
-  const order = { tea: "taro", toppings: ["pearls", "foam"] };
-  assert.equal(sameDrink({ tea: "taro", toppings: ["foam", "pearls"] }, order), true);
-  assert.equal(sameDrink({ tea: "taro", toppings: ["pearls"] }, order), false);
-  assert.equal(sameDrink({ tea: "matcha", toppings: ["pearls", "foam"] }, order), false);
-});
-
-test("a served drink goes to the most impatient matching ticket", () => {
-  const cup = { tea: /** @type {const} */ ("milk"), toppings: [] };
-  const tickets = [
-    { order: { tea: /** @type {const} */ ("milk"), toppings: [] }, patienceLeft: 9 },
-    { order: { tea: /** @type {const} */ ("taro"), toppings: [] }, patienceLeft: 1 },
-    { order: { tea: /** @type {const} */ ("milk"), toppings: [] }, patienceLeft: 4 },
-  ];
-  assert.equal(ticketFor(cup, tickets), 2);
-  assert.equal(ticketFor({ tea: "matcha", toppings: [] }, tickets), -1);
-});
-
-test("fast service earns tips and streaks add up", () => {
-  const order = { tea: /** @type {const} */ ("milk"), toppings: /** @type {const} */ (["pearls"]) };
-  assert.deepEqual(pointsForServe({ ...order, toppings: [...order.toppings] }, 0.9, 1), { points: 5, tip: 2 });
-  assert.deepEqual(pointsForServe({ ...order, toppings: [...order.toppings] }, 0.4, 1), { points: 4, tip: 1 });
-  assert.deepEqual(pointsForServe({ ...order, toppings: [...order.toppings] }, 0.1, 8), { points: 5, tip: 0 });
-  assert.equal(timeRemaining(0), SHIFT_SECONDS);
-  assert.equal(timeRemaining(SHIFT_SECONDS + 5), 0);
-});
-
-test("toppings toggle in and out in shelf order", () => {
-  let cup = toggleTopping({ tea: null, toppings: [] }, "foam");
-  cup = toggleTopping(cup, "pearls");
-  assert.deepEqual(cup.toppings, ["pearls", "foam"]);
-  cup = toggleTopping(cup, "foam");
-  assert.deepEqual(cup.toppings, ["pearls"]);
-});
-
 // --- Cup stack ------------------------------------------------------------------
 
 test("a close drop is perfect and keeps the full width", () => {
   const top = { left: -7, width: START_WIDTH };
-  const result = dropCup(top, -6.4);
-  assert.equal(result.kind, "perfect");
-  assert.deepEqual(result.placed, top);
-  assert.equal(result.cut, null);
+  for (const left of [-6.4, -5.6, -8.5]) {
+    const result = dropCup(top, left);
+    assert.equal(result.kind, "perfect", `left ${left}`);
+    assert.deepEqual(result.placed, top);
+    assert.equal(result.cut, null);
+  }
+  assert.equal(dropCup(top, -5.4).kind, "cut");
 });
 
-test("an offset drop slices off exactly the overhang", () => {
+test("the tray is judged exactly as wide as it is drawn", () => {
+  const tray = traySpan();
+  assert.deepEqual(tray, { left: -START_WIDTH / 2 - TRAY_MARGIN, width: START_WIDTH + TRAY_MARGIN * 2 });
+  assert.equal(sliderWidth(tray), START_WIDTH);
+});
+
+test("a cup anywhere on the wider tray lands whole, with nothing cut", () => {
+  const tray = traySpan();
+  for (let left = tray.left; left + START_WIDTH <= tray.left + tray.width; left += 0.25) {
+    const result = dropCup(tray, left, START_WIDTH);
+    const snapped = Math.round(left);
+    if (snapped < tray.left || snapped + START_WIDTH > tray.left + tray.width) continue;
+    assert.notEqual(result.kind, "cut", `left ${left}`);
+    assert.equal(result.cut, null);
+    assert.equal(result.placed?.width, START_WIDTH);
+  }
+  // Flush against either edge of the tray.
+  assert.deepEqual(dropCup(tray, tray.left, START_WIDTH), {
+    kind: "clean",
+    placed: { left: tray.left, width: START_WIDTH },
+    cut: null,
+  });
+  const right = tray.left + tray.width - START_WIDTH;
+  assert.deepEqual(dropCup(tray, right, START_WIDTH).placed, { left: right, width: START_WIDTH });
+});
+
+test("on the tray, perfect means centred", () => {
+  const tray = traySpan();
+  const centre = -START_WIDTH / 2;
+  for (const left of [centre, centre + 1.4, centre - 1.5]) {
+    const result = dropCup(tray, left, START_WIDTH);
+    assert.equal(result.kind, "perfect", `left ${left}`);
+    assert.deepEqual(result.placed, { left: centre, width: START_WIDTH });
+  }
+  const off = dropCup(tray, centre + 2, START_WIDTH);
+  assert.equal(off.kind, "clean");
+  assert.deepEqual(off.placed, { left: centre + 2, width: START_WIDTH });
+});
+
+test("the sliding cup is never wider than a fresh cup", () => {
+  assert.equal(sliderWidth(traySpan()), START_WIDTH);
+  assert.equal(sliderWidth({ left: -3, width: 9 }), 9);
+  assert.equal(sliderWidth({ left: -20, width: 40 }), START_WIDTH);
+  // The track keeps the slider's own width on screen, even above the tray.
+  const track = trackFor(traySpan(), 12);
+  assert.ok(track.max + START_WIDTH <= 12 - 1);
+  assert.ok(track.min >= -12 + 1);
+});
+
+test("an overhang past the tray is still cut on the right side", () => {
+  const tray = traySpan();
+  const right = dropCup(tray, tray.left + tray.width - START_WIDTH + 3, START_WIDTH);
+  assert.equal(right.kind, "cut");
+  assert.deepEqual(right.cut, { left: tray.left + tray.width, width: 3 });
+  assert.deepEqual(right.placed, { left: tray.left + tray.width - START_WIDTH + 3, width: START_WIDTH - 3 });
+
+  const left = dropCup(tray, tray.left - 2, START_WIDTH);
+  assert.deepEqual(left.cut, { left: tray.left - 2, width: 2 });
+  assert.deepEqual(left.placed, { left: tray.left, width: START_WIDTH - 2 });
+});
+
+test("an offset drop snaps toward the tower and never cuts more than was seen", () => {
   const top = { left: -7, width: 14 };
+  // 3.8 units hang over on the right: the drop snaps in and loses 3.
   const right = dropCup(top, -3.2);
   assert.equal(right.kind, "cut");
-  assert.deepEqual(right.placed, { left: -3, width: 10 });
-  assert.deepEqual(right.cut, { left: 7, width: 4 });
+  assert.deepEqual(right.placed, { left: -4, width: 11 });
+  assert.deepEqual(right.cut, { left: 7, width: 3 });
 
+  // 2.6 units hang over on the left: it loses 2.
   const left = dropCup(top, -9.6);
-  assert.deepEqual(left.placed, { left: -7, width: 11 });
-  assert.deepEqual(left.cut, { left: -10, width: 3 });
+  assert.deepEqual(left.placed, { left: -7, width: 12 });
+  assert.deepEqual(left.cut, { left: -9, width: 2 });
+
+  for (let position = -20; position <= 6; position += 0.13) {
+    const result = dropCup(top, position);
+    if (result.kind !== "cut" || !result.cut) continue;
+    const seen = Math.max(top.left - position, position + 14 - (top.left + top.width));
+    assert.ok(result.cut.width <= seen + 1e-9, `cut ${result.cut.width} of ${seen} at ${position}`);
+  }
 });
 
 test("a drop with no overlap misses", () => {
   const result = dropCup({ left: 0, width: 4 }, 6);
   assert.equal(result.kind, "miss");
   assert.equal(result.placed, null);
+  assert.deepEqual(result.cut, { left: 6, width: 4 });
+  assert.equal(dropCup({ left: 0, width: 4 }, -4.2).kind, "miss");
+  const tray = traySpan();
+  assert.equal(dropCup(tray, tray.left + tray.width, START_WIDTH).kind, "miss");
 });
 
 test("perfect streaks grow the cup back, never past the start", () => {
@@ -239,7 +239,9 @@ test("the slide ping-pongs inside its track and stays on screen", () => {
 
 test("the stack speeds up and its music builds", () => {
   assert.ok(speedForHeight(10) > speedForHeight(0));
-  assert.equal(speedForHeight(500), 44);
+  assert.equal(speedForHeight(0), 15);
+  assert.equal(speedForHeight(20), 28);
+  assert.equal(speedForHeight(500), 40);
   assert.equal(phaseForHeight(0), "opening");
   assert.equal(phaseForHeight(20), "steady");
   assert.equal(phaseForHeight(40), "rush");

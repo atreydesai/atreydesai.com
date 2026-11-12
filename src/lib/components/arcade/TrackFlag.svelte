@@ -25,11 +25,16 @@
 </span>
 
 <style>
+  /* The box hugs what is drawn in it (the flag's canvas sets its own CSS
+     width from the measured song name, or the placeholder's text), so the
+     ticket's ordinary gap follows it whatever the song. Long names are
+     capped and cut at the free end of the flag. */
   .boba-track {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1-5);
-    width: 12rem;
+    width: max-content;
+    max-width: 12rem;
     height: 2rem;
     overflow: hidden;
   }
@@ -50,9 +55,11 @@
 
   .placeholder {
     color: var(--b-muted);
-    font-family: var(--font-prose);
-    font-size: 0.95rem;
+    font-family: var(--font-ui);
+    font-size: 0.875rem;
     font-style: italic;
+    font-weight: 400;
+    line-height: 1.25;
     white-space: nowrap;
   }
 

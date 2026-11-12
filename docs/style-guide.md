@@ -1242,69 +1242,17 @@ Must still use accessible semantic text, link, focus, and selection colors.
 
 ### Boba arcade
 
-The pixel boba on the homepage opens a menu of four small games; the Konami
-code drops straight into the first. The arcade owns a separate `.boba-*`
-system, and its surfaces extend the riso banner rather than inventing an
-arcade look, so every game reads as part of the site:
+The pixel boba on the homepage opens a menu of small games. The arcade owns a
+separate `.boba-*` system with its own rules for type, surfaces, buttons,
+motion, sound, and each game's look; they live in the
+[boba arcade style guide](arcade-style-guide.md). Two things are worth knowing
+from here:
 
-| Game       | Verb                         | Input                  | Where                  |
-| ---------- | ---------------------------- | ---------------------- | ---------------------- |
-| boba catch | Catch cups thrown by links   | Mouse                  | Desktop only           |
-| straw stab | Stab each cup on the beat    | Tap, click, Space      | Everywhere             |
-| order up   | Build drinks for the tickets | Tap, click, `1`–`8`    | Everywhere             |
-| cup stack  | Drop cups onto a tower       | Tap, click, Space      | Everywhere             |
-
-- **Riso sheets.** HUD tickets, the menu, pause cards, results slips, and
-  order tickets are `.boba-riso` sheets: `#FBF2E8` paper (`#2A2422` dark) with
-  a `2.25px` ink outline, and an accent slab misregistered `5px` behind it
-  (`3px` for `.is-small` slips). Paper, outline, and slab share one
-  displacement filter so they wobble together. Each sheet sets a `--tilt` of at
-  most `±2deg` on its slab only, never on the text.
-- **HUD.** Tickets pinned along the top: score at the start, controls and
-  lives at the end, anything else in the middle (a phone moves the middle
-  ticket to a second row). A paper wash fades the site header behind them.
-  Timers are a drawn cup whose tea drains over the shift; lives are three
-  tapioca pearls, and a dropped one becomes a dashed ring.
-- **Stages.** Catch plays on the page itself, lightly dimmed. The others lay
-  paper over the page at 93%, so the site stays faintly visible underneath.
-- **Type.** The site's three roles, not an arcade face: NHG Display for
-  scores, clocks, countdowns, and titles; NHG Text for menu names (the
-  `type-item-heading` recipe, `400`) and, at `12px` `400`/`500`, for labels, stats,
-  controls, and canvas popups (`arcadeFont()` reads `--font-ui`); Optima
-  italic for phases, decks, tips, and section labels. No uppercase outside the
-  stamps.
-- **Hand-drawn marks.** Countdowns and final scores are circled with the same
-  unclosed pen loops as the homepage interest markers, drawn on with a
-  stroke-dash reveal; straw stab rings the spot on its belt the same way. A
-  new personal best, and a ready order, get a crooked rubber stamp.
-  Separators in the arcade's own copy (tips, the serve toast) and order
-  up's "not yet" checklist marker use the site's drawn dot (see Marks);
-  canvas popups keep the plain `·`.
-- **Color.** Scoped `--b-*` variables on `.boba-ui` map to palette values and
-  switch with the theme; canvas marks read the same values through
-  `risoColors()`. Golden cups use ochre; canvas popups use the page's text
-  colors for the active theme. Sprite colors remain game art.
-- **Voice.** Lowercase titles and labels, sentence-case actions, and a light
-  joke in the decks (“The pearls will wait.”).
-
-Structure:
-
-- The arcade is loaded the first time it opens, so its code and its global
-  sheet (`arcade.css`) never ship with an ordinary page view. It sets
-  `data-justify="off"` so the paragraph justifier leaves game copy alone.
-- Shared pieces live in `src/lib/components/arcade/` (countdown, pause card,
-  results slip with the per-game leaderboard, pearls, cup timer, HUD buttons),
-  and each game's rules live in a DOM-free module under `src/lib/arcade/`
-  with node tests.
-- Straw stab draws its belt against the audio clock itself (`audioClock()` in
-  `sfx.ts`), so cups land on what is heard; pausing suspends the audio context
-  rather than stopping the music, so it resumes on the same beat. Without
-  running audio the game falls back to the page clock and plays silently.
-
-Shared focus, input, contrast, and reduced-motion rules still apply: reduced
-motion removes the pops, draws, stamps, jitter, and bumps and shows every mark
-in its finished state. Every game plays by keyboard as well as pointer, and
-touch devices hide key hints. Game styles must not leak into ordinary routes.
+- Inside the arcade the type is Neue Haas Grotesk only, and the accent slab is
+  opt-in. Neither exception applies anywhere else on the site.
+- The arcade still inherits this guide's palette, focus ring, contrast,
+  target-size, layer, and reduced-motion rules, and its styles must not leak
+  into ordinary routes.
 
 ### Canvas and generated art
 
@@ -1314,7 +1262,9 @@ website system.
 
 The homepage's falling leaves (`FallingLeaves.svelte`) are the one ambient
 animation. They stay in the margin right of the content column, never under
-text, and only from `1080px` up, where that margin can hold a leaf. Each leaf is
+text, and only from `1080px` up, where that margin can hold a leaf. They fall
+through the lower half of the screen only, fading in around its middle, so
+the top of the page stays clear. Each leaf is
 drawn on a screen-aligned `6px` grid: rounded squares where the blade covers a
 cell, NHG Text density glyphs (`.:-=+*#%`) where it only partly covers one, and
 a stroke glyph for the stem. They are drawn faint (50% light, 42% dark) from

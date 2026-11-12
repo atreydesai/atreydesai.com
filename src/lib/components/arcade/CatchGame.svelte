@@ -46,7 +46,6 @@
   import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import { firstVisit } from "$lib/arcade/scores";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import Mark from "$lib/components/Mark.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
@@ -359,7 +358,7 @@
       : perfect
         ? `perfect +${points}`
         : combo > 1
-          ? `+${points} · ×${combo}`
+          ? `+${points} ×${combo}`
           : `+${points}`;
     addPopup(popups, centerX, basketY - 14, text, boba.golden ? "gold" : perfect ? "perfect" : "plain");
   }
@@ -373,7 +372,7 @@
       popups,
       clamp(centerX, 65, viewW - 65),
       viewH - 46,
-      lostCombo > 1 ? "splat · combo lost" : "splat",
+      lostCombo > 1 ? "splat" : "splat",
       "miss",
       0.8,
     );
@@ -717,7 +716,7 @@
       </span>
     </div>
 
-    <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.8deg">
+    <div class="boba-ticket boba-ticket-end boba-riso">
       <Pearls left={hearts} pulse={missPulse} />
       {#key run}
         <TrackFlag />
@@ -726,15 +725,9 @@
     </div>
   </div>
 
-  {#if tipVisible}
+  {#if tipVisible && !paused}
     <div class="boba-tip" role="note" aria-label="How to play">
-      <span class="boba-tip-label">how to play</span>
-      <span>move to catch</span>
-      <Mark kind="dot" />
-      <span>dead center is a perfect</span>
-      <Mark kind="dot" />
-      <span>gold cups earn +3</span>
-      <span class="boba-keys"><kbd>P</kbd> pause <kbd>Esc</kbd> quit</span>
+      <span>move the basket to catch the cups</span>
     </div>
   {/if}
 </header>

@@ -165,6 +165,51 @@ export const MENU_ICONS: Record<string, { grid: Grid; palette: Palette }> = {
     ],
     palette: { O: "currentColor", L: "#b388e0", M: "#8bbf5a", N: "#f47ba0" },
   },
+  lander: {
+    grid: [
+      "....S....",
+      "...OOO...",
+      "..OlllO..",
+      "..OOOOO..",
+      "..OLLLO..",
+      "..ObLbO..",
+      "...OOO...",
+      "..O.F.O..",
+      ".O..F..O.",
+      "OO.....OO",
+    ],
+    palette: { O: "currentColor", S: STRAW_PINK, l: LID, L: "#c79a6b", b: PEARL, F: "#e85d4c" },
+  },
+  runner: {
+    grid: [
+      "....S....",
+      "..OOOOO..",
+      "..OlllO..",
+      "m.OOOOO..",
+      ".mOLLLO..",
+      "m.ObLbO..",
+      "...OOO...",
+      "..O...O..",
+      ".O.....O.",
+      ".O......O",
+    ],
+    palette: { O: "currentColor", S: STRAW_PINK, l: LID, L: "#c79a6b", b: PEARL, m: "#e85d4c" },
+  },
+  spill: {
+    grid: [
+      "OO.......",
+      "OTO......",
+      ".OT......",
+      "..T......",
+      "..T.S....",
+      "...TTS...",
+      ".....TS..",
+      "....O.TO.",
+      "....OTTO.",
+      "....OOOO.",
+    ],
+    palette: { O: "currentColor", T: "#c79a6b", S: STRAW_PINK },
+  },
 };
 
 // --- Canvas ---------------------------------------------------------------
@@ -320,10 +365,29 @@ export function arcadeFont(size = 13, weight = 500) {
 }
 
 const loopPaths = new Map<number, Path2D>();
+const loopLengths = new Map<number, number>();
+
+/** A loop's length in its own 44 × 28 units, measured once through SVG. */
+function loopLength(key: number) {
+  let length = loopLengths.get(key);
+  if (length === undefined) {
+    length = 130;
+    try {
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", LOOPS[key]);
+      length = path.getTotalLength() || length;
+    } catch {
+      // Without SVG geometry, a generous guess still draws the whole loop.
+    }
+    loopLengths.set(key, length);
+  }
+  return length;
+}
 
 /**
  * Strokes pen loop `index` into a box, with its accent print misregistered
- * behind it, the canvas version of the riso marks in the HUD.
+ * behind it, the canvas version of the riso marks in the HUD. `progress`
+ * below 1 draws only that share of the stroke, for the pen's draw-on reveal.
  */
 export function drawLoop(
   ctx: CanvasRenderingContext2D,
@@ -334,7 +398,9 @@ export function drawLoop(
   height: number,
   colors = risoColors(),
   lineWidth = 2,
+  progress = 1,
 ) {
+  if (progress <= 0) return;
   const key = index % LOOPS.length;
   let path = loopPaths.get(key);
   if (!path) {
@@ -346,6 +412,10 @@ export function drawLoop(
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+  if (progress < 1) {
+    const length = loopLength(key);
+    ctx.setLineDash([length * progress, length]);
+  }
   for (const [color, offset] of [
     [colors.slab, 3],
     [colors.ink, 0],

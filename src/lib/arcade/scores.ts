@@ -7,8 +7,11 @@ import type { GameId } from "$lib/boba";
 const BEST_COOKIE: Record<GameId, string> = {
   catch: "boba_best_v2",
   stab: "boba_best_stab_v1",
-  orders: "boba_best_orders_v1",
+  orders: "boba_best_orders_v2",
   stack: "boba_best_stack_v1",
+  lander: "boba_best_lander_v1",
+  runner: "boba_best_runner_v1",
+  spill: "boba_best_spill_v1",
 };
 
 const TIP_COOKIE: Record<GameId, string> = {
@@ -16,6 +19,9 @@ const TIP_COOKIE: Record<GameId, string> = {
   stab: "boba_tip_stab_v1",
   orders: "boba_tip_orders_v1",
   stack: "boba_tip_stack_v1",
+  lander: "boba_tip_lander_v1",
+  runner: "boba_tip_runner_v1",
+  spill: "boba_tip_spill_v1",
 };
 
 const ONE_YEAR = 31_536_000;

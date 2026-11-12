@@ -10,6 +10,9 @@
 
   const dispatch = createEventDispatcher<{ pick: GameId; close: null }>();
 
+  /** A game that just failed to load, so the menu can say so. */
+  export let failed: GameId | null = null;
+
   let card: HTMLElement;
   let bests: Partial<Record<GameId, number>> = {};
   let playable: Partial<Record<GameId, boolean>> = {};
@@ -54,7 +57,7 @@
     if (event.target === event.currentTarget) dispatch("close");
   }}
 >
-  <div bind:this={card} class="boba-card boba-riso menu" tabindex="-1" style="--tilt: -1deg">
+  <div bind:this={card} class="boba-card boba-riso menu" tabindex="-1">
     <h2 id="boba-menu-title" class="boba-title">today’s menu</h2>
 
     <!-- Priced like a menu board: each game's best score sits where the
@@ -84,6 +87,8 @@
               </span>
               {#if playable[game.id] === false}
                 <span class="blurb">Needs a mouse, so it only opens on a computer.</span>
+              {:else if failed === game.id}
+                <span class="blurb" role="alert">Couldn’t load just now. Try it again.</span>
               {/if}
             </span>
             <kbd class="key" aria-hidden="true">{game.key}</kbd>
@@ -187,10 +192,11 @@
 
   .blurb {
     color: var(--b-text);
-    font-family: var(--font-prose);
-    font-size: 0.95rem;
+    font-family: var(--font-ui);
+    font-size: 0.875rem;
     font-style: italic;
-    line-height: 1.47;
+    font-weight: 400;
+    line-height: 1.43;
     text-wrap: pretty;
   }
 

@@ -33,4 +33,6 @@ Watchlist films remain untagged until watched; when they are promoted, up to
 five exact Letterboxd genres are added unless the bookshelf already has
 curated tags.
 
-The design system is documented in [docs/style-guide.md](docs/style-guide.md).
+The design system is documented in [docs/style-guide.md](docs/style-guide.md);
+the boba arcade's games have their own
+[docs/arcade-style-guide.md](docs/arcade-style-guide.md).

@@ -76,48 +76,46 @@
     aria-modal="true"
     aria-labelledby="boba-over-title"
     tabindex="-1"
-    style="--tilt: 1.2deg"
   >
-    <header class="head">
-      <div>
+    <!-- The score on the left; the run's stats print beside it like a
+         receipt: labels, dot leaders, figures, one to a row. -->
+    <div class="top">
+      <div class="score">
         <h2 id="boba-over-title" class="boba-title">{title}</h2>
         <p class="boba-deck">{deck}</p>
-      </div>
-      {#if newBest}
-        <span class="stamp">new best</span>
-      {/if}
-    </header>
 
-    <div class="final">
-      <span class="circle">
-        <svg viewBox="0 0 44 28" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-          <path pathLength="1" d={LOOPS[1]} />
-        </svg>
-        <strong>{score}</strong>
-      </span>
-      <span class="boba-meta">{unit}</span>
+        <div class="final">
+          <span class="circle">
+            <svg viewBox="0 0 44 28" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+              <path pathLength="1" d={LOOPS[1]} />
+            </svg>
+            <strong>{score}</strong>
+          </span>
+          <span class="final-side">
+            <span class="boba-meta">{unit}</span>
+            {#if newBest}
+              <span class="stamp">new best</span>
+            {/if}
+          </span>
+        </div>
+      </div>
+
+      {#if stats.length}
+        <dl class="receipt">
+          {#each stats as stat}
+            <div>
+              <dt>{stat.label}</dt>
+              <dd>{stat.value}</dd>
+            </div>
+          {/each}
+        </dl>
+      {/if}
     </div>
 
-    <!-- The run's stats print like a receipt: labels, dot leaders, figures. -->
-    <dl class="receipt">
-      {#each stats as stat}
-        <div>
-          <dt>{stat.label}</dt>
-          <dd>{stat.value}</dd>
-        </div>
-      {/each}
-    </dl>
-
     <div class="lower">
-      <section class="board" aria-labelledby="boba-board-title">
-        <h3 id="boba-board-title" class="label">the regulars</h3>
-        {#if boardLoading}
-          <p class="note">checking the board…</p>
-        {:else if !boardAvailable}
-          <p class="note">the board is offline right now</p>
-        {:else if board.length === 0}
-          <p class="note">nobody yet. be the first</p>
-        {:else}
+      {#if !boardLoading && boardAvailable && board.length > 0}
+        <section class="board" aria-labelledby="boba-board-title">
+          <h3 id="boba-board-title" class="label">the regulars</h3>
           <ol>
             {#each board.slice(0, 6) as entry, index}
               <li class="row" class:me={entry.me}>
@@ -128,8 +126,8 @@
               </li>
             {/each}
           </ol>
-        {/if}
-      </section>
+        </section>
+      {/if}
 
       <div class="sign">
         {#if score > 0 && boardAvailable && !submitted}
@@ -162,12 +160,6 @@
           <p class="note signed">
             you’re on the board{#if playerRank}&nbsp;at #{playerRank}{/if}
           </p>
-        {:else if boardLoading}
-          <p class="note">checking the board…</p>
-        {:else if score === 0}
-          <p class="note">score something to sign the board</p>
-        {:else}
-          <p class="note">your personal best stays on this device</p>
         {/if}
       </div>
     </div>
@@ -187,21 +179,46 @@
 </div>
 
 <style>
+  /* The card is the container: the top block goes two-up only when the
+     card itself is wide enough, whatever the viewport. */
   .boba-over-card {
     width: min(100%, 36rem);
+    container-type: inline-size;
   }
 
-  .head {
+  /* Score block on the left, the receipt beside it, centred against it. */
+  .top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(10.5rem, 12rem);
+    align-items: center;
+    gap: var(--space-6);
+  }
+
+  .score {
+    min-width: 0;
+  }
+
+  .score:only-child {
+    grid-column: 1 / -1;
+  }
+
+  .final {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-5);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-top: var(--space-6);
+  }
+
+  /* The unit, and under it the stamp: it never reaches the receipt. */
+  .final-side {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-3);
   }
 
   /* A rubber stamp, pressed a little crooked. */
   .stamp {
-    flex: none;
-    margin-top: var(--space-1);
     padding: var(--space-1) var(--space-2-5);
     color: var(--b-accent);
     border: 2px solid currentColor;
@@ -211,6 +228,7 @@
     letter-spacing: 0.12em;
     line-height: 1.25;
     text-transform: uppercase;
+    white-space: nowrap;
     transform: rotate(-8deg);
     filter: url(#boba-rough-fine);
     animation: stamp 380ms var(--ease-emphasized) 350ms both;
@@ -223,19 +241,12 @@
     }
   }
 
-  .final {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-4);
-    margin: var(--space-8) 0 var(--space-6);
-  }
-
   .circle {
     position: relative;
     display: inline-grid;
     place-items: center;
-    min-width: 8rem;
-    padding: var(--space-4) var(--space-8);
+    min-width: 6.5rem;
+    padding: var(--space-3) var(--space-6);
   }
 
   .circle svg {
@@ -261,16 +272,16 @@
     position: relative;
     color: var(--b-strong);
     font-family: var(--font-display);
-    font-size: clamp(3.75rem, 2.25rem + 6vw, 6rem);
+    font-size: clamp(3.25rem, 2.25rem + 4vw, 4.5rem);
     font-weight: 700;
     letter-spacing: -0.025em;
     line-height: 0.9;
   }
 
+  /* The run's stats, one to a row, like a receipt. */
   .receipt {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2) var(--space-8);
+    gap: var(--space-2);
     margin: 0;
     padding: var(--space-4) 0;
     border-block: 1px dashed var(--b-rule);
@@ -306,6 +317,7 @@
     margin: 0;
     color: var(--b-strong);
     font-weight: 500;
+    white-space: nowrap;
   }
 
   .lower {
@@ -319,11 +331,11 @@
     display: block;
     margin: 0 0 var(--space-2);
     color: var(--b-strong);
-    font-family: var(--font-prose);
-    font-size: 1.0625rem;
+    font-family: var(--font-ui);
+    font-size: 0.875rem;
     font-style: italic;
     font-weight: 400;
-    line-height: 1.4;
+    line-height: 1.333;
   }
 
   .board ol {
@@ -427,18 +439,16 @@
     line-height: 1.333;
   }
 
-  @media (max-width: 640px) {
-    .receipt,
-    .lower {
-      grid-template-columns: 1fr;
+  /* A narrow card (phones) stacks: score block, then the receipt. */
+  @container (max-width: 30rem) {
+    .top {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-5);
     }
 
     .lower {
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--space-6);
-    }
-
-    .final {
-      margin: var(--space-6) 0 var(--space-5);
     }
   }
 
@@ -452,7 +462,7 @@
     }
 
     .final {
-      margin-block: var(--space-5) var(--space-4);
+      margin-top: var(--space-5);
     }
 
     .lower {

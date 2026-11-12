@@ -6,21 +6,68 @@
   import { arcadeScreen, closeArcade, type GameId } from "$lib/boba";
   import { sfxBlip } from "$lib/sfx";
   import ArcadeMenu from "./ArcadeMenu.svelte";
-  import CatchGame from "./CatchGame.svelte";
-  import CupStack from "./CupStack.svelte";
-  import OrderUp from "./OrderUp.svelte";
   import RisoDefs from "./RisoDefs.svelte";
-  import StrawStab from "./StrawStab.svelte";
 
   // The host owns everything the games share: the scroll lock, the hidden
   // site cursor, pausing the footer's music, Escape to quit, and returning
   // focus to wherever the visitor was when the arcade closes.
+
+  // Each game is fetched when it is picked, so the menu opens on its own
+  // code alone, and a game that fails to load can't take the arcade with it.
+  // Games still being built load through a glob, which matches nothing until
+  // the file exists, so the build and type-check pass in the meantime and
+  // picking one falls back to the menu's "Couldn't load just now".
+  const PENDING = import.meta.glob<{ default: any }>(["./SugarRush.svelte", "./Spill.svelte"]);
+  const pending = (path: string) => () =>
+    PENDING[path]?.() ?? Promise.reject(new Error(`${path} isn't built yet`));
+
+  const LOADERS: Record<GameId, () => Promise<{ default: any }>> = {
+    catch: () => import("./CatchGame.svelte"),
+    stab: () => import("./StrawStab.svelte"),
+    orders: () => import("./OrderUp.svelte"),
+    stack: () => import("./CupStack.svelte"),
+    lander: () => import("./TeaMinus.svelte"),
+    runner: pending("./SugarRush.svelte"),
+    spill: pending("./Spill.svelte"),
+  };
+
+  let Game: any = null;
+  let loaded: GameId | null = null;
+  let failed: GameId | null = null;
+
+  async function load(id: GameId) {
+    try {
+      const module = await LOADERS[id]();
+      // The visitor may have moved on while it loaded.
+      if ($arcadeScreen !== id) return;
+      Game = module.default;
+      loaded = id;
+    } catch (error) {
+      console.error(`[arcade] ${id} failed to load`, error);
+      if ($arcadeScreen !== id) return;
+      failed = id;
+      arcadeScreen.set("menu");
+    }
+  }
+
+  $: screen = $arcadeScreen;
+  $: if (screen && screen !== "menu") {
+    if (loaded !== screen) {
+      Game = null;
+      loaded = null;
+      void load(screen);
+    }
+  } else {
+    Game = null;
+    loaded = null;
+  }
 
   function showMenu() {
     arcadeScreen.set("menu");
   }
 
   function pick(event: CustomEvent<GameId>) {
+    failed = null;
     arcadeScreen.set(event.detail);
   }
 
@@ -61,15 +108,12 @@
   <RisoDefs />
 
   {#if $arcadeScreen === "menu"}
-    <ArcadeMenu on:pick={pick} on:close={closeArcade} />
-  {:else if $arcadeScreen === "catch"}
-    <CatchGame on:close={closeArcade} on:menu={showMenu} />
-  {:else if $arcadeScreen === "stab"}
-    <StrawStab on:close={closeArcade} on:menu={showMenu} />
-  {:else if $arcadeScreen === "orders"}
-    <OrderUp on:close={closeArcade} on:menu={showMenu} />
-  {:else if $arcadeScreen === "stack"}
-    <CupStack on:close={closeArcade} on:menu={showMenu} />
+    <ArcadeMenu {failed} on:pick={pick} on:close={closeArcade} />
+  {:else if Game && loaded === $arcadeScreen}
+    <svelte:component this={Game} on:close={closeArcade} on:menu={showMenu} />
+  {:else}
+    <!-- Paper over the page while the game's code arrives. -->
+    <div class="boba-stage is-paper" aria-hidden="true"></div>
   {/if}
 </div>
 

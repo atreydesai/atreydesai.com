@@ -1,8 +1,12 @@
-// Procedural Web Audio for the boba arcade. The engine is intentionally
-// asset-free: small oscillator voices, filtered noise drums, keyed feedback,
-// and a short look-ahead scheduler keep it light and responsive.
+// Procedural Web Audio for the boba arcade: asset-free sound effects, keyed
+// feedback, and the controls for the soundtrack. The soundtrack itself (the
+// songbook, its notation, and the synth that arranges it) lives in
+// `$lib/music`; this file only creates it, rides its fader, and keeps it fed
+// from a short look-ahead timer.
 
-import { BARS_PER_SONG, barSeconds } from "$lib/arcade/stab-engine.js";
+import { createMusicEngine, type MusicEngine } from "./music/engine";
+import { climbingPlaylist, shuffledPlaylist } from "./music/playlist";
+import { SONGS, type MusicPhase } from "./music/songs";
 
 const MASTER_LEVEL = 0.48;
 const MUTE_KEY = "boba_muted_v2";
@@ -11,6 +15,7 @@ const MUSIC_TICK_MS = 75;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+let musicEngine: MusicEngine | null = null;
 let musicBus: GainNode | null = null;
 let musicFilter: BiquadFilterNode | null = null;
 let noiseBuffer: AudioBuffer | null = null;
@@ -21,34 +26,37 @@ let musicOn = false;
 let musicPaused = false;
 let musicPhase: MusicPhase = "opening";
 let musicTimer: ReturnType<typeof setTimeout> | null = null;
-let musicStopTimer: ReturnType<typeof setTimeout> | null = null;
-let activeMusicSources = new Set<AudioScheduledSourceNode>();
 
-type MusicPhase = "opening" | "steady" | "rush";
-type NoteSeq = [number, number][];
+// Tea minus's engine: one looping noise voice, built on first use and then
+// only steered, so a per-frame caller never creates nodes.
+const THRUSTER_LEVEL = 0.5;
+const THRUSTER_GLIDE = 0.04;
+let thrusterGain: GainNode | null = null;
+let thrusterBuffer: AudioBuffer | null = null;
+let thrusterGoal = 0;
 
-interface Song {
-  name: string;
-  bpm: number;
-  wave: OscillatorType;
-  leadTranspose?: number;
-  root: number;
-  scale: number[];
-  lead: NoteSeq;
-  bass: NoteSeq;
-}
+// Order up's pour: built and steered like the thruster. A band-pass sweeps
+// up as the cup fills, the way a filling glass rises in pitch, so a player
+// can stop on the line by ear. It is a thin trickle, kept under the rumble.
+const POUR_LEVEL = 0.22;
+// A short glide, so releasing the pour falls silent in about 30ms.
+const POUR_GLIDE = 0.01;
+const POUR_EMPTY_HZ = 500;
+const POUR_FULL_HZ = 1_700;
+let pourGain: GainNode | null = null;
+let pourFilter: BiquadFilterNode | null = null;
+let pourGoal = 0;
+let pourPitch = 0;
 
-// Song order for the current run; empty means every song, in order.
-let playlist: number[] = [];
 // While a game holds the clock (see suspendAudio), nothing may wake the
 // context: a stray blip would restart the soundtrack under a pause card.
 let clockHeld = false;
 
-let songIndex = 0;
-let barIndex = 0;
-let nextBarTime = 0;
 let currentRoot = 60;
 let currentScale = [0, 2, 4, 7, 9];
+
+/** The song that opened the last shuffled run, so the next one opens on another. */
+let lastOpener: number | null = null;
 
 let songListener: ((name: string) => void) | null = null;
 
@@ -105,17 +113,6 @@ function panNode(value: number) {
   return panner;
 }
 
-function trackMusicSource(source: AudioScheduledSourceNode) {
-  activeMusicSources.add(source);
-  source.addEventListener(
-    "ended",
-    () => {
-      activeMusicSources.delete(source);
-    },
-    { once: true },
-  );
-}
-
 function connectVoice(
   source: AudioNode,
   gain: GainNode,
@@ -135,7 +132,6 @@ function note(
   volume = 0.3,
   pan = 0,
   destination: AudioNode | null = master,
-  trackAsMusic = false,
 ) {
   if (!ctx || !destination || frequency <= 0) return;
   const oscillator = ctx.createOscillator();
@@ -149,7 +145,6 @@ function note(
   connectVoice(oscillator, gain, destination, pan);
   oscillator.start(start);
   oscillator.stop(start + duration + 0.025);
-  if (trackAsMusic) trackMusicSource(oscillator);
 }
 
 function slide(
@@ -186,14 +181,22 @@ function midiFrequency(midi: number) {
 function ensureMusicGraph() {
   const c = audioContext();
   if (!c || !master) return false;
-  if (!musicBus || !musicFilter) {
-    musicBus = c.createGain();
-    musicFilter = c.createBiquadFilter();
+  if (!musicEngine) {
+    try {
+      musicEngine = createMusicEngine(c, master);
+    } catch {
+      // A browser without some node the band needs plays effects only.
+      return false;
+    }
+    musicBus = musicEngine.bus;
+    musicFilter = musicEngine.filter;
     musicBus.gain.value = phaseMusicLevel();
-    musicFilter.type = "lowpass";
-    musicFilter.frequency.value = 14_000;
-    musicFilter.Q.value = 0.35;
-    musicBus.connect(musicFilter).connect(master);
+    musicEngine.setPhase(musicPhase);
+    musicEngine.onSong((song) => {
+      currentRoot = song.sfxRoot;
+      currentScale = song.sfxScale;
+      songListener?.(song.name);
+    });
   }
   return true;
 }
@@ -210,135 +213,10 @@ function getNoiseBuffer() {
   return noiseBuffer;
 }
 
-function noiseHit(
-  start: number,
-  duration: number,
-  volume: number,
-  filterType: BiquadFilterType,
-  frequency: number,
-) {
-  if (!ctx || !musicBus) return;
-  const buffer = getNoiseBuffer();
-  if (!buffer) return;
-  const source = ctx.createBufferSource();
-  const filter = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
-  source.buffer = buffer;
-  filter.type = filterType;
-  filter.frequency.setValueAtTime(frequency, start);
-  filter.Q.value = 0.8;
-  gain.gain.setValueAtTime(Math.max(0.0001, volume), start);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
-  source.connect(filter).connect(gain).connect(musicBus);
-  source.start(start);
-  source.stop(start + duration + 0.02);
-  trackMusicSource(source);
-}
-
-function kick(start: number, volume = 0.16) {
-  if (!ctx || !musicBus) return;
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(135, start);
-  oscillator.frequency.exponentialRampToValueAtTime(48, start + 0.11);
-  gain.gain.setValueAtTime(volume, start);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.15);
-  oscillator.connect(gain).connect(musicBus);
-  oscillator.start(start);
-  oscillator.stop(start + 0.17);
-  trackMusicSource(oscillator);
-}
-
-function clap(start: number) {
-  noiseHit(start, 0.11, 0.085, "bandpass", 1_650);
-  noiseHit(start + 0.022, 0.08, 0.045, "bandpass", 2_150);
-}
-
-function hat(start: number, strong = false) {
-  noiseHit(start, strong ? 0.055 : 0.032, strong ? 0.037 : 0.024, "highpass", 5_800);
-}
-
+// The phases are arrangement, not volume: the engine keeps its loudness level
+// across them, so the fader rests at one level.
 function phaseMusicLevel() {
-  if (musicPhase === "rush") return 0.57;
-  if (musicPhase === "steady") return 0.53;
-  return 0.49;
-}
-
-function scheduleSequenceWindow(
-  sequence: NoteSeq,
-  windowStartBeat: number,
-  windowEndBeat: number,
-  barStart: number,
-  secondsPerBeat: number,
-  wave: OscillatorType,
-  volume: number,
-  transpose = 0,
-) {
-  if (!musicBus) return;
-  let beat = 0;
-  for (const [midi, beats] of sequence) {
-    if (beat >= windowStartBeat && beat < windowEndBeat && midi > 0) {
-      const localBeat = beat - windowStartBeat;
-      note(
-        midiFrequency(midi + transpose),
-        barStart + localBeat * secondsPerBeat,
-        Math.max(0.045, beats * secondsPerBeat * 0.88),
-        wave,
-        volume,
-        0,
-        musicBus,
-        true,
-      );
-    }
-    beat += beats;
-  }
-}
-
-function scheduleDrums(barStart: number, secondsPerBeat: number) {
-  if (musicPhase === "opening") return;
-
-  kick(barStart);
-  kick(barStart + 2 * secondsPerBeat, 0.14);
-  clap(barStart + secondsPerBeat);
-  clap(barStart + 3 * secondsPerBeat);
-
-  const step = musicPhase === "rush" ? 0.25 : 0.5;
-  for (let beat = 0; beat < 4; beat += step) {
-    hat(barStart + beat * secondsPerBeat, beat % 1 === 0);
-  }
-
-  if (musicPhase === "rush") {
-    kick(barStart + 1.5 * secondsPerBeat, 0.09);
-    kick(barStart + 3.5 * secondsPerBeat, 0.09);
-  }
-}
-
-function scheduleBar(song: Song, index: number, start: number) {
-  const secondsPerBeat = 60 / song.bpm;
-  const cycleBar = index % 4;
-  const windowStart = cycleBar * 4;
-
-  scheduleSequenceWindow(
-    song.lead,
-    windowStart,
-    windowStart + 4,
-    start,
-    secondsPerBeat,
-    song.wave,
-    musicPhase === "rush" ? 0.19 : 0.175,
-    song.leadTranspose,
-  );
-  scheduleSequenceWindow(
-    song.bass,
-    0,
-    4,
-    start,
-    secondsPerBeat,
-    "triangle",
-    0.17,
-  );
-  scheduleDrums(start, secondsPerBeat);
+  return 0.5;
 }
 
 function clearMusicTimer() {
@@ -348,54 +226,16 @@ function clearMusicTimer() {
   }
 }
 
-function clearMusicStopTimer() {
-  if (musicStopTimer) {
-    clearTimeout(musicStopTimer);
-    musicStopTimer = null;
-  }
-}
-
 function stopScheduledMusic(afterSeconds = 0) {
   if (!ctx) return;
   const stopAt = ctx.currentTime + Math.max(0, afterSeconds);
-  for (const source of activeMusicSources) {
-    try {
-      source.stop(stopAt);
-    } catch {
-      // A source may already have ended.
-    }
-  }
-  if (afterSeconds === 0) activeMusicSources.clear();
-}
-
-function activePlaylist() {
-  return playlist.length ? playlist : SONGS.map((_, index) => index);
+  musicEngine?.stopSources(stopAt);
 }
 
 function runMusicScheduler() {
   clearMusicTimer();
-  if (!ctx || !musicOn || musicPaused) return;
-
-  const order = activePlaylist();
-  const horizon = ctx.currentTime + MUSIC_LOOKAHEAD_SECONDS;
-  while (nextBarTime < horizon) {
-    const song = SONGS[order[songIndex % order.length]];
-    if (barIndex === 0) {
-      currentRoot = song.root;
-      currentScale = song.scale;
-      songListener?.(song.name);
-    }
-
-    scheduleBar(song, barIndex, nextBarTime);
-    nextBarTime += barSeconds(song.bpm);
-    barIndex += 1;
-
-    if (barIndex >= BARS_PER_SONG) {
-      barIndex = 0;
-      songIndex = (songIndex + 1) % order.length;
-    }
-  }
-
+  if (!ctx || !musicEngine || !musicOn || musicPaused) return;
+  musicEngine.scheduleUntil(ctx.currentTime + MUSIC_LOOKAHEAD_SECONDS);
   musicTimer = setTimeout(runMusicScheduler, MUSIC_TICK_MS);
 }
 
@@ -455,6 +295,11 @@ export function songTempos(order?: number[]) {
   return indices.map((index) => SONGS[index].bpm);
 }
 
+/** A fresh four for straw stab: one from each tempo band, slowest first. */
+export function stabPlaylist(): number[] {
+  return climbingPlaylist(SONGS.map((song) => song.bpm));
+}
+
 /**
  * The audio time reaching the listener right now, in the same coordinate
  * that notes are scheduled in, or null while the context is not running.
@@ -481,6 +326,11 @@ export function audioClock(): number | null {
  */
 export function suspendAudio() {
   clockHeld = true;
+  // Hard stop rather than a fade: the context freezes before a fade could
+  // finish, and the tail would play out on resume.
+  quietThruster(0);
+  quietPour(0);
+  quietLoops(0);
   if (ctx?.state === "running") {
     void ctx.suspend().catch(() => {
       // Already suspended or closed.
@@ -499,33 +349,39 @@ export function resumeAudio() {
 
 export function setMusicPhase(phase: MusicPhase) {
   musicPhase = phase;
-  if (!ctx || !musicBus || musicPaused || !musicOn) return;
-  const now = ctx.currentTime;
-  hold(musicBus.gain, now);
-  musicBus.gain.linearRampToValueAtTime(phaseMusicLevel(), now + 0.2);
+  musicEngine?.setPhase(phase);
 }
 
 /**
- * Starts the soundtrack from the top of `order` (every song, in order, by
- * default). Returns the audio time of the first downbeat, or null when
- * there is no audio to start.
+ * Starts the soundtrack. With an `order`, plays those songs eight bars each
+ * (the rhythm form); without one, every song in a fresh shuffle, whole
+ * songs each, never opening on the song that opened the last such run.
+ * Returns the audio time of the first downbeat, or null when there is no
+ * audio to start.
  */
 export function startMusic(order?: number[]): number | null {
-  if (!ensureMusicGraph() || !ctx || !musicBus || !musicFilter) return null;
+  if (!ensureMusicGraph() || !ctx || !musicEngine || !musicBus || !musicFilter) return null;
   clearMusicTimer();
-  clearMusicStopTimer();
   stopScheduledMusic();
 
-  playlist = order?.filter((index) => SONGS[index]) ?? [];
-  const first = SONGS[activePlaylist()[0]];
   musicOn = true;
   musicPaused = false;
-  songIndex = 0;
-  barIndex = 0;
-  currentRoot = first.root;
-  currentScale = first.scale;
-  nextBarTime = ctx.currentTime + 0.12;
-  const firstDownbeat = nextBarTime;
+  const firstDownbeat = ctx.currentTime + 0.12;
+  const given = order?.filter((index) => SONGS[index]);
+  let opener: number;
+  if (given?.length) {
+    opener = given[0];
+    musicEngine.start(given, firstDownbeat);
+  } else {
+    const shuffled = shuffledPlaylist(SONGS.length, lastOpener);
+    opener = shuffled[0];
+    lastOpener = opener;
+    musicEngine.start(shuffled, firstDownbeat, "listening");
+  }
+  // Keyed to the opening song now; the first bar, scheduled below, keeps
+  // the effects on each song as it comes on.
+  currentRoot = SONGS[opener].sfxRoot;
+  currentScale = SONGS[opener].sfxScale;
 
   const now = ctx.currentTime;
   hold(musicBus.gain, now);
@@ -538,6 +394,10 @@ export function startMusic(order?: number[]): number | null {
 }
 
 export function setMusicPaused(paused: boolean) {
+  // Before the early return: a game can pause without its music running.
+  if (paused) quietThruster();
+  if (paused) quietPour();
+  if (paused) quietLoops();
   if (!ctx || !musicBus || !musicOn || paused === musicPaused) return;
   musicPaused = paused;
   const now = ctx.currentTime;
@@ -551,13 +411,16 @@ export function setMusicPaused(paused: boolean) {
   }
 
   stopScheduledMusic();
-  nextBarTime = now + 0.12;
+  musicEngine?.resumeAt(now + 0.12);
   hold(musicBus.gain, now);
   musicBus.gain.exponentialRampToValueAtTime(phaseMusicLevel(), now + 0.12);
   runMusicScheduler();
 }
 
 export function finishMusic() {
+  quietThruster();
+  quietPour();
+  quietLoops();
   if (!ctx || !musicBus || !musicFilter) {
     musicOn = false;
     clearMusicTimer();
@@ -567,7 +430,6 @@ export function finishMusic() {
   musicOn = false;
   musicPaused = false;
   clearMusicTimer();
-  clearMusicStopTimer();
   const now = ctx.currentTime;
   hold(musicBus.gain, now);
   musicBus.gain.exponentialRampToValueAtTime(0.0001, now + 0.44);
@@ -575,17 +437,15 @@ export function finishMusic() {
   musicFilter.frequency.setValueAtTime(Math.max(650, musicFilter.frequency.value), now);
   musicFilter.frequency.exponentialRampToValueAtTime(650, now + 0.34);
   stopScheduledMusic(0.48);
-  musicStopTimer = setTimeout(() => {
-    activeMusicSources.clear();
-    musicStopTimer = null;
-  }, 520);
 }
 
 export function stopMusic() {
+  quietThruster();
+  quietPour();
+  quietLoops();
   musicOn = false;
   musicPaused = false;
   clearMusicTimer();
-  clearMusicStopTimer();
   if (ctx && musicBus) {
     const now = ctx.currentTime;
     hold(musicBus.gain, now);
@@ -857,80 +717,682 @@ export function sfxTopple() {
   slide(300, 50, 0.5, "triangle", 0.26);
 }
 
+/** Tea minus: builds the engine voice the first time the throttle opens. */
+function ensureThruster() {
+  if (thrusterGain) return true;
+  const c = audioContext();
+  if (!c || !master) return false;
+  // Its own two-second buffer: the shared half-second one, looped, repeats
+  // often enough to be heard as a flutter under a held throttle.
+  if (!thrusterBuffer) {
+    const length = Math.floor(c.sampleRate * 2);
+    thrusterBuffer = c.createBuffer(1, length, c.sampleRate);
+    const channel = thrusterBuffer.getChannelData(0);
+    for (let i = 0; i < channel.length; i++) channel[i] = Math.random() * 2 - 1;
+  }
+  const source = c.createBufferSource();
+  const filter = c.createBiquadFilter();
+  const gain = c.createGain();
+  source.buffer = thrusterBuffer;
+  source.loop = true;
+  filter.type = "lowpass";
+  filter.frequency.value = 170;
+  filter.Q.value = 2.2;
+  gain.gain.value = 0;
+  source.connect(filter);
+  connectVoice(filter, gain, master);
+  source.start();
+  thrusterGain = gain;
+  thrusterGoal = 0;
+  return true;
+}
+
+/** Fades the engine out (or cuts it, with `glide` 0) without dropping it. */
+function quietThruster(glide = 0.02) {
+  if (!ctx || !thrusterGain) return;
+  const now = ctx.currentTime;
+  thrusterGain.gain.cancelScheduledValues(now);
+  if (glide > 0) thrusterGain.gain.setTargetAtTime(0, now, glide);
+  else thrusterGain.gain.setValueAtTime(0, now);
+  thrusterGoal = 0;
+}
+
+/**
+ * Tea minus: the engine rumble, `level` 0–1, meant to be called every frame.
+ * It glides toward each new level instead of jumping, so a tapped throttle
+ * puffs rather than clicks. Held silent while the game's audio is paused.
+ */
+export function setThruster(level: number) {
+  const throttle = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
+  // A closed throttle never needs to wake audio just to stay quiet.
+  if (!thrusterGain && throttle === 0) return;
+  if (!ensureThruster() || !ctx || !thrusterGain) return;
+  const goal = muted || clockHeld || musicPaused ? 0 : throttle * THRUSTER_LEVEL;
+  // Only steer on a real change, so a held throttle doesn't stack up an
+  // automation event per frame.
+  if (Math.abs(goal - thrusterGoal) < 0.004 && (goal > 0 || thrusterGoal === 0)) return;
+  thrusterGoal = goal;
+  thrusterGain.gain.setTargetAtTime(goal, ctx.currentTime, THRUSTER_GLIDE);
+}
+
+/** Tea minus: feet down. A feather-light landing rings a third, higher note. */
+export function sfxTouchdown(feather = false) {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(feather ? 0.5 : 0.36, 0.3);
+  const start = c.currentTime;
+  note(midiFrequency(currentRoot), start, 0.16, "triangle", 0.18);
+  note(midiFrequency(currentRoot + 7), start + 0.17, feather ? 0.16 : 0.26, "triangle", 0.18);
+  if (feather) note(midiFrequency(currentRoot + 12), start + 0.34, 0.26, "triangle", 0.13);
+}
+
+/** Tea minus: the cup comes down too hard. A soft thud, not a bang. */
+export function sfxCrashLanding() {
+  const c = audioContext();
+  if (!c || !master) return;
+  duckMusic(0.6, 0.2);
+  const start = c.currentTime;
+  // Built here rather than with `slide()`, which floors its sweep at 40 Hz;
+  // the thump should sink below that.
+  const oscillator = c.createOscillator();
+  const gain = c.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(90, start);
+  oscillator.frequency.exponentialRampToValueAtTime(26, start + 0.6);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(0.34, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.6);
+  connectVoice(oscillator, gain, master);
+  oscillator.start(start);
+  oscillator.stop(start + 0.62);
+  effectNoise(start, 1.1, 0.16, "lowpass", 1_500, 55);
+}
+
+/** Tea minus: coming down too fast near the ground. The caller paces it. */
+export function sfxDescentAlarm() {
+  const c = audioContext();
+  if (!c) return;
+  note(132, c.currentTime, 0.09, "triangle", 0.2);
+}
+
+/** Tea minus: the tank is nearly dry. Lower and longer than the alarm. */
+export function sfxLowFuel() {
+  const c = audioContext();
+  if (!c) return;
+  note(98, c.currentTime, 0.14, "triangle", 0.2);
+}
+
+/** Order up: builds the pour voice the first time the tap opens. */
+function ensurePour() {
+  if (pourGain) return true;
+  const c = audioContext();
+  if (!c || !master) return false;
+  // Shares the thruster's long buffer, for the same reason: the short shared
+  // one loops often enough to flutter under a held pour.
+  if (!thrusterBuffer) {
+    const length = Math.floor(c.sampleRate * 2);
+    thrusterBuffer = c.createBuffer(1, length, c.sampleRate);
+    const channel = thrusterBuffer.getChannelData(0);
+    for (let i = 0; i < channel.length; i++) channel[i] = Math.random() * 2 - 1;
+  }
+  const source = c.createBufferSource();
+  const filter = c.createBiquadFilter();
+  const gain = c.createGain();
+  source.buffer = thrusterBuffer;
+  source.loop = true;
+  filter.type = "bandpass";
+  filter.frequency.value = POUR_EMPTY_HZ;
+  filter.Q.value = 4;
+  gain.gain.value = 0;
+  source.connect(filter);
+  connectVoice(filter, gain, master);
+  source.start();
+  pourGain = gain;
+  pourFilter = filter;
+  pourGoal = 0;
+  pourPitch = POUR_EMPTY_HZ;
+  return true;
+}
+
+/** Fades the pour out (or cuts it, with `glide` 0) without dropping it. */
+function quietPour(glide = POUR_GLIDE) {
+  if (!ctx || !pourGain) return;
+  const now = ctx.currentTime;
+  pourGain.gain.cancelScheduledValues(now);
+  if (glide > 0) pourGain.gain.setTargetAtTime(0, now, glide);
+  else pourGain.gain.setValueAtTime(0, now);
+  pourGoal = 0;
+}
+
+/**
+ * Order up: the tea stream, `level` 0–1 loudness and `fill` 0–1 of the cup,
+ * meant to be called every frame while the pour is held. The pitch rises
+ * evenly (in octaves, not hertz) from empty to full, so every bit of fill
+ * sounds like the same step up. Held silent while the game's audio is paused.
+ */
+export function setPourStream(level: number, fill = 0) {
+  const flow = Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
+  // A closed tap never needs to wake audio just to stay quiet.
+  if (!pourGain && flow === 0) return;
+  if (!ensurePour() || !ctx || !pourGain || !pourFilter) return;
+  const now = ctx.currentTime;
+  const goal = muted || clockHeld || musicPaused ? 0 : flow * POUR_LEVEL;
+  // Only steer on a real change, so a held pour doesn't stack up an
+  // automation event per frame.
+  if (Math.abs(goal - pourGoal) >= 0.004 || (goal === 0 && pourGoal > 0)) {
+    pourGoal = goal;
+    pourGain.gain.setTargetAtTime(goal, now, POUR_GLIDE);
+  }
+  const level01 = Number.isFinite(fill) ? Math.max(0, Math.min(1, fill)) : 0;
+  const pitch = POUR_EMPTY_HZ * Math.pow(POUR_FULL_HZ / POUR_EMPTY_HZ, level01);
+  // Half a percent is below what anyone hears as a pitch change.
+  if (goal > 0 && Math.abs(pitch - pourPitch) / pourPitch > 0.005) {
+    pourPitch = pitch;
+    pourFilter.frequency.setTargetAtTime(pitch, now, 0.03);
+  }
+}
+
+/**
+ * A pitch drop that starts at a given time. `slide()` always starts now; the
+ * order-up sounds need a second part to land a beat after the first.
+ */
+function dropAt(
+  start: number,
+  fromFrequency: number,
+  toFrequency: number,
+  duration: number,
+  type: OscillatorType,
+  volume: number,
+  pan = 0,
+) {
+  if (!ctx || !master) return;
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(fromFrequency, start);
+  oscillator.frequency.exponentialRampToValueAtTime(
+    Math.max(30, toFrequency),
+    start + duration,
+  );
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  connectVoice(oscillator, gain, master, pan);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.025);
+}
+
+/**
+ * Order up: a topping falls from the ladle. A clean drop plops a scale degree
+ * higher per scoop in a row; one off the rim ticks first and lands dull; a
+ * miss only thuds on the counter.
+ */
+export function sfxScoop(result: "clean" | "rim" | "miss", step = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+
+  if (result === "miss") {
+    dropAt(start, 150, 55, 0.13, "sine", 0.2);
+    effectNoise(start, 0.07, 0.07, "lowpass", 420);
+    return;
+  }
+
+  const degree = Math.min(Math.max(Math.floor(step), 0), 7);
+  const top = midiFrequency(scaleMidi(1, degree + 2));
+  if (result === "rim") {
+    effectNoise(start, 0.014, 0.12, "highpass", 3_800);
+    dropAt(start + 0.035, top * 0.75, top * 0.3, 0.07, "sine", 0.17);
+    return;
+  }
+  dropAt(start, top, top * 0.27, 0.11, "sine", 0.24);
+}
+
+/**
+ * Order up: one shake of a lidded cup of ice. Strokes swing left and right,
+ * and each brightens a little toward the eighth, so the mix sounds like it
+ * is coming together.
+ */
+export function sfxShake(step = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  const count = Math.max(0, Math.floor(step));
+  const pan = count % 2 === 0 ? -0.35 : 0.35;
+  const progress = Math.min(count, 8) / 8;
+  effectNoise(start, 0.045, 0.1 + progress * 0.03, "bandpass", 2_500 + progress * 1_500, 0, pan);
+  note(105, start, 0.04, "sine", 0.07, pan);
+}
+
+/** Order up: the sealer presses a film lid on, then the film pops taut. */
+export function sfxSeal() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  dropAt(start, 420, 140, 0.08, "triangle", 0.18);
+  effectNoise(start + 0.09, 0.025, 0.1, "highpass", 3_600);
+  note(midiFrequency(scaleMidi(2, 4)), start + 0.09, 0.06, "triangle", 0.11);
+}
+
+/**
+ * Order up: a customer gives up and leaves. A soft falling pair, quieter and
+ * rounder than `sfxWrong`, so it reads as a sigh rather than a buzzer.
+ */
+export function sfxWalkOut() {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.3, 0.55);
+  const start = c.currentTime;
+  note(midiFrequency(scaleMidi(1, 2)), start, 0.14, "triangle", 0.12);
+  note(midiFrequency(scaleMidi(1, 0)), start + 0.16, 0.28, "triangle", 0.11);
+}
+
 export function unlockAudio() {
   audioContext();
 }
 
-const SONGS: Song[] = [
-  {
-    name: "HEYYYYYTEA",
-    bpm: 144,
-    // Lower and soften the opening melody so a run does not start piercingly.
-    wave: "triangle",
-    leadTranspose: -12,
-    root: 60,
-    scale: [0, 2, 4, 7, 9],
-    lead: [
-      [72, 0.5], [76, 0.5], [79, 0.5], [84, 0.5],
-      [83, 0.5], [79, 0.5], [76, 0.5], [79, 0.5],
-      [77, 0.5], [74, 0.5], [77, 0.5], [81, 0.5],
-      [79, 0.5], [76, 0.5], [72, 0.5], [74, 0.5],
-      [76, 0.5], [79, 0.5], [84, 0.5], [86, 0.5],
-      [84, 0.5], [81, 0.5], [79, 0.5], [76, 0.5],
-      [72, 1], [74, 1], [76, 1], [72, 1],
-    ],
-    bass: [[36, 1], [43, 1], [41, 1], [43, 1]],
-  },
-  {
-    name: "CHAGEE (자기야)",
-    bpm: 128,
-    wave: "triangle",
-    root: 57,
-    scale: [0, 3, 5, 7, 10],
-    lead: [
-      [76, 0.5], [79, 0.5], [81, 1], [79, 0.5], [76, 0.5], [74, 1],
-      [72, 0.5], [74, 0.5], [76, 1], [74, 0.5], [72, 0.5], [69, 1],
-      [76, 0.5], [79, 0.5], [81, 0.5], [79, 0.5],
-      [76, 0.5], [74, 0.5], [72, 1], [69, 1], [72, 1], [69, 2],
-    ],
-    bass: [[45, 1.5], [40, 1.5], [43, 1]],
-  },
-  {
-    name: "moge mog",
-    bpm: 152,
-    wave: "square",
-    root: 53,
-    scale: [0, 2, 4, 7, 9],
-    lead: [
-      [65, 0.5], [69, 0.5], [72, 0.5], [69, 0.5],
-      [70, 0.5], [69, 0.5], [67, 0.5], [65, 0.5],
-      [67, 0.5], [70, 0.5], [74, 0.5], [70, 0.5],
-      [72, 0.5], [70, 0.5], [69, 0.5], [67, 0.5],
-      [65, 0.5], [72, 0.5], [77, 0.5], [72, 0.5],
-      [76, 0.5], [72, 0.5], [69, 0.5], [65, 0.5],
-      [67, 1], [65, 1], [69, 1], [65, 1],
-    ],
-    bass: [[41, 1], [36, 1], [43, 1], [36, 1]],
-  },
-  {
-    name: "ume zoome",
-    bpm: 162,
-    wave: "sawtooth",
-    root: 55,
-    scale: [0, 2, 4, 7, 9],
-    lead: [
-      [67, 0.25], [69, 0.25], [71, 0.25], [72, 0.25],
-      [74, 0.25], [76, 0.25], [78, 0.25], [79, 0.25],
-      [78, 0.25], [76, 0.25], [74, 0.25], [72, 0.25],
-      [71, 0.25], [69, 0.25], [67, 0.25], [69, 0.25],
-      [71, 0.25], [72, 0.25], [74, 0.25], [76, 0.25],
-      [78, 0.25], [79, 0.25], [81, 0.25], [83, 0.25],
-      [81, 0.25], [79, 0.25], [78, 0.25], [76, 0.25],
-      [74, 0.25], [72, 0.25], [71, 0.25], [69, 0.25],
-      [67, 0.5], [74, 0.5], [79, 0.5], [74, 0.5],
-      [71, 0.5], [74, 0.5], [79, 0.5], [83, 0.5],
-      [79, 1], [76, 1], [74, 1], [67, 1],
-    ],
-    bass: [[43, 1], [50, 1], [48, 1], [50, 1]],
-  },
-];
+/** Order up: a scoop of ice clinks into the cup; each scoop a little higher. */
+export function sfxIce(step = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  const lift = Math.min(Math.max(Math.floor(step), 0), 4) * 120;
+  effectNoise(start, 0.03, 0.08, "highpass", 4_200 + lift);
+  note(1_900 + lift, start + 0.02, 0.05, "sine", 0.07);
+  note(2_500 + lift, start + 0.07, 0.04, "sine", 0.05);
+}
+
+/** Order up: a tank starts brewing, a low bubbling swell. */
+export function sfxBrew() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.32, 0.06, "lowpass", 300, 900);
+  note(midiFrequency(scaleMidi(0, 0)), start + 0.04, 0.12, "triangle", 0.08);
+}
+
+/** Order up: a tank has finished brewing. */
+export function sfxBrewed() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  note(midiFrequency(scaleMidi(2, 2)), start, 0.07, "triangle", 0.09);
+  note(midiFrequency(scaleMidi(2, 4)), start + 0.07, 0.12, "triangle", 0.08);
+}
+
+/** Order up: the sealer was too hot and the film scorches. */
+export function sfxScorch() {
+  const c = audioContext();
+  if (!c) return;
+  effectNoise(c.currentTime + 0.08, 0.26, 0.08, "highpass", 2_800, 6_000);
+}
+
+/** Order up: a tap runs dry mid-pour and sputters. */
+export function sfxSputter() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.05, 0.08, "bandpass", 700);
+  effectNoise(start + 0.09, 0.04, 0.05, "bandpass", 600);
+}
+
+/**
+ * Order up's demo: the pour stream while the shift's music is paused under
+ * the demo. Same as setPourStream, but heard through that pause, since the
+ * demo plays its sounds while the shift waits.
+ */
+export function setDemoPourStream(level: number, fill = 0) {
+  const held = musicPaused;
+  musicPaused = false;
+  try {
+    setPourStream(level, fill);
+  } finally {
+    musicPaused = held;
+  }
+}
+
+// --- Sugar rush and spill ---------------------------------------------------
+
+// Two more steered loops, built on first use like the thruster: sugar rush's
+// straw rotor and spill's pour. Both read the same long noise buffer, and
+// `quietLoops` silences them wherever the thruster and order up's pour are.
+const GLIDE_LEVEL = 0.16;
+const GLIDE_TIME = 0.04;
+const SPILL_POUR_LEVEL = 0.2;
+const SPILL_POUR_GLIDE = 0.015;
+let glideGain: GainNode | null = null;
+let glideGoal = 0;
+let spillPourGain: GainNode | null = null;
+let spillPourGoal = 0;
+
+function longNoise(c: AudioContext) {
+  if (!thrusterBuffer) {
+    const length = Math.floor(c.sampleRate * 2);
+    thrusterBuffer = c.createBuffer(1, length, c.sampleRate);
+    const channel = thrusterBuffer.getChannelData(0);
+    for (let i = 0; i < channel.length; i++) channel[i] = Math.random() * 2 - 1;
+  }
+  return thrusterBuffer;
+}
+
+/** Fades both loops out (or cuts them, with `glide` 0) without dropping them. */
+function quietLoops(glide = 0.015) {
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  for (const gain of [glideGain, spillPourGain]) {
+    if (!gain) continue;
+    gain.gain.cancelScheduledValues(now);
+    if (glide > 0) gain.gain.setTargetAtTime(0, now, glide);
+    else gain.gain.setValueAtTime(0, now);
+  }
+  glideGoal = 0;
+  spillPourGoal = 0;
+}
+
+/**
+ * A looping noise voice through a band-pass, with a slow sine wobbling
+ * either its loudness (`wobble: "gain"`, a rotor's chop) or its centre
+ * (`wobble: "pitch"`, a stream's warble). Returns its outer gain, at zero.
+ */
+function buildLoop(
+  c: AudioContext,
+  frequency: number,
+  q: number,
+  wobble: "gain" | "pitch",
+  rate: number,
+  depth: number,
+) {
+  if (!master) return null;
+  const source = c.createBufferSource();
+  const filter = c.createBiquadFilter();
+  const shaper = c.createGain();
+  const gain = c.createGain();
+  const lfo = c.createOscillator();
+  const lfoDepth = c.createGain();
+  source.buffer = longNoise(c);
+  source.loop = true;
+  filter.type = "bandpass";
+  filter.frequency.value = frequency;
+  filter.Q.value = q;
+  shaper.gain.value = wobble === "gain" ? 1 - depth : 1;
+  gain.gain.value = 0;
+  lfo.frequency.value = rate;
+  lfoDepth.gain.value = depth;
+  lfo.connect(lfoDepth).connect(wobble === "gain" ? shaper.gain : filter.frequency);
+  source.connect(filter).connect(shaper);
+  connectVoice(shaper, gain, master);
+  source.start();
+  lfo.start();
+  return gain;
+}
+
+/** Steers a loop toward `goal`, only on a real change. Returns the new goal. */
+function steerLoop(gain: GainNode, current: number, goal: number, glide: number) {
+  if (!ctx) return current;
+  if (Math.abs(goal - current) < 0.004 && (goal > 0 || current === 0)) return current;
+  gain.gain.setTargetAtTime(goal, ctx.currentTime, glide);
+  return goal;
+}
+
+function clamp01(value: number) {
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+}
+
+/**
+ * Sugar rush: the straw rotor's soft whirr while gliding, `level` 0–1, meant
+ * to be called every frame. Held silent while the game's audio is paused.
+ */
+export function setRunGlide(level: number) {
+  const spin = clamp01(level);
+  // A still rotor never needs to wake audio just to stay quiet.
+  if (!glideGain && spin === 0) return;
+  if (!glideGain) {
+    const c = audioContext();
+    if (!c) return;
+    glideGain = buildLoop(c, 1_100, 2.5, "gain", 17, 0.4);
+    glideGoal = 0;
+  }
+  if (!ctx || !glideGain) return;
+  const goal = muted || clockHeld || musicPaused ? 0 : spin * GLIDE_LEVEL;
+  glideGoal = steerLoop(glideGain, glideGoal, goal, GLIDE_TIME);
+}
+
+/** Sugar rush: feet leave the roof. */
+export function sfxRunJump() {
+  const c = audioContext();
+  if (!c) return;
+  dropAt(c.currentTime, 260, 560, 0.09, "triangle", 0.13);
+  effectNoise(c.currentTime, 0.04, 0.04, "highpass", 2_600);
+}
+
+/** Sugar rush: feet back down, a soft pad; a hard landing adds a low thud. */
+export function sfxRunLand(hard = false) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.05, 0.08, "lowpass", 700);
+  if (hard) {
+    duckMusic(0.12, 0.55);
+    dropAt(start, 120, 45, 0.14, "sine", 0.22);
+  }
+}
+
+/** Sugar rush: a short filtered swish under a low beam. */
+export function sfxRunSlide() {
+  const c = audioContext();
+  if (!c) return;
+  effectNoise(c.currentTime, 0.2, 0.08, "bandpass", 2_600, 700);
+}
+
+/** Sugar rush: a pearl picked up, a pluck that climbs the scale with the combo. */
+export function sfxRunPearl(combo = 1) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  const step = Math.min(Math.max(Math.floor(combo) - 1, 0), 7);
+  effectNoise(start, 0.015, 0.05, "highpass", 4_000);
+  note(midiFrequency(scaleMidi(2, step)), start, 0.07, "triangle", 0.12);
+}
+
+/** Sugar rush: tea sloshes out of the cup; `amount` 0–1 sets how wet. */
+export function sfxRunSpill(amount = 0.2) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  const wet = clamp01(amount);
+  effectNoise(start, 0.12 + wet * 0.12, 0.05 + wet * 0.1, "bandpass", 1_300, 400);
+  dropAt(start + 0.02, 700, 240, 0.06, "sine", 0.06 + wet * 0.08);
+}
+
+/** Sugar rush: ran into a crate. */
+export function sfxRunBump() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  duckMusic(0.14, 0.5);
+  dropAt(start, 200, 85, 0.1, "sine", 0.2);
+  effectNoise(start, 0.06, 0.08, "lowpass", 500);
+}
+
+/** Sugar rush: a crate broken through during a rush. */
+export function sfxRunSmash() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  duckMusic(0.12, 0.5);
+  effectNoise(start, 0.18, 0.13, "bandpass", 1_700, 500);
+  effectNoise(start + 0.03, 0.08, 0.08, "lowpass", 800);
+  dropAt(start, 170, 65, 0.1, "sine", 0.16);
+}
+
+/** Sugar rush: bounced off an awning. */
+export function sfxRunBounce() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  dropAt(start, 170, 480, 0.1, "sine", 0.18);
+  dropAt(start + 0.09, 480, 360, 0.1, "sine", 0.1);
+}
+
+/** Sugar rush: off the edge of a roof, a long sinking slide. */
+export function sfxRunFall() {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.5, 0.3);
+  dropAt(c.currentTime, midiFrequency(scaleMidi(2, 0)), 110, 0.55, "triangle", 0.18);
+}
+
+/** Sugar rush: a doorbell at the delivery; a full cup rings a third, brighter note. */
+export function sfxRunDeliver(full = false) {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(full ? 0.4 : 0.3, 0.35);
+  const start = c.currentTime;
+  note(midiFrequency(scaleMidi(2, 2)), start, 0.14, "triangle", 0.17);
+  note(midiFrequency(scaleMidi(2, 0)), start + 0.15, full ? 0.14 : 0.26, "triangle", 0.16);
+  if (full) note(midiFrequency(scaleMidi(3, 0)), start + 0.3, 0.24, "triangle", 0.14);
+}
+
+/** Sugar rush: a sugar rush kicks in, a quick climb. */
+export function sfxRushStart() {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.25, 0.4);
+  const start = c.currentTime;
+  effectNoise(start, 0.2, 0.05, "bandpass", 800, 4_000);
+  [0, 1, 2, 4].forEach((step, index) => {
+    note(midiFrequency(scaleMidi(1, step)), start + index * 0.045, 0.08, "triangle", 0.14);
+  });
+}
+
+/** Sugar rush: the rush wears off, two notes settling down. */
+export function sfxRushEnd() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  note(midiFrequency(scaleMidi(1, 4)), start, 0.09, "triangle", 0.11);
+  note(midiFrequency(scaleMidi(1, 2)), start + 0.1, 0.16, "triangle", 0.1);
+}
+
+/**
+ * Spill: the poured stream, `level` 0–1, meant to be called every frame. A
+ * soft band of noise with a slight warble. Held silent while the game's
+ * audio is paused.
+ */
+export function setPour(level: number) {
+  const flow = clamp01(level);
+  // A closed tap never needs to wake audio just to stay quiet.
+  if (!spillPourGain && flow === 0) return;
+  if (!spillPourGain) {
+    const c = audioContext();
+    if (!c) return;
+    spillPourGain = buildLoop(c, 900, 2.5, "pitch", 5, 110);
+    spillPourGoal = 0;
+  }
+  if (!ctx || !spillPourGain) return;
+  const goal = muted || clockHeld || musicPaused ? 0 : flow * SPILL_POUR_LEVEL;
+  spillPourGoal = steerLoop(spillPourGain, spillPourGoal, goal, SPILL_POUR_GLIDE);
+}
+
+/** Spill: one droplet lands in the cup; `pitch` 0–1 rises as the cup fills. */
+export function sfxDrop(pitch = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const top = midiFrequency(scaleMidi(2, Math.round(clamp01(pitch) * 7)));
+  dropAt(c.currentTime, top * 0.7, top, 0.05, "sine", 0.08);
+}
+
+/** Spill: tea on the floor. */
+export function sfxSplash() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.2, 0.1, "bandpass", 1_800, 450);
+  dropAt(start, 150, 70, 0.08, "sine", 0.1);
+}
+
+/** Spill: boiled off on a hot plate. */
+export function sfxSizzle() {
+  const c = audioContext();
+  if (!c) return;
+  effectNoise(c.currentTime, 0.32, 0.06, "highpass", 4_000, 7_000);
+}
+
+/** Spill: soaked up by a sponge. */
+export function sfxSponge() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.18, 0.07, "lowpass", 900, 250);
+  dropAt(start, 220, 120, 0.09, "sine", 0.08);
+}
+
+/** Spill: off a jelly block. */
+export function sfxBoing() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  dropAt(start, 140, 380, 0.08, "sine", 0.17);
+  dropAt(start + 0.08, 380, 260, 0.14, "sine", 0.1);
+}
+
+/** Spill: through a pipe, a hollow gulp. */
+export function sfxPipe() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.15, 0.06, "bandpass", 500, 1_100);
+  dropAt(start, 200, 320, 0.12, "sine", 0.12);
+}
+
+/** Spill: a gate swings open. */
+export function sfxGate() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.02, 0.06, "highpass", 3_000);
+  note(midiFrequency(scaleMidi(1, 0)), start, 0.07, "triangle", 0.12);
+  note(midiFrequency(scaleMidi(1, 2)), start + 0.07, 0.12, "triangle", 0.12);
+}
+
+/** Spill: a soft pencil tick as a stroke grows. The caller paces it. */
+export function sfxDraw() {
+  const c = audioContext();
+  if (!c) return;
+  effectNoise(c.currentTime, 0.02, 0.035, "highpass", 2_800 + Math.random() * 1_200);
+}
+
+/** Spill: a straw rubbed out. */
+export function sfxErase() {
+  const c = audioContext();
+  if (!c) return;
+  effectNoise(c.currentTime, 0.12, 0.07, "bandpass", 1_500, 3_500);
+}
+
+/** Spill: the room is cleared, one bright note per star, climbing. */
+export function sfxRoomClear(stars = 1) {
+  const c = audioContext();
+  if (!c) return;
+  const count = Math.min(Math.max(Math.floor(stars), 1), 3);
+  duckMusic(0.2 + count * 0.12, 0.3);
+  const start = c.currentTime;
+  for (let index = 0; index < count; index++) {
+    note(
+      midiFrequency(scaleMidi(2, index * 2)),
+      start + index * 0.12,
+      index === count - 1 ? 0.24 : 0.11,
+      "triangle",
+      0.16,
+    );
+  }
+}
+
+/** Spill: the room failed, a short, gentle falling pair. */
+export function sfxRoomFail() {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.3, 0.5);
+  const start = c.currentTime;
+  note(midiFrequency(scaleMidi(1, 2)), start, 0.13, "triangle", 0.12);
+  note(midiFrequency(scaleMidi(1, 0)), start + 0.15, 0.26, "triangle", 0.11);
+}

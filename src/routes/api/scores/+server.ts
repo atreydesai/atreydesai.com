@@ -15,8 +15,11 @@ export const trailingSlash = 'ignore';
 const BOARDS = {
 	catch: 'boba/v2-leaderboard.json',
 	stab: 'boba/stab-v1-leaderboard.json',
-	orders: 'boba/orders-v1-leaderboard.json',
+	orders: 'boba/orders-v2-leaderboard.json',
 	stack: 'boba/stack-v1-leaderboard.json',
+	lander: 'boba/lander-v1-leaderboard.json',
+	runner: 'boba/runner-v1-leaderboard.json',
+	spill: 'boba/spill-v1-leaderboard.json',
 } as const;
 
 function boardPath(game: unknown): string | null {

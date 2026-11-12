@@ -94,9 +94,10 @@
     color: var(--b-strong);
     background: var(--b-paper);
     border-radius: var(--radius-control);
-    font-family: var(--font-prose);
-    font-size: 1.2rem;
+    font-family: var(--font-ui);
+    font-size: 1rem;
     font-style: italic;
+    font-weight: 400;
     line-height: 1.4;
   }
 
