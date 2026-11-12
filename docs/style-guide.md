@@ -888,12 +888,13 @@ loses scroll position.
 
 ### Marks
 
-The site draws its two small typographic marks instead of taking them from a
-font. Both are the riso recipe of the banner and the interest loops at text
+The site draws its small marks instead of taking them from a font: two
+typographic marks, the key of the banner's updates log, and the banner's
+pushpin. All are the riso recipe of the banner and the interest loops at text
 size: an ink outline in the text colour, over a paper fill (`#FBF2E8`, dark
 `#2A2422`), with the accent plate (`#E85D4C`, dark `#F07563`) printed off
 register down and to the right. They live in `src/lib/marks.ts` and render
-through `<Mark kind="caret|dot" />`.
+through `<Mark kind="…" />` or `markHtml()`.
 
 - **Caret** (`kind="caret"`, `0.8em`) replaces `▸` on every disclosure. It
   turns a quarter by itself inside an element with `aria-expanded="true"` or
@@ -905,6 +906,33 @@ through `<Mark kind="caret|dot" />`.
   the interest markers’ loop at separator size. As a separator it carries a
   visually hidden `·`, so copied text and screen readers keep the separator;
   as a purely visual marker it passes `text=""`.
+- **Updates key** (`0.95em`, the `14px` standard-metadata size beside
+  `type-body-small`) leads rows of the banner's updates log, like a
+  bullet-journal key printed on a risograph. It doesn't turn. Its ink is
+  thinned to `1.5` so the printed stroke matches the caret's at the larger
+  size. Each kind says what the update is:
+
+  | Kind        | Shape                                | For                                                   |
+  | ----------- | ------------------------------------ | ----------------------------------------------------- |
+  | `paper`     | None: the date alone                 | Things written: papers, preprints, the CV, blog posts |
+  | `read`      | A bookmark ribbon, notched           | Things read                                           |
+  | `talk`      | A speech bubble, tail bottom-left    | Talks, posters, visits, conversations                 |
+  | `milestone` | A four-point spark                   | Acceptances, awards, applications submitted           |
+  | `note`      | A drawn loop, the separator's cousin | Everything else, and any unknown kind                 |
+
+  Written things are the log's usual business, so they go unmarked and the
+  drawn keys stand out for the rest. The key is decorative; each row carries
+  its kind as a visually hidden word ("Paper:", "Reading:", "Talk:",
+  "Milestone:"; nothing for a note), so the kind is never carried by shape
+  alone.
+- **Pin** (`kind="pin"`, `0.95em`, the key's size) is the key of the log's
+  pinned first row, ahead of its date like any other key. Its ink is thinned
+  to `1.3` so the cap, waist, and collar stay open at `14px`. It is drawn
+  side-on (flat cap, waisted barrel, flared collar, needle). The path is
+  upright; the row tilts it `-12deg`.
+- A shape is one closed outline (`d`), printed as plate, paper, and ink, plus
+  optional ink-only strokes (`detail`) for interior lines that shouldn't get a
+  plate or fill of their own: the pin's needle.
 - Separators typed into trusted HTML (CV publications, Markdown posts) are
   swapped for the drawn mark by `withMarks()`; don’t hand-write the SVG.
 - Each shape closes on itself. At this size an overshooting pen tail reads as
@@ -1159,6 +1187,48 @@ overrides could cause loss. This requirement comes from
 ## Expressive exceptions
 
 ### Riso banner
+
+The homepage's updates log: one wobbly cream sheet over an offset accent
+slab, holding a single list with no heading or rule of its own. The sheet's
+padding is `20px` all round, `24px` at the sides from `md`.
+
+- **Rows.** Each row is a grid of the date and the text, sharing the first
+  line's baseline; wrapped text hangs under the text column. Dates start on
+  the sheet's content edge. A key hangs ahead of its date in the sheet's
+  padding, `4px` from it, like a hanging bullet, so it takes no column and
+  never indents the log; the scroll window reaches into the padding by the
+  same amount so a hanging key isn't clipped. Below `sm` the row stacks:
+  date on one line, the text beneath on the same edge; the phone sheet's
+  padding is too narrow to hang a key, so there the key sits ahead of the
+  date on its line. Dates are `type-meta` in the secondary colour,
+  in one fixed `46px` column so they align down the log: `nov 12`, or
+  `nov ’25` when the year differs from the newest entry's. The short year
+  keeps every label inside that column, so an old entry never widens it and
+  shifts the text. They are formatted from the date string, never through
+  `Date`, so an entry can't shift a day. Text is `type-body-small`; links to
+  the site stay in the same tab.
+- **Voice.** Entries are announcements, not a changelog: "New blog post: …",
+  "New paper on arXiv: …", "Three papers accepted to ACL 2026 … See you
+  there." Every date is a real day with a source (a post's frontmatter, an
+  arXiv v1, an official notification or event date); an item known only to
+  the month stays out.
+- **Pinned row.** The first row is the one sentence a recruiting reader
+  needs (applying to Ph.D. programs, then email, CV, and research), with the
+  inline projects disclosure expanding beneath it. It is an ordinary row:
+  dated the day the sentence first went up (`banner.leadDate`), with the
+  drawn pin (see Marks) as its key. It stays first whatever its date. The
+  pin is decorative: a visually hidden "Pinned:" opens the sentence.
+- **Scrolling updates.** The dated rows, newest first, sit one ordinary row
+  gap below the pinned row, in a window three single-line rows tall plus
+  three quarters of a fourth (taller on phones, where rows stack), and
+  scroll inside it. A fade of the sheet's own paper covers whichever edge
+  has more behind it. The bottom fade starts at the peeking row's top and
+  turns solid just before the edge, so that row stays legible as "more"
+  without showing a hard cut; the thin scrollbar is a secondary cue. The
+  window takes keyboard focus only when it overflows. With no updates, the
+  sheet holds only the pinned row.
+- Entries live in `banner.updates` in `src/content/homepage.yaml`; the
+  pinned sentence and its date are `banner.lead` and `banner.leadDate`.
 
 May use:
 

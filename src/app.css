@@ -846,11 +846,14 @@
   }
 }
 
-/* Marks ($lib/marks): the drawn disclosure caret and separator. Sized in
-   em so they follow the text they sit in; the ink takes the text colour.
+/* Marks ($lib/marks): the drawn disclosure caret and separator, the
+   updates-log key, and the banner's pushpin. Sized in em so they follow the
+   text they sit in; the ink takes the text colour.
    Deliberately outside @layer: their classes are assembled in a template
    string (`mark-${kind}`), which Tailwind's content scan can't see, so a
-   layered rule would be purged from the build. */
+   layered rule would be purged from the build.
+   Size rules are qualified with `.mark` and layer rules with `.mark-svg`,
+   so a kind's class can never collide with a layer's (`.mark-paper`). */
 .mark {
   display: inline-flex;
   flex: none;
@@ -858,14 +861,47 @@
   line-height: 0;
 }
 
-.mark-caret {
+.mark.mark-caret {
   width: 0.8em;
   height: 0.8em;
 }
 
-.mark-dot {
+.mark.mark-dot {
   width: 0.6em;
   height: 0.6em;
+}
+
+/* The updates-log key: the standard-metadata icon size (14px) beside
+   15.2px row text. */
+.mark.mark-read,
+.mark.mark-talk,
+.mark.mark-milestone,
+.mark.mark-note {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+/* At 0.95em the 12-unit box prints larger than the caret's, so the ink thins
+   to 1.5 to land on the same 1.8px stroke. */
+.mark-read .mark-ink,
+.mark-talk .mark-ink,
+.mark-milestone .mark-ink,
+.mark-note .mark-ink {
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+/* The pushpin is the pinned row's key, at the key's size. Its ink is
+   thinner than the others' so its cap, waist, and collar stay open at
+   14px. */
+.mark.mark-pin {
+  width: 0.95em;
+  height: 0.95em;
+}
+
+.mark-pin .mark-ink {
+  stroke-width: 1.3;
+  stroke-linecap: round;
 }
 
 .mark-svg {
@@ -874,11 +910,11 @@
   overflow: visible;
 }
 
-.mark-plate {
+.mark-svg .mark-plate {
   fill: var(--mark-plate);
 }
 
-.mark-paper {
+.mark-svg .mark-paper {
   fill: var(--mark-paper);
 }
 

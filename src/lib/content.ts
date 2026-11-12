@@ -83,11 +83,27 @@ export interface ResearchInterestItem {
     citations?: ResearchInterestCitation[];
 }
 
+// One dated line in the homepage banner's updates log. `kind` picks the drawn
+// key that leads the row (see $lib/marks); anything unrecognised reads as a
+// note.
+export type BannerUpdateKind = 'paper' | 'read' | 'talk' | 'milestone' | 'note';
+
+export interface BannerUpdate {
+    /** "YYYY-MM-DD". */
+    date: string;
+    kind?: BannerUpdateKind;
+    /** Inline markdown: **bold** and [links](url). */
+    text: string;
+}
+
 export interface HomepageData {
     intro: string[];
     banner?: {
         lead: string;
+        /** "YYYY-MM-DD": when the pinned lead went up; shown as its date. */
+        leadDate?: string;
         projects: string[];
+        updates?: BannerUpdate[];
     };
     researchInterests: {
         intro: string;

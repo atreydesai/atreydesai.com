@@ -9,10 +9,68 @@ intro:
 banner:
   # The {curly} phrase becomes the click-to-expand toggle for the projects list.
   lead: "**I'm applying to Ph.D. programs this fall (2026-27 cycle)** and am happy to chat about my {ongoing projects}"
+  # The day the lead first went up, shown as the pinned row's date.
+  leadDate: "2026-05-09"
   projects:
     - "AI agents for long-form text generation ([autofiction.ai](https://autofiction.ai/))."
     - "Calibrating human reliance and susceptibility to VQA model explanations ([QANTA](https://qanta-org.github.io/competition/2026/))."
     - "Detection of out-of-context video misinformation using VLMs."
+  # The dated log under the pinned sentence, newest shown first (order here
+  # doesn't matter; it's sorted by date). The `lead` above is its pinned first
+  # row. About three updates show; the rest scroll. Leave it empty and only
+  # the pinned row remains.
+  #   date: "YYYY-MM-DD", quoted. Only a real day: if all you know is the
+  #         month, leave the entry out.
+  #   kind: the drawn key that leads the row. Missing or unknown reads as note.
+  #     paper     - something written: a paper, preprint, the CV, a blog post
+  #                 (no drawn key, just the date)
+  #     read      - something read
+  #     talk      - a talk, poster, visit, or conversation
+  #     milestone - an acceptance, an award, an application submitted
+  #     note      - everything else
+  #   text: one sentence, with **bold** and [links](url), written as an
+  #         announcement: "New blog post: …", "New paper on arXiv: …",
+  #         "Accepted to …". Links to this site (/blog/..., /research/#id)
+  #         stay in the same tab; others open a new one.
+  # Sources for the dates below: blog posts from their frontmatter; arXiv v1
+  # submission dates from arxiv.org/abs; ACL 2026's official notification
+  # date (2026.aclweb.org); the TLS 2026 schedule; ACM Computing Surveys
+  # online date (Crossref, doi 10.1145/3850160); the EMM-QA
+  # workshop day at ICML 2026 (qanta-org.github.io).
+  updates:
+    - date: "2026-10-09"
+      kind: paper
+      text: "New blog post: [prose diff](/blog/prose-diff/)."
+    - date: "2026-10-06"
+      kind: paper
+      text: "New paper: [A Preview of Computational Animal Linguistics](/research/#computational-animal-linguistics) is out in ACM Computing Surveys."
+    - date: "2026-09-10"
+      kind: paper
+      text: "New blog post: [making fruit](/blog/fruit-studies/)."
+    - date: "2026-08-13"
+      kind: paper
+      text: "New on the AutoFiction blog: [Behind the curtain of “Eight Tuesdays”](https://www.autofiction.ai/blog/behind-the-curtain-of-eight-tuesdays)."
+    - date: "2026-07-11"
+      kind: talk
+      text: "Co-organized the [EMM-QA workshop](https://qanta-org.github.io/competition/2026/icml/) at ICML 2026 in Seoul."
+    - date: "2026-04-18"
+      kind: paper
+      text: "New blog post: [wallpapers](/blog/shader-wallpapers/)."
+    - date: "2026-04-15"
+      kind: paper
+      text: "New paper on arXiv: [Filling in the Mechanisms](/research/#filler-gap), on how LMs learn filler-gap dependencies under developmental constraints."
+    - date: "2026-04-04"
+      kind: milestone
+      text: "Three papers accepted to ACL 2026: [BenchMarker](/research/#benchmarker) and [Test-Time Reasoners](/research/#test-time-reasoners) in the main conference, [filler-gap](/research/#filler-gap) in Findings. I'll be at ACL in San Diego, July 2–7. See you there."
+    - date: "2026-02-21"
+      kind: talk
+      text: "Gave an oral talk at [TLS 2026](https://tls.ling.utexas.edu) (virtually) on how filler-gap mechanisms emerge in developmentally constrained LMs."
+    - date: "2026-02-05"
+      kind: paper
+      text: "New paper on arXiv: [BenchMarker](/research/#benchmarker), an education-inspired toolkit for highlighting flaws in multiple-choice benchmarks."
+    - date: "2025-10-09"
+      kind: paper
+      text: "New paper on arXiv: [Test-Time Reasoners Are Strategic Multiple-Choice Test-Takers](/research/#test-time-reasoners)."
 
 researchInterests:
   # Each item's `quadrant` draws a 2×2 glyph beside its title, filling the

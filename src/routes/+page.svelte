@@ -15,6 +15,7 @@
   import { sfxBoba, unlockAudio } from "$lib/sfx";
   import { track } from "$lib/analytics";
   import Lately from "$lib/components/home/Lately.svelte";
+  import BannerUpdates from "$lib/components/home/BannerUpdates.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -307,12 +308,20 @@
         <div class="banner-riso-sketch-wrap relative">
           <div class="banner-riso-back" aria-hidden="true"></div>
           <div
-            class="banner-box banner-riso-front relative select-text px-5 py-4 md:px-6 text-ink-800 dark:text-cream-100"
+            class="banner-box banner-riso-front relative select-text p-5 md:px-6 text-ink-800 dark:text-cream-100"
           >
-            <!-- The "{label}" token in banner.lead becomes the click-to-expand
-                 projects toggle, inline in the sentence. A second sentence
-                 carries the three things a recruiting reader reaches for. -->
-            <p class="type-body-small relative z-10">
+            <!-- The pinned sentence is the log's first row, dated the day it
+                 went up and keyed with the pin (BannerUpdates draws the pin
+                 and says "Pinned:" to screen readers). The "{label}" token in
+                 banner.lead becomes the click-to-expand projects toggle,
+                 inline in the sentence. A second sentence carries the three
+                 things a recruiting reader reaches for. -->
+            <BannerUpdates
+              updates={homepageData.banner.updates ?? []}
+              pinnedDate={homepageData.banner.leadDate}
+            >
+            <svelte:fragment slot="pinned">
+            <p>
               {@html parseBanner(bannerLead.pre)}<button
                 type="button"
                 class="banner-toggle link font-[inherit] text-[length:inherit] cursor-pointer select-none"
@@ -341,9 +350,7 @@
               inert={!projectsOpen}
             >
               <div class="banner-projects-inner">
-                <ol
-                  class="type-body-small relative z-10 mt-2.5 space-y-1.5"
-                >
+                <ol class="mt-2.5 space-y-1.5">
                   {#each homepageData.banner.projects as project, i}
                     <li
                       class="banner-project-item"
@@ -355,6 +362,8 @@
                 </ol>
               </div>
             </div>
+            </svelte:fragment>
+            </BannerUpdates>
           </div>
         </div>
       </section>

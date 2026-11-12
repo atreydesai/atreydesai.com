@@ -11,11 +11,16 @@ export interface ParseInlineOptions {
 	italic?: boolean;
 	/** Enable `[^N]` → footnote reference marker. */
 	footnotes?: boolean;
+	/**
+	 * Keep site-internal links (`/…`, not `//…`) in the same tab. Off by
+	 * default: every link opens in a new tab.
+	 */
+	internalSameTab?: boolean;
 }
 
 // Transforms run in a fixed order: strong → italic → link → footnote.
 export function parseInline(text: string, options: ParseInlineOptions = {}): string {
-	const { strongClass = "", italic = false, footnotes = false } = options;
+	const { strongClass = "", italic = false, footnotes = false, internalSameTab = false } = options;
 
 	text = text.replace(
 		/\*\*([^*]+)\*\*/g,
@@ -29,9 +34,10 @@ export function parseInline(text: string, options: ParseInlineOptions = {}): str
 		);
 	}
 
-	text = text.replace(
-		/\[([^\]]+)\]\(([^)]+)\)/g,
-		'<a href="$2" target="_blank" rel="noopener noreferrer" class="link">$1</a>',
+	text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label: string, href: string) =>
+		internalSameTab && /^\/(?!\/)/.test(href)
+			? `<a href="${href}" class="link">${label}</a>`
+			: `<a href="${href}" target="_blank" rel="noopener noreferrer" class="link">${label}</a>`,
 	);
 
 	if (footnotes) {
