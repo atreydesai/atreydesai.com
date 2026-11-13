@@ -182,40 +182,44 @@
   // to the empty cup, so the cup drains as the HUD's does. The surface row's
   // numbering leans one way or the other with the slosh.
 
-  const RUNNER_PAL = { O: INK, S: STRAW_PINK, l: LID, T: TEA, e: EMPTY_CUP, b: PEARL };
-  const RUSH_PAL = { O: ACCENT, S: STRAW_PINK, l: "#fff3da", T: "#e0b07c", e: "#fff6ea", b: PEARL };
-  const GHOST_PAL = { O: STRAW_PINK, S: STRAW_PINK, l: STRAW_PINK, T: STRAW_PINK, e: STRAW_PINK, b: STRAW_PINK };
+  // The courier is dressed for the job, so it never reads as tea minus's
+  // lander: a red cap with its brim forward (C), a delivery bag on its back
+  // (g), red trainers (k), and a bendy straw swept back by the run.
+  const BAG = "#7bae8c";
+  const RUNNER_PAL = { O: INK, S: STRAW_PINK, l: LID, T: TEA, e: EMPTY_CUP, b: PEARL, C: ACCENT, k: ACCENT, g: BAG };
+  const RUSH_PAL = { O: ACCENT, S: STRAW_PINK, l: "#fff3da", T: "#e0b07c", e: "#fff6ea", b: PEARL, C: "#fff3da", k: ACCENT, g: "#fff3da" };
+  const GHOST_PAL = { O: STRAW_PINK, S: STRAW_PINK, l: STRAW_PINK, T: STRAW_PINK, e: STRAW_PINK, b: STRAW_PINK, C: STRAW_PINK, k: STRAW_PINK, g: STRAW_PINK };
   const TEA_CELLS = 7;
 
   const HEADS: Record<string, string[]> = {
-    straw: ["....S....", "....S...."],
+    straw: ["..SSS....", "....S...."],
     rotor0: ["SSSSSSSSS", "....S...."],
     rotor1: [".SSSSSSS.", "....S...."],
     rotor2: ["...SSS...", "....S...."],
     hook: ["....SSS..", "....S.S.."],
   };
-  const LID_ROWS = ["..OOOOO..", ".OlllllO.", ".OOOOOOO."];
+  const LID_ROWS = ["..CCCCC..", ".CCCCCCCC", ".OOOOOOO."];
   /** The two upper tea rows, by lean: -1 tea pushed left, 1 pushed right. */
   const UPPER = { "-1": ["567", "234"], "0": ["657", "324"], "1": ["765", "432"] } as Record<string, string[]>;
   const LEGS: Record<string, string[]> = {
-    stand: ["..O...O..", ".O.....O."],
-    run0: ["..O...O..", ".O.....OO"],
-    run1: ["...O.O...", "...O.O...", "...O..OO."],
-    run2: ["..O...O..", "OO.....O."],
-    run3: ["...O.O...", "...O.O...", "..OO.O..."],
-    tuck: ["..OO.OO.."],
-    fall: ["..O...O..", "..O...O.."],
-    slam: ["...O.O...", "...O.O..."],
-    hang: ["..O...O..", "..O...O..", "..O...O.."],
-    glide: [".O.....O.", "O.......O"],
+    stand: ["..O...O..", ".k.....k."],
+    run0: ["..O...O..", ".k.....kk"],
+    run1: ["...O.O...", "...O.O...", "...k..kk."],
+    run2: ["..O...O..", "kk.....k."],
+    run3: ["...O.O...", "...O.O...", "..kk.k..."],
+    tuck: ["..kk.kk.."],
+    fall: ["..O...O..", "..k...k.."],
+    slam: ["...O.O...", "...k.k..."],
+    hang: ["..O...O..", "..O...O..", "..k...k.."],
+    glide: [".O.....O.", "k.......k"],
   };
   /** Lying back for a slide, legs out in front; tea fills from the cup's foot. */
   const SLIDE_ROWS = [
-    ".OlOOOOO....",
-    ".OlO52bO....",
-    "SOlO741OO...",
-    "..OlO63bOOO.",
-    "..OlOOOOO.OO",
+    ".OCOOOOO....",
+    ".OCO52bO....",
+    "SOCO741OO...",
+    "..OCO63bOOO.",
+    "..OCOOOOO.kk",
   ];
 
   const runnerGrids = new Map<string, string[]>();
@@ -238,9 +242,9 @@
       const rows = [
         ...HEADS[head],
         ...LID_ROWS,
-        `..O${row5}O..`,
-        `..O${row6}O..`,
-        "..Ob1bO..",
+        `ggO${row5}O..`,
+        `ggO${row6}O..`,
+        "ggOb1bO..",
         "..OOOOO..",
         ...LEGS[legs],
       ];

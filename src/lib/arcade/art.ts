@@ -182,18 +182,18 @@ export const MENU_ICONS: Record<string, { grid: Grid; palette: Palette }> = {
   },
   runner: {
     grid: [
-      "....S....",
-      "..OOOOO..",
-      "..OlllO..",
+      "..SSS....",
+      "..CCCCC..",
+      ".CCCCCCCC",
       "m.OOOOO..",
       ".mOLLLO..",
       "m.ObLbO..",
       "...OOO...",
       "..O...O..",
       ".O.....O.",
-      ".O......O",
+      ".k......k",
     ],
-    palette: { O: "currentColor", S: STRAW_PINK, l: LID, L: "#c79a6b", b: PEARL, m: "#e85d4c" },
+    palette: { O: "currentColor", S: STRAW_PINK, C: "#e85d4c", k: "#e85d4c", L: "#c79a6b", b: PEARL, m: "#e85d4c" },
   },
   spill: {
     grid: [
