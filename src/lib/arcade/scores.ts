@@ -54,18 +54,54 @@ export function firstVisit(game: GameId) {
   return !seen;
 }
 
-// Spill remembers the furthest room a run has reached on this device, so a
-// later run can start from a checkpoint it has earned.
-const SPILL_REACH_COOKIE = "boba_reach_spill_v1";
+// Spill keeps its progress on this device as one small JSON value: each
+// room's best stars and points, and whether after hours is open. The engine's
+// cleanProgress checks whatever comes back, so this only stores and fetches.
+// Storage can be off (private windows, blocked site data): every read and
+// write is guarded, and the game plays on without it.
+const SPILL_PROGRESS_KEY = "boba_spill_progress_v1";
+// The furthest room a run had reached, from before spill had levels.
+const SPILL_REACH_COOKIES = ["boba_reach_spill_v1", "boba_spill_reach"];
+/** Stars and points a migrated room gets: cleared once, at the least a clear scores. */
+const MIGRATED_STARS = 1;
+const MIGRATED_POINTS = 100;
 
-/** The furthest spill room index reached on this device, 0 if none. */
-export function readSpillReach() {
-  return parseInt(readCookie(SPILL_REACH_COOKIE) ?? "", 10) || 0;
+/**
+ * Spill progress as stored on this device, unchecked (null if there is
+ * none). The first time, an old reach cookie becomes progress: every room
+ * before the one reached counts as cleared with one star.
+ */
+export function readSpillProgress(): unknown {
+  try {
+    const raw = localStorage.getItem(SPILL_PROGRESS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // Unreadable or unavailable: fall through to the old cookie, then nothing.
+  }
+  let reached = 0;
+  for (const name of SPILL_REACH_COOKIES) reached = Math.max(reached, parseInt(readCookie(name) ?? "", 10) || 0);
+  if (reached <= 0) return null;
+  const rooms = Math.min(reached, 64);
+  const migrated = {
+    stars: Array.from({ length: rooms }, () => MIGRATED_STARS),
+    points: Array.from({ length: rooms }, () => MIGRATED_POINTS),
+    afterHours: false,
+  };
+  // Only once it is safely stored does the cookie go, so nothing is lost.
+  if (writeSpillProgress(migrated)) {
+    for (const name of SPILL_REACH_COOKIES) document.cookie = `${name}=; path=/; max-age=0; samesite=lax`;
+  }
+  return migrated;
 }
 
-/** Saves `index` if it is further than the room already remembered. */
-export function recordSpillReach(index: number) {
-  if (index > readSpillReach()) writeCookie(SPILL_REACH_COOKIE, String(Math.floor(index)));
+/** Saves spill progress on this device. Returns whether it was stored. */
+export function writeSpillProgress(progress: unknown) {
+  try {
+    localStorage.setItem(SPILL_PROGRESS_KEY, JSON.stringify(progress));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export interface BoardEntry {

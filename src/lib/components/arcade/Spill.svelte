@@ -25,6 +25,7 @@
   } from "$lib/sfx";
   import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import {
+    AFTER_HOURS,
     CUP_WALL,
     EVENTS,
     HEIGHT,
@@ -33,38 +34,41 @@
     MIN_SEGMENT,
     PEARL as PEARL_KIND,
     PIPE_MOUTH,
+    ROOMS,
     SPILLED,
-    START_LIVES,
     STEP,
     WIDTH,
-    availableCheckpoints,
     beginStroke,
     cancelStroke,
+    cleanProgress,
     clearStrokes,
     commitStroke,
     createWorld,
-    currentRoom,
     cupWalls,
     describeRoom,
     extendStroke,
+    frameSteps,
     judgeRoom,
-    newRun,
+    nextRoom,
     pourNow,
-    recordResult,
+    progressSummary,
+    progressTotal,
+    recordRoomResult,
     removeStroke,
+    roomAt,
     step,
     strawLeft,
     strokeAt,
+    unlockedRooms,
   } from "$lib/arcade/spill-engine.js";
-  import type { Room, RoomResult, Run, World } from "$lib/arcade/spill-engine.js";
-  import { MENU_ICONS, fitCanvas, arcadeFont } from "$lib/arcade/art";
-  import { firstVisit, readSpillReach, recordSpillReach } from "$lib/arcade/scores";
+  import type { Progress, Room, RoomResult, World } from "$lib/arcade/spill-engine.js";
+  import { ICON_AUDIO_PAL, ICON_LEVELS, ICON_LOCK, MENU_ICONS, fitCanvas, arcadeFont } from "$lib/arcade/art";
+  import { firstVisit, readSpillProgress, writeSpillProgress } from "$lib/arcade/scores";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
-  import Pearls from "./Pearls.svelte";
   import ResultsSlip from "./ResultsSlip.svelte";
 
   // Spill: a kettle pours, and the player draws straws to steer the tea into
@@ -74,7 +78,12 @@
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
-  type Phase = "start" | "countdown" | "play" | "result" | "over";
+  /**
+   * idle: no room started yet (the level select is up over the next room);
+   * countdown, play, and result (the verdict is in, the tea still moves);
+   * done: the closing-time slip after room 18.
+   */
+  type Phase = "idle" | "countdown" | "play" | "result" | "done";
   type Kettle = World["kettles"][number];
   type Cup = World["cups"][number];
   type Block = World["blocks"][number];
@@ -108,10 +117,14 @@
   const CLEAR_SECONDS = 2.1;
   const FAIL_SECONDS = 2.8;
   const SKIP_AFTER = 0.6;
-  const GAME_OVER_SECONDS = 2;
   const INTRO_SECONDS = 4;
-  const NOTE_SECONDS = 2.4;
   const STAR_STAGGER = 0.12;
+  /** Below this share of the budget the straw is low: coral, and the word. */
+  const LOW_SHARE = 0.2;
+  /** The reach ring shows below this share, and is at full strength by LOW_SHARE. */
+  const RING_SHARE = 0.6;
+  /** The level select lays rooms out a page to a row. */
+  const ROOM_COLUMNS = 3;
 
   // --- Colour ---------------------------------------------------------------------
   // The kitchen has no light mode: it is painted the same in both themes, and
@@ -349,37 +362,50 @@
   ];
   const STAR_ON = { O: "currentColor", f: "#dba84d" };
   const STAR_OFF = { O: "currentColor" };
+  const LOCK_PAL = { L: "currentColor" };
 
   const PEARL_GRID = ["..ppp..", ".ppppp.", "pphpppp", "phhpppp", "ppppppp", ".ppppp.", "..ppp.."];
   const CHECK_GRID = ["......O", ".....OO", "O...OO.", "OO.OO..", ".OOO...", "..O...."];
 
   // --- State -------------------------------------------------------------------
 
-  let phase: Phase = "countdown";
-  let score = 0;
-  let lives = START_LIVES;
-  let livesPulse = 0;
+  let phase: Phase = "idle";
   let paused = false;
-  let gameOver = false;
   let tipVisible = false;
   let liveMessage = "Spill starting";
   let localBest = 0;
   let newBest = false;
-  let countdown = COUNTDOWN_SECONDS;
+  let countdown = 0;
   let countdownElapsed = 0;
   let goVisible = false;
-  let checkpoints: number[] = [0];
-  let reached = 0;
 
-  // HUD readouts, refreshed about ten times a second.
+  // Progress lives on the device; the score is every room's best points.
+  let progress: Progress = cleanProgress(null);
+  let levelIndex = 0;
+  let remixSeed = 1;
+  let afterHoursCleared = 0;
+  let levelsOpen = false;
+  /** A room has been started this visit, so the level select can close back to it. */
+  let roomStarted = false;
+  let musicStarted = false;
+  /** The slip has been shown for this clear of room 18, so the result waits for Next. */
+  let holdResult = false;
+  let focusedTile = 0;
+
+  // HUD readouts, refreshed about ten times a second (the gauge as it changes).
   let roomLabel = "room 01";
   let roomName = "";
   let previewStars = 0;
-  let strawNow = 0;
-  let strawBudget = 1;
-  let strawPulse = 0;
   let canPour = false;
-  let canUndo = false;
+  let canClear = false;
+  let canNext = false;
+  let strawBudget = 1;
+  let strawUsed = 0;
+  let draftUsed = 0;
+  let strawSpent: number[] = [];
+  let gaugeShake = 0;
+  let lowAnnounced = false;
+  let outAnnounced = false;
 
   let caption: { id: number; line: string } | null = null;
   let captionAge = 0;
@@ -394,8 +420,7 @@
   let threeStarRooms = 0;
   let teaSpilled = 0;
 
-  let run: Run = newRun();
-  let room: Room = currentRoom(run);
+  let room: Room = roomAt(0);
   let world: World = createWorld(room);
   let resultAge = 0;
   let lastCleared = false;
@@ -414,11 +439,11 @@
   let barEl: HTMLElement;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
-  let startCard: HTMLElement;
+  let levelsCard: HTMLElement;
+  let tileButtons: HTMLButtonElement[] = [];
   let ctx: CanvasRenderingContext2D | null = null;
   let reduceMotion = false;
   let dialFont = '700 11px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
-  let chipFont = '500 12px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
 
   // Layout, in CSS px.
   let viewW = 0;
@@ -2060,7 +2085,7 @@
   }
 
   function labelFor(index: number, r: Room) {
-    return r.remix ? `after hours ${index + 1}` : `room ${pad2(index + 1)}`;
+    return r.remix ? "after hours" : `room ${pad2(index + 1)}`;
   }
 
   function showCaption(line: string, life: number) {
@@ -2070,20 +2095,24 @@
     captionLife = life;
   }
 
-  /** A fresh world for the run's current room: straws cleared, kettles full. */
-  function enterRoom() {
+  /** A fresh world for a level: straws cleared, kettles full. */
+  function enterRoom(index: number) {
     const previousPage = room ? pageIndex() : -1;
     const wasRemix = !!room?.remix;
-    room = currentRoom(run);
+    levelIndex = index;
+    room = roomAt(index, remixSeed);
     world = createWorld(room);
     accumulator = 0;
     alpha = 1;
     pourAnnounced = false;
+    lowAnnounced = false;
+    outAnnounced = false;
+    holdResult = false;
     verdict = null;
     resetRoomVisuals();
     cancelGesture();
     penDrawing = false;
-    roomLabel = labelFor(run.index, room);
+    roomLabel = labelFor(index, room);
     roomName = room.name;
     bakeRoom();
     if (previousPage !== pageIndex() || wasRemix !== !!room.remix) bakeKitchen();
@@ -2095,23 +2124,52 @@
     liveMessage = describeRoom(room);
   }
 
+  /** Into a level: through the countdown the first time the music starts, else straight in. */
+  function playLevel(index: number) {
+    if (index >= AFTER_HOURS && levelIndex < AFTER_HOURS) remixSeed = 1 + Math.floor(Math.random() * 1_000_000);
+    caption = null;
+    enterRoom(index);
+    roomStarted = true;
+    if (!musicStarted) {
+      phase = "countdown";
+      countdown = COUNTDOWN_SECONDS;
+      countdownElapsed = 0;
+      goVisible = false;
+      last = 0;
+      sfxCountdown(COUNTDOWN_SECONDS);
+      liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+      return;
+    }
+    setMusicPhase(phaseFor(room));
+    setMusicPaused(false);
+    phase = "play";
+    last = 0;
+    syncHud();
+    announceRoom();
+  }
+
   function settleRoom(result: RoomResult) {
     phase = "result";
     resultAge = 0;
-    accumulator = 0;
     cancelGesture();
     penDrawing = false;
     setPour(0);
     lastCleared = result.cleared;
     teaSpilled += result.spilled;
-    recordResult(run, result);
-    score = run.total;
-    syncHud();
     if (result.cleared) {
-      roomsCleared += 1;
-      starsTotal += result.stars;
-      if (result.stars === 3) threeStarRooms += 1;
-      recordSpillReach(run.reached);
+      let note = "";
+      if (levelIndex < AFTER_HOURS) {
+        const before = progress;
+        progress = recordRoomResult(progress, levelIndex, result);
+        writeSpillProgress(progress);
+        const opened = unlockedRooms(progress);
+        if (levelIndex + 1 < ROOMS.length && opened[levelIndex + 1] && !unlockedRooms(before)[levelIndex + 1]) {
+          note = ` Room ${levelIndex + 2} is open.`;
+        } else if (progress.afterHours && !before.afterHours) note = " After hours is open.";
+        else if (result.points > before.points[levelIndex] && before.stars[levelIndex] > 0) note = " A new best for this room.";
+      } else {
+        afterHoursCleared += 1;
+      }
       verdictCount += 1;
       verdict = { id: verdictCount, stars: result.stars, points: result.points };
       sfxRoomClear(result.stars);
@@ -2123,22 +2181,31 @@
         }
       }
       caption = null;
-      liveMessage = `Room cleared with ${result.stars} ${result.stars === 1 ? "star" : "stars"}, ${result.points} points.`;
+      liveMessage = `Room cleared with ${result.stars} ${result.stars === 1 ? "star" : "stars"}, ${result.points} points.${note}`;
     } else {
-      lives = run.lives;
-      livesPulse += 1;
       sfxRoomFail();
       if (!reduceMotion) shake = 1;
       showCaption(room.hint, Infinity);
-      const left = run.lives > 0 ? `${run.lives} ${run.lives === 1 ? "pearl" : "pearls"} left` : "no pearls left";
-      liveMessage = `Spilled, and a pearl lost, ${left}. Hint: ${room.hint}.`;
+      liveMessage = `Spilled. Hint: ${room.hint}.`;
     }
+    syncHud();
   }
 
+  /** On from a result: the next room after a clear (or the slip after room 18), the same room after a spill. */
   function advance() {
-    if (lastCleared) setMusicPhase(phaseFor(currentRoom(run)));
+    if (lastCleared && levelIndex === ROOMS.length - 1 && !holdResult) {
+      void openSlip();
+      return;
+    }
+    const nextIndex = lastCleared ? levelIndex + 1 : levelIndex;
+    // The slip winds the music down: the next room starts it again through the countdown.
+    if (!musicStarted) {
+      playLevel(nextIndex);
+      return;
+    }
+    if (lastCleared) setMusicPhase(phaseFor(roomAt(nextIndex, remixSeed)));
     const keepHint = !lastCleared ? caption : null;
-    enterRoom();
+    enterRoom(nextIndex);
     phase = "play";
     syncHud();
     if (keepHint) {
@@ -2150,7 +2217,7 @@
   }
 
   function trySkip() {
-    if (phase !== "result" || run.over || paused || resultAge < SKIP_AFTER) return;
+    if (phase !== "result" || paused || levelsOpen || resultAge < SKIP_AFTER) return;
     advance();
   }
 
@@ -2160,35 +2227,57 @@
     return status === "cleared" || status === "failed";
   }
 
-  /** Steps the simulation on a fixed clock and catches the room settling. */
+  /**
+   * Steps the simulation on a fixed clock. It runs while the room is in play
+   * and after its verdict, so tea still on its way keeps flowing; the verdict
+   * is caught the step it lands.
+   */
   function simulate(dt: number) {
-    if (settled()) return;
-    accumulator += dt;
-    while (accumulator >= STEP) {
-      accumulator -= STEP;
+    const clock = frameSteps(accumulator, dt);
+    accumulator = clock.accumulator;
+    for (let k = 0; k < clock.steps; k++) {
       step(world, STEP);
       if (world.events.count) handleEvents();
-      if (settled()) {
-        alpha = 1;
-        settleRoom(world.result ?? judgeRoom(world));
-        return;
-      }
+      if (phase === "play" && settled()) settleRoom(world.result ?? judgeRoom(world));
     }
-    alpha = accumulator / STEP;
+    alpha = clock.alpha;
     let flowing = 0;
     for (const kettle of world.kettles) if (kettle.started && kettle.left > 0) flowing++;
     setPour(Math.min(1, flowing * 0.6));
   }
 
   function syncHud() {
-    strawNow = Math.round(strawLeft(world));
-    strawBudget = world.budget;
-    const live = phase === "play" && world.status !== "cleared" && world.status !== "failed";
+    const live = phase === "play" && !settled();
     canPour = live && world.status === "waiting";
-    canUndo = live && world.strokes.length > 0;
-    const judged = judgeRoom(world);
+    canClear = live && world.strokes.length > 0;
+    canNext = phase === "result" && lastCleared && !levelsOpen;
+    const judged = world.result ?? judgeRoom(world);
     previewStars = world.status === "waiting" ? 0 : judged.stars;
     cupOk = judged.cups.map((cup) => cup.ok);
+    syncGauge();
+  }
+
+  /**
+   * The straw gauge: what is left, the stroke being drawn, and what each
+   * straw down cost. Says "low" and "out" once each a room.
+   */
+  function syncGauge() {
+    strawBudget = world.budget;
+    strawSpent = world.strokes.map((stroke) => stroke.length).reverse();
+    strawUsed = strawSpent.reduce((sum, length) => sum + length, 0);
+    draftUsed = world.draftLength;
+    const left = strawLeft(world);
+    if (phase !== "play") return;
+    if (left < 0.5) {
+      if (!outAnnounced) {
+        outAnnounced = true;
+        gaugeShake += 1;
+        liveMessage = "Out of straw.";
+      }
+    } else if (left < strawBudget * LOW_SHARE && !lowAnnounced) {
+      lowAnnounced = true;
+      liveMessage = `Straw low, ${Math.round(left)} units left.`;
+    }
   }
 
   // --- Drawing a frame -------------------------------------------------------------
@@ -2259,7 +2348,7 @@
     ctx.restore();
   }
 
-  /** Screen-space marks: timer figures, the keyboard pen, the straw-left chip. */
+  /** Screen-space marks: timer figures, the keyboard pen, the reach ring, the draft's end. */
   function drawOverlays(left: number, top: number) {
     if (!ctx) return;
     ctx.save();
@@ -2290,6 +2379,8 @@
       }
     }
 
+    drawReachRing(left, top, drawing);
+
     if (drawing && world.draft) {
       const end = world.draft[world.draft.length - 1];
       const ex = left + end[0] * S;
@@ -2317,7 +2408,7 @@
       }
       const touch = gesture?.touch ?? false;
       if (touch || out) {
-        // The finger hides the draft's end, so a ring marks it.
+        // The finger hides the draft's end, so a square marks it.
         ctx.strokeStyle = "#fdf8f3";
         ctx.lineWidth = 4;
         ctx.strokeRect(Math.round(ex) - 6, Math.round(ey) - 6, 12, 12);
@@ -2325,18 +2416,66 @@
         ctx.lineWidth = 2;
         ctx.strokeRect(Math.round(ex) - 6, Math.round(ey) - 6, 12, 12);
       }
-      const text = String(Math.round(strawLeft(world)));
-      ctx.font = chipFont;
-      const width = Math.max(28, Math.ceil(ctx.measureText(text).width + 14));
-      const cx = touch ? anchorX : anchorX + 14 + width / 2;
-      const cy = touch ? anchorY - 64 : anchorY - 22;
-      const boxX = Math.round(clamp(cx - width / 2, 4, viewW - width - 4));
-      const boxY = Math.round(clamp(cy - 11, 4, viewH - 26));
-      ctx.fillStyle = "#2b2320";
-      ctx.fillRect(boxX, boxY, width, 22);
-      if (touch) ctx.fillRect(Math.round(clamp(cx, boxX + 4, boxX + width - 6)) - 1, boxY + 22, 2, 8);
-      ctx.fillStyle = out ? "#f18272" : "#fdf8f3";
-      ctx.fillText(text, boxX + width / 2, boxY + 11.5);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * How far the straw left can still reach: a ring of pixel dashes round the
+   * pen tip (the draft's end on touch, where the finger isn't), clipped to
+   * the room. Unseen while straw is plentiful, firm once it runs short.
+   */
+  function drawReachRing(left: number, top: number, drawing: boolean) {
+    if (!ctx || phase !== "play" || paused || levelsOpen || settled()) return;
+    const budget = world.budget || 1;
+    const remaining = strawLeft(world);
+    const share = remaining / budget;
+    const strength = clamp((RING_SHARE - share) / (RING_SHARE - LOW_SHARE), 0, 1);
+    if (strength <= 0.02 || remaining < 0.5) return;
+    let cx: number;
+    let cy: number;
+    let reach = remaining;
+    if (drawing && world.draft) {
+      const end = world.draft[world.draft.length - 1];
+      cx = end[0];
+      cy = end[1];
+      // A mouse or the keyboard pen: centred on the tip, less what the
+      // straw still has to cover to get there from the draft's end.
+      if (!gesture?.touch) {
+        const tip = gesture?.drawing ? { x: worldX(gesture.x), y: worldY(gesture.y) } : pen;
+        const tx = clamp(tip.x, 0, WIDTH);
+        const ty = clamp(tip.y, 0, HEIGHT);
+        reach = Math.max(0, remaining - Math.hypot(tx - cx, ty - cy));
+        cx = tx;
+        cy = ty;
+      }
+    } else if (penVisible) {
+      cx = pen.x;
+      cy = pen.y;
+    } else return;
+    if (reach < 1) return;
+    const low = share < LOW_SHARE;
+    const x0 = left + cx * S;
+    const y0 = top + cy * S;
+    const radius = reach * S;
+    const size = low ? 4 : 3;
+    const count = Math.max(12, Math.floor((Math.PI * 2 * radius) / 9));
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, WIDTH * S, HEIGHT * S);
+    ctx.clip();
+    for (const [color, grow, alphaScale] of [
+      ["#fdf8f3", 2, 0.7],
+      [low ? "#c9462f" : "#1a1a1a", 0, 1],
+    ] as const) {
+      ctx.globalAlpha = strength * alphaScale * (low ? 1 : 0.8);
+      ctx.fillStyle = color;
+      for (let k = 0; k < count; k += 2) {
+        const angle = (k / count) * Math.PI * 2;
+        const px = Math.round(x0 + Math.cos(angle) * radius - (size + grow) / 2);
+        const py = Math.round(y0 + Math.sin(angle) * radius - (size + grow) / 2);
+        ctx.fillRect(px, py, size + grow, size + grow);
+      }
     }
     ctx.restore();
   }
@@ -2364,7 +2503,7 @@
   const worldY = (clientY: number) => (clientY - ry) / S;
 
   function playable() {
-    return phase === "play" && !paused && !gameOver && world.status !== "cleared" && world.status !== "failed";
+    return phase === "play" && !paused && !levelsOpen && world.status !== "cleared" && world.status !== "failed";
   }
 
   function flashNoDraw(x: number, y: number) {
@@ -2382,12 +2521,10 @@
     if (best >= 0 && bestD < 24) noDrawFlash[best] = 0.6;
   }
 
+  /** A straw refused for want of straw: the gauge says so, with a shake. */
   function outOfStraw() {
-    strawPulse += 1;
-    if (paced("empty", 1.2)) {
-      liveMessage = "Out of straw.";
-      showCaption("out of straw", NOTE_SECONDS);
-    }
+    if (paced("empty", 0.8)) gaugeShake += 1;
+    if (!outAnnounced) syncGauge();
   }
 
   /** Starts a straw at a world point; says why if it can't. */
@@ -2408,6 +2545,7 @@
     const [lx, ly] = draft[draft.length - 1];
     const before = world.draftLength;
     if (extendStroke(world, x, y)) {
+      syncGauge();
       tickLength += world.draftLength - before;
       if (tickLength >= 8 && clock - lastTick > 0.045) {
         tickLength = 0;
@@ -2419,9 +2557,7 @@
     const cx = clamp(x, 0, WIDTH);
     const cy = clamp(y, 0, HEIGHT);
     if (Math.hypot(cx - lx, cy - ly) < MIN_SEGMENT) return;
-    if (strawLeft(world) < 0.5) {
-      if (paced("stopped", 0.8)) strawPulse += 1;
-    } else flashNoDraw(cx, cy);
+    if (strawLeft(world) >= 0.5) flashNoDraw(cx, cy);
   }
 
   /**
@@ -2447,8 +2583,8 @@
     if (commitStroke(world) >= 0) {
       strawVersion++;
       tipVisible = false;
-      syncHud();
     }
+    syncHud();
   }
 
   function crumbs(points: Array<[number, number]>) {
@@ -2478,6 +2614,7 @@
   function cancelGesture() {
     if (gesture?.drawing) cancelStroke(world);
     gesture = null;
+    draftUsed = world.draftLength;
   }
 
   function onStageDown(event: PointerEvent) {
@@ -2551,6 +2688,7 @@
     }
     if (!playable()) {
       cancelStroke(world);
+      draftUsed = 0;
       return;
     }
     if (g.drawing) finishDraft(worldX(event.clientX), worldY(event.clientY));
@@ -2586,13 +2724,27 @@
   };
 
   function onKey(event: KeyboardEvent) {
-    if (gameOver || paused || phase === "start") return;
     const key = event.key;
-    if ((key === " " || key === "Enter") && isOnControl(event)) return;
+    const lower = key.toLowerCase();
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (levelsOpen) {
+      // The dialog's tiles take their own keys; L closes it again.
+      if (lower === "l") {
+        event.preventDefault();
+        closeLevels();
+      }
+      return;
+    }
+    if (paused || phase === "idle" || phase === "done") return;
+    if (lower === "l") {
+      event.preventDefault();
+      void openLevels();
+      return;
+    }
+    if ((key === " " || key === "Enter") && isOnControl(event)) return;
     if (phase === "result") {
       if (key === " " || key === "Enter" || ARROWS[key]) event.preventDefault();
-      trySkip();
+      if (key === " " || key === "Enter") trySkip();
       return;
     }
     const arrow = ARROWS[key];
@@ -2615,11 +2767,7 @@
       pour();
       return;
     }
-    const lower = key.toLowerCase();
-    if (lower === "z" || key === "Backspace") {
-      event.preventDefault();
-      undo();
-    } else if (lower === "c") clearAll();
+    if (lower === "c") clearAll();
     else if (key === "Delete") {
       event.preventDefault();
       penVisible = true;
@@ -2635,7 +2783,10 @@
     if (event.key === " " && penDrawing) {
       penDrawing = false;
       if (playable()) finishDraft(pen.x, pen.y);
-      else cancelStroke(world);
+      else {
+        cancelStroke(world);
+        syncGauge();
+      }
     }
   }
 
@@ -2676,18 +2827,6 @@
     }
   }
 
-  function undo() {
-    if (!playable()) return;
-    if (world.draft) {
-      cancelGesture();
-      penDrawing = false;
-      cancelStroke(world);
-      return;
-    }
-    const last = world.strokes[world.strokes.length - 1];
-    if (last) removeById(last.id);
-  }
-
   function clearAll() {
     if (!playable() || !world.strokes.length) return;
     for (const stroke of world.strokes) crumbs(stroke.points);
@@ -2697,16 +2836,21 @@
     syncHud();
   }
 
+  function next() {
+    if (phase !== "result" || !lastCleared || paused || levelsOpen) return;
+    advance();
+  }
+
   /** Bar buttons keep focus for keyboard users, and hand it back after a click. */
   function barAction(event: MouseEvent, action: () => void) {
     action();
     if (event.detail > 0) focusPlayfield();
   }
 
-  // --- Pause, the start card, and the end -------------------------------------------------
+  // --- Pause, the level select, and closing time ---------------------------------------------
 
   async function pauseGame() {
-    if (gameOver || paused || phase === "start") return;
+    if (paused || levelsOpen || phase === "idle" || phase === "done") return;
     paused = true;
     releaseAll();
     setPour(0);
@@ -2717,7 +2861,7 @@
   }
 
   function resumeGame() {
-    if (gameOver || !paused) return;
+    if (!paused) return;
     paused = false;
     last = 0;
     setMusicPaused(false);
@@ -2727,6 +2871,7 @@
   }
 
   function togglePause() {
+    if (levelsOpen || phase === "done") return;
     if (paused) resumeGame();
     else void pauseGame();
   }
@@ -2749,61 +2894,115 @@
     lastControl.focus();
   }
 
-  async function endGame() {
-    if (gameOver) return;
-    gameOver = true;
-    phase = "over";
+  $: openRooms = unlockedRooms(progress);
+  $: summary = progressSummary(progress);
+  $: score = progressTotal(progress);
+  $: nextLevel = nextRoom(progress);
+  $: isAfterHours = levelIndex >= AFTER_HOURS;
+
+  /** Whether a level-select tile (0 to 17, or after hours) can be played. */
+  function tileOpen(index: number) {
+    return index >= AFTER_HOURS ? progress.afterHours : !!openRooms[index];
+  }
+
+  function tileLabel(index: number) {
+    if (index >= AFTER_HOURS) return progress.afterHours ? `after hours, endless remixes${index === nextLevel ? ", next" : ""}` : "after hours, locked";
+    const n = index + 1;
+    if (!openRooms[index]) return `room ${n}, locked`;
+    const stars = progress.stars[index];
+    const scored = stars > 0 ? `, ${stars} of 3 stars, best ${progress.points[index]} points` : ", not cleared yet";
+    return `room ${n}, ${ROOMS[index].name}${scored}${index === nextLevel ? ", next" : ""}`;
+  }
+
+  /** Opens the level select over the room, which waits until it closes. */
+  async function openLevels() {
+    if (levelsOpen || paused || phase === "countdown" || phase === "done") return;
+    levelsOpen = true;
     releaseAll();
     setPour(0);
-    const result = concludeRun("spill", score);
+    if (musicStarted) setMusicPaused(true);
+    syncHud();
+    // Read fresh: progress may have changed this tick, before the reactive copies catch up.
+    const now = progressSummary(progress);
+    focusedTile = nextRoom(progress);
+    liveMessage = `Rooms. ${now.cleared} of ${ROOMS.length} cleared, ${now.stars} of ${now.maxStars} stars.`;
+    await tick();
+    tileButtons[focusedTile]?.focus();
+  }
+
+  /** Back to the room, which carries on; with no room started yet, back to the arcade menu. */
+  function closeLevels() {
+    if (!levelsOpen) return;
+    if (!roomStarted) {
+      toMenu();
+      return;
+    }
+    levelsOpen = false;
+    last = 0;
+    if (musicStarted) setMusicPaused(false);
+    sfxBlip();
+    syncHud();
+    liveMessage = phase === "play" ? `Back to ${room.name}.` : liveMessage;
+    focusPlayfield();
+  }
+
+  function chooseLevel(index: number) {
+    if (!tileOpen(index)) {
+      liveMessage = index >= AFTER_HOURS ? "After hours opens once room 18 is cleared." : `Room ${index + 1} opens once room ${index} is cleared.`;
+      return;
+    }
+    levelsOpen = false;
+    sfxBlip();
+    releaseAll();
+    playLevel(index);
+    focusPlayfield();
+  }
+
+  function onTileKey(event: KeyboardEvent, index: number) {
+    const last = AFTER_HOURS;
+    let to = -1;
+    if (event.key === "ArrowRight") to = Math.min(last, index + 1);
+    else if (event.key === "ArrowLeft") to = Math.max(0, index - 1);
+    else if (event.key === "ArrowDown") to = index >= last ? last : Math.min(last, index + ROOM_COLUMNS);
+    else if (event.key === "ArrowUp") to = index >= last ? last - 2 : Math.max(0, index - ROOM_COLUMNS);
+    else if (event.key === "Home") to = 0;
+    else if (event.key === "End") to = last;
+    if (to < 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    focusedTile = to;
+    tileButtons[to]?.focus();
+  }
+
+  /** Escape closes the level select before the arcade's own Escape can quit. */
+  function onEscapeFirst(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !levelsOpen) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeLevels();
+  }
+
+  /** Closing time: room 18 is cleared, and the slip scores every room's best. */
+  async function openSlip() {
+    phase = "done";
+    holdResult = true;
+    releaseAll();
+    setPour(0);
+    const result = concludeRun("spill", score, "time");
+    musicStarted = false;
     localBest = result.best;
     newBest = result.newBest;
-    liveMessage = `Game over. Final score ${score}.`;
+    liveMessage = `Closing time. ${score} points across the eighteen rooms.`;
     await tick();
     slip?.focus();
   }
 
-  /** A fresh run from a checkpoint, into the countdown. */
-  function newGame(start: number) {
-    run = newRun({ start, reached, seed: 1 + Math.floor(Math.random() * 1_000_000) });
-    score = run.total;
-    lives = run.lives;
-    livesPulse = 0;
-    roomsCleared = 0;
-    starsTotal = 0;
-    threeStarRooms = 0;
-    teaSpilled = 0;
+  /** The slip closes onto the level select, with after hours open. */
+  function closeSlip() {
+    phase = "result";
+    resultAge = 0;
     newBest = false;
-    caption = null;
-    verdict = null;
-    enterRoom();
-    phase = "countdown";
-    countdown = COUNTDOWN_SECONDS;
-    countdownElapsed = 0;
-    goVisible = false;
-    last = 0;
-    sfxCountdown(COUNTDOWN_SECONDS);
-    liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
-  }
-
-  /** The start card if a checkpoint has been earned, else straight to the countdown. */
-  async function openRun() {
-    reached = readSpillReach();
-    checkpoints = availableCheckpoints(reached);
-    if (checkpoints.length > 1) {
-      run = newRun({ start: checkpoints[checkpoints.length - 1], reached });
-      enterRoom();
-      phase = "start";
-      liveMessage = "Choose where to start.";
-      await tick();
-      startCard?.querySelector<HTMLButtonElement>(".boba-btn:not(.secondary)")?.focus();
-    } else newGame(0);
-  }
-
-  function chooseStart(index: number) {
-    sfxBlip();
-    newGame(index);
-    focusPlayfield();
+    void openLevels();
   }
 
   function beginRun() {
@@ -2812,6 +3011,7 @@
     timers.later(() => (goVisible = false), 620);
     setMusicPhase(phaseFor(room));
     startMusic();
+    musicStarted = true;
     sfxStart();
     phase = "play";
     syncHud();
@@ -2819,13 +3019,17 @@
     focusPlayfieldIfIdle();
   }
 
-  function restart() {
-    stopMusic();
-    timers.clear();
-    releaseAll();
-    paused = false;
-    gameOver = false;
-    void openRun();
+  /** First visit: straight into room 1. Later visits: the level select, next room in focus. */
+  function openGame() {
+    progress = cleanProgress(readSpillProgress());
+    const start = nextRoom(progress);
+    if (progressSummary(progress).cleared === 0) {
+      playLevel(0);
+      return;
+    }
+    enterRoom(start >= AFTER_HOURS ? ROOMS.length - 1 : start);
+    phase = "idle";
+    void openLevels();
   }
 
   // --- The loop ----------------------------------------------------------------------
@@ -2833,30 +3037,30 @@
   function frame(timestamp: number) {
     if (!active) return;
     if (!last) last = timestamp;
-    const rawDt = (timestamp - last) / 1000;
+    const elapsed = Math.max(0, (timestamp - last) / 1000);
     last = timestamp;
-    const dt = Math.min(rawDt, 0.05);
+    const dt = Math.min(elapsed, 0.05);
 
-    if (!paused) {
+    if (!paused && !levelsOpen && phase !== "done") {
       clock += dt;
       if (phase === "countdown") {
-        const next = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
-        countdownElapsed = next.elapsed;
-        if (next.beep) {
-          countdown = next.count;
+        const nextCount = stepCountdown(countdownElapsed, countdown, Math.min(elapsed, 0.25));
+        countdownElapsed = nextCount.elapsed;
+        if (nextCount.beep) {
+          countdown = nextCount.count;
           sfxCountdown(countdown);
         }
-        if (next.done) beginRun();
+        if (nextCount.done) beginRun();
       } else if (phase === "play") {
         stepPen(dt);
         simulate(dt);
       } else if (phase === "result") {
+        // The verdict is in, and the tea keeps moving until the room changes.
+        simulate(dt);
         resultAge += dt;
-        if (run.over) {
-          if (resultAge >= GAME_OVER_SECONDS) void endGame();
-        } else if (resultAge >= (lastCleared ? CLEAR_SECONDS : FAIL_SECONDS)) advance();
+        if (!holdResult && resultAge >= (lastCleared ? CLEAR_SECONDS : FAIL_SECONDS)) advance();
       }
-      if (phase !== "start") stepVisuals(dt);
+      if (phase !== "idle") stepVisuals(dt);
       if (caption) {
         captionAge += dt;
         if (captionAge >= captionLife) caption = null;
@@ -2903,10 +3107,9 @@
 
   onMount(() => {
     dialFont = arcadeFont(Math.max(10, Math.round(11 * Math.min(1.2, S / 2))), 700);
-    chipFont = arcadeFont(12, 500);
     const unmountShell = mountShell({
-      isOver: () => gameOver,
-      isPaused: () => paused || phase === "start",
+      isOver: () => phase === "done",
+      isPaused: () => paused || levelsOpen,
       pause: () => void pauseGame(),
       togglePause,
       playScope: () => playScope,
@@ -2920,15 +3123,17 @@
     });
     const onTab = (event: KeyboardEvent) => onPlayfieldTab(event);
     window.addEventListener("keydown", onTab);
+    // Capture, so the level select's Escape is seen before the arcade's.
+    window.addEventListener("keydown", onEscapeFirst, true);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", releaseAll);
 
     tick().then(() => {
       if (!active) return;
-      void openRun();
       layout();
       dialFont = arcadeFont(Math.max(10, Math.round(10 + S * 1.2)), 700);
       tipVisible = firstVisit("spill");
+      openGame();
       raf = requestAnimationFrame(frame);
     });
 
@@ -2939,13 +3144,21 @@
       setPour(0);
       stopMusic();
       window.removeEventListener("keydown", onTab);
+      window.removeEventListener("keydown", onEscapeFirst, true);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", releaseAll);
       unmountShell();
     };
   });
 
-  $: strawFraction = strawBudget > 0 ? clamp(strawNow / strawBudget, 0, 1) : 0;
+  // The gauge, in shares of the room's straw.
+  $: strawLeftNow = Math.max(0, strawBudget - strawUsed - draftUsed);
+  $: leftShare = strawBudget > 0 ? clamp(strawLeftNow / strawBudget, 0, 1) : 0;
+  $: draftShare = strawBudget > 0 ? clamp(draftUsed / strawBudget, 0, 1) : 0;
+  $: spentShares = strawSpent.map((length) => (strawBudget > 0 ? clamp(length / strawBudget, 0, 1) : 0));
+  $: strawFigure = Math.round(strawLeftNow);
+  $: strawOut = strawLeftNow < 0.5;
+  $: strawLow = !strawOut && leftShare < LOW_SHARE;
 </script>
 
 <div
@@ -2980,45 +3193,43 @@
           <span class="boba-meta">{roomLabel}</span>
           <span class="boba-phase sp-room-name">{roomName}</span>
         </span>
-        <span class="sp-pips" role="img" aria-label="{previewStars} of 3 stars so far">
-          {#each [0, 1, 2] as index}
-            <span class="sp-pip" class:is-on={index < previewStars}>
-              <PixelIcon grid={STAR} palette={index < previewStars ? STAR_ON : STAR_OFF} px={2} />
-            </span>
-          {/each}
-        </span>
+        {#if isAfterHours}
+          <span class="sp-count" role="img" aria-label="{afterHoursCleared} after-hours {afterHoursCleared === 1 ? 'room' : 'rooms'} poured">
+            <span class="sp-count-figure" aria-hidden="true">{afterHoursCleared}</span>
+            <span class="boba-meta" aria-hidden="true">poured</span>
+          </span>
+        {:else}
+          <span class="sp-pips" role="img" aria-label="{previewStars} of 3 stars so far">
+            {#each [0, 1, 2] as index}
+              <span class="sp-pip" class:is-on={index < previewStars}>
+                <PixelIcon grid={STAR} palette={index < previewStars ? STAR_ON : STAR_OFF} px={2} />
+              </span>
+            {/each}
+          </span>
+        {/if}
       </div>
 
       <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.6deg">
-        {#key strawPulse}
-          <span
-            class="sp-meter"
-            class:is-out={strawNow <= 0}
-            class:is-hit={strawPulse > 0}
-            role="img"
-            aria-label="{strawNow} units of straw left"
+        <span class="sp-hud-buttons">
+          <button
+            type="button"
+            class="boba-icon-btn"
+            disabled={phase === "countdown" || phase === "done" || paused}
+            aria-label="Levels"
+            aria-keyshortcuts="L"
+            aria-haspopup="dialog"
+            aria-expanded={levelsOpen}
+            title="Levels (L)"
+            on:click={() => (levelsOpen ? closeLevels() : void openLevels())}
           >
-            <svg class="sp-meter-straw" viewBox="0 0 60 10" aria-hidden="true" focusable="false">
-              <defs>
-                <pattern id="sp-stripes" width="6" height="10" patternUnits="userSpaceOnUse" patternTransform="skewX(-35)">
-                  <rect width="3" height="10" fill="#ff5277" />
-                  <rect x="3" width="3" height="10" fill="#fdf8f3" />
-                </pattern>
-              </defs>
-              <rect class="sp-meter-ghost" x="1" y="2" width="58" height="6" rx="3" />
-              {#if strawFraction > 0}
-                <rect class="sp-meter-body" x="1" y="2" width={Math.max(6, 58 * strawFraction)} height="6" rx="3" />
-              {/if}
-            </svg>
-            <span class="sp-meter-figure" aria-hidden="true">{strawNow}</span>
-          </span>
-        {/key}
-        <Pearls left={lives} total={START_LIVES} pulse={livesPulse} />
-        <HudButtons {paused} disabled={phase === "start"} on:pause={togglePause} />
+            <PixelIcon grid={ICON_LEVELS} palette={ICON_AUDIO_PAL} px={2} />
+          </button>
+          <HudButtons {paused} disabled={phase === "idle" || phase === "done" || levelsOpen} on:pause={togglePause} />
+        </span>
       </div>
     </div>
 
-    {#if tipVisible && !paused && phase !== "start"}
+    {#if tipVisible && !paused && !levelsOpen && phase !== "idle"}
       <div class="boba-tip" role="note" aria-label="How to play">
         <span>draw a straw to steer the tea into the cup</span>
       </div>
@@ -3048,33 +3259,65 @@
   {/if}
 
   <div bind:this={barEl} class="sp-bar boba-ui">
-    <button
-      type="button"
-      class="boba-btn sp-bar-btn"
-      style="--lean: -0.6deg"
-      disabled={!canPour}
-      aria-keyshortcuts="Enter"
-      on:click={(event) => barAction(event, pour)}
-    >
-      Pour
-      <kbd aria-hidden="true">Enter</kbd>
-    </button>
+    {#if canNext}
+      <button
+        type="button"
+        class="boba-btn sp-bar-btn sp-bar-main"
+        style="--lean: -0.6deg"
+        aria-keyshortcuts="Enter"
+        on:click={(event) => barAction(event, next)}
+      >
+        Next
+        <kbd aria-hidden="true">Enter</kbd>
+      </button>
+    {:else}
+      <button
+        type="button"
+        class="boba-btn sp-bar-btn sp-bar-main"
+        style="--lean: -0.6deg"
+        disabled={!canPour}
+        aria-keyshortcuts="Enter"
+        on:click={(event) => barAction(event, pour)}
+      >
+        Pour
+        <kbd aria-hidden="true">Enter</kbd>
+      </button>
+    {/if}
+
+    <!-- The straw gauge: what is left, the straw being drawn, and what each straw down cost. -->
+    {#key gaugeShake}
+      <div
+        class="sp-gauge boba-riso is-small"
+        class:is-low={strawLow}
+        class:is-out={strawOut}
+        class:is-hit={gaugeShake > 0}
+        role="img"
+        aria-label={strawOut ? "Out of straw" : `${strawFigure} units of straw left${strawLow ? ", low" : ""}`}
+      >
+        <span class="sp-gauge-straw" aria-hidden="true">
+          {#if leftShare > 0}
+            <span class="sp-gauge-left" style="width: {leftShare * 100}%"></span>
+          {/if}
+          {#if draftShare > 0}
+            <span class="sp-gauge-draft" style="width: {draftShare * 100}%"></span>
+          {/if}
+          {#each spentShares as share}
+            <span class="sp-gauge-spent" style="width: {share * 100}%"></span>
+          {/each}
+        </span>
+        <span class="sp-gauge-readout" aria-hidden="true">
+          <span class="boba-meta sp-gauge-label">straw</span>
+          <span class="sp-gauge-figure">{strawOut ? "out" : strawFigure}</span>
+          {#if strawLow}<span class="sp-gauge-word">low</span>{/if}
+        </span>
+      </div>
+    {/key}
+
     <button
       type="button"
       class="boba-btn secondary sp-bar-btn"
       style="--lean: 0.5deg"
-      disabled={!canUndo}
-      aria-keyshortcuts="Z"
-      on:click={(event) => barAction(event, undo)}
-    >
-      Undo
-      <kbd aria-hidden="true">Z</kbd>
-    </button>
-    <button
-      type="button"
-      class="boba-btn secondary sp-bar-btn"
-      style="--lean: -0.4deg"
-      disabled={!canUndo}
+      disabled={!canClear}
       aria-keyshortcuts="C"
       on:click={(event) => barAction(event, clearAll)}
     >
@@ -3084,22 +3327,78 @@
   </div>
 </div>
 
-{#if phase === "start"}
-  <div class="boba-scrim boba-ui" role="dialog" aria-modal="true" aria-labelledby="sp-start-title">
-    <div bind:this={startCard} class="boba-card boba-riso boba-pause-card" tabindex="-1">
-      <h2 id="sp-start-title" class="boba-title">start from</h2>
-      <p class="boba-deck">Skipped rooms are scored at par.</p>
-      <div class="boba-actions is-start">
-        {#each checkpoints as index, i}
+{#if levelsOpen}
+  <div class="boba-scrim boba-ui" role="dialog" aria-modal="true" aria-labelledby="sp-levels-title">
+    <div bind:this={levelsCard} class="boba-card boba-riso boba-pause-card sp-levels-card" tabindex="-1">
+      <div class="sp-levels-head">
+        <h2 id="sp-levels-title" class="boba-title">rooms</h2>
+        <p class="sp-levels-stats">
+          <span><strong>{summary.total}</strong> points</span>
+          <span><strong>{summary.stars}</strong> of {summary.maxStars} stars</span>
+        </p>
+      </div>
+      <div class="sp-rooms" role="group" aria-label="Rooms, a page to a row">
+        {#each ROOMS as level, index}
+          {@const open = tileOpen(index)}
           <button
+            bind:this={tileButtons[index]}
             type="button"
-            class="boba-btn"
-            class:secondary={i !== checkpoints.length - 1}
-            on:click={() => chooseStart(index)}
+            class="sp-tile"
+            class:is-locked={!open}
+            class:is-next={index === nextLevel}
+            class:is-current={roomStarted && index === levelIndex}
+            tabindex={index === focusedTile ? 0 : -1}
+            aria-disabled={open ? undefined : "true"}
+            aria-label={tileLabel(index)}
+            on:click={() => chooseLevel(index)}
+            on:keydown={(event) => onTileKey(event, index)}
+            on:focus={() => (focusedTile = index)}
           >
-            Room {index + 1}
+            <span class="sp-tile-top">
+              <span class="sp-tile-number">{pad2(index + 1)}</span>
+              {#if open}
+                <span class="sp-tile-stars">
+                  {#each [0, 1, 2] as star}
+                    <span class="sp-tile-star" class:is-on={star < progress.stars[index]}>
+                      <PixelIcon grid={STAR} palette={star < progress.stars[index] ? STAR_ON : STAR_OFF} px={1} />
+                    </span>
+                  {/each}
+                </span>
+              {:else}
+                <span class="sp-tile-lock"><PixelIcon grid={ICON_LOCK} palette={LOCK_PAL} px={2} /></span>
+              {/if}
+            </span>
+            <span class="sp-tile-name">{level.name}</span>
           </button>
         {/each}
+        <button
+          bind:this={tileButtons[AFTER_HOURS]}
+          type="button"
+          class="sp-tile sp-tile-wide"
+          class:is-locked={!progress.afterHours}
+          class:is-next={nextLevel === AFTER_HOURS}
+          class:is-current={roomStarted && isAfterHours}
+          tabindex={focusedTile === AFTER_HOURS ? 0 : -1}
+          aria-disabled={progress.afterHours ? undefined : "true"}
+          aria-label={tileLabel(AFTER_HOURS)}
+          on:click={() => chooseLevel(AFTER_HOURS)}
+          on:keydown={(event) => onTileKey(event, AFTER_HOURS)}
+          on:focus={() => (focusedTile = AFTER_HOURS)}
+        >
+          <span class="sp-tile-top">
+            <span class="sp-tile-name sp-tile-hours">after hours</span>
+            {#if !progress.afterHours}
+              <span class="sp-tile-lock"><PixelIcon grid={ICON_LOCK} palette={LOCK_PAL} px={2} /></span>
+            {/if}
+          </span>
+          <span class="boba-meta">{progress.afterHours ? "every room again, remixed" : "opens when room 18 is cleared"}</span>
+        </button>
+      </div>
+      <div class="boba-actions">
+        <button type="button" class="boba-btn secondary" aria-keyshortcuts="Escape" on:click={closeLevels}>
+          {roomStarted ? "Back" : "Menu"}
+          <kbd aria-hidden="true">Esc</kbd>
+        </button>
       </div>
     </div>
   </div>
@@ -3111,29 +3410,27 @@
   <Countdown value={0} caption="kettle's on" goCaption="pour" />
 {/if}
 
-{#if paused && !gameOver}
+{#if paused}
   <PauseCard bind:this={pauseCard} deck="The kettle is holding its pour." on:resume={resumeGame} on:menu={toMenu} on:exit={exit} />
 {/if}
 
-{#if gameOver}
+{#if phase === "done"}
   <ResultsSlip
     bind:this={slip}
     game="spill"
-    title="last drop"
-    deck={roomsCleared === 0
-      ? "Not a drop made it."
-      : `${roomsCleared} ${roomsCleared === 1 ? "room" : "rooms"} poured before the pearls ran out.`}
+    title="closing time"
+    deck="All eighteen rooms poured."
     {score}
     unit="points"
     {newBest}
     stats={[
-      { label: "rooms cleared", value: roomsCleared },
-      { label: "stars", value: starsTotal },
-      { label: "three-star rooms", value: threeStarRooms },
+      { label: "rooms cleared", value: summary.cleared },
+      { label: "stars", value: `${summary.stars} of ${summary.maxStars}` },
+      { label: "three-star rooms", value: summary.threeStar },
       { label: "tea spilled", value: teaSpilled },
       { label: "personal best", value: localBest },
     ]}
-    on:restart={restart}
+    on:restart={closeSlip}
     on:menu={toMenu}
     on:exit={exit}
   />
@@ -3183,49 +3480,31 @@
     opacity: 0.45;
   }
 
-  /* --- The straw meter: a drawn straw that shortens as it is spent --- */
-
-  .sp-meter {
+  .sp-hud-buttons {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1-5);
+    gap: var(--space-1);
   }
 
-  .sp-meter.is-hit {
-    animation: boba-shake var(--motion-slow) var(--ease-standard);
+  .sp-hud-buttons > .boba-icon-btn:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
 
-  .sp-meter-straw {
-    width: 3.75rem;
-    height: 0.625rem;
-    overflow: visible;
+  /* After hours: how many remixes have been poured this visit. */
+  .sp-count {
+    display: inline-grid;
+    justify-items: center;
+    gap: var(--space-0-5);
   }
 
-  .sp-meter-ghost {
-    fill: none;
-    stroke: var(--b-muted);
-    stroke-width: 1;
-    stroke-dasharray: 2 2;
-  }
-
-  .sp-meter-body {
-    fill: url(#sp-stripes);
-    stroke: var(--b-line);
-    stroke-width: 1.4;
-  }
-
-  .sp-meter-figure {
-    min-width: 2.5ch;
+  .sp-count-figure {
     color: var(--b-strong);
-    font-size: 0.95rem;
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
     font-variant-numeric: lining-nums tabular-nums;
-    line-height: 1.2;
-    text-align: right;
-  }
-
-  .sp-meter.is-out .sp-meter-figure {
-    color: var(--b-accent);
-    font-weight: 500;
+    line-height: 1;
   }
 
   /* --- Caption chip: one line, in the strip above the room --- */
@@ -3328,6 +3607,240 @@
     pointer-events: auto;
   }
 
+  /* --- The straw gauge: a long straw that shortens from the right as it is spent --- */
+
+  .sp-gauge {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    max-width: 28rem;
+    min-height: 2.5rem;
+    padding: var(--space-1-5) var(--space-3);
+    pointer-events: auto;
+    cursor: default;
+  }
+
+  .sp-gauge.is-hit {
+    animation: boba-shake var(--motion-slow) var(--ease-standard);
+  }
+
+  .sp-gauge-straw {
+    display: flex;
+    flex: 1 1 auto;
+    gap: 2px;
+    min-width: 10rem;
+    height: 0.875rem;
+  }
+
+  .sp-gauge-straw > span {
+    flex: 0 1 auto;
+    min-width: 0;
+    height: 100%;
+    border-radius: 999px;
+  }
+
+  /* What is left: pink and white stripes in an ink outline. */
+  .sp-gauge-left {
+    background: repeating-linear-gradient(-55deg, #ff5277 0 4px, #fdf8f3 4px 8px);
+    border: 1.5px solid var(--b-line);
+  }
+
+  /* Low: the stripes lose their white and go coral, and the figure says so. */
+  .sp-gauge.is-low .sp-gauge-left {
+    background: repeating-linear-gradient(-55deg, #e85d4c 0 4px, #b8402f 4px 8px);
+  }
+
+  /* The straw being drawn, eating into the gauge in a lighter tint. */
+  .sp-gauge-draft {
+    background: repeating-linear-gradient(-55deg, #ffb0c0 0 4px, #fdf8f3 4px 8px);
+    border: 1.5px dashed var(--b-line);
+    opacity: 0.8;
+  }
+
+  /* Each straw down, faint, at what it cost. */
+  .sp-gauge-spent {
+    background: var(--b-wash);
+    border: 1px dashed var(--b-muted);
+    opacity: 0.6;
+  }
+
+  .sp-gauge-readout {
+    display: inline-flex;
+    flex: none;
+    align-items: baseline;
+    gap: var(--space-1);
+    white-space: nowrap;
+  }
+
+  .sp-gauge-figure {
+    min-width: 2.5ch;
+    color: var(--b-strong);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-variant-numeric: lining-nums tabular-nums;
+    line-height: 1.2;
+    text-align: right;
+  }
+
+  .sp-gauge-word,
+  .sp-gauge.is-out .sp-gauge-figure {
+    color: var(--b-accent);
+    font-weight: 500;
+  }
+
+  .sp-gauge-word {
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
+
+  /* --- The level select: a page of rooms to a row --- */
+
+  .sp-levels-card {
+    width: min(100%, 34rem);
+  }
+
+  .sp-levels-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-5);
+  }
+
+  .sp-levels-stats {
+    display: flex;
+    gap: var(--space-4);
+    margin: 0;
+    color: var(--b-muted);
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
+
+  .sp-levels-stats strong {
+    color: var(--b-strong);
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+
+  .sp-rooms {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin-top: var(--space-5);
+  }
+
+  .sp-tile {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: var(--space-1);
+    min-height: 3.25rem;
+    padding: var(--space-2) var(--space-2-5);
+    color: var(--b-strong);
+    background: var(--b-raised);
+    border: 1px solid var(--b-rule);
+    border-radius: 8px 11px 7px 10px;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+    touch-action: manipulation;
+    transition:
+      border-color var(--motion-fast) var(--ease-standard),
+      background-color var(--motion-fast) var(--ease-standard);
+  }
+
+  @media (hover: hover) {
+    .sp-tile:not(.is-locked):hover {
+      background-image: linear-gradient(var(--b-wash), var(--b-wash));
+      border-color: var(--b-muted);
+    }
+  }
+
+  .sp-tile.is-current {
+    border-color: var(--b-line);
+  }
+
+  /* The next room to play: a small accent tab on its top edge. */
+  .sp-tile.is-next::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: var(--space-2-5);
+    width: 1.5rem;
+    height: 4px;
+    background: var(--b-slab);
+    border-radius: 0 0 2px 2px;
+  }
+
+  .sp-tile.is-locked {
+    color: var(--b-muted);
+    background: transparent;
+    border-style: dashed;
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  .sp-tile-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .sp-tile-number {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    font-variant-numeric: lining-nums tabular-nums;
+    line-height: 1;
+  }
+
+  .sp-tile-lock {
+    display: inline-grid;
+    color: var(--b-muted);
+  }
+
+  .sp-tile-name {
+    color: var(--b-text);
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
+
+  .sp-tile.is-locked .sp-tile-name {
+    color: var(--b-muted);
+  }
+
+  .sp-tile-hours {
+    color: var(--b-strong);
+    font-size: 0.875rem;
+    font-style: italic;
+  }
+
+  .sp-tile-stars {
+    display: inline-flex;
+    gap: 2px;
+    color: var(--b-line);
+  }
+
+  .sp-tile-star {
+    display: inline-grid;
+  }
+
+  .sp-tile-star:not(.is-on) {
+    opacity: 0.35;
+  }
+
+  .sp-tile-wide {
+    grid-column: 1 / -1;
+    min-height: 3rem;
+  }
+
+  .sp-levels-card .boba-actions {
+    margin-top: var(--space-5);
+  }
+
   @media (hover: none) and (pointer: coarse) {
     .sp-bar-btn {
       min-width: 6.5rem;
@@ -3339,7 +3852,7 @@
   @media (prefers-reduced-motion: reduce) {
     .sp-caption,
     .sp-verdict-star,
-    .sp-meter.is-hit {
+    .sp-gauge.is-hit {
       animation: none;
     }
   }
@@ -3349,22 +3862,39 @@
       gap: var(--space-3);
     }
 
-    .sp-meter-straw {
-      width: 2.5rem;
-    }
-
     .sp-caption {
       font-size: 0.875rem;
     }
 
     .sp-bar {
+      flex-wrap: wrap;
       gap: var(--space-2);
       padding-inline: var(--space-3);
+    }
+
+    /* The gauge takes a row of its own above the buttons, as wide as the bar. */
+    .sp-gauge {
+      flex: 1 1 100%;
+      order: -1;
+      max-width: none;
     }
 
     .sp-bar-btn {
       flex: 1;
       min-width: 0;
+    }
+
+    /* Tiles scroll inside the card, so its title and its way out stay in view. */
+    .sp-rooms {
+      max-height: calc(100dvh - 15rem);
+      margin-inline: calc(var(--space-1) * -1);
+      padding: var(--space-1);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .sp-tile {
+      padding: var(--space-2);
     }
   }
 </style>

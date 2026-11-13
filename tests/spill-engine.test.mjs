@@ -2,51 +2,60 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  CHECKPOINTS,
+  AFTER_HOURS,
   EVENTS,
   FLOOR,
   IN_PIPE,
+  MAX_FRAME,
   MAX_PARTICLES,
+  MAX_STARS,
   MIN_SEGMENT,
   MILK,
-  PAR_POINTS,
   PEARL,
   RADIUS,
   ROOMS,
-  START_LIVES,
+  SETTLE_TIMEOUT,
+  SNAP,
+  SPILLED,
   STEP,
+  STRAW_HALF,
   TEA,
   WIDTH,
-  availableCheckpoints,
   beginStroke,
+  blockCorners,
+  cleanProgress,
   clearStrokes,
   commitStroke,
   createWorld,
   cupAt,
-  currentRoom,
   describeRoom,
   drawStrokes,
+  emptyProgress,
   extendStroke,
+  frameSteps,
   judgeCup,
   judgeRoom,
   mirrorRoom,
   mirrorStrokes,
-  newRun,
+  nextRoom,
   polylineLength,
   pourCountdown,
   pourNow,
+  progressSummary,
+  progressTotal,
   ratioAccuracy,
-  recordResult,
+  recordRoomResult,
   remix,
   removeStroke,
   roomAt,
   simplify,
   simulate,
+  snapToStraws,
   starsFor,
   step,
   strawLeft,
   strokeAt,
-  undoStroke,
+  unlockedRooms,
 } from "../src/lib/arcade/spill-engine.js";
 
 /**
@@ -229,9 +238,8 @@ test("straw is spent by length, clipped at the budget, and refunded on removal",
   assert.ok(removeStroke(world, first));
   assert.equal(strawLeft(world), 40);
   assert.equal(removeStroke(world, first), false);
-  assert.ok(undoStroke(world));
+  assert.ok(removeStroke(world, second));
   assert.equal(strawLeft(world), 100);
-  assert.equal(undoStroke(world), false);
 
   drawStrokes(world, [[[10, 100], [50, 100]], [[10, 150], [50, 150]]]);
   assert.equal(world.strokes.length, 2);
@@ -258,12 +266,21 @@ test("no-draw zones refuse a stroke that starts in or crosses them", () => {
 
 // --- Fixtures, one at a time -----------------------------------------------------------
 
-test("an ice block holds droplets up", () => {
+test("an ice block holds droplets up, and what leaves it goes over its ends, never through", () => {
   const world = createWorld(bareRoom({ blocks: [{ type: "ice", x: 60, y: 200, w: 60, h: 20 }], kettles: [{ x: 60, y: 60, vx: 0, vy: 50, count: 20, rate: 20, delay: 0 }] }));
-  run(world, 4);
-  let resting = 0;
-  for (let i = 0; i < world.count; i++) if (world.p.y[i] < 190) resting++;
-  assert.ok(resting >= 15, `${resting} on the ice`);
+  let most = 0;
+  run(world, 4, (w) => {
+    let on = 0;
+    for (let i = 0; i < w.count; i++) {
+      const x = w.p.x[i];
+      const y = w.p.y[i];
+      if (y < 190) on++;
+      // Nothing inside the block, and nothing below its top within its span.
+      assert.ok(!(x > 30 && x < 90 && y > 188 && y < 212), `a droplet at ${x.toFixed(1)}, ${y.toFixed(1)}`);
+    }
+    most = Math.max(most, on);
+  });
+  assert.ok(most >= 15, `${most} on the ice at once`);
 });
 
 test("a fan pushes droplets that pass through it", () => {
@@ -434,6 +451,156 @@ test("kettles wait out the planning time, and pour now ends it early, keeping th
   assert.ok(Math.abs(judgeRoom(eager).earlySeconds - 15) < 0.02);
 });
 
+// --- Liquid that never stalls ------------------------------------------------------------------
+
+/** Where the room was judged, then where everything ended up ten seconds later. */
+function verdictThenLater(room, strokes, seconds = 10) {
+  const { world, result } = simulate(room, strokes);
+  const status = world.status;
+  const events = eventLog(world);
+  const counts = world.cups.map((cup) => cup.count);
+  run(world, seconds, events.collect);
+  return { world, result, status, counts, later: world.cups.map((cup) => cup.count), events: events.log };
+}
+
+test("the tea keeps moving after the verdict, and the verdict never changes once given", () => {
+  const room = ROOMS[0];
+  const { world, result, status, events } = verdictThenLater(room, room.solution.strokes);
+  assert.equal(status, "cleared");
+  assert.equal(world.status, "cleared", "the status is locked");
+  assert.equal(world.result, result, "the same result, untouched");
+  assert.ok(!events.includes(EVENTS.CLEARED) && !events.includes(EVENTS.FAILED), "judged once");
+  // Stepping still moves things: a droplet dropped in after the verdict falls.
+  const i = place(world, 120, 40);
+  run(world, 0.5);
+  assert.ok(world.p.y[i] > 90, `fell to ${world.p.y[i].toFixed(1)}`);
+});
+
+test("the verdict waits for the tea: every room's cups hold the same ten seconds after it, with its solution and with nothing", () => {
+  for (const room of ROOMS) {
+    for (const strokes of [room.solution.strokes, []]) {
+      const { result, counts, later } = verdictThenLater(room, strokes, 8);
+      assert.deepEqual(later, counts, `${room.name}: ${counts} then ${later}`);
+      assert.deepEqual(result.cups.map((cup) => cup.count), counts);
+    }
+  }
+});
+
+test("the verdict comes early once all the tea is at rest in the cup or spilled", () => {
+  const world = createWorld(
+    bareRoom({
+      kettles: [{ x: 120, y: 200, vx: 0, vy: 20, count: 20, rate: 40, delay: 0 }],
+      cups: [{ x: 120, y: 300, w: 44, h: 46, order: { need: 10, full: 30 } }],
+    }),
+  );
+  let judgedAt = -1;
+  run(world, 6, (w) => {
+    if (judgedAt < 0 && w.result) judgedAt = w.time;
+  });
+  assert.equal(world.status, "cleared");
+  assert.ok(judgedAt - world.pourEndedAt < 1.6, `judged ${(judgedAt - world.pourEndedAt).toFixed(2)}s after the pour`);
+  assert.equal(world.result?.cups[0].count, world.cups[0].count, "and nothing changed after");
+});
+
+test("a room that never settles is still judged, SETTLE_TIMEOUT after the last pour", () => {
+  // Both mouths of the pipe face up, one above the other: what comes out of
+  // the lower falls straight back in, round and round for ever (one droplet,
+  // so nothing knocks it out of the loop).
+  const world = createWorld(
+    bareRoom({
+      kettles: [{ x: 60, y: 100, vx: 0, vy: 0, count: 1, rate: 10, delay: 0 }],
+      pipes: [{ a: { x: 60, y: 150, nx: 0, ny: -1 }, b: { x: 60, y: 250, nx: 0, ny: -1 } }],
+    }),
+  );
+  let judgedAt = -1;
+  run(world, SETTLE_TIMEOUT + 3, (w) => {
+    if (judgedAt < 0 && w.result) judgedAt = w.time;
+  });
+  assert.ok(world.stats.piped > 20, "still going round");
+  assert.ok(Math.abs(judgedAt - world.pourEndedAt - SETTLE_TIMEOUT) < 2 * STEP, `judged ${(judgedAt - world.pourEndedAt).toFixed(2)}s after the pour`);
+  assert.equal(world.status, "failed");
+});
+
+test("a droplet rolls off a block's corner instead of hanging on it", () => {
+  const block = { type: "ice", x: 120, y: 200, w: 60, h: 10, angle: 0.3 };
+  const world = createWorld(bareRoom({ blocks: [block], kettles: [{ x: 20, y: 20, vx: 0, vy: 0, count: 0, rate: 1, delay: 99 }] }));
+  // Its lower top corner, and a droplet resting on the face just above it.
+  const [, corner] = blockCorners(block);
+  const dir = [Math.cos(0.3), Math.sin(0.3)];
+  const up = [Math.sin(0.3), -Math.cos(0.3)];
+  const reach = RADIUS[TEA] + 0.5;
+  const i = place(world, corner[0] - dir[0] * 6 + up[0] * reach, corner[1] - dir[1] * 6 + up[1] * reach);
+  run(world, 1);
+  assert.ok(world.p.y[i] > corner[1] + 30, `still at ${world.p.x[i].toFixed(1)}, ${world.p.y[i].toFixed(1)}`);
+});
+
+test("a droplet slides off the free end of a shallow straw instead of hanging from its tip", () => {
+  const world = createWorld(bareRoom({ kettles: [{ x: 20, y: 20, vx: 0, vy: 0, count: 0, rate: 1, delay: 99 }] }));
+  drawStrokes(world, [[[100, 150], [160, 156]]]);
+  const i = place(world, 110, 151 - RADIUS[TEA] - STRAW_HALF);
+  run(world, 3);
+  assert.ok(world.p.y[i] > 200, `still at ${world.p.x[i].toFixed(1)}, ${world.p.y[i].toFixed(1)}`);
+});
+
+test("a straw started or ended by another joins it, and tea runs across the joint", () => {
+  const world = createWorld(bareRoom({ straw: 600, kettles: [{ x: 40, y: 40, vx: 0, vy: 30, count: 40, rate: 15, delay: 0 }] }));
+  const a1 = [30 + Math.cos(0.21) * 70, 100 + Math.sin(0.21) * 70];
+  drawStrokes(world, [[[30, 100], a1]]);
+  // Started a hair above the first straw's tip: that start cap would be a lip.
+  assert.ok(beginStroke(world, a1[0] + 2, a1[1] - 3));
+  assert.deepEqual(world.draft?.[0], a1, "starts at the tip");
+  extendStroke(world, a1[0] + 70, a1[1] + 10);
+  commitStroke(world);
+  // Ending just short of another straw's middle line lands on it.
+  beginStroke(world, 200, 60);
+  extendStroke(world, 150, 80);
+  extendStroke(world, 120, 94);
+  commitStroke(world);
+  const end = world.strokes[2].points.at(-1);
+  const near = snapToStraws(world, 120, 94);
+  assert.ok(near && Math.hypot(end[0] - 120, end[1] - 94) < SNAP);
+  assert.equal(snapToStraws(world, 120, 20), null, "nothing to join far away");
+  clearStrokes(world);
+  // Tea poured down the first straw crosses onto the second.
+  drawStrokes(world, [[[30, 100], a1], [[a1[0] + 2, a1[1] - 3], [a1[0] + 70, a1[1] + 10]]]);
+  run(world, 8);
+  let held = 0;
+  for (let k = 0; k < world.count; k++) if (world.p.y[k] < 260 && !(world.p.flags[k] & SPILLED)) held++;
+  assert.equal(held, 0, `${held} droplets held at the joint`);
+});
+
+test("a droplet squeezed out of a block keeps its slide along the face", () => {
+  const world = createWorld(bareRoom({ blocks: [{ type: "ice", x: 120, y: 200, w: 60, h: 20 }], kettles: [{ x: 20, y: 20, vx: 0, vy: 0, count: 0, rate: 1, delay: 99 }] }));
+  const i = place(world, 120, 192);
+  world.p.vx[i] = 60;
+  step(world);
+  assert.ok(world.p.y[i] < 190 - RADIUS[TEA] + 0.6, `out on top, at ${world.p.y[i].toFixed(2)}`);
+  assert.ok(world.p.vx[i] > 30, `still sliding at ${world.p.vx[i].toFixed(1)}`);
+});
+
+test("the screen's frame clock catches up at most MAX_FRAME, never runs backwards, and draws between steps", () => {
+  let clock = frameSteps(0, 1 / 60);
+  assert.equal(clock.steps, 2);
+  assert.ok(clock.alpha >= 0 && clock.alpha < 1);
+  // A slow frame or a tab back from hiding: a few steps, not a backlog.
+  clock = frameSteps(clock.accumulator, 30);
+  assert.equal(clock.steps, Math.floor(MAX_FRAME / STEP + 1e-6));
+  for (const bad of [-1, Number.NaN, Infinity, undefined]) {
+    const next = frameSteps(STEP / 2, /** @type {number} */ (bad));
+    assert.ok(next.steps <= Math.ceil(MAX_FRAME / STEP));
+    assert.ok(next.alpha >= 0 && next.alpha <= 1);
+  }
+  // A second's worth of 120 Hz frames is exactly a second of steps.
+  let acc = 0;
+  let total = 0;
+  for (let k = 0; k < 120; k++) {
+    const next = frameSteps(acc, 1 / 120);
+    acc = next.accumulator;
+    total += next.steps;
+  }
+  assert.equal(total, 120);
+});
+
 // --- Determinism and cost --------------------------------------------------------------------
 
 test("the same room, straws and timing always end the same way", () => {
@@ -560,51 +727,87 @@ test("mirroring flips everything left to right", () => {
   assert.equal((fans.fans?.[0].x ?? 0) + (fans.fans?.[0].w ?? 0), WIDTH - (ROOMS[3].fans?.[0].x ?? 0));
 });
 
-test("after the authored rooms the run carries on with remixes", () => {
+test("after the authored rooms, after hours carries on with remixes", () => {
+  assert.equal(AFTER_HOURS, ROOMS.length);
   assert.equal(roomAt(0), ROOMS[0]);
   assert.equal(roomAt(17), ROOMS[17]);
-  const next = roomAt(18, 3);
+  const next = roomAt(AFTER_HOURS, 3);
   assert.equal(next.remix?.of, ROOMS[0].id);
   assert.equal(next.remix?.difficulty, 1);
   assert.equal(roomAt(18 + 6 * 3, 3).remix?.difficulty, 4);
   assert.deepEqual(roomAt(25, 3), roomAt(25, 3));
 });
 
-// --- Runs ------------------------------------------------------------------------------------------
+// --- Progress ---------------------------------------------------------------------------------------
 
-test("checkpoints open once reached and credit par for the rooms skipped", () => {
-  assert.deepEqual(CHECKPOINTS, [0, 6, 12]);
-  assert.deepEqual(availableCheckpoints(0), [0]);
-  assert.deepEqual(availableCheckpoints(9), [0, 6]);
-  assert.deepEqual(availableCheckpoints(40), [0, 6, 12]);
-  const fresh = newRun();
-  assert.equal(fresh.index, 0);
-  assert.equal(fresh.total, 0);
-  assert.equal(fresh.lives, START_LIVES);
-  const later = newRun({ start: 6, reached: 8 });
-  assert.equal(later.index, 6);
-  assert.equal(later.total, 6 * PAR_POINTS);
-  assert.equal(currentRoom(later), ROOMS[6]);
-  assert.equal(newRun({ start: 12, reached: 8 }).index, 0, "not reached yet");
+/** A result as the engine reports one, with only what progress reads. */
+const cleared = (stars, points) => ({ cleared: true, stars, points });
+const failed = { cleared: false, stars: 0, points: 0 };
+
+test("room 1 is always open, and clearing a room opens the next", () => {
+  const fresh = emptyProgress();
+  assert.equal(fresh.stars.length, ROOMS.length);
+  assert.deepEqual(unlockedRooms(fresh), ROOMS.map((_, i) => i === 0));
+  let progress = recordRoomResult(fresh, 0, failed);
+  assert.deepEqual(unlockedRooms(progress), unlockedRooms(fresh), "a failure opens nothing");
+  progress = recordRoomResult(progress, 0, cleared(1, 140));
+  assert.deepEqual(unlockedRooms(progress).slice(0, 3), [true, true, false]);
+  progress = recordRoomResult(progress, 1, cleared(2, 230));
+  assert.deepEqual(unlockedRooms(progress).slice(0, 4), [true, true, true, false]);
+  assert.equal(fresh.stars[0], 0, "the old progress is left as it was");
 });
 
-test("a clear banks points and moves on; a failure costs a pearl and retries", () => {
-  const run = newRun();
-  const cleared = simulate(ROOMS[0], ROOMS[0].solution.strokes).result;
-  const failed = simulate(ROOMS[0], []).result;
-  recordResult(run, failed);
-  assert.equal(run.lives, 2);
-  assert.equal(run.index, 0);
-  recordResult(run, cleared);
-  assert.equal(run.index, 1);
-  assert.equal(run.total, cleared.points);
-  assert.equal(run.results[0].name, "first pour");
-  recordResult(run, failed);
-  recordResult(run, failed);
-  assert.equal(run.over, true);
-  assert.equal(run.lives, 0);
-  recordResult(run, cleared);
-  assert.equal(run.index, 1, "nothing counts once the run is over");
+test("a room keeps its best stars and points, never lowering either", () => {
+  let progress = recordRoomResult(emptyProgress(), 4, cleared(2, 260));
+  progress = recordRoomResult(progress, 4, cleared(1, 300));
+  assert.equal(progress.stars[4], 2, "the better stars stay");
+  assert.equal(progress.points[4], 300, "the better points come in");
+  progress = recordRoomResult(progress, 4, cleared(3, 120));
+  assert.equal(progress.stars[4], 3);
+  assert.equal(progress.points[4], 300);
+  progress = recordRoomResult(progress, 4, failed);
+  assert.deepEqual([progress.stars[4], progress.points[4]], [3, 300], "a failure takes nothing away");
+  // After hours is not an authored room: it never touches the bests.
+  assert.deepEqual(recordRoomResult(progress, AFTER_HOURS + 2, cleared(3, 999)), progress);
+});
+
+test("the total is the sum of best points, and the summary counts rooms, stars and three-star rooms", () => {
+  let progress = emptyProgress();
+  progress = recordRoomResult(progress, 0, cleared(3, 340));
+  progress = recordRoomResult(progress, 1, cleared(2, 250));
+  progress = recordRoomResult(progress, 2, cleared(3, 312));
+  assert.equal(progressTotal(progress), 902);
+  assert.equal(MAX_STARS, 54);
+  assert.deepEqual(progressSummary(progress), { rooms: 18, cleared: 3, stars: 8, maxStars: 54, threeStar: 2, total: 902 });
+  assert.equal(progressTotal(emptyProgress()), 0);
+});
+
+test("clearing the last room opens after hours, and the next room to play follows progress", () => {
+  let progress = emptyProgress();
+  assert.equal(nextRoom(progress), 0);
+  for (let i = 0; i < ROOMS.length - 1; i++) progress = recordRoomResult(progress, i, cleared(1, 100));
+  assert.equal(progress.afterHours, false);
+  assert.equal(nextRoom(progress), ROOMS.length - 1);
+  progress = recordRoomResult(progress, ROOMS.length - 1, cleared(2, 210));
+  assert.equal(progress.afterHours, true);
+  assert.equal(nextRoom(progress), AFTER_HOURS);
+});
+
+test("stored progress is checked field by field, so junk or an old shape never breaks the game", () => {
+  assert.deepEqual(cleanProgress(null), emptyProgress());
+  assert.deepEqual(cleanProgress("nonsense"), emptyProgress());
+  assert.deepEqual(cleanProgress({ stars: "3" }), emptyProgress());
+  const cleaned = cleanProgress({ stars: [3, 9, -1, 1.7, "2", null], points: [300, 410, 50, 120.6, 200, 80], afterHours: "yes" });
+  assert.deepEqual(cleaned.stars.slice(0, 6), [3, 3, 0, 1, 2, 0]);
+  assert.deepEqual(cleaned.points.slice(0, 6), [300, 410, 0, 120, 200, 0], "no points without a clear");
+  assert.equal(cleaned.stars.length, ROOMS.length);
+  assert.equal(cleaned.afterHours, false);
+  // A migrated reach (rooms before it cleared with one star) may run past the authored rooms.
+  const migrated = cleanProgress({ stars: Array(25).fill(1), points: Array(25).fill(100) });
+  assert.equal(migrated.stars.length, ROOMS.length);
+  assert.equal(migrated.afterHours, true, "the last room cleared means after hours is open");
+  assert.equal(progressTotal(migrated), 1800);
+  assert.deepEqual(cleanProgress(JSON.parse(JSON.stringify(migrated))), migrated, "round-trips through JSON");
 });
 
 test("a room's points add straw left over and an early pour, scaled by the planning time given back", () => {

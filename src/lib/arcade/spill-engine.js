@@ -26,6 +26,12 @@ export const HEIGHT = 300;
 export const FLOOR = HEIGHT;
 /** The fixed step the screen calls `step` with. */
 export const STEP = 1 / 120;
+/**
+ * The most simulated time one drawn frame may catch up. A slow frame or a
+ * tab coming back from hiding drops the rest rather than queueing it, so the
+ * screen never spirals into ever more steps per frame.
+ */
+export const MAX_FRAME = 0.05;
 export const GRAVITY = 520;
 /** Terminal speed, so a long fall stays readable and the swept test stays cheap. */
 export const MAX_SPEED = 320;
@@ -47,6 +53,12 @@ export const WEIGHT = [1, 1, 4];
 export const STRAW_HALF = 1.5;
 /** Points closer than this to the last kept point are dropped while drawing. */
 export const MIN_SEGMENT = 6;
+/**
+ * A straw end this close to another straw joins it. Two straws' surfaces
+ * closer than a droplet's width (2 × 2.2 + 2 × 1.5 between middle lines)
+ * would otherwise leave a notch that holds tea.
+ */
+export const SNAP = 7;
 /** Douglas–Peucker tolerance applied when a stroke is committed. */
 const SIMPLIFY_EPSILON = 0.6;
 /** Cup walls' half thickness. */
@@ -85,6 +97,8 @@ const SPLAT = 0.0012;
 const PUDDLE = 8;
 const JELLY_BOUNCE = 0.85;
 const BOUNCE = 0.08;
+/** How far past a segment's end a crossing of its line still counts as crossing it, in units. */
+const CROSS_SLOP = 0.05;
 
 /** See `fresh` in createWorld. */
 const FRESH_SECONDS = 0.18;
@@ -103,12 +117,19 @@ const MAX_SEG_REFS = 16384;
 /** How far past a segment's thickness the broadphase reaches: a pearl plus a step. */
 const SEG_MARGIN = 3.6 + 4;
 
-/** A room has settled when hardly anything moved SETTLE_DRIFT in a window, twice running. */
+/**
+ * The verdict waits for the tea. Every SETTLE_WINDOW the room measures how
+ * far each particle that could still change the outcome has moved; the room
+ * has settled once hardly any moved SETTLE_DRIFT for SETTLE_SECONDS running,
+ * with the belts stopped.
+ */
 const SETTLE_WINDOW = 0.25;
 const SETTLE_DRIFT = 1;
-const SETTLE_SECONDS = 0.5;
-/** A room resolves this long after the last pour even if something still sloshes. */
-const SETTLE_TIMEOUT = 5;
+const SETTLE_SECONDS = 0.75;
+/** Share of the particles still in play that may keep creeping when the room has settled. */
+const SETTLE_ALLOWANCE = 0.02;
+/** A safety net: the verdict comes this long after the last pour, whatever still moves. */
+export const SETTLE_TIMEOUT = 15;
 /** The conveyor runs on this long after the pours end, then eases to a stop. */
 const BELT_RUN_ON = 1;
 const BELT_EASE = 0.8;
@@ -129,12 +150,6 @@ const SPOUT_CLEAR = 14;
 export const DEFAULT_PLAN = 20;
 /** The most an early pour earns, for pouring the instant the room opens. */
 const EARLY_BONUS = 40;
-
-export const START_LIVES = 3;
-/** A run may start at these room indices once they have been reached. */
-export const CHECKPOINTS = [0, 6, 12];
-/** Points credited for each room skipped by starting at a checkpoint. */
-export const PAR_POINTS = 220;
 
 /** Event types emitted by `step`, read from `world.events`. */
 export const EVENTS = Object.freeze({
@@ -693,13 +708,61 @@ function clampToRoom(x, y) {
 }
 
 /**
- * Starts a stroke at a point. Refused in a no-draw zone or with no straw left.
+ * Where a straw's end joins the straws already down: the tip of one within
+ * SNAP units, else the nearest point on the middle line of one within SNAP,
+ * else null. Two straws that nearly meet leave a notch narrower than a
+ * droplet, and a start cap a hair above the last straw is a lip; joined
+ * exactly, tea runs from one onto the next.
+ * @param {World} world
+ * @param {number} x
+ * @param {number} y
+ * @returns {[number, number] | null}
+ */
+export function snapToStraws(world, x, y) {
+  /** @type {[number, number] | null} */
+  let best = null;
+  let bestDist = SNAP;
+  for (const stroke of world.strokes) {
+    for (const end of [stroke.points[0], stroke.points[stroke.points.length - 1]]) {
+      const d = Math.hypot(end[0] - x, end[1] - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = [end[0], end[1]];
+      }
+    }
+  }
+  if (best) return best;
+  bestDist = SNAP;
+  for (const stroke of world.strokes) {
+    for (let i = 1; i < stroke.points.length; i++) {
+      const [ax, ay] = stroke.points[i - 1];
+      const [bx, by] = stroke.points[i];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const t = clamp(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+      const px = ax + dx * t;
+      const py = ay + dy * t;
+      const d = Math.hypot(px - x, py - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = [px, py];
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Starts a stroke at a point, joined onto a straw it nearly touches.
+ * Refused in a no-draw zone or with no straw left.
  * @param {World} world
  * @param {number} x
  * @param {number} y
  */
 export function beginStroke(world, x, y) {
-  const [cx, cy] = clampToRoom(x, y);
+  let [cx, cy] = clampToRoom(x, y);
+  const snapped = snapToStraws(world, cx, cy);
+  if (snapped && !inNoDraw(world, snapped[0], snapped[1])) [cx, cy] = snapped;
   if (inNoDraw(world, cx, cy) || strawLeft(world) < MIN_SEGMENT) {
     world.draft = null;
     return false;
@@ -786,6 +849,17 @@ export function commitStroke(world) {
   world.draftLength = 0;
   if (!draft || draft.length < 2) return -1;
   const points = simplify(draft);
+  // The far end joins a straw it nearly touches too, if the straw left covers it.
+  const last = points[points.length - 1];
+  const snapped = snapToStraws(world, last[0], last[1]);
+  if (snapped) {
+    const before = points[points.length - 2];
+    const extra = Math.hypot(snapped[0] - before[0], snapped[1] - before[1]) - Math.hypot(last[0] - before[0], last[1] - before[1]);
+    const clear = !world.noDraw.some((r) => segmentHitsRect(r, before[0], before[1], snapped[0], snapped[1]));
+    if (clear && polylineLength(points) + extra <= strawLeft(world) + 1e-9 && Math.hypot(snapped[0] - before[0], snapped[1] - before[1]) >= 1) {
+      points[points.length - 1] = snapped;
+    }
+  }
   const length = polylineLength(points);
   if (length < MIN_SEGMENT) return -1;
   const id = world.nextStrokeId++;
@@ -838,12 +912,6 @@ export function removeStroke(world, id) {
   world.strokes.splice(index, 1);
   rebuildSegments(world);
   return true;
-}
-
-/** Removes the newest straw. @param {World} world */
-export function undoStroke(world) {
-  const last = world.strokes[world.strokes.length - 1];
-  return last ? removeStroke(world, last.id) : false;
 }
 
 /** @param {World} world */
@@ -1022,13 +1090,33 @@ function pour(world, dt) {
 // --- Physics --------------------------------------------------------------------------
 
 /**
+ * The screen's fixed-step clock: adds a frame's elapsed seconds (clamped to
+ * MAX_FRAME; a negative or missing time counts as none) to what was left
+ * over, and says how many steps to run now, what is left for next frame, and
+ * how far between the last two steps to draw (0 to 1).
+ * @param {number} accumulator seconds left over from the last frame
+ * @param {number} elapsed seconds since the last frame
+ */
+export function frameSteps(accumulator, elapsed) {
+  const add = Number.isFinite(elapsed) ? clamp(elapsed, 0, MAX_FRAME) : 0;
+  const total = (Number.isFinite(accumulator) ? clamp(accumulator, 0, STEP) : 0) + add;
+  // A hair of slack, so 1/120 of a second added 120 times is 120 steps.
+  const steps = Math.floor(total / STEP + 1e-6);
+  const left = Math.max(0, total - steps * STEP);
+  return { steps, accumulator: left, alpha: clamp(left / STEP, 0, 1) };
+}
+
+/**
  * One fixed step. Returns how many events it emitted into `world.events`.
+ *
+ * The simulation never stops while a room is on screen: once the verdict is
+ * in (status "cleared" or "failed") the tea keeps flowing, sloshing and
+ * settling, and only the result is locked.
  * @param {World} world
  * @param {number} [dt] seconds; the screen calls this at STEP
  */
 export function step(world, dt = STEP) {
   world.events.count = 0;
-  if (world.status === "cleared" || world.status === "failed") return 0;
   world.time += dt;
 
   // The belt runs while tea is coming, then eases to a stop so the room can settle.
@@ -1250,9 +1338,12 @@ function collideOne(world, i, k) {
     const cx = qx + (x - qx) * f;
     const cy = qy + (y - qy) * f;
     const tc = ((cx - ax) * dx + (cy - ay) * dy) / len2;
-    // The ends count as round caps, so nothing slips through where two
-    // walls meet at a corner.
-    const cap = reach / len;
+    // A hair past each end, so nothing slips through the shared corner of
+    // two walls. No more than that: a particle crossing the line beyond an
+    // end went round the end, and the round cap below pushes it out
+    // radially, so it rolls off a corner or a straw's tip instead of being
+    // put back where it came from and held there.
+    const cap = CROSS_SLOP / len;
     if (tc >= -cap && tc <= 1 + cap) {
       crossed = true;
       t = tc;
@@ -1372,10 +1463,15 @@ function expelFromBlocks(world) {
       const nx = (by - ay) / len;
       const ny = -(bx - ax) / len;
       const out = nearest + RADIUS[p.kind[i]] + 0.5;
+      // Keep the slide along the face and drop only the motion into the
+      // block, so a particle squeezed out never stops dead (or jitters there).
+      const mx = x - p.qx[i];
+      const my = y - p.qy[i];
+      const into = mx * nx + my * ny;
       p.x[i] = x + nx * out;
       p.y[i] = y + ny * out;
-      p.qx[i] = p.x[i];
-      p.qy[i] = p.y[i];
+      p.qx[i] = p.x[i] - (into < 0 ? mx - into * nx : mx);
+      p.qy[i] = p.y[i] - (into < 0 ? my - into * ny : my);
       break;
     }
   }
@@ -1612,34 +1708,49 @@ function weighScales(world) {
  * Every SETTLE_WINDOW the room checks how far each particle moved since the
  * last check. Position, not velocity, is the honest measure: a resting pile
  * carries a little velocity that its contacts cancel every step.
+ *
+ * Spilled particles are left out: they can never count in a cup again, so
+ * a puddle may spread as long as it likes. Two ways to a verdict:
+ * - early, the moment the outcome can no longer change: every particle still
+ *   in play sits at rest inside a cup's counting region, and the belts have
+ *   stopped (the kettles and hopper are already empty in "settling");
+ * - settled: all but a negligible few are at rest for SETTLE_SECONDS.
+ * SETTLE_TIMEOUT after the last pour is only a safety net.
  * @param {World} world
  * @param {number} dt
  */
 function settle(world, dt) {
   const timedOut = world.time - world.pourEndedAt >= SETTLE_TIMEOUT;
   world.settleClock += dt;
-  if (world.settleClock >= SETTLE_WINDOW) {
+  let locked = false;
+  if (world.settleClock >= SETTLE_WINDOW - 1e-9) {
     world.settleClock = 0;
     const p = world.p;
     let moving = 0;
+    let inPlay = 0;
+    let outside = 0;
     for (let i = 0; i < world.count; i++) {
       if (p.flags[i] & IN_PIPE) {
         moving += MAX_PARTICLES;
+        outside++;
         continue;
       }
-      // What is already on the floor can puddle as long as it likes.
       if (p.flags[i] & SPILLED) continue;
+      inPlay++;
       const dx = p.x[i] - p.rx[i];
       const dy = p.y[i] - p.ry[i];
       if (dx * dx + dy * dy > SETTLE_DRIFT * SETTLE_DRIFT) moving++;
+      else if (p.cup[i] < 0) outside++;
       p.rx[i] = p.x[i];
       p.ry[i] = p.y[i];
     }
-    const allowed = Math.floor(world.count * 0.02);
     const beltStill = world.beltSpeed === 0 || world.cups.every((cup) => !cup.conveyor);
+    const allowed = Math.floor(inPlay * SETTLE_ALLOWANCE);
     world.quiet = moving <= allowed && beltStill ? world.quiet + SETTLE_WINDOW : 0;
+    // A window that began before the last pour ended measured particles that were still arriving.
+    locked = beltStill && moving === 0 && outside === 0 && world.time - world.pourEndedAt >= SETTLE_WINDOW;
   }
-  if (world.quiet >= SETTLE_SECONDS || timedOut) resolve(world);
+  if (locked || world.quiet >= SETTLE_SECONDS - 1e-9 || timedOut) resolve(world);
 }
 
 /** @param {World} world */
@@ -1781,7 +1892,7 @@ export function simulate(room, strokes = [], options = {}) {
   const world = createWorld(room);
   drawStrokes(world, strokes);
   const pourAt = options.pourAt ?? room.solution?.pourAt;
-  const maxSteps = Math.round((options.maxSeconds ?? 40) / STEP);
+  const maxSteps = Math.round((options.maxSeconds ?? 60) / STEP);
   for (let n = 0; n < maxSteps; n++) {
     if (pourAt !== undefined && world.status === "waiting" && world.time >= pourAt) pourNow(world);
     step(world, STEP);
@@ -1790,48 +1901,11 @@ export function simulate(room, strokes = [], options = {}) {
   return { world, result: world.result ?? judgeRoom(world) };
 }
 
-// --- Runs, lives and checkpoints ---------------------------------------------------------
+// --- Rooms, after hours, and progress ----------------------------------------------------
 
 /**
- * @typedef {{
- *   index: number, lives: number, total: number, seed: number, over: boolean,
- *   attempts: number, results: Array<{ index: number, name: string, stars: number, points: number }>,
- *   reached: number, startedAt: number
- * }} Run
- */
-
-/**
- * Which checkpoints a run may start from, given the furthest room index ever
- * reached on this device.
- * @param {number} reached
- */
-export function availableCheckpoints(reached) {
-  return CHECKPOINTS.filter((index) => index <= reached);
-}
-
-/**
- * A fresh run at a checkpoint, with par points for the rooms it skips.
- * @param {{ start?: number, reached?: number, seed?: number }} [options]
- * @returns {Run}
- */
-export function newRun({ start = 0, reached = 0, seed = 1 } = {}) {
-  const index = availableCheckpoints(reached).includes(start) ? start : 0;
-  return {
-    index,
-    lives: START_LIVES,
-    total: index * PAR_POINTS,
-    seed,
-    over: false,
-    attempts: 0,
-    results: [],
-    reached: Math.max(reached, index),
-    startedAt: index,
-  };
-}
-
-/**
- * The room at a run index: the authored rooms in order, then remixes of them
- * forever, a little harder each time round.
+ * The room at a level index: the eighteen authored rooms, then (after hours)
+ * remixes of them forever, a little harder each time round.
  * @param {number} index
  * @param {number} [seed]
  * @returns {Room}
@@ -1843,31 +1917,108 @@ export function roomAt(index, seed = 1) {
   return remix(ROOMS[past % ROOMS.length], difficulty, seed * 7919 + index);
 }
 
-/** @param {Run} run */
-export function currentRoom(run) {
-  return roomAt(run.index, run.seed);
+/** The level-select index of after hours: the first remix, after the authored rooms. */
+export const AFTER_HOURS = ROOMS.length;
+/** Every star the authored rooms can give. */
+export const MAX_STARS = ROOMS.length * 3;
+
+/**
+ * What a device remembers between visits: the best stars (0 to 3, 0 meaning
+ * never cleared) and best points of each authored room, and whether after
+ * hours is open.
+ * @typedef {{ stars: number[], points: number[], afterHours: boolean }} Progress
+ */
+
+/** @returns {Progress} */
+export function emptyProgress() {
+  return { stars: ROOMS.map(() => 0), points: ROOMS.map(() => 0), afterHours: false };
 }
 
 /**
- * Books a finished room into the run: a clear banks its points and moves on,
- * a failure costs a pearl and the same room is tried again.
- * @param {Run} run mutated in place
- * @param {RoomResult} result
+ * Progress from whatever storage held (parsed JSON, null, or junk), with
+ * every field checked: one entry per authored room, stars 0 to 3, points
+ * whole and not negative, and none without a clear.
+ * @param {unknown} value
+ * @returns {Progress}
  */
-export function recordResult(run, result) {
-  if (run.over) return run;
-  run.attempts++;
-  if (result.cleared) {
-    run.total += result.points;
-    run.results.push({ index: run.index, name: currentRoom(run).name, stars: result.stars, points: result.points });
-    run.index++;
-    run.reached = Math.max(run.reached, run.index);
-    run.attempts = 0;
-  } else {
-    run.lives--;
-    if (run.lives <= 0) run.over = true;
+export function cleanProgress(value) {
+  const progress = emptyProgress();
+  if (!value || typeof value !== "object") return progress;
+  const raw = /** @type {{ stars?: unknown, points?: unknown, afterHours?: unknown }} */ (value);
+  const stars = Array.isArray(raw.stars) ? raw.stars : [];
+  const points = Array.isArray(raw.points) ? raw.points : [];
+  for (let i = 0; i < ROOMS.length; i++) {
+    const s = Number(stars[i]);
+    const p = Number(points[i]);
+    progress.stars[i] = Number.isFinite(s) ? clamp(Math.floor(s), 0, 3) : 0;
+    progress.points[i] = progress.stars[i] > 0 && Number.isFinite(p) ? Math.max(0, Math.floor(p)) : 0;
   }
-  return run;
+  progress.afterHours = raw.afterHours === true || progress.stars[ROOMS.length - 1] > 0;
+  return progress;
+}
+
+/**
+ * Which authored rooms can be played, by index: room 1 always, and each room
+ * once the one before it has been cleared.
+ * @param {Progress} progress
+ * @returns {boolean[]}
+ */
+export function unlockedRooms(progress) {
+  return ROOMS.map((_, i) => i === 0 || progress.stars[i - 1] > 0);
+}
+
+/**
+ * Books a finished room. A clear keeps the better of the old and new stars
+ * and points (bests never go down), and clearing the last authored room opens
+ * after hours. A failure, or an after-hours remix, changes nothing. Returns
+ * new progress; the old is left as it was.
+ * @param {Progress} progress
+ * @param {number} index level index of the room played
+ * @param {{ cleared: boolean, stars: number, points: number }} result
+ * @returns {Progress}
+ */
+export function recordRoomResult(progress, index, result) {
+  const next = { stars: progress.stars.slice(), points: progress.points.slice(), afterHours: progress.afterHours };
+  if (!result.cleared || index < 0 || index >= ROOMS.length) return next;
+  next.stars[index] = Math.max(next.stars[index], clamp(Math.round(result.stars), 1, 3));
+  next.points[index] = Math.max(next.points[index], Math.max(0, Math.round(result.points)));
+  if (index === ROOMS.length - 1) next.afterHours = true;
+  return next;
+}
+
+/**
+ * The score: every authored room's best points added up.
+ * @param {Progress} progress
+ */
+export function progressTotal(progress) {
+  return progress.points.reduce((sum, points) => sum + points, 0);
+}
+
+/**
+ * Progress in numbers, for the level select and the results slip.
+ * @param {Progress} progress
+ */
+export function progressSummary(progress) {
+  let cleared = 0;
+  let stars = 0;
+  let threeStar = 0;
+  for (const s of progress.stars) {
+    if (s > 0) cleared++;
+    stars += s;
+    if (s === 3) threeStar++;
+  }
+  return { rooms: ROOMS.length, cleared, stars, maxStars: MAX_STARS, threeStar, total: progressTotal(progress) };
+}
+
+/**
+ * The level to offer next: the first open room not yet cleared, or after
+ * hours once every room is.
+ * @param {Progress} progress
+ */
+export function nextRoom(progress) {
+  const open = unlockedRooms(progress);
+  for (let i = 0; i < ROOMS.length; i++) if (open[i] && progress.stars[i] === 0) return i;
+  return progress.afterHours ? AFTER_HOURS : 0;
 }
 
 // --- Remixes --------------------------------------------------------------------------------

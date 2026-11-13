@@ -658,7 +658,6 @@
     cupX: number;
     wobble: number;
     tapReach: number;
-    folk: Folk[];
   }
 
   /** True from opening the demo until it is closed, end card included. */
@@ -1303,8 +1302,6 @@
     guest.left = sampleBoost(guest.left, guest.patience);
     samplesLeft -= 1;
     sfxPlop(SAMPLES_PER_SHIFT - samplesLeft);
-    const figure = folk.find((item) => item.id === guest.id);
-    if (figure && !reduceMotion) figure.hop = 0;
     guests = guests;
     note(`sample for ${guest.regular.name}`);
     liveMessage = `A free sample for ${guest.regular.name}; they will wait longer. ${samplesLeft} ${samplesLeft === 1 ? "sample" : "samples"} left.`;
@@ -1383,8 +1380,8 @@
     sfxServe(pay.tip > 0);
     // The fanfare comes in just after the serve chime.
     if (perfect) timers.later(() => sfxMilestone(), 220);
-    // The room celebrates too: the lamps flare and gold runs along the transom.
-    if (perfect && !reduceMotion) flareAge = sparkAge = 0;
+    // The room answers too: the lamps flare for a moment, up out of the way.
+    if (perfect && !reduceMotion) flareAge = 0;
     removeGuest(guest, "served");
 
     const rows = [
@@ -2172,12 +2169,11 @@
     for (let index = 0; index < count; index++) addParticle(particles, x + (Math.random() - 0.5) * cell * 2, y, color, 60, 620);
   }
 
-  /** A perfect drink throws a little burst of pearls as it leaves the counter. */
+  /** A perfect drink throws a little burst of pearls as it leaves the counter (the wall stays light enough for them all shift). */
   function pearlBurst() {
     if (reduceMotion) return;
-    const color = light.p >= 0.75 ? EMPTY_CUP : PEARL;
     for (let index = 0; index < 16; index++) {
-      addParticle(particles, cupX + (Math.random() - 0.5) * 6 * cell, cupTop - cell, color, 170, 520);
+      addParticle(particles, cupX + (Math.random() - 0.5) * 6 * cell, cupTop - cell, PEARL, 170, 520);
     }
   }
 
@@ -2277,14 +2273,23 @@
 
   // --- The room ----------------------------------------------------------------------
 
-  // The shop, seen from behind the counter in side elevation: a ceiling with
-  // pendant lamps, a wide window onto the street, the side walls, the guests
-  // waiting across the counter, and the counter itself. It is painted at one
-  // pixel per SC-px cell into small offscreen layers, rebuilt only when the
-  // light steps (every two seconds of shift) or the layout changes, and scaled
-  // up without smoothing; each frame only blits them and draws the few moving
-  // things between. The palette is fixed: the room looks the same in both
-  // site themes.
+  // The shop, seen from behind the counter: a ceiling with pendant lamps, a
+  // plain wall, and the counter. Behind the line, the taps and the bench the
+  // wall is one flat tone with nothing on it and nothing moving, so the
+  // tickets and the stations are always the most readable things on screen.
+  // The room's character lives on the side walls, outside the play area, when
+  // the screen leaves room for them: a menu board and a shelf of jars on the
+  // left, and on the right the clock and a small window onto the street,
+  // where the day turns from afternoon to night as the shift runs out. On a
+  // narrow screen there are no side walls, so there is just the wall. The
+  // room's own light warms and then dims only a little over the shift.
+  //
+  // It is painted at one pixel per SC-px cell into small offscreen layers,
+  // rebuilt only when the light steps (every two seconds of shift) or the
+  // layout changes, and scaled up without smoothing. Each frame blits them
+  // and draws the clock's hand and, briefly, the room's answer to a perfect
+  // drink or a lost guest, both kept off the play area. The palette is fixed:
+  // the room looks the same in both site themes.
 
   const SC = 4;
   /** Ordered dithering thresholds, 4 × 4. */
@@ -2303,22 +2308,17 @@
   ];
   const css = (color: RGB) => `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 
-  /** The sky through the day, by shift progress, with the street's colour. */
-  const SKY_KEYS = [
-    { p: 0, top: "#779bbe", mid: "#a9c4d9", low: "#f5e6d3", town: "#7d8ba3" },
-    { p: 0.5, top: "#c68098", mid: "#f18272", low: "#ffd166", town: "#6d6888" },
-    { p: 0.78, top: "#3b2a52", mid: "#8a3251", low: "#e85d4c", town: "#3a3157" },
-    { p: 1, top: "#141a2e", mid: "#1f2547", low: "#3b2a52", town: "#2a2748" },
-  ];
-  /** The room's light in flat steps: walls, their shade, the lamps, and how dark it is. */
-  // Warm by golden hour, clearly dim by dusk (p ≈ 0.78), at night's values
-  // by p ≈ 0.9; the middle steps are the golden and night colours mixed.
-  const ROOM_STEPS = [
-    { until: 0.3, wall: "#d9c7ae", shade: "#bfa98c", lamp: 0, dark: 0 },
-    { until: 0.56, wall: "#e2b77f", shade: "#c08a55", lamp: 0.3, dark: 0.06 },
-    { until: 0.7, wall: "#be966c", shade: "#976c4e", lamp: 0.55, dark: 0.15 },
-    { until: 0.86, wall: "#99765a", shade: "#6d4f46", lamp: 0.8, dark: 0.28 },
-    { until: Infinity, wall: "#7a5a4a", shade: "#4a3540", lamp: 1, dark: 0.38 },
+  /**
+   * The light through the shift, eased between keys: the sky in the window
+   * and the rooftops under it, and in the room a small swing in the wall
+   * (warmer by golden hour, a little dimmer by night), the lamps coming on,
+   * and how far the wood darkens.
+   */
+  const LIGHT_KEYS = [
+    { p: 0, top: "#8ba6c2", low: "#e6dccd", town: "#8f97a6", wall: "#d9c7ae", lamp: 0, dark: 0 },
+    { p: 0.5, top: "#b98e9c", low: "#efc48f", town: "#857f93", wall: "#dcc4a3", lamp: 0.3, dark: 0.03 },
+    { p: 0.78, top: "#5a4a6a", low: "#c97a6a", town: "#5a5170", wall: "#d1b999", lamp: 0.8, dark: 0.08 },
+    { p: 1, top: "#2c3049", low: "#4a4262", town: "#3b3953", wall: "#c7ae90", lamp: 1, dark: 0.12 },
   ];
   const WOOD = rgb("#8a5a3a");
   const WOOD_LINE = rgb("#5e3d2a");
@@ -2330,9 +2330,7 @@
   const SOFFIT_BEAM = rgb("#4f3a33");
   const GOLD = rgb("#ffd166");
   const CREAM_RGB = rgb("#f6eee2");
-  const WARM = rgb("#ffe3a3");
   const DEEP = rgb("#2a1c18");
-  const STREET_DARK = rgb("#151325");
   const SCENE_INK = "#1a1a1a";
   const SCENE_CREAM = "#fdf8f3";
   /** The bench's art keeps its light-theme colours over the room, always. */
@@ -2346,6 +2344,10 @@
   const GAUGE_BAND = "#8bbf5a";
   const GAUGE_HOT = "#f4b6a8";
   const STEP_SECONDS = 2;
+  /** Cells kept clear between the play area and anything on a side wall. */
+  const GUTTER = 4;
+  /** A side wall narrower than this, in cells, stays bare. */
+  const SIDE_MIN = 14;
   const URN_ROWS = 10;
   const URN = [
     "...OO....",
@@ -2366,71 +2368,19 @@
     h: rgb("#c9d0d4"),
     T: rgb("#3a3f44"),
   };
-  // Passers-by: two-frame walks, one flat colour, drawn facing right.
-  const WALKER = [
-    [".##..", ".##..", "####.", "#.##.", ".##..", ".#.#.", "#...#"],
-    [".##..", ".##..", ".###.", ".##..", ".##..", ".##..", ".#.#."],
-  ];
-  const DOG = [
-    ["...##", "####.", "#..#."],
-    ["...##", "####.", ".##.."],
-  ];
-  const BIKE = [
-    ["....##...", "....##...", "...###...", "....##...", ".##.#.##.", "#..#.#..#", ".##...##."],
-    ["....##...", "....##...", "...###...", "...#.#...", ".##.#.##.", "#..#.#..#", ".##...##."],
-  ];
-  // Guests across the counter: head and shoulders, three flat tones.
-  const FIGURE_BODY = ["..SSSSSS..", "..SSSSSS..", "...SSSS...", "....SS....", "..CCCCCC..", ".CCCCCCCC.", "CCCCCCCCCC", "CCCCCCCCCC", "CCCCCCCCCC"];
-  const FIGURE_TOPS = [
-    ["...HHHH...", "..HHHHHH..", "..HSSSSH.."],
-    ["....HH....", "..HHHHHH..", "..HHHHHH.."],
-    ["...TTTT...", "..TTTTTTTT", "..HSSSSH.."],
-  ];
-  const FIGURE_ROWS = 12;
-  /** The lunch-rush crowd further back: smaller and darker. */
-  const CROWD = ["..XXXX..", ".XXXXXX.", ".XXXXXX.", "..XXXX..", "...XX...", ".YYYYYY.", "YYYYYYYY", "YYYYYYYY", "YYYYYYYY"];
-  const MAX_WALKERS = 10;
-  const MAX_STEAM = 24;
+  /** The jars on the shelf: the teas, then a few tins. */
+  const SHELF_TINTS = [...TEAS.map((tea) => rgb(TEA_COLORS[tea])), rgb("#b0442f"), rgb("#3f6f6a"), rgb("#8f8f8f")];
 
   interface Buf {
     w: number;
     h: number;
     d: Uint8ClampedArray<ArrayBuffer>;
   }
-  interface Building {
-    x: number;
-    w: number;
-    h: number;
-    tank: boolean;
-    awning: number;
-    sign: boolean;
-    seed: number;
-  }
-  interface Walker {
-    active: boolean;
-    x: number;
-    dir: number;
-    speed: number;
-    kind: number;
-  }
-  interface Folk {
-    id: number;
-    guest: Guest;
-    x: number;
-    leaving: "served" | "gone" | null;
-    age: number;
-    rate: number;
-    phase: number;
-    /** Seconds since a sample made them hop. */
-    hop: number;
-  }
-  interface Puff {
-    active: boolean;
+  interface Box {
     x: number;
     y: number;
-    age: number;
-    life: number;
-    seed: number;
+    w: number;
+    h: number;
   }
 
   const newBuf = (w: number, h: number): Buf => ({ w, h, d: new Uint8ClampedArray(new ArrayBuffer(Math.max(1, w * h) * 4)) });
@@ -2464,15 +2414,6 @@
   function disc(b: Buf, cx: number, cy: number, r: number, c: RGB) {
     for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r + r * 0.6) px(b, cx + x, cy + y, c);
   }
-  /** A soft pool of light: dithered, densest in the middle. */
-  function glow(b: Buf, cx: number, cy: number, r: number, c: RGB, strength: number) {
-    for (let y = -r; y <= r; y++) {
-      for (let x = -r; x <= r; x++) {
-        const d = Math.hypot(x, y) / r;
-        if (d < 1 && bayer(cx + x, cy + y) < strength * (1 - d)) px(b, cx + x, cy + y, c);
-      }
-    }
-  }
   function commit(b: Buf, canvas: HTMLCanvasElement) {
     canvas.width = b.w;
     canvas.height = b.h;
@@ -2480,8 +2421,8 @@
     context?.putImageData(new ImageData(b.d, b.w, b.h), 0, 0);
   }
 
-  // Two canvases, so CSS can set the street further back than the room:
-  // `far` is the view through the window, `near` the room and the queue.
+  // Two canvases, so CSS can set the view through the window further back
+  // than the room: `far` is the window's view, `near` the room.
   let farCanvas: HTMLCanvasElement;
   let farCtx: CanvasRenderingContext2D | null = null;
   let nearCanvas: HTMLCanvasElement;
@@ -2492,70 +2433,50 @@
   let hudRow: HTMLElement;
   let VW = 0;
   let VH = 0;
+  const NONE: Box = { x: 0, y: 0, w: 0, h: 0 };
   /** The room's layout in cells, measured from the DOM so it lines up. */
   const room = {
     cols: 0,
     rows: 0,
     soffit: 0,
-    winL: 0,
-    winR: 0,
-    winT: 0,
-    transom: 0,
-    sill: 0,
-    street: 0,
     counter: 0,
     counterPx: 0,
-    doorL: 0,
-    doorR: 0,
-    mullions: [] as number[],
+    /** The play area: the column from the line down, plus a gutter. The wall here stays bare. */
+    play: { l: 0, r: 0, t: 0 },
     lamps: [] as number[],
     lampY: 0,
+    /** Side-wall pieces; zero-sized when the wall has no room for them. */
+    board: { ...NONE },
+    shelves: [] as Box[],
     clock: { x: 0, y: 0, r: 0 },
-    bench: { l: 0, r: 0, t: 0, b: 0 },
+    window: { ...NONE },
     urnX: -1,
-    lineL: 0,
-    lineW: 0,
   };
-  let buildings: Building[] = [];
   const skyLayer = typeof document === "undefined" ? null : document.createElement("canvas");
-  const streetLayer = typeof document === "undefined" ? null : document.createElement("canvas");
   const roomLayer = typeof document === "undefined" ? null : document.createElement("canvas");
   const counterLayer = typeof document === "undefined" ? null : document.createElement("canvas");
   const veils: HTMLCanvasElement[] = [];
-  const figureSprites = new Map<string, HTMLCanvasElement>();
   let bakedStep = -1;
   let light = lightAt(0);
-  let walkers: Walker[] = Array.from({ length: MAX_WALKERS }, () => ({ active: false, x: 0, dir: 1, speed: 0, kind: 0 }));
-  let walkerTimer = 0.5;
-  let folk: Folk[] = [];
-  let steam: Puff[] = Array.from({ length: MAX_STEAM }, () => ({ active: false, x: 0, y: 0, age: 0, life: 1, seed: 0 }));
-  let steamTimer = 0;
-  let doorAge = 10;
-  let bellAge = 10;
   let flareAge = 10;
-  let sparkAge = 10;
   let veilAge = 10;
 
-  /** The light at a point in the shift: sky and street by keyframe, the room in steps. */
+  /** The light at a point in the shift, eased between its keys. */
   function lightAt(p: number) {
     let index = 0;
-    while (index < SKY_KEYS.length - 2 && p > SKY_KEYS[index + 1].p) index++;
-    const a = SKY_KEYS[index];
-    const b = SKY_KEYS[index + 1];
+    while (index < LIGHT_KEYS.length - 2 && p > LIGHT_KEYS[index + 1].p) index++;
+    const a = LIGHT_KEYS[index];
+    const b = LIGHT_KEYS[index + 1];
     const t = clamp((p - a.p) / (b.p - a.p), 0, 1);
-    const step = Math.max(0, ROOM_STEPS.findIndex((item) => p < item.until));
-    const inside = ROOM_STEPS[step];
+    const mix = (from: string, to: string) => mixRgb(rgb(from), rgb(to), t);
     return {
       p,
-      step,
-      top: mixRgb(rgb(a.top), rgb(b.top), t),
-      mid: mixRgb(rgb(a.mid), rgb(b.mid), t),
-      low: mixRgb(rgb(a.low), rgb(b.low), t),
-      town: mixRgb(rgb(a.town), rgb(b.town), t),
-      wall: rgb(inside.wall),
-      shade: rgb(inside.shade),
-      lamp: inside.lamp,
-      dark: inside.dark,
+      top: mix(a.top, b.top),
+      low: mix(a.low, b.low),
+      town: mix(a.town, b.town),
+      wall: mix(a.wall, b.wall),
+      lamp: lerp(a.lamp, b.lamp, t),
+      dark: lerp(a.dark, b.dark, t),
     };
   }
 
@@ -2579,40 +2500,49 @@
     room.counterPx = benchBox.top + counterY;
     room.counter = Math.floor(room.counterPx / SC);
     room.soffit = clamp(Math.round((hudBottom * 0.55) / SC), 6, 16);
-    // The window takes the middle; the side walls get what the column leaves.
-    const columnW = columnBox ? columnBox.width : VW;
-    const side = Math.max(2, Math.round(((VW - columnW) / 2 / SC) * 0.75));
-    room.winL = side;
-    room.winR = cols - side;
-    room.winT = room.soffit + 2;
-    room.sill = Math.max(room.winT + 12, room.counter - 5);
-    room.street = room.sill - 3;
-    room.transom = room.winT + Math.max(4, Math.round((room.street - room.winT) * 0.18));
-    const doorW = 12;
-    room.doorR = room.winR - 1;
-    room.doorL = room.doorR - doorW;
-    room.mullions = [];
-    const span = room.doorL - room.winL;
-    const panes = Math.max(1, Math.round(span / 28));
-    for (let index = 1; index < panes; index++) room.mullions.push(Math.round(room.winL + (span * index) / panes));
     room.lamps = [1 / 6, 1 / 2, 5 / 6].map((f) => Math.round(cols * f));
     room.lampY = room.soffit + 4;
-    // The clock: on the right wall if there is one, else hung from the ceiling.
-    const rightWall = cols - room.winR;
-    if (rightWall >= 12) {
-      const r = Math.min(5, Math.floor(rightWall / 2) - 2);
-      room.clock = { x: room.winR + Math.round(rightWall / 2), y: room.winT + r + 4, r };
-    } else {
-      room.clock = { x: room.doorL - 7, y: room.soffit + 6, r: 4 };
-    }
-    room.bench = {
-      l: Math.floor(benchBox.left / SC),
-      r: Math.ceil(benchBox.right / SC),
-      t: Math.floor(benchBox.top / SC),
-      b: room.counter,
+    room.play = {
+      l: columnBox ? Math.floor(columnBox.left / SC) - GUTTER : 0,
+      r: columnBox ? Math.ceil(columnBox.right / SC) + GUTTER : cols,
+      t: Math.floor((lineBox ? lineBox.top : hudBottom) / SC),
     };
-    room.lineL = lineBox ? lineBox.left : 0;
-    room.lineW = lineBox ? lineBox.width : VW;
+
+    // The side walls: whatever the play area leaves, under the HUD and above
+    // the counter (and the urn on it).
+    const top = Math.ceil(hudBottom / SC) + 4;
+    const bottom = room.counter - URN_ROWS - 4;
+    const leftW = room.play.l - 2;
+    const rightL = room.play.r;
+    const rightW = cols - 2 - rightL;
+
+    // Left: a menu board, and under it a shelf or two of jars.
+    room.board = { ...NONE };
+    room.shelves = [];
+    if (leftW >= SIDE_MIN && bottom - top >= 16) {
+      const w = Math.min(30, leftW - 4);
+      const h = clamp(Math.round(w * 0.55), 8, 16);
+      room.board = { x: 2 + Math.round((leftW - w) / 2), y: top + 2, w, h };
+      const shelfW = Math.min(leftW - 2, w + 6);
+      const shelfX = 2 + Math.round((leftW - shelfW) / 2);
+      for (let y = top + 2 + h + 14; y <= bottom && room.shelves.length < 2; y += 13) {
+        room.shelves.push({ x: shelfX, y, w: shelfW, h: 1 });
+      }
+    }
+
+    // Right: the clock, and under it a small window.
+    room.clock = { x: 0, y: 0, r: 0 };
+    room.window = { ...NONE };
+    if (rightW >= SIDE_MIN && bottom - top >= 16) {
+      const centre = rightL + Math.round(rightW / 2);
+      const r = clamp(Math.floor(rightW / 5), 3, 6);
+      room.clock = { x: centre, y: top + 2 + r, r };
+      const w = clamp(Math.round(rightW * 0.45), 10, 24);
+      const t = room.clock.y + r + 7;
+      const h = Math.min(Math.round(w * 1.3), bottom - 2 - t);
+      if (h >= 10) room.window = { x: centre - Math.round(w / 2), y: t, w, h };
+    }
+
     // The urn stands at whichever end of the counter has room outside the taps.
     room.urnX = -1;
     if (tapsBox) {
@@ -2621,27 +2551,9 @@
       else if (tapsBox.left >= need) room.urnX = Math.round(tapsBox.left / 2 / SC) - 4;
     }
 
-    // Seeded buildings across the street.
-    buildings = [];
-    const glassH = room.street - room.winT;
-    let x = room.winL;
-    for (let index = 0; x < room.winR; index++) {
-      const w = 8 + Math.floor(hash(index + 1) * 14);
-      buildings.push({
-        x,
-        w,
-        h: Math.round(glassH * (0.24 + hash(index + 50) * 0.3)),
-        tank: hash(index + 7) < 0.3,
-        awning: hash(index + 9) < 0.5 ? Math.floor(hash(index + 13) * 3) : -1,
-        sign: hash(index + 11) < 0.35,
-        seed: index,
-      });
-      x += w + Math.floor(hash(index + 21) * 3);
-    }
-
     // Veils for a dimmed room, a few ordered-dither densities.
     veils.length = 0;
-    for (const density of [0.125, 0.25, 0.375]) {
+    for (const density of [0.0625, 0.1875]) {
       const b = newBuf(cols, rows);
       dither(b, 0, 0, cols, rows, rgb("#120c10"), density);
       const canvas = document.createElement("canvas");
@@ -2652,162 +2564,33 @@
     bakeRoom();
   }
 
-  function guestTones(name: string) {
-    const palette = facePalette(name);
-    return { skin: rgb(palette.S), hair: rgb(palette.H), hat: rgb(palette.T), shirt: rgb(palette.C) };
-  }
-
-  /** A guest's figure, cached per name, facing, and light step. */
-  function figureSprite(name: string, back: boolean) {
-    const key = `${name}|${back}|${light.step}`;
-    const cached = figureSprites.get(key);
-    if (cached) return cached;
-    const tones = guestTones(name);
-    const night = (c: RGB) => mixRgb(c, DEEP, light.dark);
-    const colors: Record<string, RGB> = {
-      S: night(tones.skin),
-      H: night(tones.hair),
-      T: night(tones.hat),
-      C: night(mixRgb(tones.shirt, light.shade, 0.4)),
-    };
-    const top = FIGURE_TOPS[(nameHash(name) >>> 6) % FIGURE_TOPS.length];
-    let grid = [...top, ...FIGURE_BODY];
-    // Seen from behind, the head is all hair.
-    if (back) grid = grid.map((row, index) => (index >= 2 && index <= 5 ? row.replace(/S/g, "H") : row));
-    const b = newBuf(10, FIGURE_ROWS);
-    grid.forEach((row, y) => [...row].forEach((ch, x) => ch !== "." && colors[ch] && px(b, x, y, colors[ch])));
-    const canvas = document.createElement("canvas");
-    commit(b, canvas);
-    if (figureSprites.size > 240) figureSprites.clear();
-    figureSprites.set(key, canvas);
-    return canvas;
-  }
-
   /** Repaints the static layers for the current light. */
   function bakeRoom() {
-    if (!skyLayer || !streetLayer || !roomLayer || !counterLayer || !room.cols) return;
+    if (!skyLayer || !roomLayer || !counterLayer || !room.cols) return;
     const step = Math.floor(elapsed / STEP_SECONDS);
     if (step === bakedStep) return;
     bakedStep = step;
     light = lightAt(clamp((step * STEP_SECONDS) / SHIFT_SECONDS, 0, 1));
-    const { cols, rows, winL, winR, winT, street, sill, counter } = room;
+    const { cols, rows, counter } = room;
     const L = light;
-    const p = L.p;
 
-    // Sky: flat bands joined by dithering, with the sun, or the moon and stars.
     const sky = newBuf(cols, rows);
-    const bands = [L.top, mixRgb(L.top, L.mid, 0.5), L.mid, mixRgb(L.mid, L.low, 0.5), L.low];
-    const glassH = Math.max(1, street - winT);
-    for (let y = winT; y < street; y++) {
-      const f = ((y - winT) / glassH) * (bands.length - 1);
-      const segment = Math.min(bands.length - 2, Math.floor(f));
-      const blend = clamp((f - segment - 0.3) / 0.4, 0, 1);
-      for (let x = winL; x < winR; x++) px(sky, x, y, bands[blend > bayer(x, y) ? segment + 1 : segment]);
-    }
-    if (p < 0.66) {
-      const sunY = Math.round(lerp(winT + glassH * 0.25, street + 3, clamp(p / 0.62, 0, 1)));
-      disc(sky, Math.round(lerp(winL, winR, 0.72)), sunY, 4, mixRgb(rgb("#fff6d8"), GOLD, clamp(p / 0.5, 0, 1)));
-    }
-    if (p >= 0.82) {
-      for (let index = 0; index < 40; index++) {
-        if (hash(index + 400) > (p - 0.78) * 4) continue;
-        const sx = Math.round(lerp(winL, winR, hash(index + 500)));
-        const sy = Math.round(lerp(winT, street - glassH * 0.45, hash(index + 600)));
-        px(sky, sx, sy, CREAM_RGB);
-      }
-      const mx = Math.round(lerp(winL, winR, 0.24));
-      const my = winT + 6;
-      disc(sky, mx, my, 3, CREAM_RGB);
-      disc(sky, mx + 2, my - 1, 3, L.top);
-    }
+    paintView(sky);
     commit(sky, skyLayer);
 
-    // Across the street: buildings, their windows, a street lamp, the pavement.
-    const town = newBuf(cols, rows);
-    const shade = mixRgb(L.town, STREET_DARK, 0.2);
-    const unlit = mixRgb(L.town, STREET_DARK, 0.32);
-    const roof = mixRgb(L.town, L.low, 0.18);
-    const awnings = [rgb("#a54a3c"), rgb("#3f6f6a"), rgb("#b08a3e")].map((c) => mixRgb(c, L.town, 0.5));
-    const flatGold = mixRgb(GOLD, L.town, 0.5);
-    // Buildings behind the bench stay calm: their dark windows are a single
-    // step off the wall, so no grid of dots competes with the machines.
-    const calm = mixRgb(L.town, STREET_DARK, 0.08);
-    for (const house of buildings) {
-      const top = street - house.h;
-      const right = Math.min(house.x + house.w, winR);
-      const behind = house.x < room.bench.r && right > room.bench.l;
-      fill(town, house.x, top, right - house.x, house.h, L.town);
-      fill(town, house.x, top, right - house.x, 1, roof);
-      fill(town, right - 1, top + 1, 1, house.h - 1, shade);
-      if (house.tank && house.w > 9) {
-        const tx = house.x + 2 + Math.floor(hash(house.seed + 70) * (house.w - 7));
-        fill(town, tx, top - 4, 4, 3, shade);
-        fill(town, tx, top - 1, 1, 1, shade);
-        fill(town, tx + 3, top - 1, 1, 1, shade);
-      }
-      const ground = street - 3;
-      if (house.awning >= 0) fill(town, house.x + 1, ground - 1, right - house.x - 2, 2, awnings[house.awning]);
-      if (house.sign && house.w > 9) fill(town, house.x + 2, ground - 5, Math.min(7, house.w - 4), 2, roof);
-      // Windows come on one by one from golden hour; behind the bench they
-      // stay muted so they never compete with the cup.
-      for (let wy = top + 2; wy < ground - 6; wy += 3) {
-        for (let wx = house.x + 2; wx < right - 2; wx += 3) {
-          const on = 0.45 + hash(wx * 31 + wy * 7) * 0.53;
-          const behindBench = wx >= room.bench.l && wx <= room.bench.r && wy >= room.bench.t;
-          px(town, wx, wy, p >= on ? (behindBench ? flatGold : GOLD) : behind ? calm : unlit);
-        }
-      }
-    }
-    const pavement = mixRgb(rgb("#a39d94"), STREET_DARK, L.dark * 1.4);
-    fill(town, winL, street, winR - winL, sill - street, pavement);
-    fill(town, winL, street, winR - winL, 1, mixRgb(pavement, STREET_DARK, 0.25));
-    fill(town, room.doorL, sill, room.doorR - room.doorL, counter - sill + 1, pavement);
-    const lampX = winL + 5;
-    const post = mixRgb(rgb("#2b2320"), L.town, 0.3);
-    fill(town, lampX, street - 14, 1, 14, post);
-    fill(town, lampX, street - 14, 3, 1, post);
-    if (p >= 0.7) {
-      fill(town, lampX + 2, street - 13, 2, 1, GOLD);
-      for (let y = street - 12; y < street; y++) {
-        const half = Math.round(((y - (street - 12)) / 12) * 5);
-        dither(town, lampX + 3 - half, y, half * 2 + 1, 1, mixRgb(GOLD, L.town, 0.45), 0.3);
-      }
-    }
-    commit(town, streetLayer);
-
-    // The room: soffit, walls, the window frame, side walls, lamps, the clock.
+    // The room: the ceiling, the wall, and what hangs on the side walls.
     const inside = newBuf(cols, rows);
     fill(inside, 0, 0, cols, rows, L.wall);
-    fill(inside, 0, sill, cols, rows - sill, L.shade);
     fill(inside, 0, 0, cols, room.soffit, SOFFIT);
     fill(inside, 0, room.soffit - 1, cols, 1, SOFFIT_BEAM);
-    // Glass: clear it so the street shows, then frame it.
-    for (let y = winT; y < sill; y++) for (let x = winL; x < winR; x++) clear(inside, x, y);
-    for (let y = sill; y <= counter + 1; y++) for (let x = room.doorL; x < room.doorR; x++) clear(inside, x, y);
-    const frame = mixRgb(FRAME, DEEP, L.dark);
-    fill(inside, winL - 1, winT - 1, winR - winL + 2, 1, frame);
-    fill(inside, winL - 1, winT - 1, 1, sill - winT + 1, frame);
-    fill(inside, winR, winT - 1, 1, sill - winT + 1, frame);
-    fill(inside, winL, room.transom, winR - winL, 1, frame);
-    for (const x of room.mullions) fill(inside, x, winT, 1, sill - winT, frame);
-    fill(inside, room.doorL - 1, room.transom, 1, counter - room.transom + 2, frame);
-    fill(inside, winL - 2, sill, room.doorL - winL + 2, 2, mixRgb(SILL, DEEP, L.dark));
-    // Golden hour lays a long warm patch of window light across the left wall.
-    if (L.step === 1) {
-      for (let y = winT + 3; y < sill; y++) {
-        const x0 = Math.round((y - winT) * 0.6);
-        const w = Math.min(7, winL - 1 - x0);
-        if (w > 0) dither(inside, x0, y, w, 1, mixRgb(L.wall, rgb("#f6d09a"), 0.85), 0.5);
-      }
-    }
-    paintLeftWall(inside);
-    paintRightWall(inside);
+    paintWindowFrame(inside);
+    paintBoard(inside);
+    paintShelves(inside);
     paintClockFace(inside);
-    // Pendant lamps, their bulbs warming and their glow spreading as evening comes.
-    const bulb = L.lamp > 0 ? mixRgb(rgb("#e8dcc4"), GOLD, L.lamp) : rgb("#e8dcc4");
+    // Pendant lamps, their bulbs warming as evening comes.
+    const bulb = mixRgb(rgb("#e8dcc4"), GOLD, L.lamp * 0.8);
     for (const x of room.lamps) {
       fill(inside, x, room.soffit, 1, room.lampY - room.soffit, SOFFIT);
-      if (L.lamp > 0) glow(inside, x, room.lampY + 3, Math.round(3 + 9 * L.lamp), WARM, 0.5 + 0.35 * L.lamp);
       fill(inside, x - 1, room.lampY, 3, 1, SOFFIT);
       fill(inside, x - 2, room.lampY + 1, 5, 1, SOFFIT);
       fill(inside, x - 3, room.lampY + 2, 7, 1, SOFFIT_BEAM);
@@ -2815,324 +2598,140 @@
     }
     commit(inside, roomLayer);
 
-    // The counter: lip, wood face with panels, an under-counter shelf, the urn.
+    // The counter: a lip, a plain wood face in three panels, and the urn.
     const below = rows - counter + 2;
     const o = URN_ROWS;
     const front = newBuf(cols, o + below);
     const wood = mixRgb(WOOD, DEEP, L.dark);
     const line = mixRgb(WOOD_LINE, DEEP, L.dark);
-    const muted = (c: RGB) => mixRgb(mixRgb(c, wood, 0.72), DEEP, L.dark * 0.5);
     fill(front, 0, o + 3, cols, below, wood);
     fill(front, 0, o, cols, 2, mixRgb(LIP, DEEP, L.dark * 0.6));
     fill(front, 0, o + 2, cols, 1, mixRgb(LIP_EDGE, DEEP, L.dark * 0.6));
     fill(front, 0, o + 3, cols, 1, line);
-    const shelf = o + 3 + Math.max(6, Math.floor((below - 3) * 0.55));
-    for (let x = 14; x < cols; x += 32) fill(front, x, o + 4, 1, shelf - o - 4, line);
-    fill(front, 0, shelf, cols, 1, line);
-    fill(front, 0, shelf + 1, cols, 1, mixRgb(line, DEEP, 0.4));
-    for (let x = 3, index = 0; x < cols - 6; index++) {
-      const kind = Math.floor(hash(index + 800) * 3);
-      if (kind === 0) {
-        const h = 4 + Math.floor(hash(index + 810) * 3);
-        fill(front, x, shelf - h, 3, h, muted(CREAM_RGB));
-        x += 5;
-      } else if (kind === 1) {
-        fill(front, x, shelf - 3, 5, 3, muted(rgb("#b0603e")));
-        for (let s = 0; s < 5; s += 2) px(front, x + s, shelf - 4, muted(rgb(STRAW_PINK)));
-        x += 7;
-      } else {
-        const color = muted(rgb(["#8a3251", "#3f6f3a", "#c98b3a"][Math.floor(hash(index + 820) * 3)]));
-        fill(front, x, shelf - 4, 2, 4, color);
-        px(front, x, shelf - 5, color);
-        x += 4;
-      }
-      x += Math.floor(hash(index + 830) * 4);
-    }
-    if (L.lamp > 0) {
-      for (const lx of room.lamps) {
-        const half = Math.round((6 + 10 * L.lamp) * (2 / 3));
-        for (let dx = -half; dx <= half; dx++) {
-          const k = 1 - Math.abs(dx) / half;
-          for (let y = o; y < o + 6; y++) {
-            if (bayer(lx + dx, y) < L.lamp * 0.55 * k) px(front, lx + dx, y, mixRgb(y < o + 3 ? LIP : wood, WARM, 0.35));
-          }
-        }
-      }
+    const seam = mixRgb(line, wood, 0.55);
+    for (const x of [room.play.l - 2, room.play.r + 1]) {
+      if (x > 2 && x < cols - 3) fill(front, x, o + 4, 1, below, seam);
     }
     if (room.urnX >= 0) {
       URN.forEach((row, y) =>
-        [...row].forEach((ch, x) => ch !== "." && URN_PALETTE[ch] && px(front, room.urnX + x, y, mixRgb(URN_PALETTE[ch], DEEP, L.dark * 0.6))),
+        [...row].forEach((ch, x) => {
+          if (ch === "." || !URN_PALETTE[ch]) return;
+          px(front, room.urnX + x, y, mixRgb(mixRgb(URN_PALETTE[ch], L.wall, 0.3), DEEP, L.dark * 0.6));
+        }),
       );
     }
     commit(front, counterLayer);
   }
 
-  /** Shelves of jars and tins and a menu board of chalk dashes, if the wall has room. */
-  function paintLeftWall(b: Buf) {
-    const width = room.winL - 1;
-    if (width < 12) return;
+  /** Mixes a side-wall colour toward the wall, so nothing up there competes with the play. */
+  const quiet = (c: RGB, toward: number) => mixRgb(c, light.wall, toward);
+
+  /**
+   * The view through the window: the sky in flat bands joined by dithering,
+   * the sun going down or the moon, and a line of rooftops with a lit window
+   * or two by night. Nothing in it moves.
+   */
+  function paintView(b: Buf) {
+    const { x, y, w, h } = room.window;
+    if (!w || !h) return;
     const L = light;
-    const boardW = Math.min(26, width - 4);
-    const boardH = Math.min(14, Math.max(8, Math.round((room.sill - room.winT) * 0.3)));
-    const bx = Math.round((width - boardW) / 2);
-    const by = room.winT + 2;
-    fill(b, bx - 1, by - 1, boardW + 2, boardH + 2, mixRgb(FRAME, DEEP, L.dark));
-    fill(b, bx, by, boardW, boardH, mixRgb(rgb("#2f3a33"), DEEP, L.dark * 0.5));
-    const chalk = mixRgb(rgb("#d8d3c8"), DEEP, L.dark * 0.4);
-    for (let y = by + 2, row = 0; y < by + boardH - 1; y += 2, row++) {
-      let x = bx + 2;
-      while (x < bx + boardW - 3) {
-        const length = 2 + Math.floor(hash(row * 17 + x) * 4);
-        fill(b, x, y, Math.min(length, bx + boardW - 2 - x), 1, chalk);
-        x += length + 1 + Math.floor(hash(row * 5 + x + 3) * 2);
-      }
+    const bands = [L.top, mixRgb(L.top, L.low, 0.5), L.low];
+    for (let yy = y; yy < y + h; yy++) {
+      const f = ((yy - y) / h) * (bands.length - 1);
+      const segment = Math.min(bands.length - 2, Math.floor(f));
+      const blend = clamp((f - segment - 0.3) / 0.4, 0, 1);
+      for (let xx = x; xx < x + w; xx++) px(b, xx, yy, bands[blend > bayer(xx, yy) ? segment + 1 : segment]);
     }
-    const plank = mixRgb(FRAME, DEEP, L.dark);
-    const tints = [...TEAS.map((tea) => rgb(TEA_COLORS[tea])), rgb("#8f8f8f"), rgb("#b0442f"), rgb("#3f6f6a")];
-    for (let shelfY = by + boardH + 7, row = 0; shelfY < room.sill - 2 && row < 3; shelfY += 7, row++) {
-      fill(b, 1, shelfY, width - 2, 1, plank);
-      for (let x = 2, index = 0; x < width - 4; index++) {
-        const w = 2 + Math.floor(hash(row * 40 + index) * 2);
-        const h = 3 + Math.floor(hash(row * 40 + index + 9) * 2);
-        const color = mixRgb(tints[Math.floor(hash(row * 40 + index + 3) * tints.length)], L.shade, 0.3 + L.dark);
-        fill(b, x, shelfY - h, w, h, color);
-        fill(b, x, shelfY - h, w, 1, mixRgb(color, DEEP, 0.3));
-        x += w + 1;
-      }
+    if (L.p < 0.7) {
+      // The sun sinks behind the rooftops by dusk.
+      const sunY = Math.round(lerp(y + h * 0.3, y + h, clamp(L.p / 0.66, 0, 1)));
+      disc(b, x + Math.round(w * 0.66), sunY, 2, mixRgb(rgb("#fbeed2"), rgb("#f2c27a"), clamp(L.p / 0.5, 0, 1)));
+    }
+    if (L.p >= 0.84) {
+      const mx = x + Math.round(w * 0.3);
+      const my = y + Math.max(3, Math.round(h * 0.2));
+      disc(b, mx, my, 2, mixRgb(CREAM_RGB, L.top, 0.25));
+      disc(b, mx + 1, my - 1, 2, L.top);
+    }
+    // Three rooftops across the bottom of the glass, in one flat tone.
+    const lit = mixRgb(GOLD, L.town, 0.55);
+    let left = x;
+    for (let index = 0; index < 3 && left < x + w; index++) {
+      const width = index === 2 ? x + w - left : Math.round(w * (0.28 + hash(index + 60) * 0.12));
+      const height = Math.round(h * (0.22 + hash(index + 70) * 0.16));
+      fill(b, left, y + h - height, width, height, L.town);
+      if (L.p >= 0.75 && index !== 1 && width > 4) px(b, left + 2 + Math.floor(hash(index + 80) * (width - 4)), y + h - height + 2, lit);
+      left += width;
     }
   }
 
-  /** A potted plant on the right wall, if there is one. */
-  function paintRightWall(b: Buf) {
-    const width = room.cols - room.winR - 1;
-    if (width < 10) return;
-    const L = light;
-    const x = room.winR + 1 + Math.round(width / 2) - 3;
-    const y = room.sill - 4;
-    fill(b, x - 1, room.sill - 1, 8, 1, mixRgb(FRAME, DEEP, L.dark));
-    fill(b, x, y, 6, 3, mixRgb(rgb("#b0603e"), DEEP, L.dark));
-    fill(b, x - 1, y, 8, 1, mixRgb(rgb("#c97a55"), DEEP, L.dark));
-    const leaf = mixRgb(rgb("#5a8f4e"), DEEP, L.dark);
-    const leafDark = mixRgb(rgb("#3f6f3a"), DEEP, L.dark);
-    for (let index = 0; index < 18; index++) {
-      const lx = x + 3 + Math.round((hash(index + 900) - 0.5) * 9);
-      const ly = y - 1 - Math.floor(hash(index + 910) * 7);
-      px(b, lx, ly, index % 3 ? leaf : leafDark);
-      px(b, lx + 1, ly, leaf);
+  /** The window's frame, a cross of glazing bars, and its sill; the glass is cleared so the view shows. */
+  function paintWindowFrame(b: Buf) {
+    const { x, y, w, h } = room.window;
+    if (!w || !h) return;
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) clear(b, xx, yy);
+    const frame = quiet(mixRgb(FRAME, DEEP, light.dark), 0.35);
+    fill(b, x - 1, y - 1, w + 2, 1, frame);
+    fill(b, x - 1, y - 1, 1, h + 2, frame);
+    fill(b, x + w, y - 1, 1, h + 2, frame);
+    fill(b, x, y + Math.round(h * 0.4), w, 1, frame);
+    fill(b, x + Math.floor(w / 2), y, 1, h, frame);
+    fill(b, x - 2, y + h, w + 4, 2, quiet(SILL, 0.3));
+  }
+
+  /** The menu board: a few rows of chalk, each an item and its price, barely off the board. */
+  function paintBoard(b: Buf) {
+    const { x, y, w, h } = room.board;
+    if (!w || !h) return;
+    const board = quiet(rgb("#2f3a33"), 0.45);
+    fill(b, x - 1, y - 1, w + 2, h + 2, quiet(FRAME, 0.35));
+    fill(b, x, y, w, h, board);
+    const chalk = mixRgb(rgb("#d8d3c8"), board, 0.5);
+    // A heading, then the menu.
+    const heading = Math.round(w * 0.4);
+    fill(b, x + Math.round((w - heading) / 2), y + 2, heading, 1, chalk);
+    for (let row = 0, yy = y + 5; yy < y + h - 1; row++, yy += 3) {
+      fill(b, x + 2, yy, Math.round((w - 9) * (0.45 + hash(row + 90) * 0.4)), 1, chalk);
+      fill(b, x + w - 5, yy, 3, 1, chalk);
     }
+  }
+
+  /** A shelf or two of jars: a few large shapes, muted toward the wall. */
+  function paintShelves(b: Buf) {
+    room.shelves.forEach((shelf, row) => {
+      fill(b, shelf.x, shelf.y, shelf.w, 1, quiet(FRAME, 0.4));
+      const count = clamp(Math.floor(shelf.w / 8), 2, 4);
+      const slot = shelf.w / count;
+      for (let index = 0; index < count; index++) {
+        const seed = row * 10 + index;
+        const w = 4 + Math.floor(hash(seed + 100) * 2);
+        const h = 5 + Math.floor(hash(seed + 110) * 3);
+        const jx = Math.round(shelf.x + slot * (index + 0.5) - w / 2);
+        const body = quiet(SHELF_TINTS[Math.floor(hash(seed + 120) * SHELF_TINTS.length)], 0.55);
+        fill(b, jx, shelf.y - h + 1, w, h - 1, body);
+        fill(b, jx + 1, shelf.y - h, w - 2, 1, mixRgb(body, DEEP, 0.18));
+      }
+    });
   }
 
   function paintClockFace(b: Buf) {
     const { x, y, r } = room.clock;
     if (r < 3) return;
-    const rim = mixRgb(SOFFIT, DEEP, 0.2);
-    if (room.cols - room.winR < 12) fill(b, x, room.soffit, 1, y - r - room.soffit, rim);
+    const rim = quiet(SOFFIT, 0.4);
     disc(b, x, y, r, rim);
-    disc(b, x, y, r - 1, CREAM_RGB);
-    px(b, x, y - r + 1, rgb("#e85d4c"));
+    disc(b, x, y, r - 1, quiet(CREAM_RGB, 0.4));
+    px(b, x, y - r + 1, quiet(rgb("#e85d4c"), 0.45));
     px(b, x + r - 1, y, rim);
     px(b, x, y + r - 1, rim);
     px(b, x - r + 1, y, rim);
-  }
-
-  // --- The room: moving things -------------------------------------------------------
-
-  const doorX = () => ((room.doorL + room.doorR) / 2) * SC;
-
-  function guestSlot(index: number) {
-    return room.lineL + ((index + 0.5) * room.lineW) / MAX_TICKETS;
-  }
-
-  function swingDoor() {
-    if (reduceMotion) return;
-    doorAge = 0;
-    bellAge = 0;
-  }
-
-  /** Keeps a figure for every guest on the line, and walks the leavers out. */
-  function stepFolk(dt: number) {
-    guests.forEach((guest, index) => {
-      if (folk.some((item) => item.id === guest.id)) return;
-      folk.push({
-        id: guest.id,
-        guest,
-        x: reduceMotion ? guestSlot(index) : doorX(),
-        leaving: null,
-        age: 0,
-        rate: 1.4 + hash(guest.id) * 1.2,
-        hop: 10,
-        phase: hash(guest.id + 3) * 6,
-      });
-      swingDoor();
-    });
-    for (let index = folk.length - 1; index >= 0; index--) {
-      const item = folk[index];
-      item.age += dt;
-      item.hop += dt;
-      const slot = guests.indexOf(item.guest);
-      if (slot < 0 && !item.leaving) {
-        item.leaving = item.guest.outcome ?? "gone";
-        item.age = 0;
-      }
-      if (item.leaving && reduceMotion) {
-        folk.splice(index, 1);
-        continue;
-      }
-      // A served guest hops first, then everyone leaving heads for the door.
-      if (item.leaving === "served" && item.age < 0.3) continue;
-      const target = item.leaving ? doorX() : guestSlot(slot);
-      const step = 260 * (figureCell() / SC) * dt;
-      if (reduceMotion) item.x = target;
-      else item.x += clamp(target - item.x, -step, step);
-      if (item.leaving && Math.abs(item.x - target) < 1) {
-        folk.splice(index, 1);
-        swingDoor();
-      }
-    }
-  }
-
-  function stepWalkers(dt: number) {
-    const left = room.winL * SC - 48;
-    const right = room.winR * SC + 48;
-    for (const walker of walkers) {
-      if (!walker.active) continue;
-      walker.x += walker.dir * walker.speed * dt;
-      if (walker.x < left - 40 || walker.x > right + 40) walker.active = false;
-    }
-    walkerTimer -= dt;
-    if (walkerTimer > 0) return;
-    const rush = phase === "rush";
-    walkerTimer = (rush ? 0.7 : 1.8) + Math.random() * (rush ? 0.9 : 1.8);
-    // A quiet street: two at a time by day, four in the rush.
-    if (walkers.filter((walker) => walker.active).length >= (rush ? 4 : 2)) return;
-    const free = walkers.find((walker) => !walker.active);
-    if (!free) return;
-    const roll = Math.random();
-    free.active = true;
-    free.dir = Math.random() < 0.5 ? 1 : -1;
-    free.kind = roll < 0.1 ? 2 : roll < 0.22 ? 1 : 0;
-    free.speed = free.kind === 2 ? 70 + Math.random() * 20 : 18 + Math.random() * 14;
-    free.x = free.dir > 0 ? left : right;
-  }
-
-  function stepSteam(dt: number) {
-    if (room.urnX < 0) return;
-    steamTimer -= dt;
-    if (steamTimer <= 0) {
-      steamTimer = 0.26;
-      const puff = steam.find((item) => !item.active);
-      if (puff) {
-        puff.active = true;
-        puff.x = (room.urnX + 3.5) * SC;
-        puff.y = room.counterPx - URN_ROWS * SC;
-        puff.age = 0;
-        puff.life = 1.2 + Math.random() * 0.8;
-        puff.seed = Math.random() * 6;
-      }
-    }
-    for (const puff of steam) {
-      if (!puff.active) continue;
-      puff.age += dt;
-      puff.y -= 22 * dt;
-      puff.x += Math.sin(puff.age * 3 + puff.seed) * 10 * dt;
-      if (puff.age >= puff.life) puff.active = false;
-    }
   }
 
   /** Advances the room on the game clock, so it freezes with the pause. */
   function stepRoom(dt: number) {
     if (!room.cols) return;
     bakeRoom();
-    stepFolk(dt);
-    doorAge += dt;
-    bellAge += dt;
     flareAge += dt;
-    sparkAge += dt;
     veilAge += dt;
-    if (reduceMotion) return;
-    stepWalkers(dt);
-    stepSteam(dt);
-  }
-
-  function blitCells(g: CanvasRenderingContext2D, grid: string[], x: number, y: number, color: string, mirror: boolean, size = SC) {
-    g.fillStyle = color;
-    const width = grid[0].length;
-    grid.forEach((row, r) =>
-      [...row].forEach((ch, c) => {
-        if (ch === ".") return;
-        g.fillRect(x + (mirror ? width - 1 - c : c) * size, y + r * size, size, size);
-      }),
-    );
-  }
-
-  /**
-   * The guests' cell: from the bench's cup cell, so a figure's visible head
-   * and shoulders stand about 60% of the cup's height at every width.
-   */
-  const figureCell = () => Math.max(2, Math.round((0.6 * CUP_H * cell) / (FIGURE_ROWS - 2)));
-
-  function drawWalkers(g: CanvasRenderingContext2D) {
-    if (reduceMotion) return;
-    const color = css(mixRgb(light.town, STREET_DARK, 0.5));
-    const feet = (room.street + 2) * SC;
-    for (const walker of walkers) {
-      if (!walker.active) continue;
-      const x = Math.round(walker.x / SC) * SC;
-      const frame = Math.floor(walker.x / (SC * 3)) & 1;
-      const mirror = walker.dir < 0;
-      const sprite = walker.kind === 2 ? BIKE[frame] : WALKER[frame];
-      blitCells(g, sprite, x, feet - sprite.length * SC, color, mirror);
-      if (walker.kind === 1) blitCells(g, DOG[frame], x - walker.dir * 7 * SC, feet - DOG[0].length * SC, color, mirror);
-    }
-  }
-
-  function drawClouds(g: CanvasRenderingContext2D) {
-    if (light.p >= 0.72) return;
-    const tint = light.p < 0.4 ? "#f6eee2" : "#f5c6a5";
-    const glassW = (room.winR - room.winL) * SC;
-    g.fillStyle = tint;
-    for (let index = 0; index < 2; index++) {
-      const w = (12 + index * 6) * SC;
-      // The clouds sit still: nothing behind the bench should pull the eye.
-      const drift = 0;
-      const x = room.winL * SC + ((hash(index + 40) * glassW + drift) % (glassW + w)) - w;
-      const y = (room.winT + 3 + index * 5) * SC;
-      const sx = Math.round(x / SC) * SC;
-      g.fillRect(sx, y + SC, w, SC * 2);
-      g.fillRect(sx + 3 * SC, y, w - 7 * SC, SC);
-    }
-  }
-
-  function drawDoor(g: CanvasRenderingContext2D) {
-    const swing = !reduceMotion && doorAge < 0.7 ? Math.sin((doorAge / 0.7) * Math.PI) : 0;
-    const top = (room.transom + 1) * SC;
-    const bottom = (room.counter + 1) * SC;
-    const full = (room.doorR - room.doorL) * SC;
-    const width = Math.round((full * (1 - 0.55 * swing)) / SC) * SC;
-    const left = room.doorR * SC - width;
-    const frame = css(mixRgb(FRAME, DEEP, light.dark));
-    g.fillStyle = frame;
-    g.fillRect(left, top, SC, bottom - top);
-    g.fillRect(room.doorR * SC - SC, top, SC, bottom - top);
-    g.fillRect(left, top, width, SC);
-    g.fillRect(left + 2 * SC, (room.sill - 2) * SC, SC, 2 * SC);
-    if (swing > 0) {
-      g.save();
-      g.globalAlpha = 0.18;
-      g.fillRect(left + SC, top + SC, width - 2 * SC, bottom - top - SC);
-      g.restore();
-    }
-    // The bell above the door, tipping when someone comes or goes.
-    const tip = !reduceMotion && bellAge < 1 ? Math.round(Math.sin(bellAge * 18) * Math.exp(-bellAge * 4) * 1.5) : 0;
-    const bx = (room.doorL + 3 + tip) * SC;
-    const by = (room.transom - 3) * SC;
-    g.fillStyle = frame;
-    g.fillRect((room.doorL + 3) * SC, by - SC, SC, SC);
-    g.fillStyle = "#dba84d";
-    g.fillRect(bx - SC, by, 3 * SC, SC);
-    g.fillRect(bx - SC, by + SC, 3 * SC, SC);
-    g.fillStyle = "#704a05";
-    g.fillRect(bx, by + 2 * SC, SC, SC);
   }
 
   /** The clock's one hand sweeps a full turn over the shift. */
@@ -3140,69 +2739,26 @@
     const { x, y, r } = room.clock;
     if (r < 3) return;
     const angle = -Math.PI / 2 + (Math.PI * 2 * clamp(elapsed, 0, SHIFT_SECONDS)) / SHIFT_SECONDS;
-    g.fillStyle = css(mixRgb(SOFFIT, DEEP, 0.2));
+    g.fillStyle = css(quiet(SOFFIT, 0.3));
     for (let s = 0; s <= r - 1.5; s += 0.5) {
       g.fillRect((x + Math.round(Math.cos(angle) * s)) * SC, (y + Math.round(Math.sin(angle) * s)) * SC, SC, SC);
     }
   }
 
-  function drawQueue(g: CanvasRenderingContext2D) {
-    const base = Math.round(room.counterPx);
-    const fc = figureCell();
-    // The lunch rush brings a few more, further back: two thirds the size, darker.
-    if (phase === "rush") {
-      const cc = Math.max(2, Math.round((fc * 2) / 3));
-      const count = 2 + Math.floor(hash(7) * 3);
-      const head = css(mixRgb(light.shade, DEEP, 0.35 + light.dark * 0.5));
-      const body = css(mixRgb(light.shade, DEEP, 0.5 + light.dark * 0.4));
-      for (let index = 0; index < count; index++) {
-        const x = Math.round(lerp(room.winL * SC + 16, room.doorL * SC - 40, hash(index + 300)) / cc) * cc;
-        const bob = !reduceMotion && Math.sin(clock * (1.1 + hash(index + 310)) + index) > 0.5 ? Math.max(1, Math.round(cc / 2)) : 0;
-        const y = base - (CROWD.length + 1) * cc - bob;
-        blitCells(g, CROWD.slice(0, 5), x, y, head, false, cc);
-        blitCells(g, CROWD.slice(5), x, y + 5 * cc, body, false, cc);
-      }
-    }
-    for (const item of folk) {
-      const back = item.leaving === "gone";
-      const sprite = figureSprite(item.guest.regular.name, back);
-      let lift = 0;
-      if (!reduceMotion) {
-        if (item.leaving === "served" && item.age < 0.3) lift = Math.round(Math.sin((item.age / 0.3) * Math.PI) * 3) * fc;
-        // A sample's hop: twice, quickly.
-        else if (!item.leaving && item.hop < 0.5) lift = Math.round(Math.abs(Math.sin((item.hop / 0.5) * 2 * Math.PI)) * 2) * fc;
-        else if (!item.leaving && Math.sin(clock * item.rate + item.phase) > 0.55) lift = Math.max(1, Math.round(fc / 2));
-      }
-      const x = Math.round(item.x - 5 * fc);
-      const y = base - (FIGURE_ROWS - 2) * fc - lift;
-      g.drawImage(sprite, x, y, 10 * fc, FIGURE_ROWS * fc);
-    }
-  }
-
-  function drawSteam(g: CanvasRenderingContext2D) {
-    if (reduceMotion || room.urnX < 0) return;
-    g.save();
-    g.fillStyle = "#f6eee2";
-    for (const puff of steam) {
-      if (!puff.active) continue;
-      const k = 1 - puff.age / puff.life;
-      g.globalAlpha = 0.35 * k;
-      const size = SC;
-      g.fillRect(Math.round(puff.x / SC) * SC, Math.round(puff.y / SC) * SC, size, size);
-    }
-    g.restore();
-  }
-
-  /** Lamps flare and gold runs along the transom for a perfect drink; the room dims for a lost guest. */
+  /**
+   * The room's answers, brief and up out of the way: the lamps flare for a
+   * perfect drink, and for a lost guest the lights dip around the play area.
+   */
   function drawRoomEffects(g: CanvasRenderingContext2D) {
     if (reduceMotion) return;
-    if (flareAge < 0.5) {
-      const strength = 0.7 * (1 - flareAge / 0.5);
+    if (flareAge < 0.4) {
+      const strength = 0.6 * (1 - flareAge / 0.4);
+      const r = 6;
       g.fillStyle = "#ffe3a3";
       for (const lx of room.lamps) {
         const cy = room.lampY + 3;
-        const r = 14;
         for (let y = -r; y <= r; y++) {
+          if (cy + y >= room.play.t) break;
           for (let x = -r; x <= r; x++) {
             const d = Math.hypot(x, y) / r;
             if (d < 1 && bayer(lx + x, cy + y) < strength * (1 - d)) g.fillRect((lx + x) * SC, (cy + y) * SC, SC, SC);
@@ -3210,58 +2766,46 @@
         }
       }
     }
-    if (sparkAge < 0.7) {
-      const head = lerp(room.winL, room.winR, sparkAge / 0.6);
-      g.fillStyle = "#ffd166";
-      for (let k = 0; k < 8; k++) {
-        const x = Math.round(head - k * 3);
-        if (x < room.winL || x >= room.winR) continue;
-        g.fillRect(x * SC, (room.transom + (k % 2 ? -1 : 0)) * SC, SC, SC);
-      }
-      const hx = Math.round(head);
-      if (hx >= room.winL && hx < room.winR) {
-        g.fillRect(hx * SC, (room.transom - 2) * SC, SC, 5 * SC);
-        g.fillRect((hx - 2) * SC, room.transom * SC, 5 * SC, SC);
-      }
-    }
-    if (veilAge < 0.6 && veils.length) {
-      const k = veilAge < 0.15 ? 1 : 1 - (veilAge - 0.15) / 0.45;
+    if (veilAge < 0.5 && veils.length) {
+      const k = veilAge < 0.15 ? 1 : 1 - (veilAge - 0.15) / 0.35;
       const level = Math.min(veils.length - 1, Math.floor(k * veils.length));
-      if (k > 0.05) g.drawImage(veils[level], 0, 0, room.cols * SC, room.rows * SC);
+      const { l, r, t } = room.play;
+      const w = room.cols * SC;
+      const h = room.rows * SC;
+      g.save();
+      g.beginPath();
+      g.rect(0, 0, w, h);
+      g.rect(l * SC, t * SC, (r - l) * SC, h - t * SC);
+      g.clip("evenodd");
+      if (k > 0.05) g.drawImage(veils[level], 0, 0, w, h);
+      g.restore();
+      // The bulbs go out for a moment.
+      g.fillStyle = css(SOFFIT_BEAM);
+      for (const x of room.lamps) g.fillRect((x - 1) * SC, (room.lampY + 3) * SC, 3 * SC, SC);
     }
   }
 
   function drawRoom() {
     const far = farCtx;
     const g = nearCtx;
-    if (!far || !g || !room.cols || !skyLayer || !streetLayer || !roomLayer || !counterLayer) return;
+    if (!far || !g || !room.cols || !skyLayer || !roomLayer || !counterLayer) return;
     const w = room.cols * SC;
     const h = room.rows * SC;
     // Far: the view through the window, softened in CSS like a shallow depth of field.
     far.imageSmoothingEnabled = false;
     far.clearRect(0, 0, w, h);
     far.drawImage(skyLayer, 0, 0, w, h);
-    drawClouds(far);
-    far.drawImage(streetLayer, 0, 0, w, h);
-    drawWalkers(far);
-    // Near: the room and everything in it, a little muted.
+    // Near: the room, a little muted.
     g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, w, h);
     g.drawImage(roomLayer, 0, 0, w, h);
-    drawDoor(g);
     drawClockHand(g);
-    drawQueue(g);
     g.drawImage(counterLayer, 0, Math.round(room.counterPx) - URN_ROWS * SC, w, counterLayer.height * SC);
-    drawSteam(g);
     drawRoomEffects(g);
   }
 
   function resetRoom() {
-    folk = [];
-    walkers.forEach((walker) => (walker.active = false));
-    steam.forEach((puff) => (puff.active = false));
-    walkerTimer = 0.5;
-    doorAge = bellAge = flareAge = sparkAge = veilAge = 10;
+    flareAge = veilAge = 10;
     bakedStep = -1;
     bakeRoom();
   }
@@ -3495,7 +3039,6 @@
       cupX,
       wobble,
       tapReach,
-      folk,
     };
   }
 
@@ -3518,7 +3061,6 @@
     cupX = saved.cupX;
     wobble = saved.wobble;
     tapReach = saved.tapReach;
-    folk = saved.folk;
     refreshTanks();
   }
 
@@ -3545,7 +3087,6 @@
     cupX = spoutX[tapIndex] ?? W / 2;
     wobble = 0;
     tapReach = 1;
-    folk = [];
     demoTask = null;
     demoCaption = "";
     enterDemoStep(0);

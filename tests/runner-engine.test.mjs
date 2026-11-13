@@ -36,8 +36,11 @@ import {
   SLIDE_H,
   SLIDE_MAX,
   SLIDE_TIME,
+  SPARE_BONUS,
+  SPARE_FIRST,
+  SPARE_GAP,
+  SPARE_RADIUS,
   SPEED_RAMP,
-  START_LIVES,
   START_SPEED,
   STEP,
   STUMBLE_SLOW,
@@ -94,8 +97,9 @@ function stage(roofs, items = [], at = {}) {
 
 const floor = (top = 100) => [{ x0: -2000, x1: 1e6, top }];
 const obstacle = (type, x, top, w, h, y0 = top) => ({ type, x0: x, x1: x + w, y0, y1: y0 + h, count: 1, hit: false, broken: false });
-const pearl = (x, y) => ({ type: "pearl", x, y, taken: false });
-const coaster = (x, y) => ({ type: "coaster", x0: x - 12, x1: x + 12, y, customer: true, hard: false, done: null });
+const pearl = (x, y) => ({ type: "pearl", x, y, taken: false, group: 1 });
+const spare = (x, y) => ({ type: "spare", x, y, taken: false });
+const coaster =(x, y) => ({ type: "coaster", x0: x - 12, x1: x + 12, y, customer: true, hard: false, done: null });
 
 /** Steps with one input until a predicate or a time limit; returns every event. */
 function run(s, input, seconds, until = () => false) {
@@ -515,7 +519,7 @@ test("a step within MANTLE is climbed; a tall wall stops the runner and drops it
   const curb = stage([{ x0: -2000, x1: 300, top: 100 }, { x0: 300, x1: 1e6, top: 100 + MANTLE - 2 }]);
   run(curb, IDLE, 2);
   assert.equal(curb.runner.y, 100 + MANTLE - 2);
-  assert.equal(curb.lives, START_LIVES);
+  assert.equal(curb.status, "running");
 
   const wall = stage([{ x0: -2000, x1: 300, top: 100 }, { x0: 340, x1: 1e6, top: 160 }]);
   const events = run(wall, IDLE, 3);
@@ -605,7 +609,7 @@ test("pigeons are harmless underfoot but spill tea if jumped into", () => {
   assert.ok(struck > 0, "some jump into the flock strikes it");
 });
 
-// --- Deliveries, sugar, lives ------------------------------------------------------------
+// --- Deliveries, sugar, the one cup ----------------------------------------------------
 
 test("running across a coaster delivers, pays by tea and streak, and refills the cup", () => {
   const s = stage(floor(), [coaster(300, 100), coaster(700, 100)], { x: 100 });
@@ -672,18 +676,44 @@ test("a rush can't start before the sugar is full", () => {
   assert.equal(kinds(run(s, { rush: true }, 0.1), "rushStart").length, 0);
 });
 
-test("falling into a gap costs a life and respawns on the next proper roof", () => {
-  const roofs = [
-    { x0: -2000, x1: 500, top: 100 },
-    { x0: 800, x1: 840, top: 90, kind: "chimney" },
-    { x0: 900, x1: 980, top: 90 },
-    { x0: 1100, x1: 1e6, top: 120 },
-  ];
-  const s = stage(roofs, [], { x: 400 });
-  s.tea = 0.3;
-  const events = run(s, IDLE, 3, (st) => st.status === "respawning");
+const GAP_ROOFS = [
+  { x0: -2000, x1: 500, top: 100 },
+  { x0: 800, x1: 840, top: 90, kind: "chimney" },
+  { x0: 900, x1: 980, top: 90 },
+  { x0: 1100, x1: 1500, top: 120 },
+];
+
+test("a fall without a spare ends the run at once, and an ended run stands still", () => {
+  const s = stage(GAP_ROOFS, [], { x: 400 });
+  let fellOn = -1;
+  const events = run(s, IDLE, 3, (st, ev) => {
+    if (kinds(ev, "fall").length) fellOn = st.time;
+    return st.status !== "running";
+  });
   assert.equal(kinds(events, "fall").length, 1);
-  assert.equal(s.lives, START_LIVES - 1);
+  assert.equal(kinds(events, "fall")[0].spare, false);
+  assert.equal(kinds(events, "spareUsed").length, 0);
+  assert.equal(kinds(events, "over").length, 1);
+  assert.equal(kinds(events, "over")[0].cause, "fall");
+  assert.equal(s.status, "over", "no respawn pause");
+  assert.equal(s.time, fellOn, "over on the step of the fall");
+  const frozen = cloneRun(s);
+  assert.deepEqual(step(s, { jump: true }, H), []);
+  assert.deepEqual(s, frozen);
+});
+
+test("a fall with a spare spends it and comes back on the next proper roof", () => {
+  const s = stage(GAP_ROOFS, [], { x: 400 });
+  s.spare = 1;
+  s.tea = 0.3;
+  const events = run(s, IDLE, 3, (st) => st.status !== "running");
+  assert.equal(kinds(events, "fall").length, 1);
+  assert.equal(kinds(events, "fall")[0].spare, true);
+  assert.equal(kinds(events, "spareUsed")[0].cause, "fall");
+  assert.equal(kinds(events, "over").length, 0);
+  assert.equal(s.status, "respawning");
+  assert.equal(s.spare, 0);
+  assert.equal(s.stats.sparesUsed, 1);
   const back = run(s, IDLE, RESPAWN_TIME + H);
   const respawn = kinds(back, "respawn")[0];
   assert.deepEqual([respawn.x, respawn.y], [1116, 120]);
@@ -691,38 +721,71 @@ test("falling into a gap costs a life and respawns on the next proper roof", () 
   assert.equal(s.runner.grounded, true);
   assert.ok(s.runner.grace > RESPAWN_GRACE - 0.1);
   assert.equal(s.tea, DRY_REFILL);
+
+  // The next fall, with no spare left, is the end.
+  const again = run(s, IDLE, 20, (st) => st.status !== "running");
+  assert.equal(kinds(again, "over").length, 1);
 });
 
-test("an empty cup costs a life and refills it", () => {
-  const s = stage(floor(), [obstacle("ac", 300, 100, 24, 16)], { x: 100 });
-  s.tea = 0.05;
-  const events = run(s, IDLE, 2);
+test("a dry cup ends the run; with a spare it is saved the same way", () => {
+  const roofs = [{ x0: -2000, x1: 600, top: 100 }, { x0: 620, x1: 1e6, top: 100 }];
+  const dry = stage(roofs, [obstacle("ac", 300, 100, 24, 16)], { x: 100 });
+  dry.tea = 0.05;
+  const ended = run(dry, IDLE, 2, (st) => st.status !== "running");
+  assert.equal(kinds(ended, "dry").length, 1);
+  assert.equal(kinds(ended, "over")[0].cause, "dry");
+  assert.equal(dry.status, "over");
+
+  const saved = stage(roofs, [obstacle("ac", 300, 100, 24, 16)], { x: 100 });
+  saved.tea = 0.05;
+  saved.spare = 1;
+  const events = run(saved, IDLE, 2, (st) => st.status !== "running");
   assert.equal(kinds(events, "dry").length, 1);
-  assert.equal(s.lives, START_LIVES - 1);
-  assert.equal(s.tea, DRY_REFILL);
-  assert.equal(s.status, "running");
+  assert.equal(kinds(events, "spareUsed")[0].cause, "dry");
+  assert.equal(saved.status, "respawning");
+  assert.equal(saved.spare, 0);
+  const back = run(saved, IDLE, RESPAWN_TIME + H);
+  assert.deepEqual(kinds(back, "respawn").map((e) => [e.x, e.y]), [[636, 100]]);
+  assert.equal(saved.tea, DRY_REFILL);
+  assert.ok(saved.runner.grace > RESPAWN_GRACE - 0.1);
 });
 
-test("losing the last life ends the run, and an ended run stands still", () => {
-  const s = stage([{ x0: -2000, x1: 500, top: 100 }, { x0: 900, x1: 1e6, top: 100 }], [], { x: 400 });
-  s.lives = 1;
-  const events = run(s, IDLE, 3);
-  assert.equal(kinds(events, "over").length, 1);
-  assert.equal(s.status, "over");
-  assert.equal(s.lives, 0);
-  const frozen = cloneRun(s);
-  assert.deepEqual(step(s, { jump: true }, H), []);
-  assert.deepEqual(s, frozen);
+test("a spare cup is kept, at most one, and another is worth points instead", () => {
+  const s = stage(floor(), [spare(200, 108), spare(400, 108), pearl(600, 109)], { x: 100 });
+  const first = run(s, IDLE, 2, (st) => st.runner.x > 300);
+  assert.deepEqual(kinds(first, "spare").map((e) => [e.x, e.y]), [[200, 108]]);
+  assert.equal(s.spare, 1);
+  const second = run(s, IDLE, 2, (st) => st.runner.x > 500);
+  assert.equal(kinds(second, "spare").length, 0);
+  assert.deepEqual(kinds(second, "spareBonus").map((e) => e.points), [SPARE_BONUS]);
+  assert.equal(s.spare, 1, "still only one");
+  assert.equal(s.stats.spares, 2);
+  run(s, IDLE, 1);
+  assert.equal(s.score, s.points.distance + s.points.pearls + SPARE_BONUS);
+
+  // Taken by a touch of the box, as drawn: just over the lid is a pickup, a
+  // little higher is not.
+  const touch = (y) => {
+    const t = stage(floor(), [spare(200, y)], { x: 100 });
+    run(t, IDLE, 1);
+    return t.spare;
+  };
+  assert.equal(touch(100 + RUNNER_H + SPARE_RADIUS - 1), 1);
+  assert.equal(touch(100 + RUNNER_H + SPARE_RADIUS + 1), 0);
 });
 
 test("the results breakdown adds up to the score", () => {
-  const s = stage(floor(), [pearl(150, 109), coaster(300, 100), obstacle("ac", 500, 100, 24, 16)], { x: 100 });
-  run(s, IDLE, 4);
+  const items = [pearl(150, 109), coaster(300, 100), obstacle("ac", 500, 100, 24, 16), spare(700, 108), spare(800, 108)];
+  const s = stage(floor(), items, { x: 100 });
+  run(s, IDLE, 5);
   const b = breakdown(s);
-  assert.equal(b.score, b.distancePoints + b.pearlPoints + b.deliveryPoints + b.smashPoints);
+  assert.equal(b.score, b.distancePoints + b.pearlPoints + b.deliveryPoints + b.smashPoints + b.sparePoints);
   assert.equal(b.pearls, 1);
   assert.equal(b.deliveries, 1);
   assert.equal(b.bumps, 1);
+  assert.equal(b.spares, 2);
+  assert.equal(b.sparesUsed, 0);
+  assert.equal(b.sparePoints, SPARE_BONUS);
   assert.ok(b.distance > 50);
 });
 
@@ -841,6 +904,159 @@ test("every assisted gap (awning, vent, cable) is crossed by the bot from a stan
   assert.ok(checked > 20);
 });
 
+// --- Reaching what the generator places -----------------------------------------------
+//
+// The reference player makes one input from a standing start on a roof or a
+// plank before the target, and the engine flies it on a copy of the run, with
+// no rush and so no magnet. It runs on, slides, or jumps holding for one of a
+// few times, gliding or not on the way down. A target counts as reachable
+// when one input takes all of it from two take-offs REACH_SLACK seconds of
+// running apart, with no bump or fall, and a safe touchdown after.
+
+const REACH_SLACK = 0.03;
+const REACH_INPUTS = [{ kind: "run" }, { kind: "slide" }];
+for (const hold of [H, 0.05, 0.1, 0.15, HOLD_TIME]) {
+  for (const glide of [false, true]) REACH_INPUTS.push({ kind: "jump", hold, glide });
+}
+const BLOCKING = new Set(["ac", "tank", "crate", "clothesline", "billboard"]);
+
+/** Each pearl group (an arc or line placed together, or a lone pearl), and each spare on its own. */
+function targetsIn(chunk) {
+  const groups = new Map();
+  for (const o of chunk.items) {
+    const key = o.type === "pearl" ? `pearls ${o.group}` : o.type === "spare" ? `spare ${o.x}` : null;
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  }
+  return [...groups.entries()].map(([key, items]) => ({ key, items }));
+}
+
+/** Plays one input from a standing start and says whether it took every item of the target. */
+function takesAll(seed, slice, target, at, input) {
+  const s = newRun(seed);
+  s.chunks = structuredClone(slice);
+  s.course.end = 1e9;
+  const live = s.chunks.flatMap((c) => c.items);
+  if (live.some((o) => BLOCKING.has(o.type) && at.x + RUNNER_W / 2 > o.x0 && at.x - RUNNER_W / 2 < o.x1 && at.y + RUNNER_H > o.y0 && at.y < o.y1)) return false;
+  Object.assign(s.runner, { x: at.x, y: at.y, grounded: true });
+  s.startX = at.x;
+  const items = live.filter((o) => target.items.some((t) => t.type === o.type && t.x === o.x && t.y === o.y && t.group === o.group));
+  let t = 0;
+  let taken = false;
+  for (let i = 0; i < 4 / H; i++) {
+    const r = s.runner;
+    let keys = IDLE;
+    if (input.kind === "slide") keys = { down: true };
+    else if (input.kind === "jump") keys = { jump: t < input.hold - 1e-9 || (input.glide && !r.grounded && r.vy <= 0) };
+    const events = step(s, keys, H);
+    t += H;
+    if (events.some((e) => e.type === "bump" || e.type === "wall" || e.type === "strike" || e.type === "fall" || e.type === "dry")) return false;
+    if (taken) {
+      if (r.grounded || r.cable) return true;
+    } else if (items.every((o) => o.taken)) {
+      taken = true;
+    } else if (items.some((o) => !o.taken && r.x - RUNNER_W / 2 > o.x + SPARE_RADIUS)) {
+      return false; // run past one it can no longer reach
+    }
+  }
+  return false;
+}
+
+/** Searches take-offs from just before the target backward, nearest first. */
+function reachTarget(seed, chunks, index, target) {
+  const slice = chunks.slice(Math.max(0, index - 1), index + 3);
+  const first = Math.min(...target.items.map((o) => o.x));
+  const v = speedAt(first);
+  const stride = REACH_SLACK * v;
+  const from = chunks[index].x0 - 0.5 * v;
+  const spots = [];
+  for (const c of slice) {
+    const surfaces = [...c.roofs.map((r) => ({ x0: r.x0, x1: r.x1, y: r.top })), ...c.items.filter((o) => o.type === "ledge").map((o) => ({ x0: o.x0, x1: o.x1, y: o.y }))];
+    for (const sf of surfaces) {
+      for (let x = Math.min(sf.x1 + RUNNER_W / 2 - 0.5, first + 4); x - stride >= Math.max(sf.x0, from); x -= stride) spots.push({ x, y: sf.y });
+    }
+  }
+  spots.sort((a, b) => b.x - a.x);
+  for (const at of spots) {
+    for (const input of REACH_INPUTS) {
+      if (takesAll(seed, slice, target, at, input) && takesAll(seed, slice, target, { x: at.x - stride, y: at.y }, input)) return true;
+    }
+  }
+  return false;
+}
+
+test("every pearl group, lone pearl and spare cup can be taken whole by one input, with a little slack", () => {
+  let checked = 0;
+  let spares = 0;
+  const failed = [];
+  for (const seed of SEEDS) {
+    for (const start of [0, 8000, 16000, 24000, 32000, 40000]) {
+      const chunks = buildCourse(seed, 5000, start);
+      chunks.forEach((chunk, index) => {
+        for (const target of targetsIn(chunk)) {
+          checked += 1;
+          if (target.key.startsWith("spare")) spares += 1;
+          if (!reachTarget(seed, chunks, index, target)) failed.push(`${target.key} (${target.items.length}) in ${chunk.pattern} at ${target.items[0].x} on seed ${seed}`);
+        }
+      });
+    }
+  }
+  assert.deepEqual(failed, []);
+  assert.ok(checked > 1000, `${checked} checked`);
+  assert.ok(spares >= 40, `${spares} spares checked`);
+});
+
+test("just running off the roof onto an awning takes its arc, any spare, and the line after", () => {
+  let checked = 0;
+  for (const seed of SEEDS) {
+    for (const start of [6000, 20000, 40000]) {
+      const chunks = buildCourse(seed, 12000, start);
+      chunks.forEach((chunk, index) => {
+        if (chunk.pattern !== "awning") return;
+        const roof = chunk.roofs[0];
+        const at = { x: Math.max(roof.x0 + 4, roof.x1 - 0.6 * speedAt(roof.x1)), y: roof.top };
+        const slice = chunks.slice(Math.max(0, index - 1), index + 3);
+        for (const target of targetsIn(chunk)) {
+          assert.ok(takesAll(seed, slice, target, at, { kind: "run" }), `${target.key} at ${target.items[0].x} on seed ${seed}`);
+          checked += 1;
+        }
+      });
+    }
+  }
+  assert.ok(checked > 60, `${checked} checked`);
+});
+
+test("spare cups are rare: none early, then one every 4,000 to 6,000 units or so, on a harder line", () => {
+  const hard = new Set(PATTERNS.filter((p) => p.hard).map((p) => p.id));
+  assert.deepEqual([...hard].sort(), ["awning", "cable", "split", "vent"]);
+  const gaps = [];
+  for (const seed of SEEDS) {
+    for (const start of [0, 20000]) {
+      const chunks = buildCourse(seed, 40000, start);
+      const xs = [];
+      for (const c of chunks) {
+        for (const o of c.items) {
+          if (o.type !== "spare") continue;
+          assert.ok(hard.has(c.pattern), `a spare in ${c.pattern}`);
+          xs.push(o.x);
+        }
+      }
+      assert.ok(xs.length >= 5, `${xs.length} spares on seed ${seed}`);
+      assert.ok(xs[0] - start >= SPARE_FIRST, `first spare ${xs[0] - start} in`);
+      for (let i = 1; i < xs.length; i++) {
+        assert.ok(xs[i] - xs[i - 1] >= SPARE_GAP[0], `spares ${xs[i] - xs[i - 1]} apart`);
+        gaps.push(xs[i] - xs[i - 1]);
+      }
+    }
+  }
+  gaps.sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)];
+  const middle = [gaps[Math.floor(gaps.length / 4)], gaps[Math.floor((gaps.length * 3) / 4)]];
+  assert.ok(median >= 4000 && median <= 6000, `median ${median}`);
+  assert.ok(middle[0] >= 3500 && middle[1] <= 7000, `middle half ${middle}`);
+});
+
 // --- Whole runs ------------------------------------------------------------------------------
 
 test("the same seed and inputs replay to the identical state", () => {
@@ -856,22 +1072,23 @@ test("the same seed and inputs replay to the identical state", () => {
   assert.notDeepEqual(newRun(12).chunks, newRun(13).chunks);
 });
 
-test("doing nothing loses every life", () => {
+test("doing nothing ends the run", () => {
   for (const seed of SEEDS) {
     const s = newRun(seed);
-    run(s, IDLE, 180, (st) => st.status === "over");
+    const events = run(s, IDLE, 180, (st) => st.status === "over");
     assert.equal(s.status, "over", `seed ${seed}`);
-    assert.equal(s.lives, 0);
+    assert.equal(kinds(events, "over").length, 1);
   }
 });
 
 for (const [label, startDistance] of [["the first chunk", 0], ["middling difficulty", 12000], ["full difficulty", 30000]]) {
-  test(`a competent bot runs 6,000 units from ${label} without losing a life`, () => {
+  test(`a competent bot runs 6,000 units from ${label} on its one cup`, () => {
     for (const seed of SEEDS) {
       const s = newRun(seed, { startDistance });
       const lost = drive(s, { distance: 6000 });
       assert.deepEqual(lost, [], `seed ${seed}`);
-      assert.equal(s.lives, START_LIVES);
+      assert.equal(s.status, "running");
+      assert.equal(s.stats.sparesUsed, 0);
       assert.ok(s.distance >= 6000);
       assert.ok(s.stats.deliveries > 0);
     }

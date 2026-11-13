@@ -158,13 +158,13 @@ hover.
 
 ## HUD
 
-Tickets pinned along the top: score at the start, controls and lives at the
-end, anything else in the middle (a phone moves the middle ticket to a second
+Tickets pinned along the top: score at the start, controls (and lives,
+where a game has them) at the end, anything else in the middle (a phone moves the middle ticket to a second
 row). A paper wash fades the site header behind them.
 
 - The score ticket is the one with a slab.
-- Timers are a drawn cup whose tea drains; lives are three tapioca pearls,
-  and a dropped one becomes a dashed ring.
+- Timers are a drawn cup whose tea drains. Where a game has lives, they are
+  three tapioca pearls, and a dropped one becomes a dashed ring.
 - The song's name waves on a small flag that hugs its text, capped at
   `12rem`, so there is never a gap between it and the buttons beside it.
 - Numbers that change use tabular figures and update at most about ten times
@@ -180,10 +180,15 @@ row). A paper wash fades the site header behind them.
 - **Pause says each thing once.** A title, one sentence, and three buttons
   that carry their own key chips. Nothing else.
 - **Results.** The slip's top is two columns: title, deck, and the circled
-  score with its unit and any `new best` stamp on the left; the run's stats as
-  a single receipt column on the right (label, dot leader, figure; at most
-  five). Below: the leaderboard and the sign-in field, then the actions. On a
-  phone the receipt drops under the score, still one column.
+  score with its unit on the left, with any `new best` stamp pressed across
+  the top of the circle; the run's stats as a single receipt column on the
+  right (label, dot leader, figure; at most five, named so a first-time player
+  understands them). Below: the leaderboard and the sign-in field, then the
+  actions. On a phone the receipt drops under the score, still one column.
+- **Signing the board** prefills the last name signed on this device. Once
+  signed, the field simply goes away and the player's row is highlighted on
+  the board; nothing else is added. Leaderboard rows centre their text in
+  the row.
 - All three trap focus, close on Escape through the host, and return focus to
   where the visitor was.
 
@@ -279,10 +284,14 @@ swinging ladle, shake, and the drink is sealed, graded, and served.
   shift starts.
 - **A written cast.** Customers come from a set list of about forty regulars
   with their own quirks, not from the leaderboard.
-- **The shop, from behind the counter.** A painted pixel room: shelves, a
-  clock whose hands show the shift's time left, a steaming urn, the waiting
-  queue, and a front window where the day turns from afternoon to night as
-  the shift runs out.
+- **The shop, kept quiet.** Behind the whole play area is one flat wall
+  tone with nothing on it and nothing moving, so tickets, taps, and the cup
+  always read first. The room lives only in the side walls, mixed toward the
+  wall colour: a menu board, a few large jars, a clock whose hand shows the
+  shift's time left, and a small window where the day turns to night. The
+  wall itself barely darkens over the shift. A phone shows a plain wall.
+  A perfect drink briefly brightens the lamps; a lost guest briefly dims
+  the edges.
 - Order slips and station panels carry no slab at rest; a customer about to
   walk out earns one.
 
@@ -339,7 +348,14 @@ the cup is your health and your pay.**
 
 - **Rough play spills.** Hard landings, bumps, slams, and pigeons slosh tea
   out; clean hops and glides don't. The level in the runner's cup and in the
-  HUD's cup are the same number. An empty cup, or a fall, costs a pearl.
+  HUD's cup are the same number.
+- **One cup.** There are no lives: a fall, or the cup running dry, ends the
+  run. Now and then a **spare cup** waits on the harder line (the top of an
+  awning bounce, the end of a cable, a vent's high line, the upper planks of
+  a split), roughly every five thousand units after the first stretch. The
+  player can hold one; it saves a single fall or dry cup. A spare found
+  while one is held is a golden cup worth points. The HUD shows one slot:
+  the cup when held, a dashed outline when not.
 - **Deliveries are the heartbeat.** Customers wait at coasters along the
   route. Crossing one hands off a cup: a fuller cup pays more, a streak
   multiplies it, and the cup refills. A cup at nine tenths or more is a full
@@ -352,8 +368,11 @@ the cup is your health and your pay.**
 - **The course is authored, then shuffled.** Eighteen set pieces (awnings
   that bounce, vents that lift, cables to ride, crates, pigeons, split
   routes) unlock with distance and never repeat back to back. A test bot must
-  finish long runs on many seeds without losing a life, so every gap is
-  clearable.
+  finish long runs on many seeds on a single cup, so every gap is clearable.
+- **Every pearl can be taken.** Pearl curves are plotted from the runner's
+  real speed and take-off, and a test proves each group (and each spare) is
+  collected in full by one ordinary input, with a little slack in the timing.
+  Pearls are drawn exactly where they are judged.
 - **Hop or slide, at a glance.** Things you hop are ink-outlined with a cream
   top; things you slide under carry red and cream on their underside.
 - **The scene** is cup stack's city from the side: dusk at the start, full
@@ -367,13 +386,28 @@ room, to steer it into the cup.
 
 - **The liquid is simulated and drawn as pixels,** never as circles: tea,
   milk, and a quantised blend where they mix, with a lighter surface line and
-  duller puddles. Cups fill and overflow.
+  duller puddles. Cups fill and overflow. The simulation never stops while
+  a room is on screen: the verdict waits until the tea has come to rest, and
+  the tea keeps moving after it.
 - **Straws** are pink and white, drawn by dragging and removed with a tap,
-  refunding their length. They can be drawn and removed during the pour.
+  refunding their length; `Clear` removes them all. There is no undo. They
+  can be drawn and removed during the pour, and a straw's end that comes
+  close to another straw snaps onto it so a joint never holds tea back.
+- **Straw left is always in sight.** A long striped gauge in the bottom bar
+  shortens as straw is spent, with each straw's cost marked on the spent
+  part and the stroke in progress shown live; it turns coral and says `low`
+  under a fifth, and `out` when gone. While drawing, a dashed ring around the
+  pen shows how far the straw left can still reach.
 - **Rooms teach one thing, then combine.** Eighteen authored rooms in six
   pages: ramps, fans, moving cups and overflow, jelly and pipes, milk to a
   ratio with sponges and hot plates in the way, then pearls and a scale that
   lifts a gate. After those, rooms return as remixes labelled after hours.
+- **Levels, not lives.** Spill has no lives. A failed room shows its one-line
+  hint and is tried again. A `Levels` button (key `L`) opens the room grid:
+  each room's best stars, locked rooms marked with a padlock, the next room
+  to play marked and focused, and after hours as one tile opened by clearing
+  room 18. Progress lives on the device. The leaderboard score is the total
+  of best points across the eighteen rooms, signed when room 18 is cleared.
 - **Every room is proven.** Each ships with a reference solution, and tests
   check that it clears with the solution, fails with nothing drawn, and needs
   most of its straw.
@@ -385,8 +419,6 @@ room, to steer it into the cup.
 - **Fixtures show how they work before they are used:** a fan's wind drifts
   across the region it pushes, and a scale is joined to its gate by a dashed
   line.
-- A failed room costs a pearl, shows its one-line hint, and is retried. Runs
-  may start at room 7 or 13 once reached.
 - **The scene** is the shop's back kitchen, with the tiles tinted differently
   for each page.
 

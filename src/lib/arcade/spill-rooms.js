@@ -236,7 +236,9 @@ export const ROOMS = [
       { x: 70, y: 40, vx: 5, vy: 50, count: 60, rate: 18 },
       { x: 185, y: 60, vx: 15, vy: 40, count: 28, rate: 10, kind: "milk", delay: 0.5 },
     ],
-    cups: [{ x: 80, y: 300, w: 50, h: 44, order: { need: 60, full: 80, milk: 0.3, tol: 0.1 } }],
+    // The milk leaves the straw's tip at speed and carries on, so the cup sits
+    // far enough over that a short straw drops it short.
+    cups: [{ x: 60, y: 300, w: 50, h: 44, order: { need: 60, full: 80, milk: 0.3, tol: 0.1 } }],
     solution: { strokes: [[[205, 100], [110, 180]]] },
   },
   {

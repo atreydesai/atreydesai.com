@@ -575,3 +575,62 @@ export function drawPopups(ctx: CanvasRenderingContext2D, list: Popup[], font: s
 export function clearSpriteCache() {
   spriteCache.clear();
 }
+
+// --- Spill's level select ------------------------------------------------------
+
+/** A 2 × 2 grid of rooms: the HUD's levels button, beside pause and mute. */
+export const ICON_LEVELS: Grid = [
+  "PPP.PPP",
+  "PPP.PPP",
+  "PPP.PPP",
+  ".......",
+  "PPP.PPP",
+  "PPP.PPP",
+  "PPP.PPP",
+];
+
+/** A padlock for a room not open yet; draw it in currentColor. */
+export const ICON_LOCK: Grid = [
+  "..LLL..",
+  ".L...L.",
+  ".L...L.",
+  "LLLLLLL",
+  "LLL.LLL",
+  "LLL.LLL",
+  "LLLLLLL",
+];
+
+// --- Sugar rush's spare cup ------------------------------------------------------
+
+/**
+ * A to-go cup with a domed lid and a kraft sleeve, 7 by 8: sugar rush's
+ * spare, on the course and in the HUD's slot.
+ */
+export const SPARE_CUP: Grid = [
+  "....S..",
+  ".OOOSO.",
+  "OlllllO",
+  "OOOOOOO",
+  ".OcccO.",
+  ".OwRwO.",
+  ".OwwwO.",
+  "..OOO..",
+];
+export const SPARE_CUP_PAL: Palette = {
+  O: INK,
+  S: STRAW_PINK,
+  l: LID,
+  c: PAPER_WHITE,
+  w: "#c08a52",
+  R: "#e85d4c",
+};
+/** A spare picked up with one already held is a golden cup, worth points. */
+export const SPARE_GOLD_PAL: Palette = {
+  ...SPARE_CUP_PAL,
+  l: "#ffe9a8",
+  c: "#ffe9a8",
+  w: "#dba84d",
+  R: PAPER_WHITE,
+};
+/** The HUD slot's cup: its outline follows the ticket's ink. */
+export const SPARE_ICON_PAL: Palette = { ...SPARE_CUP_PAL, O: "currentColor" };

@@ -27,7 +27,6 @@
   import {
     RESPAWN_GRACE,
     RUSH_TIME,
-    START_LIVES,
     STEP,
     SUGAR_FULL,
     breakdown,
@@ -46,6 +45,10 @@
     LID,
     MENU_ICONS,
     PEARL,
+    SPARE_CUP,
+    SPARE_CUP_PAL,
+    SPARE_GOLD_PAL,
+    SPARE_ICON_PAL,
     SPRITE_PAD,
     STRAW_PINK,
     arcadeFont,
@@ -60,7 +63,6 @@
   import CupTimer from "./CupTimer.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
-  import Pearls from "./Pearls.svelte";
   import ResultsSlip from "./ResultsSlip.svelte";
 
   // Sugar rush: a delivery cup of milk tea on legs runs the rooftops from dusk
@@ -496,6 +498,14 @@
   }
 
   const PEARL_GRID = [".bb.", "bhbb", "bbbb", ".bb."];
+  /** The spare's glow: two stepped discs of light around the cup, three cells out. */
+  const SPARE_GLOW = [5.2, 6.4].map((radius) => {
+    const rows = SPARE_CUP.length + 6;
+    const cols = SPARE_CUP[0].length + 6;
+    return Array.from({ length: rows }, (_, y) =>
+      Array.from({ length: cols }, (_, x) => (Math.hypot(x + 0.5 - cols / 2, y + 0.5 - rows / 2) <= radius ? "g" : ".")).join(""),
+    );
+  });
   const COASTER_GRID = [".cccccccccc.", "RRRRRRRRRRRR"];
   const COASTER_HARD = [".cccccccccc.", "GGGGGGGGGGGG"];
   const SMALL_CUP = ["..S.", "OOOO", "OTTO", "OTTO", ".OO."];
@@ -664,8 +674,10 @@
   let rushReady = false;
   let rushing = false;
   let teaShown = 1;
-  let lives = START_LIVES;
-  let livesPulse = 0;
+  /** The spare slot: held, popped in (counts pickups), or emptying after a save. */
+  let spareHeld = false;
+  let sparePop = 0;
+  let spareLeaving = false;
   let hudClock = 0;
   let finalStats = breakdown(state);
 
@@ -719,6 +731,10 @@
   let lastVy = 0;
   let respawnAt = -10;
   let fallAt = -10;
+  /** A spare cup is bringing the runner back; it sounds when the runner reappears. */
+  let saving = false;
+  /** How the run ended: a fall drops out of sight, a dry cup stands there empty. */
+  let overCause: "fall" | "dry" | null = null;
   let handoffAt = -10;
   let rushFlashAt = -10;
   let lastPearlSound = -1;
@@ -1689,11 +1705,37 @@
           blit(`sr-pigeon-${frame}`, PIGEON[frame], PIGEON_PAL, p.x - 6, p.y + 4 * CELL);
         } else if (item.type === "pearl") {
           if (item.taken || item.x < left || item.x > right) continue;
-          const lift = bob ? Math.round(Math.sin(clock * 3.2 + item.x * 0.05) * 1.5) : 0;
+          // Drawn 8 across, centred on where it is judged, bobbing a unit either way.
+          const lift = bob ? Math.round(Math.sin(clock * 3.2 + item.x * 0.05)) : 0;
           blit("sr-pearl", PEARL_GRID, ITEM_PAL, item.x - 4, item.y + 4 + lift);
+        } else if (item.type === "spare") {
+          if (item.taken || item.x < left || item.x > right) continue;
+          drawSpare(item.x, item.y);
         }
       }
     }
+  }
+
+  /**
+   * A spare cup, centred where it is judged, in a gentle glow of stepped
+   * light. With a spare already held it is a golden cup, worth points.
+   */
+  function drawSpare(x: number, y: number) {
+    if (!ctx) return;
+    const gold = state.spare > 0;
+    const pulse = reduceMotion ? 0.5 : quarters(0.5 + 0.5 * Math.sin(clock * 2.4));
+    const light = gold ? NOTE_GOLD : "#fff3c4";
+    const glowPal = { g: light };
+    const halfW = (SPARE_GLOW[0][0].length * CELL) / 2;
+    const halfH = (SPARE_GLOW[0].length * CELL) / 2;
+    ctx.globalAlpha = 0.12 + 0.1 * pulse;
+    blit(`sr-spare-glow-1-${gold ? 1 : 0}`, SPARE_GLOW[1], glowPal, x - halfW, y + halfH, false);
+    ctx.globalAlpha = 0.16 + 0.12 * pulse;
+    blit(`sr-spare-glow-0-${gold ? 1 : 0}`, SPARE_GLOW[0], glowPal, x - halfW, y + halfH, false);
+    ctx.globalAlpha = 1;
+    const cupW = (SPARE_CUP[0].length * CELL) / 2;
+    const cupH = (SPARE_CUP.length * CELL) / 2;
+    blit(gold ? "sr-spare-gold" : "sr-spare", SPARE_CUP, gold ? SPARE_GOLD_PAL : SPARE_CUP_PAL, x - cupW, y + cupH);
   }
 
   function drawVent(vent: any) {
@@ -1793,6 +1835,8 @@
     pose.rotor = false;
     if (mode === "countdown") {
       legs = "stand";
+    } else if (state.status === "over") {
+      legs = r.grounded ? "stand" : "fall";
     } else if (r.cable) {
       head = "hook";
       legs = "hang";
@@ -1839,7 +1883,8 @@
   }
 
   function drawRunner() {
-    if (!ctx || state.status !== "running") return;
+    // A fall has dropped out of sight behind the hedge; a dry cup stands there, empty.
+    if (!ctx || (state.status !== "running" && !(state.status === "over" && overCause === "dry"))) return;
     choosePose();
     const r = state.runner;
     const since = clock - respawnAt;
@@ -2549,27 +2594,54 @@
           sfxRunFall();
           setRunGlide(0);
           fallAt = clock;
-          lives = state.lives;
-          livesPulse += 1;
-          liveMessage = state.lives > 0 ? `Fell off the roofs. ${pearlsLeft(state.lives)}` : "Fell off the roofs.";
+          kick(0.3);
+          liveMessage = ev.spare ? "Fell off the roofs. The spare cup saved the run." : "Fell off the roofs.";
           break;
         case "dry":
           sfxRunSpill(1);
-          lives = state.lives;
-          livesPulse += 1;
-          addNote(ev.x, ev.y + 34, "dry", NOTE_DIM, 1);
-          refillFrom = 0;
-          refillAt = clock;
-          liveMessage = state.lives > 0 ? `The cup ran dry. ${pearlsLeft(state.lives)}` : "The cup ran dry.";
+          setRunGlide(0);
+          fallAt = clock;
+          addNote(ev.x, ev.y + 34, "dry", NOTE_DIM, 1.2);
+          displayTea = 0;
+          refillAt = -10;
+          liveMessage = ev.spare ? "The cup ran dry. The spare cup saved the run." : "The cup ran dry.";
+          break;
+        case "spare":
+          sfxRunDeliver(true);
+          if (reduceMotion) still(B_POP, ev.x, ev.y, 1.5, NOTE_GOLD, 0.2);
+          else spawn(B_POP, ev.x, ev.y, 0, 0, 0.32, 1.5, NOTE_GOLD);
+          spareHeld = true;
+          sparePop += 1;
+          liveMessage = "Picked up a spare cup.";
+          break;
+        case "spareBonus":
+          sfxRunDeliver(true);
+          if (reduceMotion) still(B_POP, ev.x, ev.y, 1.5, NOTE_GOLD, 0.2);
+          else spawn(B_POP, ev.x, ev.y, 0, 0, 0.32, 1.5, NOTE_GOLD);
+          addNote(ev.x, ev.y + 20, `+${ev.points}`, NOTE_GOLD, 1.1);
+          liveMessage = `A second spare cup, for ${ev.points} points.`;
+          break;
+        case "spareUsed":
+          // The slot empties with a beat now; the save sounds as the runner reappears.
+          saving = true;
+          spareHeld = false;
+          spareLeaving = true;
+          timers.later(() => (spareLeaving = false), reduceMotion ? 150 : 520);
           break;
         case "respawn":
           respawnAt = clock;
           anchorY = state.runner.y;
-          displayTea = state.tea;
+          refillFrom = displayTea;
+          refillAt = clock;
+          if (saving) {
+            saving = false;
+            sfxRushStart();
+          }
           break;
         case "over":
           setRunGlide(0);
           overAt = clock;
+          overCause = ev.cause;
           mode = "over";
           break;
         case "phase":
@@ -2578,8 +2650,6 @@
       }
     }
   }
-
-  const pearlsLeft = (n: number) => `${n} ${n === 1 ? "pearl" : "pearls"} left.`;
 
   /** The heartbeat: a cup handed off, caught, and paid for. */
   function delivered(ev: { [key: string]: any }) {
@@ -2767,7 +2837,7 @@
     rushReady = !rushing && state.sugar >= SUGAR_FULL;
     sugarPips = rushing ? Math.ceil((state.rush / RUSH_TIME) * 10) : Math.floor((state.sugar / SUGAR_FULL) * 10);
     teaShown = displayTea;
-    lives = state.lives;
+    spareHeld = state.spare > 0;
   }
 
   function frame(timestamp: number) {
@@ -2954,6 +3024,10 @@
     refillAt = -10;
     respawnAt = -10;
     fallAt = -10;
+    saving = false;
+    overCause = null;
+    spareLeaving = false;
+    sparePop = 0;
     handoffAt = -10;
     slosh = 0;
     sloshV = 0;
@@ -2968,7 +3042,6 @@
     firstChunk = 0;
     balloon.on = false;
     balloon.wait = 20 + Math.random() * 20;
-    livesPulse = 0;
     last = 0;
     snapCamera();
     syncHud();
@@ -3160,7 +3233,26 @@
           <CupTimer fraction={teaShown} rush={teaShown < 0.25} />
           <span class="boba-meta sr-tea-label">tea</span>
         </span>
-        <Pearls left={lives} total={START_LIVES} pulse={livesPulse} />
+        <span class="boba-stack sr-spare" role="img" aria-label={spareHeld ? "spare cup" : "no spare cup"}>
+          {#key sparePop}
+            <span
+              class="sr-spare-slot"
+              class:is-held={spareHeld}
+              class:is-new={spareHeld && sparePop > 0}
+              class:is-leaving={spareLeaving}
+              aria-hidden="true"
+            >
+              {#if spareHeld || spareLeaving}
+                <PixelIcon grid={SPARE_CUP} palette={SPARE_ICON_PAL} px={3} />
+              {:else}
+                <svg viewBox="0 0 21 24" focusable="false">
+                  <path d="M3.5 4.5 H16.5 L19.5 7.5 V10.5 H17.5 L15.5 22.5 H5.5 L3.5 10.5 H1.5 V7.5 Z" />
+                </svg>
+              {/if}
+            </span>
+          {/key}
+          <span class="boba-meta sr-tea-label" aria-hidden="true">spare</span>
+        </span>
         <HudButtons {paused} on:pause={togglePause} />
       </div>
     </div>
@@ -3277,7 +3369,7 @@
     title="clocked out"
     deck={deliveries === 0
       ? "The tea never arrived."
-      : `${deliveries} ${deliveries === 1 ? "delivery" : "deliveries"} before the pearls ran out.`}
+      : `${deliveries} ${deliveries === 1 ? "delivery" : "deliveries"} before the run ended.`}
     score={finalStats.score}
     unit="points"
     {newBest}
@@ -3392,6 +3484,56 @@
   .sr-tea {
     justify-items: center;
     gap: 0;
+  }
+
+  /* --- The spare slot: a to-go cup when held, its dashed outline when not --- */
+
+  .sr-spare {
+    justify-items: center;
+    gap: 0;
+  }
+
+  .sr-spare-slot {
+    display: grid;
+    place-items: center;
+    width: 21px;
+    height: 24px;
+    color: var(--b-line);
+  }
+
+  .sr-spare-slot svg {
+    width: 21px;
+    height: 24px;
+    overflow: visible;
+    fill: none;
+    stroke: var(--b-muted);
+    stroke-width: 1.4;
+    stroke-dasharray: 2.4 2;
+    stroke-linejoin: round;
+    filter: url(#boba-rough-fine);
+  }
+
+  .sr-spare-slot.is-new {
+    animation: boba-pop var(--motion-slow) var(--ease-standard);
+  }
+
+  /* Spent on a save: a beat, then it is gone and the outline is left. */
+  .sr-spare-slot.is-leaving {
+    animation: sr-spare-out 0.52s var(--ease-standard) forwards;
+  }
+
+  @keyframes sr-spare-out {
+    30% {
+      transform: translateY(-3px) rotate(-6deg) scale(1.15);
+    }
+    60% {
+      opacity: 1;
+      transform: translateX(2px) rotate(4deg);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(4px) scale(0.7);
+    }
   }
 
   .sr-teach {
@@ -3514,7 +3656,9 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sr-sugar.is-ready .sr-pips {
+    .sr-sugar.is-ready .sr-pips,
+    .sr-spare-slot.is-new,
+    .sr-spare-slot.is-leaving {
       animation: none;
     }
 

@@ -1,7 +1,8 @@
 // Sugar rush rules: a cup of milk tea on legs runs the rooftops at dusk,
 // making deliveries. The tea in the cup is both its health and its pay: rough
-// play sloshes it out, a fuller cup pays more at each drop-off, and an empty
-// cup is a failed delivery. Kept free of the DOM, of Math.random and of the
+// play sloshes it out, a fuller cup pays more at each drop-off, and there is
+// only the one cup: running dry or falling ends the run, unless a rare spare
+// cup is in hand. Kept free of the DOM, of Math.random and of the
 // clock, so a seed and a list of inputs always replay the same run under node.
 //
 // The world is in its own units. x grows along the run (the runner only ever
@@ -86,11 +87,24 @@ export const STUMBLE_SLOW = 0.35;
 /** After a bump, nothing else can bump or strike for this long. */
 export const GRACE_TIME = 1;
 export const RESPAWN_GRACE = 1.5;
-/** Seconds between falling and reappearing. */
+/** Seconds between a spare cup saving the run and the runner reappearing. */
 export const RESPAWN_TIME = 1;
-export const START_LIVES = 3;
-/** The cup is refilled to this when it runs dry (and after a fall, if lower). */
+/** A spare cup comes back with the tea at least this full. */
 export const DRY_REFILL = 0.6;
+
+// --- The spare cup ------------------------------------------------------------------
+//
+// There is one cup: a fall or a dry cup ends the run, unless the runner holds
+// a spare, picked up now and then on a pattern's harder line.
+
+/** No spare is placed before this far along the course. */
+export const SPARE_FIRST = 3000;
+/** Units from one spare to when the next falls due, chosen between these. */
+export const SPARE_GAP = Object.freeze([2800, 4000]);
+/** Points for a spare picked up while one is already held. */
+export const SPARE_BONUS = 200;
+/** Half the side of a spare's pickup box (the cup is drawn 14 by 16). */
+export const SPARE_RADIUS = 8;
 
 // --- Score --------------------------------------------------------------------------
 
@@ -120,7 +134,11 @@ export const SMASH_POINTS = 25;
 export const CRATE_POINTS = 30;
 /** Pearls packed in each crate, freed when it breaks. */
 export const PEARLS_PER_CRATE = 2;
-export const PEARL_RADIUS = 5;
+/**
+ * Half the side of a pearl's pickup box. The pearl is drawn 8 across and bobs
+ * a unit either way, so anything that touches the drawn pearl takes it.
+ */
+export const PEARL_RADIUS = 6;
 
 // --- The course ---------------------------------------------------------------------
 
@@ -155,9 +173,11 @@ export const PHASES = Object.freeze([
  * Everything on the course the screen draws. Solid obstacles (ac, tank, crate)
  * stand on a roof from y0 to y1 and can be stood on; low ones (clothesline,
  * billboard) hang from y0 to y1 and are slid under. `hit` marks one bumped
- * through, `broken` one smashed.
+ * through, `broken` one smashed. A pearl's `group` names the arc or line it
+ * was placed with (0 for pearls freed from a crate).
  * @typedef {(
- *   { type: "pearl", x: number, y: number, taken: boolean }
+ *   { type: "pearl", x: number, y: number, taken: boolean, group: number }
+ *   | { type: "spare", x: number, y: number, taken: boolean }
  *   | { type: "coaster", x0: number, x1: number, y: number, customer: boolean, hard: boolean, done: null | "delivered" | "missed" }
  *   | { type: "ac" | "tank" | "crate" | "clothesline" | "billboard", x0: number, x1: number, y0: number, y1: number, count: number, hit: boolean, broken: boolean }
  *   | { type: "awning" | "ledge", x0: number, x1: number, y: number }
@@ -392,6 +412,15 @@ export function fallReach(speed, drop) {
 }
 
 /**
+ * Where a runner that runs off a roof's edge starts to fall: once its back
+ * foot is past the edge, half a step on (the step lands anywhere in one).
+ * @param {number} edge
+ */
+export function leaveAt(edge) {
+  return edge + HALF_W + (speedAt(edge) * STEP) / 2;
+}
+
+/**
  * Where a pigeon is now: sitting, or on its way up and away.
  * @param {Extract<Item, { type: "pigeon" }>} pigeon
  */
@@ -415,7 +444,8 @@ export function cableY(cable, x) {
 /**
  * The authored set pieces, by the difficulty that unlocks each. A pattern's
  * parameters stretch from its first, teaching form toward a remix as
- * difficulty climbs past its minimum.
+ * difficulty climbs past its minimum. A `hard` pattern offers a harder line,
+ * where a spare cup can sit.
  */
 export const PATTERNS = Object.freeze([
   { id: "warmup", min: 0, weight: 1, late: 0.3, note: "a flat roof and a line of pearls" },
@@ -427,13 +457,13 @@ export const PATTERNS = Object.freeze([
   { id: "pigeons", min: 0.1, weight: 0.8, note: "a flock that takes off as you come; jumping into it spills" },
   { id: "longDrop", min: 0.15, weight: 1, bias: "down", note: "a long drop: glide late to save the tea" },
   { id: "crates", min: 0.15, weight: 0.9, note: "crate stacks to hop, or slam open for pearls" },
-  { id: "awning", min: 0.2, weight: 0.8, bias: "up", note: "an awning that bounces you to a high roof" },
+  { id: "awning", min: 0.2, weight: 0.8, bias: "up", hard: true, note: "an awning that bounces you to a high roof" },
   { id: "stairs", min: 0.2, weight: 0.8, note: "three short steps up or down" },
   { id: "slideDrop", min: 0.25, weight: 0.8, note: "slide under a billboard and off the edge" },
   { id: "hopSlide", min: 0.3, weight: 0.9, note: "a hop straight into a slide" },
-  { id: "cable", min: 0.3, weight: 0.8, bias: "down", note: "a cable to catch and ride across a wide gap" },
-  { id: "vent", min: 0.35, weight: 0.8, note: "an updraft that carries you over a gap too wide to jump" },
-  { id: "split", min: 0.35, weight: 0.7, note: "an upper line of pearls over a lower line with the coaster" },
+  { id: "cable", min: 0.3, weight: 0.8, bias: "down", hard: true, note: "a cable to catch and ride across a wide gap" },
+  { id: "vent", min: 0.35, weight: 0.8, hard: true, note: "an updraft that carries you over a gap too wide to jump" },
+  { id: "split", min: 0.35, weight: 0.7, hard: true, note: "an upper line of pearls over a lower line with the coaster" },
   { id: "chimneys", min: 0.4, weight: 0.8, note: "a run of narrow chimney tops" },
   { id: "gauntlet", min: 0.55, weight: 0.9, note: "everything at once: hops, slides and crates in a row" },
 ]);
@@ -513,27 +543,73 @@ function makeBuilder(course, remix) {
       b.items.push(item);
       return item;
     },
-    /** @param {number} x @param {number} y */
-    pearl(x, y) {
-      b.add({ type: "pearl", x: Math.round(x), y: Math.round(y), taken: false });
+    /** Starts a new group: the pearls of one arc or line, placed together. */
+    group() {
+      course.groups += 1;
+      return course.groups;
+    },
+    /** @param {number} x @param {number} y @param {number} [group] a new group of one unless given */
+    pearl(x, y, group = b.group()) {
+      b.add({ type: "pearl", x: Math.round(x), y: Math.round(y), taken: false, group });
     },
     /**
-     * Pearls along the path of a jump from (x, feet y), at the body's middle,
-     * so following the line takes every one.
+     * A take-off at x, moved forward onto the next roof if x is over a gap:
+     * the runner can only jump from where it stands.
+     * @param {number} x
+     */
+    standOn(x) {
+      if (x < x0) return x; // every chunk ends on a long roof
+      const roof = b.roofs.find((r) => r.x1 > x);
+      return roof && x < roof.x0 ? roof.x0 + HALF_W : x;
+    },
+    /**
+     * Where the body's middle is `every` seconds apart along a jump from feet
+     * (x, y), starting `start` intervals in. The path is flown at the runner's
+     * real speed at the take-off, not the chunk's, so the spacing matches the
+     * run that meets it.
      * @param {number} x @param {number} y @param {number} hold @param {number} count
-     * @param {{ every?: number, vy?: number, glide?: boolean }} [options]
+     * @param {{ every?: number, vy?: number, glide?: boolean, start?: number }} [options]
+     *   vy is the launch speed: JUMP_SPEED for a jump from a roof, BOUNCE_SPEED
+     *   off an awning, 0 for running off an edge.
+     */
+    arcPoints(x, y, hold, count, options = {}) {
+      const { every = 0.08, vy = JUMP_SPEED, glide = false, start = 1 } = options;
+      const from = vy === JUMP_SPEED ? b.standOn(x) : x;
+      const path = jumpPath(speedAt(from), { hold, vy, glide, seconds: every * (start + count) + STEP });
+      const points = [];
+      for (let k = start; k < start + count; k++) {
+        const p = path[Math.min(path.length - 1, Math.round((every * k) / STEP) - 1)];
+        points.push({ x: from + p.x, y: y + p.y + RUNNER_H / 2 });
+      }
+      return points;
+    },
+    /**
+     * Pearls along the path of a jump, so following the line takes every one.
+     * @param {number} x @param {number} y @param {number} hold @param {number} count
+     * @param {{ every?: number, vy?: number, glide?: boolean, start?: number }} [options]
      */
     arc(x, y, hold, count, options = {}) {
-      const { every = 0.08, vy = JUMP_SPEED, glide = false } = options;
-      const path = jumpPath(v, { hold, vy, glide, seconds: every * count + STEP });
-      for (let k = 1; k <= count; k++) {
-        const p = path[Math.min(path.length - 1, Math.round((every * k) / STEP) - 1)];
-        b.pearl(x + p.x, y + p.y + RUNNER_H / 2);
-      }
+      const group = b.group();
+      for (const p of b.arcPoints(x, y, hold, count, options)) b.pearl(p.x, p.y, group);
+    },
+    /** Whether a spare cup is due on this chunk's harder line. */
+    spareDue: false,
+    /** @type {Array<{ x: number, y: number }>} */ spares: [],
+    /**
+     * A spare cup at (x, y), its middle; pearls of `near` within reach of it
+     * are taken out so the two never overlap.
+     * @param {number} x @param {number} y
+     */
+    spare(x, y) {
+      const spot = { x: Math.round(x), y: Math.round(y) };
+      b.items = b.items.filter((o) => o.type !== "pearl" || Math.abs(o.x - spot.x) > SPARE_RADIUS + PEARL_RADIUS + 6 || Math.abs(o.y - spot.y) > SPARE_RADIUS + PEARL_RADIUS + 6);
+      b.add({ type: "spare", x: spot.x, y: spot.y, taken: false });
+      b.spares.push(spot);
     },
     /** @param {number} x @param {number} y @param {number} count @param {number} spacing */
     line(x, y, count, spacing) {
-      for (let k = 0; k < count; k++) b.pearl(x + k * spacing, y);
+      const group = b.group();
+      for (let k = 0; k < count; k++) b.pearl(x + k * spacing, y, group);
     },
     /**
      * @param {"ac" | "tank" | "crate" | "clothesline" | "billboard"} type
@@ -738,11 +814,11 @@ const BUILDERS = {
       const edge = b.x;
       b.gap(Math.max(30, fallReach(v, drop) * b.range(0.35, 0.6)), "drop");
       const r = b.roof(b.range(b.runway + 200, b.runway + 300), from - drop);
-      // A glide line: the slope a glide falls at, from the edge to the roof.
-      const n = 6;
-      for (let k = 0; k < n; k++) {
-        const x = edge + 10 + k * 0.14 * v;
-        b.pearl(x, from + RUNNER_H / 2 - (drop * k) / n);
+      // The line running off the edge falls along, stopping high enough over
+      // the roof below that a late glide still has room to save the tea.
+      const group = b.group();
+      for (const p of b.arcPoints(leaveAt(edge), from, 0, 8, { vy: 0, every: 0.07 })) {
+        if (p.y - RUNNER_H / 2 > r.top + 60) b.pearl(p.x, p.y, group);
       }
       b.slot(r.x0 + 0.6 * (r.x1 - r.x0), r.top);
     },
@@ -762,14 +838,29 @@ const BUILDERS = {
       const a = b.roof(b.range(b.runway + 80, b.runway + 200));
       const drop = Math.round(24 + 24 * b.t * b.random());
       const width = Math.round(clamp(0.3 * v, 48, 70));
-      const off = Math.round(b.t * b.random() * 0.08 * v);
-      const awning = b.add({ type: "awning", x0: a.x1 + off, x1: a.x1 + off + width, y: a.top - drop });
+      // Hung where running off the roof comes down, give or take a little in
+      // the remix, so the plain line always bounces and the arc follows it.
+      const leave = leaveAt(a.x1);
+      const bounceX = leave + fallReach(speedAt(leave), drop);
+      const shift = (b.random() - 0.5) * 0.3 * width * b.t;
+      const x0 = Math.round(Math.max(a.x1, bounceX - width / 2 + shift));
+      const awning = b.add({ type: "awning", x0, x1: x0 + width, y: a.top - drop });
       const highX = Math.round(awning.x1 + HALF_W + 0.3 * v);
       const highTop = awning.y + Math.round(b.range(100, 118));
       b.gap(highX - a.x1, "awning");
       const high = b.roof(b.range(b.runway + 220, b.runway + 320), highTop);
-      b.arc((awning.x0 + awning.x1) / 2, awning.y, 0, 6, { every: 0.1, vy: BOUNCE_SPEED });
-      b.line(high.x0 + 40, high.top + 30, 5, 26);
+      // The arc rides the bounce; the top of it is the harder line's prize.
+      const points = b.arcPoints(bounceX, awning.y, 0, 6, { every: 0.1, vy: BOUNCE_SPEED });
+      const top = 4;
+      const group = b.group();
+      points.forEach((p, k) => {
+        if (!(b.spareDue && k === top)) b.pearl(p.x, p.y, group);
+      });
+      if (b.spareDue) b.spare(points[top].x, points[top].y);
+      // Then a line along the high roof, just past where the bounce lands.
+      const fall = jumpPath(speedAt(bounceX), { hold: 0, vy: BOUNCE_SPEED, until: high.top - awning.y }).at(-1);
+      const land = bounceX + (fall?.x ?? 0.8 * v);
+      b.line(Math.max(high.x0 + 30, land + 30), high.top + RUNNER_H / 2, 4, 24);
       b.slot(high.x0 + 0.6 * (high.x1 - high.x0), high.top);
     },
   },
@@ -822,7 +913,10 @@ const BUILDERS = {
       b.gap(span, "cable");
       const far = b.roof(b.range(b.runway + 200, b.runway + 300), a.top - drop);
       const cable = b.add({ type: "cable", x0: a.x1 - 36, y0: a.top + 44, x1: far.x0 + 40, y1: far.top + 30 });
-      for (let x = cable.x0 + 40; x < cable.x1 - 20; x += 36) b.pearl(x, cableY(cable, x) - RUNNER_H / 2);
+      const group = b.group();
+      for (let x = cable.x0 + 40; x < cable.x1 - 20; x += 36) b.pearl(x, cableY(cable, x) - RUNNER_H / 2, group);
+      // Riding all the way to the far end, without letting go early, earns it.
+      if (b.spareDue) b.spare(cable.x1 - 24, cableY(cable, cable.x1 - 24) - RUNNER_H / 2);
       b.slot(far.x0 + 0.6 * (far.x1 - far.x0), far.top);
     },
   },
@@ -843,6 +937,7 @@ const BUILDERS = {
       // A plain float takes the low line; a glide rides higher for the top one.
       b.line(x0 + width * 0.2, ceiling + 4, 4, width * 0.2);
       b.line(x0 + width * 0.3, ceiling + GLIDE_LIFT_BONUS - 4, 3, width * 0.2);
+      if (b.spareDue) b.spare(x0 + width * 0.5, ceiling + GLIDE_LIFT_BONUS - 4);
       b.slot(far.x0 + 0.5 * (far.x1 - far.x0), far.top);
     },
   },
@@ -865,11 +960,20 @@ const BUILDERS = {
       const y = r.top + 72;
       let x = r.x0 + b.runway - 0.1 * v;
       const stop = r.x1 - 0.5 * v;
+      /** @type {Array<{ x0: number, x1: number }>} */
+      const ledges = [];
       while (x < stop - 60) {
         const len = Math.min(stop - x, 0.7 * v + 80);
         const ledge = b.add({ type: "ledge", x0: Math.round(x), x1: Math.round(x + len), y });
-        for (let px = ledge.x0 + 20; px < ledge.x1 - 10; px += 34) b.pearl(px, y + RUNNER_H / 2);
+        ledges.push(ledge);
+        const group = b.group();
+        for (let px = ledge.x0 + 20; px < ledge.x1 - 10; px += 34) b.pearl(px, y + RUNNER_H / 2, group);
         x += len + b.range(26, 40);
+      }
+      // A spare up top, over the coaster: deliver below or take it above.
+      if (b.spareDue && ledges.length) {
+        const over = ledges.find((l) => l.x1 - 14 >= coasterX) ?? ledges[ledges.length - 1];
+        b.spare(clamp(coasterX, over.x0 + 20, over.x1 - 14), y + SPARE_RADIUS);
       }
     },
   },
@@ -935,11 +1039,14 @@ function pickPattern(course, d) {
   // tall roof (a long drop, a cable) or headroom (an awning) keep coming up.
   const low = course.top < 100;
   const high = course.top > 190;
+  // Once a spare is due, the patterns with a harder line to put it on come up more.
+  const due = course.end >= course.nextSpare;
   const weights = options.map((p) => {
     const late = 1 + ((p.late ?? 1) - 1) * d;
     const fresh = d - p.min < 0.1 && p.min > 0 ? 2 : 1;
     const drift = (low && p.bias === "up") || (high && p.bias === "down") ? 1.8 : 1;
-    return p.weight * late * fresh * drift;
+    const spare = due && "hard" in p && p.hard ? 4 : 1;
+    return p.weight * late * fresh * drift * spare;
   });
   const total = weights.reduce((sum, w) => sum + w, 0);
   let roll = nextRandom(course.gen) * total;
@@ -1003,6 +1110,7 @@ function buildChunk(course) {
   const first = course.count === 0;
   const pattern = first ? PATTERNS[0] : pickPattern(course, d);
   const b = makeBuilder(course, clamp((d - pattern.min) / 0.4, 0, 1));
+  b.spareDue = !first && "hard" in pattern && !!pattern.hard && course.end >= course.nextSpare;
   if (first) {
     // The first roof is long, flat and quiet: a moment to find the keys.
     const r = b.roof(560);
@@ -1027,6 +1135,10 @@ function buildChunk(course) {
     const spot = hard.length && (!plain.length || nextRandom(course.gen) < 0.5) ? nearest(hard) : nearest(plain);
     placeCoaster(b, course, spot, d);
   }
+
+  // The next spare falls due a seeded distance past this one.
+  const spare = b.spares[b.spares.length - 1];
+  if (spare) course.nextSpare = spare.x + SPARE_GAP[0] + (SPARE_GAP[1] - SPARE_GAP[0]) * nextRandom(course.gen);
 
   /** @type {Chunk} */
   const chunk = {
@@ -1059,6 +1171,8 @@ function newCourse(seed, start) {
     count: 0,
     last: "",
     nextCoaster: start + 420,
+    nextSpare: start + SPARE_FIRST,
+    groups: 0,
   };
 }
 
@@ -1079,7 +1193,7 @@ export function buildCourse(seed, length, start = 0) {
 // --- The run -------------------------------------------------------------------------------
 
 /**
- * A fresh run: a full cup, three pearls of life, standing on the first roof.
+ * A fresh run: one full cup and no spare, standing on the first roof.
  * @param {number} seed
  * @param {{ startDistance?: number }} [options] start further along (for
  *   practice and tests); speed and difficulty follow world x.
@@ -1096,7 +1210,8 @@ export function newRun(seed, options = {}) {
     startX: roof.x0 + 40,
     distance: 0,
     phase: phaseAt(0),
-    lives: START_LIVES,
+    /** Spare cups held, 0 or 1: one saves the run from a fall or a dry cup. */
+    spare: 0,
     tea: 1,
     sugar: 0,
     rush: 0,
@@ -1104,8 +1219,10 @@ export function newRun(seed, options = {}) {
     combo: { chain: 0, timer: 0 },
     streak: 0,
     score: 0,
-    points: { distance: 0, pearls: 0, deliveries: 0, smashes: 0 },
+    points: { distance: 0, pearls: 0, deliveries: 0, smashes: 0, spares: 0 },
     stats: {
+      spares: 0,
+      sparesUsed: 0,
       pearls: 0,
       deliveries: 0,
       fullCups: 0,
@@ -1314,30 +1431,28 @@ function breakCombo(state, events) {
 }
 
 /**
+ * A fall or a dry cup: the end of the run, unless a spare cup is held, in
+ * which case it is spent and the runner comes back on the next safe roof.
  * @param {RunState} state
  * @param {"fall" | "dry"} cause
  * @param {RunEvent[]} events
  */
-function loseLife(state, cause, events) {
+function cupLost(state, cause, events) {
   const r = state.runner;
-  state.lives -= 1;
   breakCombo(state, events);
-  if (cause === "fall") {
-    state.stats.falls += 1;
-    events.push({ type: "fall", x: r.x, y: r.y, lives: state.lives });
+  if (cause === "fall") state.stats.falls += 1;
+  else state.stats.dry += 1;
+  events.push({ type: cause, x: r.x, y: r.y, spare: state.spare > 0 });
+  r.cable = null;
+  if (state.spare > 0) {
+    state.spare = 0;
+    state.stats.sparesUsed += 1;
+    events.push({ type: "spareUsed", cause, x: r.x, y: r.y });
     state.status = "respawning";
     state.respawnIn = RESPAWN_TIME;
-    r.cable = null;
   } else {
-    state.stats.dry += 1;
-    events.push({ type: "dry", x: r.x, y: r.y, lives: state.lives });
-    state.tea = DRY_REFILL;
-    r.grace = Math.max(r.grace, GRACE_TIME);
-  }
-  if (state.lives <= 0) {
-    state.lives = 0;
     state.status = "over";
-    events.push({ type: "over", score: state.score });
+    events.push({ type: "over", cause, score: state.score });
   }
 }
 
@@ -1452,7 +1567,7 @@ function smash(state, o, cause, events) {
     // The pearls packed inside spill out where the stack stood.
     const chunk = state.chunks.find((c) => c.items.includes(o));
     for (let i = 0; i < o.count * PEARLS_PER_CRATE; i++) {
-      chunk?.items.push({ type: "pearl", x: o.x0 + 4 + i * 12, y: o.y0 + RUNNER_H / 2, taken: false });
+      chunk?.items.push({ type: "pearl", x: o.x0 + 4 + i * 12, y: o.y0 + RUNNER_H / 2, taken: false, group: 0 });
     }
   }
 }
@@ -1501,6 +1616,25 @@ function takePearl(state, pearl, magnet, events) {
 }
 
 /**
+ * A spare cup is kept if the hands are free; with one already held, it is
+ * worth SPARE_BONUS instead.
+ * @param {RunState} state
+ * @param {Extract<Item, { type: "spare" }>} spare
+ * @param {RunEvent[]} events
+ */
+function takeSpare(state, spare, events) {
+  spare.taken = true;
+  state.stats.spares += 1;
+  if (state.spare > 0) {
+    state.points.spares += SPARE_BONUS;
+    events.push({ type: "spareBonus", points: SPARE_BONUS, x: spare.x, y: spare.y });
+  } else {
+    state.spare = 1;
+    events.push({ type: "spare", x: spare.x, y: spare.y });
+  }
+}
+
+/**
  * @param {RunState} state
  * @param {any} coaster
  * @param {RunEvent[]} events
@@ -1531,9 +1665,11 @@ function deliver(state, coaster, events) {
  * glide, glideEnd, slam, land {impact, spill, slam, glide}, bounce, wall,
  * spill {amount, cause: landing | slam | bump | pigeon}, bump {what},
  * smash {what, cause: slam | rush, points}, strike, pigeonsUp {count},
- * pearl {points, combo, chain, magnet}, comboLost, rushReady, rushStart,
- * rushEnd, delivery {points, tea, full, streak, hard}, miss, cableOn,
- * cableOff {jump}, vent, fall, dry, respawn, over, phase {phase}.
+ * pearl {points, combo, chain, magnet}, spare, spareBonus {points},
+ * comboLost, rushReady, rushStart, rushEnd,
+ * delivery {points, tea, full, streak, hard}, miss, cableOn, cableOff {jump},
+ * vent, fall {spare}, dry {spare}, then either spareUsed {cause} (respawn
+ * follows RESPAWN_TIME later) or over {cause, score}; phase {phase}.
  *
  * @param {RunState} state
  * @param {Input} input keys held this step
@@ -1658,12 +1794,13 @@ export function step(state, input, dt = STEP) {
 
   touchItems(state, dt, events);
 
-  if (r.y < FALL_Y && state.status === "running") loseLife(state, "fall", events);
-  if (state.status === "running" && state.tea <= 1e-9) loseLife(state, "dry", events);
-
   state.distance = Math.max(state.distance, r.x - state.startX);
   state.points.distance = Math.floor(state.distance / METRE);
-  state.score = state.points.distance + state.points.pearls + state.points.deliveries + state.points.smashes;
+  const p = state.points;
+  state.score = p.distance + p.pearls + p.deliveries + p.smashes + p.spares;
+
+  if (r.y < FALL_Y && state.status === "running") cupLost(state, "fall", events);
+  if (state.status === "running" && state.tea <= 1e-9) cupLost(state, "dry", events);
   const phase = phaseAt(state.distance);
   if (phase !== state.phase) {
     state.phase = phase;
@@ -1820,6 +1957,16 @@ function touchItems(state, dt, events) {
           }
           break;
         }
+        case "spare": {
+          if (
+            !item.taken &&
+            item.x + SPARE_RADIUS > box.x0 && item.x - SPARE_RADIUS < box.x1 &&
+            item.y + SPARE_RADIUS > box.y0 && item.y - SPARE_RADIUS < box.y1
+          ) {
+            takeSpare(state, item, events);
+          }
+          break;
+        }
         case "coaster": {
           if (item.done) break;
           if (r.grounded && Math.abs(r.y - item.y) < 0.01 && box.x1 > item.x0 && box.x0 < item.x1) {
@@ -1888,10 +2035,14 @@ export function breakdown(state) {
     deliveryPoints: state.points.deliveries,
     smashes: state.stats.smashes,
     smashPoints: state.points.smashes,
+    spares: state.stats.spares,
+    sparesUsed: state.stats.sparesUsed,
+    sparePoints: state.points.spares,
     rushes: state.stats.rushes,
     missed: state.stats.missed,
     bumps: state.stats.bumps,
     falls: state.stats.falls,
+    dry: state.stats.dry,
     bestCombo: state.stats.bestCombo,
   };
 }

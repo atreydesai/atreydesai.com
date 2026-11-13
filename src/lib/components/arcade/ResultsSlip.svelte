@@ -24,13 +24,33 @@
   let nameError = "";
   let submitting = false;
   let submitted = false;
-  let playerRank: number | null = null;
 
   export function focus() {
     card?.focus();
   }
 
+  // The last name signed on any board is offered again, so a regular
+  // doesn't retype it after every run. It lives on this device only.
+  const NAME_KEY = "boba_player_name_v1";
+
+  function readName() {
+    try {
+      return localStorage.getItem(NAME_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  function saveName(name: string) {
+    try {
+      localStorage.setItem(NAME_KEY, name);
+    } catch {
+      // Storage can be off; the field just starts empty next time.
+    }
+  }
+
   onMount(async () => {
+    playerName = readName();
     const result = await fetchBoard(game);
     boardAvailable = result.available;
     board = result.scores;
@@ -57,13 +77,13 @@
       return;
     }
 
-    playerRank = result.rank;
     let marked = false;
     board = result.scores.map((entry) => {
       const me = !marked && entry.name === checked.value && entry.score === score;
       if (me) marked = true;
       return { ...entry, me };
     });
+    saveName(checked.value);
     submitted = true;
   }
 </script>
@@ -90,13 +110,11 @@
               <path pathLength="1" d={LOOPS[1]} />
             </svg>
             <strong>{score}</strong>
-          </span>
-          <span class="final-side">
-            <span class="boba-meta">{unit}</span>
             {#if newBest}
               <span class="stamp">new best</span>
             {/if}
           </span>
+          <span class="boba-meta">{unit}</span>
         </div>
       </div>
 
@@ -129,8 +147,8 @@
         </section>
       {/if}
 
-      <div class="sign">
-        {#if score > 0 && boardAvailable && !submitted}
+      {#if score > 0 && boardAvailable && !submitted}
+        <div class="sign">
           <label class="label" for="boba-player-name">sign the board</label>
           <form class="form" on:submit|preventDefault={submit}>
             <input
@@ -141,7 +159,7 @@
               placeholder="Your name"
               maxlength={MAX_NAME}
               spellcheck="false"
-              autocomplete="off"
+              autocomplete="nickname"
               aria-invalid={nameError ? "true" : undefined}
               aria-describedby={nameError ? "boba-name-error" : undefined}
             />
@@ -155,13 +173,8 @@
               {nameError}
             </p>
           {/if}
-        {:else if submitted}
-          <p class="label">signed</p>
-          <p class="note signed">
-            you’re on the board{#if playerRank}&nbsp;at #{playerRank}{/if}
-          </p>
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
 
     <div class="boba-actions">
@@ -210,15 +223,14 @@
     margin-top: var(--space-6);
   }
 
-  /* The unit, and under it the stamp: it never reaches the receipt. */
-  .final-side {
-    display: grid;
-    justify-items: start;
-    gap: var(--space-3);
-  }
-
-  /* A rubber stamp, pressed a little crooked. */
+  /* A rubber stamp, pressed a little crooked across the top of the circled
+     score, over the pen loop but clear of the figures. */
   .stamp {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: 1;
+    background: var(--b-paper);
     padding: var(--space-1) var(--space-2-5);
     color: var(--b-accent);
     border: 2px solid currentColor;
@@ -229,7 +241,7 @@
     line-height: 1.25;
     text-transform: uppercase;
     white-space: nowrap;
-    transform: rotate(-8deg);
+    transform: translate(-50%, -70%) rotate(-6deg);
     filter: url(#boba-rough-fine);
     animation: stamp 380ms var(--ease-emphasized) 350ms both;
   }
@@ -237,7 +249,7 @@
   @keyframes stamp {
     from {
       opacity: 0;
-      transform: rotate(-14deg) scale(1.8);
+      transform: translate(-50%, -70%) rotate(-12deg) scale(1.8);
     }
   }
 
@@ -346,7 +358,7 @@
 
   .row {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-2);
     min-height: 1.75rem;
     padding: var(--space-1) var(--space-1-5);
@@ -381,17 +393,6 @@
   .value {
     color: var(--b-strong);
     font-weight: 500;
-  }
-
-  .note {
-    margin: 0;
-    color: var(--b-muted);
-    font-size: 0.75rem;
-    line-height: 1.333;
-  }
-
-  .signed {
-    color: var(--b-text);
   }
 
   .form {
