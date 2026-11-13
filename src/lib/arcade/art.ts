@@ -566,3 +566,12 @@ export function drawPopups(ctx: CanvasRenderingContext2D, list: Popup[], font: s
   }
   ctx.restore();
 }
+
+/**
+ * Forgets every cached sprite, so each is painted afresh on its next use. A
+ * browser may drop the pixels of offscreen canvases while a page is hidden;
+ * a game calls this when the page comes back.
+ */
+export function clearSpriteCache() {
+  spriteCache.clear();
+}

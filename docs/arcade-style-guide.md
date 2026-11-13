@@ -1,6 +1,6 @@
 # Boba arcade style guide
 
-The pixel boba on the homepage opens a menu of five small games; the Konami
+The pixel boba on the homepage opens a menu of seven small games; the Konami
 code drops straight into the first. This guide is the contract for how those
 games look, read, move, and sound. It sits beside the
 [website style guide](style-guide.md), which still governs everything the
@@ -35,6 +35,8 @@ Three rules hold everywhere:
 | order up   | Pour, scoop, shake, and serve   | Hold, tap, click, Space                              | Everywhere   |
 | cup stack  | Drop cups onto a tower          | Tap, click, Space                                    | Everywhere   |
 | tea minus  | Land a cup of tea on a moon     | Arrows or `WASD`, Space; three hold buttons on touch | Everywhere   |
+| sugar rush | Run the rooftops and deliver    | Space, `↓`, `X`; three buttons on touch              | Everywhere   |
+| spill      | Draw straws to steer the pour   | Drag to draw; arrows and Space as a pen              | Everywhere   |
 
 Every game plays by keyboard as well as pointer. A game that needs a fine
 pointer (catch) is shown in the menu but disabled on touch devices, with a
@@ -107,8 +109,8 @@ at 32% in the dark theme, where the ink outline is the boundary).
 
 ## Scenes
 
-Straw stab, order up, cup stack, and tea minus each play in a painted scene.
-They share one way of being made, so the four read as a set:
+Every game but boba catch plays in a painted scene. They share one way of
+being made, so they read as a set:
 
 - **A pixel grid.** Screen-space art snaps to a `4px` cell; world-space art
   to the sprite's own cell. Nothing is vector-smooth.
@@ -329,6 +331,64 @@ level in the cup on screen and in the HUD's cup drains together.
   bouncing in the low gravity.
 - Telemetry that has gone unsafe changes colour and gains a word (“too
   fast”, “drifting”).
+
+### Sugar rush
+
+An endless run across the rooftops as a delivery cup on legs. **The tea in
+the cup is your health and your pay.**
+
+- **Rough play spills.** Hard landings, bumps, slams, and pigeons slosh tea
+  out; clean hops and glides don't. The level in the runner's cup and in the
+  HUD's cup are the same number. An empty cup, or a fall, costs a pearl.
+- **Deliveries are the heartbeat.** Customers wait at coasters along the
+  route. Crossing one hands off a cup: a fuller cup pays more, a streak
+  multiplies it, and the cup refills. A cup at nine tenths or more is a full
+  cup and gets a stamp.
+- **Four moves that combine:** a jump whose height follows the hold, a glide
+  on the straw as a rotor, a slide, and a slam.
+- **Sugar rush.** Pearls fill a meter of ten sugar cubes; triggering it
+  smashes obstacles for a few seconds, with afterimages and speed lines. The
+  full meter is the one ticket here that earns a slab.
+- **The course is authored, then shuffled.** Eighteen set pieces (awnings
+  that bounce, vents that lift, cables to ride, crates, pigeons, split
+  routes) unlock with distance and never repeat back to back. A test bot must
+  finish long runs on many seeds without losing a life, so every gap is
+  clearable.
+- **Hop or slide, at a glance.** Things you hop are ink-outlined with a cream
+  top; things you slide under carry red and cream on their underside.
+- **The scene** is cup stack's city from the side: dusk at the start, full
+  night by about a kilometre and a half, windows coming on as it darkens.
+- New moves are taught in context, once per device, one caption at a time.
+
+### Spill
+
+A kettle pours a stream of tea; you draw straws, with a limited length per
+room, to steer it into the cup.
+
+- **The liquid is simulated and drawn as pixels,** never as circles: tea,
+  milk, and a quantised blend where they mix, with a lighter surface line and
+  duller puddles. Cups fill and overflow.
+- **Straws** are pink and white, drawn by dragging and removed with a tap,
+  refunding their length. They can be drawn and removed during the pour.
+- **Rooms teach one thing, then combine.** Eighteen authored rooms in six
+  pages: ramps, fans, moving cups and overflow, jelly and pipes, milk to a
+  ratio with sponges and hot plates in the way, then pearls and a scale that
+  lifts a gate. After those, rooms return as remixes labelled after hours.
+- **Every room is proven.** Each ships with a reference solution, and tests
+  check that it clears with the solution, fails with nothing drawn, and needs
+  most of its straw.
+- **Planning time.** Each room gives ten to thirty seconds before the kettle
+  pours on its own, shown on a dial by the kettle; pouring early earns a
+  bonus.
+- **The order is drawn on the cup:** a fill line, a two-tone band for a milk
+  ratio, slots for pearls, and a tick and a lid once it is met.
+- **Fixtures show how they work before they are used:** a fan's wind drifts
+  across the region it pushes, and a scale is joined to its gate by a dashed
+  line.
+- A failed room costs a pearl, shows its one-line hint, and is retried. Runs
+  may start at room 7 or 13 once reached.
+- **The scene** is the shop's back kitchen, with the tiles tinted differently
+  for each page.
 
 ## Structure
 

@@ -54,6 +54,20 @@ export function firstVisit(game: GameId) {
   return !seen;
 }
 
+// Spill remembers the furthest room a run has reached on this device, so a
+// later run can start from a checkpoint it has earned.
+const SPILL_REACH_COOKIE = "boba_reach_spill_v1";
+
+/** The furthest spill room index reached on this device, 0 if none. */
+export function readSpillReach() {
+  return parseInt(readCookie(SPILL_REACH_COOKIE) ?? "", 10) || 0;
+}
+
+/** Saves `index` if it is further than the room already remembered. */
+export function recordSpillReach(index: number) {
+  if (index > readSpillReach()) writeCookie(SPILL_REACH_COOKIE, String(Math.floor(index)));
+}
+
 export interface BoardEntry {
   name: string;
   score: number;

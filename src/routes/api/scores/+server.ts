@@ -199,7 +199,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
 	// Validate score: a non-negative integer within a sane ceiling.
 	const score = Math.floor(Number(body.score));
-	if (!Number.isFinite(score) || score < 0 || score > 100000) {
+	if (!Number.isFinite(score) || score < 0 || score > 1000000) {
 		return json({ ok: false, reason: 'invalid score' }, { status: 400 });
 	}
 

@@ -56,11 +56,6 @@ export const GAMES: GameInfo[] = [
     key: "5",
     desktopOnly: false,
   },
-];
-
-// Sugar rush and spill are wired up but not built yet, so they stay off the
-// menu until their screens exist. Move them into GAMES to switch them on.
-export const UPCOMING: GameInfo[] = [
   {
     id: "runner",
     name: "sugar rush",
@@ -76,6 +71,10 @@ export const UPCOMING: GameInfo[] = [
     desktopOnly: false,
   },
 ];
+
+// Games wired up but not built yet stay here, off the menu, until their
+// screens exist. Move one into GAMES to switch it on.
+export const UPCOMING: GameInfo[] = [];
 
 function gameInfo(id: GameId) {
   return GAMES.find((game) => game.id === id) ?? GAMES[0];
