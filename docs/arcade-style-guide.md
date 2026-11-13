@@ -324,10 +324,28 @@ You land a pixel cup of milk tea on the moon, and the tea is the fuel: the
 level in the cup on screen and in the HUD's cup drains together.
 
 - **A pixel-print night,** the same in both themes: a dithered sky in flat
-  bands, pixel stars that twinkle and the odd shooting star, a slowly turning
-  pixel earth, two stepped mountain ranges in parallax, and lit regolith
-  shaded by depth with seeded craters and rocks. The surface keeps one riso
-  touch: an ink edge over the off-register accent plate.
+  bands, pixel stars that twinkle and the odd shooting star, and lit regolith
+  shaded by depth. The surface keeps one riso touch: an ink edge over the
+  off-register accent plate.
+- **Every site is a different part of the moon.** Each has a terrain
+  character, and a run visits them in a shuffled order that never repeats
+  back to back, starting on the gentlest:
+  - **mare:** low rolling plain in cool grey basalt, with bright ray craters;
+  - **highlands:** jagged ridges between coasters in the valleys, boulders;
+  - **craters:** real bowls cut into the ground, a ×5 on a crater floor;
+  - **rille:** a deep trench with a ×5 on its floor and coasters on both banks;
+  - **mesas:** flat tops with sheer, banded cliffs and a ×5 below them;
+  - **dunes:** low rounded ridges in blue-grey, with long soft shadows.
+
+  Each has its own ground tones, far silhouettes, surface detail, and sun
+  height. The earth shows a different phase in a different place at each
+  site; some skies carry a faint band of the galaxy or a comet, and some
+  sites an old rover, a flag, or a small base with one blinking lamp. A test
+  checks every coaster in every character has room to come straight down.
+- **Later sites pay more.** Coasters narrow, tea runs short, and wind grows
+  as the sites go on, so landings are multiplied by the site: ×1 at the
+  first, a quarter more each site, up to ×3. The score ticket shows the
+  multiplier beside the site number.
 - **Fire is animated pixel flame** on the sprite's own grid: tongues
   travelling down the plume, embers, smoke, and dust billowing where it meets
   the ground, with a faint additive firelight (the arcade's only soft-edged

@@ -29,11 +29,12 @@
     groundAt,
     makeSite,
     newShip,
+    siteMultiplier,
     stepShip,
     windAt,
     zoomForClearance,
   } from "$lib/arcade/lander-engine.js";
-  import type { CrashReason, Pad, Ship, Site, Touchdown } from "$lib/arcade/lander-engine.js";
+  import type { CrashReason, Pad, Ship, Site, Terrain, Touchdown } from "$lib/arcade/lander-engine.js";
   import {
     INK,
     LID,
@@ -94,7 +95,6 @@
   // the theme.
 
   const NIGHT = { top: "#141a2e", mid: "#1f2547", horizon: "#3b2a52" };
-  const RANGE = { far: "#2a2748", near: "#3a3157", rim: "#5b4f7a" };
   const CREAM = "#fdf8f3";
   const EARTH = {
     ocean: "#3a6a91",
@@ -104,8 +104,6 @@
     cloud: CREAM,
     night: "#141a2e",
   };
-  /** Regolith, lit to deep, plus a crater's darkest floor. */
-  const REGOLITH = ["#e9dfd0", "#d8ccba", "#b9ab98", "#9c8f7e", "#867a6b"];
   const SCENE_INK = "#1a1a1a";
   const ACCENT = "#e85d4c";
   const COASTER_PAPER = "#fbf2e8";
@@ -115,6 +113,104 @@
   const SMOKE = "#cfc6ba";
   const NOTE_GOLD = "#ffd166";
   const LOOP_COLORS = { ink: CREAM, paper: COASTER_PAPER, slab: ACCENT, muted: CREAM };
+
+  // Each terrain has its own ground, its own far silhouettes, and its own
+  // sun height (a low sun throws long shadows). The lit tones stay pale
+  // enough that ink and ochre coaster labels read on them.
+  type RangeStyle = "rolling" | "jagged" | "rims" | "notched" | "buttes" | "swells";
+  interface RangeLook {
+    style: RangeStyle;
+    /** Mean ridge height above the resting horizon, and its swing, as shares of the range scale. */
+    rise: number;
+    swing: number;
+  }
+  interface Look {
+    /** Regolith, lit to deep, then the darkest. */
+    regolith: string[];
+    /** Fresh ejecta, brighter than lit ground. */
+    ray?: string;
+    range: { far: string; near: string; rim: string };
+    far: RangeLook;
+    near: RangeLook;
+    /** Rise of the sun's rays per unit across, from the right. */
+    sun: number;
+  }
+  const LOOKS: Record<Terrain, Look> = {
+    mare: {
+      regolith: ["#c9ccce", "#b1b5b9", "#969aa0", "#7c8188", "#646970"],
+      ray: "#e4e6e7",
+      range: { far: "#262a4a", near: "#343a5e", rim: "#58608a" },
+      far: { style: "rolling", rise: 0.2, swing: 0.08 },
+      near: { style: "rolling", rise: 0.08, swing: 0.05 },
+      sun: 1.1,
+    },
+    highlands: {
+      regolith: ["#eceae5", "#d8d5ce", "#bcb8b0", "#9f9b93", "#86827b"],
+      range: { far: "#2c2a4c", near: "#3d3a60", rim: "#6a6690" },
+      far: { style: "jagged", rise: 0.42, swing: 0.18 },
+      near: { style: "jagged", rise: 0.22, swing: 0.12 },
+      sun: 0.75,
+    },
+    craters: {
+      regolith: ["#e9dfd0", "#d8ccba", "#b9ab98", "#9c8f7e", "#867a6b"],
+      range: { far: "#2a2748", near: "#3a3157", rim: "#5b4f7a" },
+      far: { style: "rims", rise: 0.26, swing: 0.1 },
+      near: { style: "rims", rise: 0.12, swing: 0.08 },
+      sun: 0.9,
+    },
+    rille: {
+      regolith: ["#ddd6ca", "#c6bdae", "#a89e8f", "#8b8273", "#6f675b"],
+      range: { far: "#29263f", near: "#372f4e", rim: "#5a4d72" },
+      far: { style: "notched", rise: 0.3, swing: 0.12 },
+      near: { style: "notched", rise: 0.16, swing: 0.08 },
+      sun: 0.9,
+    },
+    mesas: {
+      regolith: ["#ebd2a2", "#d9b884", "#be9a66", "#9f7d4e", "#80623b"],
+      range: { far: "#33263f", near: "#46304c", rim: "#7a5068" },
+      far: { style: "buttes", rise: 0.22, swing: 0.12 },
+      near: { style: "buttes", rise: 0.12, swing: 0.09 },
+      sun: 0.8,
+    },
+    dunes: {
+      regolith: ["#d3d8e0", "#bac1cc", "#9ea6b4", "#848c9c", "#6b7385"],
+      range: { far: "#232c4a", near: "#2f3c5e", rim: "#506a8e" },
+      far: { style: "swells", rise: 0.16, swing: 0.07 },
+      near: { style: "swells", rise: 0.07, swing: 0.04 },
+      sun: 0.38,
+    },
+  };
+
+  /**
+   * The sky of one site: the earth's phase, which side the sun is on, where
+   * the earth hangs, a faint galaxy or a comet, and a relic on the far ground.
+   */
+  interface SkyPlan {
+    phase: number;
+    side: number;
+    spot: number;
+    feature: "none" | "galaxy" | "comet";
+    relic: "none" | "rover" | "flag" | "base";
+    /** Where along the near range the relic sits, 0 to 1. */
+    relicAt: number;
+    seed: number;
+  }
+  /** Crescent, half, gibbous, full: the sun's direction for each, lit from the right. */
+  const PHASES = [
+    [0.84, -0.26, -0.47],
+    [0.96, -0.27, 0.06],
+    [0.68, -0.52, 0.5],
+    [0.2, -0.24, 0.95],
+  ];
+  /** Where the earth hangs: share of the width, and how far down, in radii. */
+  const EARTH_SPOTS = [
+    [0.86, 0],
+    [0.15, 0.7],
+    [0.76, 1.5],
+    [0.1, 0.1],
+    [0.9, 1.1],
+    [0.24, 1.6],
+  ];
   /** The screen-space art cell, in CSS px. World-space art uses CELL units. */
   const SC = 4;
   /** Ordered dithering thresholds, 4 × 4. */
@@ -285,6 +381,8 @@
   // HUD readouts, refreshed about ten times a second rather than every frame.
   let siteN = 1;
   let siteName = "";
+  /** The site's points multiplier, as the ticket prints it. */
+  let siteMultLabel = "1";
   let readAltitude = 0;
   let readDrift = 0;
   let readDriftSign = 0;
@@ -327,6 +425,8 @@
 
   let seedBase = 0;
   let site: Site = makeSite(1, 7919);
+  let look: Look = LOOKS[site.terrain];
+  let plan: SkyPlan = planSky(site);
   let ship: Ship = newShip(site, 400);
   let mode: Mode = "countdown";
   let modeTime = 0;
@@ -362,20 +462,43 @@
   let active = true;
   const timers = createTimers();
 
-  // The sky is seeded once, so it never reshuffles between attempts.
-  const skyRandom = createRng(2107);
-  /** Kind 0 is one dim cell, 1 one bright cell, 2 a three-cell plus. */
-  const STARS = Array.from({ length: 90 }, (_, index) => {
-    const roll = skyRandom();
+  /**
+   * Each site's sky is seeded by the site, so it never reshuffles between
+   * attempts. Phase and the earth's place step on every site, so two in a
+   * row never share them.
+   */
+  function planSky(at: Site): SkyPlan {
+    const random = createRng(at.seed ^ 0x51c7a3);
+    const roll = random();
+    const relicRoll = random();
     return {
-      x: skyRandom(),
-      y: skyRandom(),
-      kind: roll < 0.6 ? 0 : roll < 0.93 ? 1 : 2,
-      twinkle: index % 7 === 3,
-      speed: 0.45 + skyRandom() * 1.1,
-      phase: skyRandom() * Math.PI * 2,
+      phase: (at.n + 1) % PHASES.length,
+      side: random() < 0.7 ? 1 : -1,
+      spot: (at.n * 2 + (at.seed & 1)) % EARTH_SPOTS.length,
+      feature: roll < 0.38 ? "galaxy" : roll < 0.6 ? "comet" : "none",
+      relic: relicRoll < 0.15 ? "rover" : relicRoll < 0.3 ? "flag" : relicRoll < 0.45 ? "base" : "none",
+      relicAt: random(),
+      seed: at.seed,
     };
-  });
+  }
+
+  /** Kind 0 is one dim cell, 1 one bright cell, 2 a three-cell plus. */
+  function makeStars(seed: number) {
+    const random = createRng(seed ^ 0x2107);
+    return Array.from({ length: 90 }, (_, index) => {
+      const roll = random();
+      return {
+        x: random(),
+        y: random(),
+        kind: roll < 0.6 ? 0 : roll < 0.93 ? 1 : 2,
+        twinkle: index % 7 === 3,
+        speed: 0.45 + random() * 1.1,
+        phase: random() * Math.PI * 2,
+      };
+    });
+  }
+  let STARS = makeStars(plan.seed);
+  const skyRandom = createRng(2107);
   const WIND_DASHES = Array.from({ length: 7 }, () => ({
     x: skyRandom(),
     y: 0.08 + skyRandom() * 0.5,
@@ -473,7 +596,76 @@
         putPixel(image.data, y * width + x, bands[blend > bayer(x, y) ? segment + 1 : segment]);
       }
     }
+    const skyRows = Math.floor((playBottom * 0.8) / SC);
+    if (plan.feature === "galaxy") paintGalaxy(image.data, width, Math.min(height, skyRows));
+    if (plan.feature === "comet") paintComet(image.data, width, Math.min(height, skyRows));
     context.putImageData(image, 0, 0);
+  }
+
+  /** Lifts a sky cell a share of the way toward cream. */
+  function lighten(data: Uint8ClampedArray, index: number, amount: number) {
+    const cream = rgb(CREAM);
+    for (let k = 0; k < 3; k++) data[index * 4 + k] = Math.round(lerp(data[index * 4 + k], cream[k], amount));
+  }
+
+  /** A faint band of the galaxy across the sky: clumped, dithered, flecked with dim stars. */
+  function paintGalaxy(data: Uint8ClampedArray, width: number, height: number) {
+    const random = createRng(plan.seed ^ 0x6a1a);
+    const angle = (random() - 0.5) * 0.9;
+    const across = Math.hypot(width, height);
+    const x0 = width * (0.3 + random() * 0.4);
+    const y0 = height * (0.25 + random() * 0.3);
+    const thick = Math.max(5, across * (0.035 + random() * 0.025));
+    const sin = Math.sin(angle);
+    const cos = Math.cos(angle);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const along = (x - x0) * cos + (y - y0) * sin;
+        const off = (-(x - x0) * sin + (y - y0) * cos) / thick;
+        const core = Math.exp(-off * off * 1.6);
+        if (core < 0.04) continue;
+        const clumps = noise2(along / 9 + 40, off * 1.7 + 11);
+        const density = core * (0.35 + 0.65 * clumps) * 0.75;
+        const index = y * width + x;
+        if (density > bayer(x, y) + 0.08) lighten(data, index, 0.07);
+        if (ihash(index * 31 + plan.seed) < density * 0.05) lighten(data, index, 0.3);
+      }
+    }
+  }
+
+  /** A comet, its tail turned from the sun, opposite the earth. */
+  function paintComet(data: Uint8ClampedArray, width: number, height: number) {
+    const random = createRng(plan.seed ^ 0xc0e7);
+    const earthRight = EARTH_SPOTS[plan.spot][0] > 0.5;
+    const hx = Math.round(width * (earthRight ? 0.22 + random() * 0.18 : 0.6 + random() * 0.18));
+    const hy = Math.round(height * (0.18 + random() * 0.28));
+    // The tail streams away from the sun, a little upward.
+    const dx = -plan.side;
+    const dy = -0.35 - random() * 0.3;
+    const length = Math.hypot(1, dy);
+    const tail = 16 + Math.floor(random() * 10);
+    for (let t = 1; t <= tail; t++) {
+      const fade = Math.pow(1 - t / tail, 1.3);
+      const spread = 0.6 + (t / tail) * 2.2;
+      const cx = hx + (dx * t) / length;
+      const cy = hy + (dy * t) / length;
+      for (let oy = -3; oy <= 3; oy++) {
+        for (let ox = -3; ox <= 3; ox++) {
+          const x = Math.round(cx + ox);
+          const y = Math.round(cy + oy);
+          if (x < 0 || y < 0 || x >= width || y >= height) continue;
+          const d = Math.hypot(x - cx, y - cy);
+          if (d > spread) continue;
+          const strength = fade * (1 - d / (spread + 0.5));
+          if (strength * 0.9 > bayer(x, y)) lighten(data, y * width + x, 0.18 + 0.3 * strength);
+        }
+      }
+    }
+    for (const [ox, oy, amount] of [[0, 0, 1], [1, 0, 0.6], [0, 1, 0.6], [-1, 0, 0.35], [0, -1, 0.35]]) {
+      const x = hx + ox;
+      const y = hy + oy;
+      if (x >= 0 && y >= 0 && x < width && y < height) lighten(data, y * width + x, amount);
+    }
   }
 
   function drawStars() {
@@ -586,12 +778,13 @@
   let earthDrawnAt = -1;
   let earthTurn = 0.62;
   const EARTH_TURN_SECONDS = 90;
-  /** Sunlight from the upper right and a little in front. */
-  const SUN = (() => {
-    const [x, y, z] = [0.68, -0.52, 0.5];
+  /** Sunlight on the earth for this site's phase, from the plan's side. */
+  let SUN = sunFor(plan);
+  function sunFor(sky: SkyPlan) {
+    const [x, y, z] = PHASES[sky.phase];
     const length = Math.hypot(x, y, z);
-    return { x: x / length, y: y / length, z: z / length };
-  })();
+    return { x: (x * sky.side) / length, y: y / length, z: z / length };
+  }
 
   /** Continents and cloud from seeded value noise, wrapped around in longitude. */
   function buildEarthMaps() {
@@ -688,7 +881,7 @@
     night: rgb(EARTH.night),
   };
 
-  /** The earth in the upper right, below the end ticket, drifting a hair against the camera. */
+  /** The earth where this site's plan hangs it, drifting a hair against the camera. */
   function drawEarth() {
     if (!ctx) return;
     // A few redraws a second turn it a full circle every 90 seconds.
@@ -705,8 +898,11 @@
     const r = earthR * SC;
     // Every ship starts at x = 100, so measure from there; tanh keeps it bounded.
     const drift = -16 * Math.tanh((cam.x - 100) / 700);
-    const x = snap(viewW - r - Math.max(28, viewW * 0.06) + drift);
-    const y = snap(playTop + r + 20);
+    const [share, down] = EARTH_SPOTS[plan.spot];
+    const edge = r + Math.max(28, viewW * 0.06);
+    const x = snap(clamp(viewW * share, edge, viewW - edge) + drift);
+    // On a phone the caption spans the width, so the earth hangs below it.
+    const y = snap(playTop + r + (viewW < 640 ? 84 : 20) + down * r);
     ctx.drawImage(earthCanvas, x - r, y - r, r * 2, r * 2);
   }
 
@@ -717,37 +913,118 @@
     factor: number;
     /** Cells before the ridge repeats. */
     period: number;
-    /** Mean ridge height above the resting horizon, and its swing, as shares of the range scale. */
-    rise: number;
-    swing: number;
-    fill: string;
-    rim: string;
-    seed: number;
+    near: boolean;
     canvas: HTMLCanvasElement | null;
+    /** The relic's light, in the canvas's cells, when the relic is a base. */
+    light: { x: number; y: number } | null;
   }
   const RANGES: Range[] = [
-    {
-      factor: 0.25,
-      period: 360,
-      rise: 0.36,
-      swing: 0.15,
-      fill: RANGE.far,
-      rim: toHex(mixRgb(rgb(RANGE.far), rgb(RANGE.rim), 0.6)),
-      seed: 31,
-      canvas: null,
-    },
-    { factor: 0.5, period: 300, rise: 0.18, swing: 0.1, fill: RANGE.near, rim: RANGE.rim, seed: 47, canvas: null },
+    { factor: 0.25, period: 360, near: false, canvas: null, light: null },
+    // Wider than any screen, so its relic never shows twice at once.
+    { factor: 0.5, period: 440, near: true, canvas: null, light: null },
   ];
+
+  /** One silhouette's height at each cell, roughly 0 to 1, in the terrain's style. */
+  function silhouette(style: RangeStyle, period: number, random: () => number) {
+    const table = (count: number) => Array.from({ length: count }, random);
+    const broad = table(4);
+    const mid = table(9);
+    const fine = table(21);
+    const grit = table(53);
+    const at = (values: number[], c: number) => tableNoise(values, (c / period) * values.length);
+    const ridged = (value: number) => 1 - Math.abs(value * 2 - 1);
+    const gap = (c: number, centre: number) => {
+      const d = Math.abs(c - centre) % period;
+      return Math.min(d, period - d);
+    };
+    const values = new Float32Array(period);
+    for (let c = 0; c < period; c++) values[c] = 0.55 * at(broad, c) + 0.3 * at(mid, c) + 0.15 * at(fine, c);
+    switch (style) {
+      case "jagged":
+        for (let c = 0; c < period; c++) {
+          values[c] = 0.3 * at(broad, c) + 0.34 * ridged(at(mid, c)) + 0.24 * ridged(at(fine, c)) + 0.12 * at(grit, c);
+        }
+        break;
+      case "rims": {
+        // Craters seen edge on: broad walls with a raised lip each side of a
+        // slightly lower floor.
+        for (let c = 0; c < period; c++) values[c] = 0.2 + 0.25 * at(broad, c);
+        const count = 3 + Math.floor(random() * 2);
+        for (let k = 0; k < count; k++) {
+          const centre = ((k + 0.2 + random() * 0.6) / count) * period;
+          const half = period * (0.07 + random() * 0.05);
+          const rise = 0.25 + random() * 0.25;
+          for (let c = 0; c < period; c++) {
+            const u = gap(c, centre) / half;
+            let v = 0;
+            if (u < 1) v = rise * (0.7 + 0.3 * Math.pow(u, 4));
+            else if (u < 2.2) v = rise * Math.pow(1 - (u - 1) / 1.2, 1.6);
+            values[c] = Math.max(values[c], 0.2 + v);
+          }
+        }
+        break;
+      }
+      case "notched": {
+        // The rille runs on into the hills behind, cutting a gap in them.
+        for (let k = 0; k < 2; k++) {
+          const centre = random() * period;
+          const half = period * (0.04 + random() * 0.04);
+          for (let c = 0; c < period; c++) {
+            const u = gap(c, centre) / half;
+            if (u < 1) values[c] *= 1 - 0.8 * (1 - u * u);
+          }
+        }
+        break;
+      }
+      case "buttes": {
+        // Broad flat tops: a sheer wall under the rim, then talus spreading
+        // down to the low ground.
+        for (let c = 0; c < period; c++) values[c] = 0.1 + 0.14 * at(mid, c);
+        let c = Math.floor(random() * 20);
+        while (c < period - 40) {
+          const width = 14 + Math.floor(random() * 40);
+          const top = 0.5 + (Math.round(random() * 3) / 3) * 0.4;
+          const talus = 4 + Math.floor(random() * 4);
+          for (let k = -talus; k < width + talus; k++) {
+            const i = c + k;
+            if (i < 0 || i >= period) continue;
+            const out = k < 0 ? -k : k >= width ? k - width + 1 : 0;
+            const v = out === 0 ? top : out === 1 ? top * 0.8 : top * 0.55 * (1 - (out - 1) / talus);
+            values[i] = Math.max(values[i], v);
+          }
+          c += width + 2 * talus + 10 + Math.floor(random() * 40);
+        }
+        break;
+      }
+      case "swells": {
+        // Long, rounded, a short face and a long back.
+        const count = 5 + Math.floor(random() * 3);
+        const phase = random();
+        for (let c = 0; c < period; c++) {
+          const p = ((c / period) * count + phase) % 1;
+          const t = p < 0.45 ? p / 0.45 : 1 - (p - 0.45) / 0.55;
+          const wave = 0.5 - 0.5 * Math.cos(Math.PI * t);
+          values[c] = 0.2 + 0.5 * wave * (0.6 + 0.4 * at(broad, c)) + 0.2 * at(mid, c);
+        }
+        break;
+      }
+    }
+    return values;
+  }
+
+  /** Small things left on the far ground, in cells: body, faded cloth, and a lamp. */
+  const RELICS: Record<Exclude<SkyPlan["relic"], "none">, string[]> = {
+    rover: ["......X.", ".XXXXXXX", "XXXXXXX.", ".X.X.X.."],
+    flag: ["Xccc.", "Xccc.", "Xcc..", "X....", "X....", "X....", "X...."],
+    base: ["........L.", "..XXX...X.", ".XXXXXXXXX", "XXXXXXXXXX"],
+  };
 
   /** A periodic, pixel-stepped silhouette with a one-cell rim of light. */
   function buildRange(range: Range) {
-    const random = createRng(range.seed);
-    const octaves = [
-      { table: Array.from({ length: 4 }, random), weight: 0.42, ridged: false },
-      { table: Array.from({ length: 9 }, random), weight: 0.3, ridged: true },
-      { table: Array.from({ length: 20 }, random), weight: 0.18, ridged: true },
-      { table: Array.from({ length: 50 }, random), weight: 0.1, ridged: false },
-    ];
+    const shape = range.near ? look.near : look.far;
+    const fill = range.near ? look.range.near : look.range.far;
+    const rim = range.near ? look.range.rim : toHex(mixRgb(rgb(look.range.far), rgb(look.range.rim), 0.6));
+    const values = silhouette(shape.style, range.period, createRng(plan.seed ^ (range.near ? 0x47 : 0x31)));
     const height = Math.ceil(viewH / SC) + 80;
     // Anchored to where the ground sits at rest (world height 90, unzoomed),
     // and sized by the narrower of the play area and the width, so a phone
@@ -756,12 +1033,7 @@
     const scale = Math.min(playBottom - playTop, viewW * 0.75);
     const tops = new Int32Array(range.period);
     for (let c = 0; c < range.period; c++) {
-      let n = 0;
-      for (const octave of octaves) {
-        const value = tableNoise(octave.table, (c / range.period) * octave.table.length);
-        n += octave.weight * (octave.ridged ? 1 - Math.abs(value * 2 - 1) : value);
-      }
-      const y = horizon - scale * (range.rise + (n - 0.5) * 2 * range.swing);
+      const y = horizon - scale * (shape.rise + (values[c] - 0.5) * 2 * shape.swing);
       tops[c] = clamp(Math.round(y / SC), 1, height - 1);
     }
     range.canvas ??= document.createElement("canvas");
@@ -770,11 +1042,14 @@
     const context = range.canvas.getContext("2d");
     if (!context) return;
     context.clearRect(0, 0, range.period, height);
-    context.fillStyle = range.fill;
+    range.light = null;
+    const relic = range.near && plan.relic !== "none" ? RELICS[plan.relic] : null;
+    if (relic) seatRelic(context, tops, range, relic, rim);
+    context.fillStyle = fill;
     for (let c = 0; c < range.period; c++) context.fillRect(c, tops[c], 1, height - tops[c]);
     // The rim runs down any step to meet its lower neighbour's top, so the
     // line never breaks.
-    context.fillStyle = range.rim;
+    context.fillStyle = rim;
     for (let c = 0; c < range.period; c++) {
       const left = tops[(c - 1 + range.period) % range.period];
       const right = tops[(c + 1) % range.period];
@@ -783,10 +1058,55 @@
     }
   }
 
+  /**
+   * Levels a little shelf on the flattest stretch near the plan's spot and
+   * stands the relic on it, in the rim's colour so it reads as a lit shape.
+   */
+  function seatRelic(
+    context: CanvasRenderingContext2D,
+    tops: Int32Array,
+    range: Range,
+    sprite: string[],
+    rim: string,
+  ) {
+    const width = sprite[0].length;
+    const start = Math.floor(plan.relicAt * (range.period - width - 60));
+    let best = start;
+    let bestSpread = Infinity;
+    for (let c = start; c < start + 60; c++) {
+      let low = Infinity;
+      let high = -Infinity;
+      for (let k = 0; k < width; k++) {
+        low = Math.min(low, tops[c + k]);
+        high = Math.max(high, tops[c + k]);
+      }
+      if (high - low < bestSpread) {
+        bestSpread = high - low;
+        best = c;
+      }
+    }
+    let ground = Infinity;
+    for (let k = 0; k < width; k++) ground = Math.min(ground, tops[best + k]);
+    for (let k = 0; k < width; k++) tops[best + k] = ground;
+    const cloth = toHex(mixRgb(rgb(rim), rgb(CREAM), 0.35));
+    const top = ground - sprite.length;
+    sprite.forEach((row, y) => {
+      for (let x = 0; x < width; x++) {
+        const cell = row[x];
+        if (cell === ".") continue;
+        context.fillStyle = cell === "c" ? cloth : rim;
+        context.fillRect(best + x, top + y, 1, 1);
+        if (cell === "L") range.light = { x: best + x, y: top + y };
+      }
+    });
+  }
+
   function drawRanges() {
     if (!ctx) return;
     const playH = playBottom - playTop;
     const restY = viewHUnits / 2 - 6;
+    // The base's one lamp blinks slowly; under Reduce Motion it stays lit.
+    const lampOn = reduceMotion || clock % 2.4 < 0.45;
     for (const range of RANGES) {
       if (!range.canvas) continue;
       const width = range.period * SC;
@@ -795,8 +1115,20 @@
       let x = -((offset % width) + width) % width;
       for (; x < viewW; x += width) {
         ctx.drawImage(range.canvas, x, shift, width, range.canvas.height * SC);
+        if (range.light && lampOn) {
+          ctx.fillStyle = ACCENT;
+          ctx.fillRect(x + range.light.x * SC, shift + range.light.y * SC, SC, SC);
+        }
       }
     }
+  }
+
+  /** Sky, ranges and earth for this site at this size, built once offscreen. */
+  function buildScene() {
+    if (!viewW) return;
+    buildSky();
+    for (const range of RANGES) buildRange(range);
+    earthDirty = true;
   }
 
   /** Cream streaks blowing across the sky, from site 2 on. */
@@ -871,16 +1203,18 @@
     return false;
   }
 
-  // The ground's depth shading, craters and specks are baked once per site
-  // into a strip one pixel per world cell, covering one period of terrain, and
-  // drawn scaled under a clip of the surface. Everything is seeded by world
-  // position, so it never shimmers and it scrolls and zooms with the world.
+  // The ground's shading, landforms and specks are baked once per site into
+  // a strip one pixel per world cell, covering one period of terrain, and
+  // drawn scaled under a clip of the surface. Everything is seeded by the site
+  // and by world position, so it never shimmers and it scrolls and zooms with
+  // the world.
   const STRIP_TOP = 220;
   const STRIP_BOTTOM = -220;
   const STRIP_COLUMNS = PERIOD / CELL;
   const STRIP_ROWS = (STRIP_TOP - STRIP_BOTTOM) / CELL;
-  const REGOLITH_RGB = REGOLITH.map(rgb);
   let groundStrip: HTMLCanvasElement | null = null;
+  /** Inside a rille, behind its near cut: the far wall winding away. */
+  let backStrip: HTMLCanvasElement | null = null;
   let stripSite: Site | null = null;
   let siteSeed = 0;
   let rocks: Array<{ x: number; w: number; h: number }> = [];
@@ -896,6 +1230,16 @@
     return 3;
   }
 
+  /** The site's first landform of a kind, if it has one. */
+  function featureOf<K extends Site["features"][number]["kind"]>(kind: K) {
+    return site.features.find((feature) => feature.kind === kind) as
+      | Extract<Site["features"][number], { kind: K }>
+      | undefined;
+  }
+
+  /** Signed distance from c to x, the short way round the moon. */
+  const around = (x: number, c: number) => x - c - Math.round((x - c) / PERIOD) * PERIOD;
+
   function bakeGround() {
     stripSite = site;
     const random = createRng(siteSeed ^ 0x5eed);
@@ -905,13 +1249,45 @@
     const context = groundStrip.getContext("2d");
     if (!context) return;
     const tones = new Int8Array(STRIP_COLUMNS * STRIP_ROWS).fill(-1);
+    const surface = new Float32Array(STRIP_COLUMNS);
+    for (let c = 0; c < STRIP_COLUMNS; c++) surface[c] = groundAt(site, c * CELL + 1);
+    const column = (c: number) => ((c % STRIP_COLUMNS) + STRIP_COLUMNS) % STRIP_COLUMNS;
+    /** The row holding world height y, and the height at a row's middle. */
+    const rowAt = (y: number) => Math.round((STRIP_TOP - 1 - y) / CELL);
+    const heightAt = (r: number) => STRIP_TOP - r * CELL - 1;
+    /** The first ground row in a column. */
+    const surfaceRow = (c: number) => Math.max(0, Math.ceil((STRIP_TOP - 1 - surface[column(c)]) / CELL));
+    /** Moves a ground cell's tone toward deep (+) or lit (−). */
+    const shade = (c: number, r: number, by: number) => {
+      if (r < 0 || r >= STRIP_ROWS) return;
+      const index = r * STRIP_COLUMNS + column(c);
+      if (tones[index] < 0) return;
+      tones[index] = clamp(tones[index] + by, 0, 4);
+    };
+
+    // A mesa's face is painted in strata down to the low ground beside it,
+    // and depth is measured from that low ground, so a mesa stands on the
+    // plain rather than sinking into it as a pillar.
+    const lowLine = new Float32Array(surface);
+    if (site.terrain === "mesas") {
+      // Wide enough to see past the broadest mesa to the ground below it.
+      const reach = 60;
+      for (let c = 0; c < STRIP_COLUMNS; c++) {
+        let low = Infinity;
+        for (let k = -reach; k <= reach; k++) low = Math.min(low, surface[column(c + k)]);
+        if (surface[c] > low + 6) lowLine[c] = low + 2;
+      }
+    }
+
+    // Depth: lit at the surface, deeper tones below, wobbling so the bands
+    // aren't ruled lines.
     const wobble = Array.from({ length: 30 }, random);
     for (let c = 0; c < STRIP_COLUMNS; c++) {
       const x = c * CELL + 1;
-      const ground = groundAt(site, x);
+      const ground = lowLine[c];
       const shift = (tableNoise(wobble, (x / PERIOD) * wobble.length) - 0.5) * 12;
       for (let r = 0; r < STRIP_ROWS; r++) {
-        const depth = ground - (STRIP_TOP - r * CELL - 1);
+        const depth = ground - heightAt(r);
         if (depth < 0) continue;
         const level = depthLevel(depth + (depth > 6 ? shift : 0));
         const floor = Math.floor(level);
@@ -924,48 +1300,271 @@
         tones[r * STRIP_COLUMNS + c] = tone;
       }
     }
-    // Craters: a darker bowl, shadowed under its upper rim, with a light lower lip.
-    for (let index = 0; index < 26; index++) {
-      const cx = random() * PERIOD;
-      const width = 10 + random() * 20;
-      const below = 8 + random() * 52;
+
+    /** A pit in the face: a darker bowl, shadowed under its upper rim, with a light lower lip. */
+    const pit = (cx: number, below: number, width: number) => {
       const rx = width / 2;
       const ry = Math.max(2.6, width * 0.24);
       const cy = groundAt(site, cx) - below - ry;
-      const c0 = Math.floor((cx - rx * 1.3) / CELL);
-      const c1 = Math.ceil((cx + rx * 1.3) / CELL);
-      const r0 = Math.max(0, Math.floor((STRIP_TOP - (cy + ry * 1.8)) / CELL));
-      const r1 = Math.min(STRIP_ROWS - 1, Math.ceil((STRIP_TOP - (cy - ry * 1.8)) / CELL));
-      for (let cc = c0; cc <= c1; cc++) {
-        const c = ((cc % STRIP_COLUMNS) + STRIP_COLUMNS) % STRIP_COLUMNS;
+      for (let cc = Math.floor((cx - rx * 1.3) / CELL); cc <= Math.ceil((cx + rx * 1.3) / CELL); cc++) {
         const dx = (cc * CELL + 1 - cx) / rx;
-        for (let r = r0; r <= r1; r++) {
-          const at = r * STRIP_COLUMNS + c;
-          const tone = tones[at];
-          if (tone < 0) continue;
-          const dy = (STRIP_TOP - r * CELL - 1 - cy) / ry;
+        for (let r = rowAt(cy + ry * 1.8); r <= rowAt(cy - ry * 1.8); r++) {
+          const dy = (heightAt(r) - cy) / ry;
           const d = dx * dx + dy * dy;
-          if (d < 1) tones[at] = Math.min(4, tone + (dy > 0.15 && d > 0.4 ? 2 : 1));
-          else if (d < 1.75 && dy < -0.3) tones[at] = Math.max(0, tone - 1);
+          if (d < 1) shade(cc, r, dy > 0.15 && d > 0.4 ? 2 : 1);
+          else if (d < 1.75 && dy < -0.3) shade(cc, r, -1);
         }
       }
+    };
+    const pits = (count: number, smallest: number, spread: number) => {
+      for (let index = 0; index < count; index++) pit(random() * PERIOD, 8 + random() * 52, smallest + random() * spread);
+    };
+    /** Ray craters' centres and rays (angle, length), streaked on after the light. */
+    const rayCraters: Array<{ cx: number; cy: number; r: number; rays: Array<[number, number]> }> = [];
+
+    switch (site.terrain) {
+      case "mare": {
+        // Small ray craters: fresh pits, their bright rays laid on after the light.
+        for (let index = 0; index < 10; index++) {
+          const cx = random() * PERIOD;
+          const below = 4 + random() * 22;
+          const r = 2.5 + random() * 3.5;
+          pit(cx, below - r * 0.5, r * 2);
+          const rays: Array<[number, number]> = [];
+          const count = 5 + Math.floor(random() * 4);
+          for (let k = 0; k < count; k++) rays.push([(k / count) * Math.PI * 2 + random() * 0.7, r * (3 + random() * 4)]);
+          rayCraters.push({ cx, cy: groundAt(site, cx) - below, r, rays });
+        }
+        pits(12, 6, 12);
+        break;
+      }
+      case "highlands": {
+        // Boulders bedded in the face, lit on top with a shadow under.
+        for (let index = 0; index < 46; index++) {
+          const cx = random() * PERIOD;
+          const cy = groundAt(site, cx) - 6 - random() * 70;
+          const rx = 1.6 + random() * 3.2;
+          const ry = rx * 0.8;
+          for (let cc = Math.floor((cx - rx) / CELL); cc <= Math.ceil((cx + rx) / CELL); cc++) {
+            const dx = (cc * CELL + 1 - cx) / rx;
+            for (let r = rowAt(cy + ry); r <= rowAt(cy - ry * 1.6); r++) {
+              const dy = (heightAt(r) - cy) / ry;
+              const d = dx * dx + dy * dy;
+              if (d < 1) shade(cc, r, -1);
+              else if (dy < -0.9 && dy > -1.6 && Math.abs(dx) < 0.8) shade(cc, r, 1);
+            }
+          }
+        }
+        pits(10, 8, 14);
+        break;
+      }
+      case "craters":
+        pits(30, 8, 22);
+        break;
+      case "rille": {
+        const trench = featureOf("rille");
+        if (!trench) break;
+        // Darker banks along the lip, and the trench's own walls and floor in shade.
+        for (let c = 0; c < STRIP_COLUMNS; c++) {
+          const d = around(c * CELL + 1, trench.cx);
+          const lip = trench.floorHalf + trench.walls[d < 0 ? 0 : 1];
+          const a = Math.abs(d);
+          const top = surfaceRow(c);
+          if (a < lip) {
+            for (let r = top; r < top + 12; r++) if (r < top + 7 || bayer(c, r) < 0.5) shade(c, r, 1);
+          } else if (a < lip + 40) {
+            const strength = 1 - (a - lip) / 40;
+            for (let r = top; r < top + 8; r++) if (strength * 0.95 > bayer(c, r)) shade(c, r, 1);
+          }
+        }
+        pits(16, 8, 16);
+        bakeRilleWall(trench);
+        break;
+      }
+      case "mesas": {
+        // Strata across each mesa's face, above the low ground, under a pale caprock.
+        const PATTERN = [0, 1, 1, 2, 0, 1, 2, 2, 1, 0, 1, 3];
+        for (let c = 0; c < STRIP_COLUMNS; c++) {
+          const ground = surface[c];
+          if (lowLine[c] >= ground) continue;
+          const x = c * CELL + 1;
+          const lean = (tableNoise(wobble, (x / PERIOD) * wobble.length * 3) - 0.5) * 3;
+          for (let r = surfaceRow(c); r < STRIP_ROWS && heightAt(r) > lowLine[c]; r++) {
+            const y = heightAt(r);
+            const index = r * STRIP_COLUMNS + c;
+            const depth = ground - y;
+            const band = Math.floor((y + lean) / 7);
+            tones[index] = depth < 2.5 ? 0 : Math.min(4, PATTERN[((band % PATTERN.length) + PATTERN.length) % PATTERN.length] + (depth > 40 ? 1 : 0));
+          }
+        }
+        pits(8, 6, 10);
+        break;
+      }
+      case "dunes": {
+        // Fine grain near the surface, and bedding lines that follow it.
+        for (let c = 0; c < STRIP_COLUMNS; c++) {
+          const x = c * CELL + 1;
+          const top = surfaceRow(c);
+          for (let r = top; r < top + 15; r++) {
+            const grain = ihash(c * 3301 + r * 977 + siteSeed);
+            if (grain < 0.05) shade(c, r, 1);
+            else if (grain > 0.975) shade(c, r, -1);
+          }
+          for (const below of [3.5, 8, 13.5, 20]) {
+            if ((c + Math.round(below * 3)) % 6 === 0) continue;
+            shade(c, rowAt(surface[c] - below - 1.2 * Math.sin(x * 0.07 + below * 1.7)), 1);
+          }
+        }
+        break;
+      }
     }
+
+    // Light: the sun is low on the right, so a band under the surface goes a
+    // tone deeper where higher ground to the right blocks it, softly at the
+    // shadow's edge, or where the slope turns away from it.
+    for (let c = 0; c < STRIP_COLUMNS; c++) {
+      const ground = surface[c];
+      let blocked = 0;
+      for (let k = 1; k < STRIP_COLUMNS / 2; k++) {
+        const ray = ground + k * CELL * look.sun;
+        if (ray > 190) break;
+        blocked = Math.max(blocked, surface[column(c + k)] - ray);
+      }
+      const slope = (surface[column(c + 1)] - surface[column(c - 1)]) / (2 * CELL);
+      const dark = Math.max(clamp(blocked / 6, 0, 1), clamp((slope - 0.6) / 0.8, 0, 1));
+      if (dark <= 0) continue;
+      const top = surfaceRow(c);
+      for (let r = top; r < top + 6; r++) if (dark > bayer(c, r)) shade(c, r, 1);
+    }
+
+    // Ray-crater streaks, brighter than lit ground, fading as they reach out.
+    const RAY = 5;
+    for (const [index, crater] of rayCraters.entries()) {
+      crater.rays.forEach(([angle, length], k) => {
+        for (let t = crater.r * 1.3; t < length; t += CELL * 0.6) {
+          const fade = (t - crater.r) / (length - crater.r);
+          if (ihash(Math.round(t * 13) + k * 977 + index * 7919) < fade * 1.1) continue;
+          const c = column(Math.floor((crater.cx + Math.cos(angle) * t) / CELL));
+          const r = rowAt(crater.cy + Math.sin(angle) * t * 0.45);
+          if (r >= 0 && r < STRIP_ROWS && tones[r * STRIP_COLUMNS + c] >= 0) tones[r * STRIP_COLUMNS + c] = RAY;
+        }
+      });
+    }
+
+    const palette = [...look.regolith, look.ray ?? look.regolith[0]].map(rgb);
     const image = context.createImageData(STRIP_COLUMNS, STRIP_ROWS);
     for (let index = 0; index < tones.length; index++) {
-      if (tones[index] >= 0) putPixel(image.data, index, REGOLITH_RGB[tones[index]]);
+      if (tones[index] >= 0) putPixel(image.data, index, palette[tones[index]]);
     }
     context.putImageData(image, 0, 0);
+    if (site.terrain !== "rille") backStrip = null;
+    placeRocks(random);
+  }
 
-    // Pixel rocks wherever the surface is flat enough to hold one.
+  /**
+   * The rille's far wall, seen across the trench behind its near cut: it
+   * dips where the rille winds off into the distance and rises to meet each
+   * lip. Painted behind the ground, in a tone between the regolith and the
+   * night.
+   */
+  function bakeRilleWall(trench: Extract<Site["features"][number], { kind: "rille" }>) {
+    backStrip ??= document.createElement("canvas");
+    backStrip.width = STRIP_COLUMNS;
+    backStrip.height = STRIP_ROWS;
+    const context = backStrip.getContext("2d");
+    if (!context) return;
+    context.clearRect(0, 0, STRIP_COLUMNS, STRIP_ROWS);
+    const random = createRng(siteSeed ^ 0x7a11);
+    const bend = (random() - 0.5) * 0.6;
+    const wall = toHex(mixRgb(rgb(look.regolith[3]), rgb(look.range.near), 0.45));
+    const edge = toHex(mixRgb(rgb(look.regolith[2]), rgb(look.range.near), 0.3));
+    const lips = [-1, 1].map((side) => groundAt(site, trench.cx + side * (trench.floorHalf + trench.walls[side < 0 ? 0 : 1])));
+    for (let c = 0; c < STRIP_COLUMNS; c++) {
+      const x = c * CELL + 1;
+      const d = around(x, trench.cx);
+      const lip = trench.floorHalf + trench.walls[d < 0 ? 0 : 1];
+      if (Math.abs(d) >= lip) continue;
+      const u = clamp(d / lip - bend, -1, 1);
+      const rim = lips[d < 0 ? 0 : 1];
+      const top = trench.floorY + (rim - trench.floorY) * (0.22 + 0.55 * Math.pow(Math.abs(u), 1.3) + 0.05 * Math.sin(x * 0.11));
+      const ground = groundAt(site, x);
+      if (top <= ground) continue;
+      const r0 = Math.round((STRIP_TOP - 1 - top) / CELL);
+      const r1 = Math.ceil((STRIP_TOP - 1 - ground) / CELL);
+      context.fillStyle = wall;
+      context.fillRect(c, r0, 1, Math.max(0, r1 - r0));
+      context.fillStyle = edge;
+      context.fillRect(c, r0, 1, 1);
+    }
+  }
+
+  /** Rocks on the surface, scattered as each terrain sheds them. */
+  function placeRocks(random: () => number) {
     rocks = [];
-    for (let index = 0; index < 40; index++) {
-      const x = Math.floor((random() * PERIOD) / CELL) * CELL;
-      const w = 1 + Math.floor(random() * 3);
-      const h = random() < 0.45 ? 2 : 1;
-      if (onPad(x, 10)) continue;
+    const tryRock = (x: number, w: number, h: number, steepest: number) => {
+      x = Math.floor((((x % PERIOD) + PERIOD) % PERIOD) / CELL) * CELL;
+      if (onPad(x, 10)) return;
       const slope = Math.abs(groundAt(site, x + w * CELL + 2) - groundAt(site, x - 2)) / (w * CELL + 4);
-      if (slope > 0.2) continue;
-      rocks.push({ x, w, h });
+      if (slope <= steepest) rocks.push({ x, w, h });
+    };
+    const scatter = (count: number, widest: number, tallest: number, steepest: number) => {
+      for (let index = 0; index < count; index++) {
+        tryRock(random() * PERIOD, 1 + Math.floor(random() * widest), 1 + Math.floor(random() * tallest), steepest);
+      }
+    };
+    switch (site.terrain) {
+      case "mare":
+        scatter(26, 2, 2, 0.25);
+        break;
+      case "highlands":
+        // Boulder fields: clusters at the feet of the ridges.
+        for (let field = 0; field < 7; field++) {
+          const centre = random() * PERIOD;
+          const count = 6 + Math.floor(random() * 7);
+          for (let index = 0; index < count; index++) {
+            tryRock(centre + (random() - 0.5) * 80, 1 + Math.floor(random() * 4), 1 + Math.floor(random() * 3), 0.6);
+          }
+        }
+        scatter(12, 2, 2, 0.4);
+        break;
+      case "craters":
+        // Blocks thrown out over the rims.
+        for (const feature of site.features) {
+          if (feature.kind !== "crater") continue;
+          for (let index = 0; index < 4; index++) {
+            const side = random() < 0.5 ? -1 : 1;
+            tryRock(feature.cx + side * feature.r * (1 + random() * 0.6), 1 + Math.floor(random() * 3), 1 + Math.floor(random() * 2), 0.45);
+          }
+        }
+        scatter(16, 2, 2, 0.3);
+        break;
+      case "rille": {
+        const trench = featureOf("rille");
+        if (trench) {
+          // Blocks fallen from the walls onto the floor.
+          for (let index = 0; index < 8; index++) {
+            const side = random() < 0.5 ? -1 : 1;
+            tryRock(trench.cx + side * (trench.floorHalf - 2 - random() * 8), 1 + Math.floor(random() * 3), 1 + Math.floor(random() * 3), 0.6);
+          }
+        }
+        scatter(24, 3, 2, 0.25);
+        break;
+      }
+      case "mesas":
+        // Talus: boulders spilled at the foot of each cliff.
+        for (const feature of site.features) {
+          if (feature.kind !== "mesa") continue;
+          for (let index = 0; index < 6; index++) {
+            const side = random() < 0.5 ? -1 : 1;
+            const out = feature.half + feature.cliff + random() * (feature.talus + 10);
+            tryRock(feature.cx + side * out, 1 + Math.floor(random() * 3), 1 + Math.floor(random() * 2), 0.9);
+          }
+        }
+        scatter(10, 2, 2, 0.25);
+        break;
+      case "dunes":
+        scatter(4, 1, 1, 0.2);
+        break;
     }
   }
 
@@ -997,16 +1596,9 @@
     if (groundPoints.length < 4) return;
     const bottom = viewH + 40;
 
-    ctx.save();
-    // Lit regolith, opaque, so it hides the sky behind it.
-    traceGround(0, 0);
-    ctx.lineTo(groundPoints[groundPoints.length - 2], bottom);
-    ctx.lineTo(groundPoints[0], bottom);
-    ctx.closePath();
-    ctx.fillStyle = REGOLITH[0];
-    ctx.fill();
-    ctx.clip();
-    if (groundStrip) {
+    /** Draws a strip baked one pixel per world cell over every copy in view. */
+    const drawStrip = (strip: HTMLCanvasElement) => {
+      if (!ctx) return;
       const top = sy(STRIP_TOP);
       const height = STRIP_ROWS * CELL * S;
       for (let k = Math.floor(left / PERIOD); k <= Math.floor(right / PERIOD); k++) {
@@ -1017,11 +1609,25 @@
         // Whole-pixel edges, so neighbouring copies meet without a seam.
         const x0 = Math.floor(sx(origin + c0 * CELL));
         const x1 = Math.ceil(sx(origin + c1 * CELL));
-        ctx.drawImage(groundStrip, c0, 0, c1 - c0, STRIP_ROWS, x0, top, x1 - x0, height);
+        ctx.drawImage(strip, c0, 0, c1 - c0, STRIP_ROWS, x0, top, x1 - x0, height);
       }
+    };
+    if (backStrip) drawStrip(backStrip);
+
+    ctx.save();
+    // Lit regolith, opaque, so it hides the sky behind it.
+    traceGround(0, 0);
+    ctx.lineTo(groundPoints[groundPoints.length - 2], bottom);
+    ctx.lineTo(groundPoints[0], bottom);
+    ctx.closePath();
+    ctx.fillStyle = look.regolith[0];
+    ctx.fill();
+    ctx.clip();
+    if (groundStrip) {
+      drawStrip(groundStrip);
       const under = sy(STRIP_BOTTOM);
       if (under < viewH) {
-        ctx.fillStyle = REGOLITH[3];
+        ctx.fillStyle = look.regolith[3];
         ctx.fillRect(0, under - 1, viewW, viewH - under + 41);
       }
     }
@@ -1051,16 +1657,18 @@
       for (const rock of rocks) {
         const x = rock.x + k * PERIOD;
         if (x < cam.x - half || x > cam.x + half) continue;
-        const baseY = sy(groundAt(site, x + rock.w)) + 1;
+        // Seated on the lower end, so a rock on a slope beds in rather than floats.
+        const baseY = sy(Math.min(groundAt(site, x), groundAt(site, x + rock.w * CELL))) + 1;
         const left = sx(x);
-        ctx.fillStyle = REGOLITH[3];
+        const tones = look.regolith;
+        ctx.fillStyle = tones[3];
         const shadowX = Math.round(left - cs);
         ctx.fillRect(shadowX, Math.round(baseY - cs * 0.5), Math.round(left) - shadowX, Math.max(1, Math.round(cs * 0.5)));
         for (let b = 0; b < rock.h; b++) {
           for (let a = 0; a < rock.w; a++) {
             if (b > 0 && a === 0 && rock.w > 1) continue;
             const top = b === rock.h - 1;
-            ctx.fillStyle = top && a === rock.w - 1 ? REGOLITH[0] : a === 0 || b === 0 ? REGOLITH[2] : REGOLITH[1];
+            ctx.fillStyle = top && a === rock.w - 1 ? tones[0] : a === 0 || b === 0 ? tones[2] : tones[1];
             const x0 = Math.round(left + a * cs);
             const y0 = Math.round(baseY - (b + 1) * cs);
             ctx.fillRect(x0, y0, Math.round(left + (a + 1) * cs) - x0, Math.round(baseY - b * cs) - y0);
@@ -1103,9 +1711,16 @@
     ctx.lineWidth = 2;
     ctx.strokeRect(left, top, width, thick);
 
-    // The label sits on the lit ground, so ink reads in either site theme.
+    // The label sits on a chip of lit ground, so ink and ochre read in either
+    // site theme, even where the ground under it is in shadow.
+    const label = `×${pad.multiplier}`;
+    const labelX = (left + right) / 2;
+    const labelY = top + thick + 7;
+    const chip = Math.ceil((ctx.measureText(label).width + 8) / 2) * 2;
+    ctx.fillStyle = look.regolith[0];
+    ctx.fillRect(Math.round(labelX - chip / 2), Math.round(labelY - 2), chip, 17);
     ctx.fillStyle = pad.multiplier === 5 ? LABEL_GOLD : SCENE_INK;
-    ctx.fillText(`×${pad.multiplier}`, (left + right) / 2, top + thick + 7);
+    ctx.fillText(label, labelX, labelY);
 
     // A post just outside the coaster's left end, carrying a pennant that
     // hangs limp in still air and streams downwind.
@@ -1490,7 +2105,7 @@
           ctx.globalAlpha = Math.ceil((1 - t) * 4) / 4;
           for (let k = 0; k < shape.length; k += 2) {
             const cell = k / 2;
-            ctx.fillStyle = shape[k + 1] > 0 ? REGOLITH[0] : REGOLITH[(cell + p.seed) % 3];
+            ctx.fillStyle = shape[k + 1] > 0 ? look.regolith[0] : look.regolith[(cell + p.seed) % 3];
             ctx.fillRect(
               Math.round(x + shape[k] * spread - cs / 2),
               Math.round(baseY - (shape[k + 1] + 1) * spread),
@@ -1698,16 +2313,26 @@
 
   function showIntro() {
     showCaption("intro", "", siteIntro);
-    liveMessage = `Site ${site.n}, ${site.name}. ${siteIntro}`;
+    const pays = site.n > 1 ? ` Landings pay ${siteMultLabel} times.` : "";
+    liveMessage = `Site ${site.n}, ${site.name}.${pays} ${siteIntro}`;
   }
 
+  /** ×1, ×1.25, ×1.5 … as the ticket prints them. */
+  const multLabel = (value: number) => String(Math.round(value * 100) / 100);
+
   function enterSite(n: number) {
-    siteSeed = seedBase + n * 7919;
-    site = makeSite(n, siteSeed);
+    site = makeSite(n, seedBase);
+    siteSeed = site.seed;
+    look = LOOKS[site.terrain];
+    plan = planSky(site);
+    SUN = sunFor(plan);
+    STARS = makeStars(plan.seed);
     siteN = n;
     siteName = site.name;
+    siteMultLabel = multLabel(siteMultiplier(n));
     siteIntro = introFor(n);
     ghosts = [];
+    buildScene();
   }
 
   /** A fresh ship at the top of the sky, and a clean sheet around it. */
@@ -2344,10 +2969,8 @@
       snapCamera();
     }
     S = base * cam.z;
-    buildSky();
-    for (const range of RANGES) buildRange(range);
     earthR = Math.max(6, Math.round((Math.min(viewW, viewH) * 0.09) / SC));
-    earthDirty = true;
+    buildScene();
     draw();
   }
 
@@ -2447,7 +3070,10 @@
         </span>
         <span class="boba-big">{String(score).padStart(4, "0")}</span>
         <span class="boba-stack">
-          <span class="boba-meta">site {pad2(siteN, 2)}</span>
+          <span class="boba-meta tm-site">
+            <span>site {pad2(siteN, 2)}</span>
+            <span class="tm-mult"><span class="sr-only">points </span>×{siteMultLabel}</span>
+          </span>
           <span class="boba-phase tm-site-name">{siteName}</span>
         </span>
       </div>
@@ -2598,14 +3224,14 @@
     game="lander"
     title="splashdown"
     deck={landings === 0
-      ? "No tea reached the moon. The moon will manage."
-      : `${landings} ${landings === 1 ? "cup" : "cups"} delivered before the pearls ran out.`}
+      ? "No tea reached the moon."
+      : `${landings} ${landings === 1 ? "landing" : "landings"} before the last lander went down.`}
     {score}
     unit="points"
     {newBest}
     stats={[
-      { label: "cups delivered", value: landings },
-      { label: "sites reached", value: siteN },
+      { label: "landings", value: landings },
+      { label: "furthest site", value: siteN },
       { label: "best landing", value: bestLanding },
       { label: "feather landings", value: feathers },
       { label: "personal best", value: localBest },
@@ -2633,6 +3259,21 @@
      shared sheet carries the same rule; this keeps it if that lands later. */
   .boba-hud.is-bare::before {
     content: none;
+  }
+
+  /* The site's points multiplier stands apart from its number, a small
+     figure of its own. */
+  .tm-site {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    white-space: nowrap;
+  }
+
+  .tm-mult {
+    color: var(--b-strong);
+    font-variant-numeric: lining-nums tabular-nums;
+    font-weight: 500;
   }
 
   .tm-site-name {
@@ -2826,6 +3467,13 @@
     .tm-site-name,
     .tm-tea-label {
       display: none;
+    }
+
+    /* The multiplier takes the site name's place, under the site number. */
+    .tm-site {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-0-5);
     }
   }
 </style>
