@@ -1,8 +1,9 @@
 <script lang="ts">
-  // Autumn leaves drifting down the homepage's right margin and piling up at
-  // the bottom of the screen, drawn as a grid of small rounded cells: a leaf's
-  // interior is solid squares, its ragged edge is set in characters by how
-  // much of each cell it covers, and its stem is a single stroke glyph. Each
+  // Autumn leaves drifting down the whole height of the homepage's right
+  // margin and piling up at the bottom of the screen, drawn as a grid of
+  // small rounded cells: a leaf's interior is solid squares, its ragged edge
+  // is set in characters by how much of each cell it covers, and its stem is
+  // a single stroke glyph. Each
   // leaf turns from one autumn colour at the stem toward another at the tip,
   // and some are still green at the stem.
   //
@@ -22,16 +23,28 @@
   // The pile is solved by events, never by a running loop, so a leaf at rest
   // stays exactly where it is. Only when leaves leave it (kicked up by a
   // brisk sweep or a click, or slipping out under the screen once the pile is
-  // full) is its footing worked out again, and any leaf that lost its footing
-  // falls again, the same way, to its new spot. Baked leaves cost no more to
-  // draw than one image each.
+  // full) or the floor moves under it is its footing worked out again, and
+  // any leaf that lost its footing falls again, the same way, to its new
+  // spot. Baked leaves cost no more to draw than one image each.
+  //
+  // The leaves are on the page, not the screen: they are laid out in page
+  // coordinates on a grid that scrolls with the text, and the floor they
+  // pile on is the bottom edge of the screen, which moves through the page
+  // as it scrolls. Scrolled down, the floor drops away and whatever it held
+  // falls after it, from just as it lay. Scrolled up, the floor comes up
+  // under the leaves: slowly, the pile rides up on it a cell at a time;
+  // briskly, the pile is squeezed against it (its leaves turn edge-on and
+  // crumple) and thrown, about as hard as the scroll was fast, within
+  // reason, to drift back down. A jump (a link, the page restoring its
+  // scroll) moves the page alone, as does any scroll while the leaves are
+  // still.
   //
   // The canvas lives on <body>, not in the page: page transitions transform
   // the page layer, which would drag a fixed element along mid-route. It sits
   // only in the margin to the right of the content column, never under text,
   // and is hidden where that margin is too narrow to hold a leaf. Reduce
-  // Motion leaves one still frame (with a pile). Colors are canvas rendering,
-  // so they are hard-coded.
+  // Motion leaves one still frame (with a pile) that stays put on screen.
+  // Colors are canvas rendering, so they are hard-coded.
   import { onMount } from "svelte";
   import { dev } from "$app/environment";
   import { arcadeScreen } from "$lib/boba";
@@ -45,11 +58,11 @@
   const REDUCE_QUERY = "(prefers-reduced-motion: reduce)";
   /** Lowkey: leaves are drawn faint. */
   const ALPHA = { light: 0.5, dark: 0.42 };
-  /** Falling leaves per 1000px of margin height. */
+  /** Falling leaves per 1000px of margin height, through the whole of it,
+   *  and the fewest and most there are, however short or tall the screen. */
   const DENSITY = 7;
-  /** Leaves fall through the lower part of the screen only: they fade in
-   *  around this share of its height, so the top of the page stays clear. */
-  const START_SHARE = 0.5;
+  const FALLING_MIN = 6;
+  const FALLING_MAX = 18;
   /** Leaves the pile holds per 100px of margin width; past that, a leaf on
    *  the floor slips out under the screen. */
   const PILE_PER_100PX = 4.5;
@@ -72,6 +85,29 @@
   /** Seconds of falling simulated before the first frame, so the pile is
    *  already started on load. */
   const HEAD_START_S = 40;
+  /** Seconds between new leaves at most, so a long scroll down (which
+   *  carries leaves up out of play) can't call up a stream of them. */
+  const SPAWN_GAP_S = 0.5;
+  /** Screen heights above the screen at which a leaf left behind on the
+   *  page is let go. */
+  const KEEP_SCREENS = 1.5;
+  /** From a falling leaf's centre to where the floor meets it, in blade
+   *  lengths. */
+  const FOOT = 0.3;
+  /** Px/s: the floor rising slower than this carries the pile up on it;
+   *  faster, it throws the pile. */
+  const FLING_MIN = 120;
+  /** Share of the floor's speed a thrown leaf flies off with, and the most
+   *  it can, px/s, however fast the scroll. */
+  const FLING_SHARE = 0.6;
+  const FLING_MAX = 480;
+  /** Seconds the floor's speed is smoothed over. */
+  const RISE_SMOOTH_S = 0.06;
+  /** After the leaves go live, ms in which the page moving into place
+   *  (its scroll restored, or reset by a navigation) moves the page alone;
+   *  a little longer while it's still moving, but never past the cap. */
+  const SETTLE_MS = 250;
+  const SETTLE_MAX_MS = 1500;
 
   // Autumn, weighted toward reds and oranges, with some browns and a few golds.
   const PALETTE: [string, number][] = [
@@ -149,6 +185,9 @@
     flip: number;
     flipRate: number;
     flipBoost: number;
+    /** Px/s it may fly at for a moment, past MAX_SPEED, having been thrown
+     *  by the floor; it dies away as the air slows the leaf. */
+    flung: number;
     crumple: number;
     /** How it will lie: off level by `restTilt`, foreshortened to `flat` of
      *  its width, crumpled to `restCrumple`. */
@@ -194,6 +233,9 @@
   /** A footprint moved by whole cells. */
   const shifted = (cols: Footprint, dc: number, dr: number): Footprint =>
     new Map([...cols].map(([c, e]) => [c + dc, { top: e.top + dr * CELL, bottom: e.bottom + dr * CELL }]));
+  /** How much of the floor's throw a leaf keeps, by its own make, so a pile
+   *  thrown together comes apart in the air. */
+  const bounce = (leaf: Leaf) => 0.8 + 0.3 * ((leaf.seed * 7.31) % 1);
 
   /** Is (u, v) inside the blade? u is across the midrib, v runs stem (0) to
    *  tip (1), both in units of the blade length. Crumpling pulls a maple's
@@ -376,12 +418,11 @@
       "pointer-events:none",
       "opacity:0",
       "transition:opacity 0.8s ease",
-      // Soften the edge nearest the text, so leaves fade rather than clip,
-      // and fade them in around START_SHARE, so none appears out of thin air.
-      `mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,transparent ${START_SHARE * 100 - 8}%,#000 ${START_SHARE * 100 + 6}%)`,
-      "mask-composite:intersect",
-      `-webkit-mask-image:linear-gradient(to right,transparent,#000 22%),linear-gradient(to bottom,transparent ${START_SHARE * 100 - 8}%,#000 ${START_SHARE * 100 + 6}%)`,
-      "-webkit-mask-composite:source-in",
+      // Soften the edge nearest the text, so leaves fade rather than clip.
+      // New leaves come in over the top edge, so none appears out of thin
+      // air.
+      "mask-image:linear-gradient(to right,transparent,#000 22%)",
+      "-webkit-mask-image:linear-gradient(to right,transparent,#000 22%)",
     ].join(";");
     document.body.appendChild(canvas);
     const ctx = canvas.getContext("2d")!;
@@ -402,7 +443,23 @@
     let arcadeOpen = false;
     let started = false;
     let font = "sans-serif";
+    /** Leaves live in page coordinates: x across the canvas, y down the
+     *  page. The screen shows y from `view` to `view + height`, and its
+     *  bottom edge is the floor. Only scroll deltas move `view`, so it is
+     *  the page's scroll give or take a constant. */
+    let view = 0;
+    /** The page's scroll as of the last frame. */
+    let scrollAt = 0;
+    /** Px/s the floor is rising (scrolling up), smoothed. */
+    let rise = 0;
+    let liveAt = 0;
+    let settleUntil = 0;
+    let spawnWait = 0;
+    /** Leaves owed to the band a scroll has uncovered, in fractions of one. */
+    let revealed = 0;
+    /** Viewport (canvas) coordinates: the pointer moves on the screen. */
     const pointer = { x: -1e4, y: -1e4, vx: 0, vy: 0, t: -1 };
+    const floorY = () => view + height;
 
     function makeLeaf(scattered: boolean): Leaf {
       const shape = weighted(SHAPES);
@@ -415,10 +472,8 @@
         turn: rand(0.2, 0.75),
         len,
         x: rand(width * 0.32, width * 0.86),
-        // New leaves start just above where the fade-in begins.
-        y: scattered
-          ? rand(height * START_SHARE, height * 0.85)
-          : height * (START_SHARE - 0.08) - rand(0, len * 2),
+        // New leaves start just above the top of the screen.
+        y: scattered ? view + rand(height * 0.05, height * 0.85) : view - rand(len, len * 3),
         vx: 0,
         vy: 0,
         fall: rand(16, 30),
@@ -432,6 +487,7 @@
         flip: rand(0, Math.PI * 2),
         flipRate: rand(0.25, 0.7),
         flipBoost: 0,
+        flung: 0,
         crumple: rand(0, 0.25),
         restTilt: rand(-0.35, 0.35),
         flat: rand(0.45, 0.7),
@@ -465,7 +521,7 @@
       return { x: leaf.x, y: leaf.y, angle: angleOf(leaf), flip: leaf.flip, crumple: leaf.crumple };
     }
 
-    const surfaceAt = (col: number) => surface.get(col) ?? height;
+    const surfaceAt = (col: number) => surface.get(col) ?? floorY();
 
     function rebuildSurface() {
       surface = new Map();
@@ -478,11 +534,12 @@
      *  for already taken, so two leaves don't aim for the same place. */
     function claimed(except: Leaf) {
       const claims = new Map(surface);
+      const floor = floorY();
       for (const leaf of falling) {
         if (leaf === except || !leaf.approach) continue;
-        for (const [c, e] of leaf.approach.cols) claims.set(c, Math.min(claims.get(c) ?? height, e.top));
+        for (const [c, e] of leaf.approach.cols) claims.set(c, Math.min(claims.get(c) ?? floor, e.top));
       }
-      return (c: number) => claims.get(c) ?? height;
+      return (c: number) => claims.get(c) ?? floor;
     }
 
     /** The highest point of the pile (or the floor) under a falling leaf. */
@@ -566,7 +623,7 @@
       let { k, rows } = solve(base, under, pose.x, leaf.len);
       let top = Infinity;
       for (const e of base.values()) top = Math.min(top, e.top + rows * CELL);
-      if (height - top > height * PILE_MAX_SHARE) {
+      if (floorY() - top > height * PILE_MAX_SHARE) {
         let lowest = { k, rows };
         for (let d = -SLIDE_CELLS; d <= SLIDE_CELLS; d++) {
           const x = pose.x + (k + d) * CELL;
@@ -705,11 +762,14 @@
 
     /** After leaves leave the pile, work its footing out again, lowest
      *  leaves first so each rests on where the ones under it end up. A leaf
-     *  that lost its footing falls again, gently, to its new spot. */
-    function collapse() {
+     *  that lost its footing falls again, gently, to its new spot; or, when
+     *  the floor dropped away (`free`), falls from just as it lay, tumbling
+     *  as it goes, and finds its spot as any falling leaf does. */
+    function collapse(free = false) {
       const order = [...pile].sort((a, b) => bottomOf(b.cols) - bottomOf(a.cols));
-      const floor = new Map<number, number>();
-      const under = (c: number) => floor.get(c) ?? height;
+      const laid = new Map<number, number>();
+      const floor = floorY();
+      const under = (c: number) => laid.get(c) ?? floor;
       const kept: Rest[] = [];
       for (const r of order) {
         const { k, rows } = solve(r.cols, under, r.pose.x, r.leaf.len);
@@ -717,15 +777,18 @@
         if (rows > 0 || (k !== 0 && rows >= 0)) {
           cols = shifted(r.cols, k, rows);
           const leaf = unrest(r);
-          const to = { ...r.pose, x: r.pose.x + k * CELL, y: r.pose.y + rows * CELL };
-          leaf.approach = {
-            y0: r.pose.y,
-            from: { angle: r.pose.angle, flip: r.pose.flip, crumple: r.pose.crumple },
-            to,
-            cols,
-          };
+          if (free) sway(leaf, rand(0.2, 0.4));
+          else {
+            const to = { ...r.pose, x: r.pose.x + k * CELL, y: r.pose.y + rows * CELL };
+            leaf.approach = {
+              y0: r.pose.y,
+              from: { angle: r.pose.angle, flip: r.pose.flip, crumple: r.pose.crumple },
+              to,
+              cols,
+            };
+          }
         } else kept.push(r);
-        for (const [c, e] of cols) floor.set(c, Math.min(under(c), e.top));
+        for (const [c, e] of cols) laid.set(c, Math.min(under(c), e.top));
       }
       pile = pile.filter((r) => kept.includes(r));
       rebuildSurface();
@@ -735,6 +798,161 @@
     function launch(r: Rest, vx: number, vy: number) {
       const leaf = unrest(r);
       Object.assign(leaf, { vx, vy, swing: rand(0.35, 0.7), spinVel: rand(-4, 4), flipBoost: 4 });
+      return leaf;
+    }
+
+    /** Set a leaf swinging again, from exactly the angle it's at. */
+    function sway(leaf: Leaf, swing: number) {
+      Object.assign(leaf, { tilt: angleOf(leaf), spin: 0, phase: -time * leaf.swayRate, swing });
+    }
+
+    /** Move the pile, and every spot a leaf is headed for, by whole rows,
+     *  so the baked leaves stay on the grid. */
+    function carry(rows: number) {
+      if (!rows) return;
+      const d = rows * CELL;
+      for (const r of pile) {
+        r.pose = { ...r.pose, y: r.pose.y + d };
+        r.cols = shifted(r.cols, 0, rows);
+        r.sy += d;
+      }
+      for (const leaf of falling) {
+        const a = leaf.approach;
+        if (!a) continue;
+        a.to = { ...a.to, y: a.to.y + d };
+        a.cols = shifted(a.cols, 0, rows);
+      }
+      rebuildSurface();
+    }
+
+    /** Falling leaves still in play: not slipping out, and not carried
+     *  up the page, by a scroll, above where new ones come in. */
+    function inPlay() {
+      let n = 0;
+      for (const leaf of falling) if (!leaf.leaving && leaf.y > view - leaf.len * 3.5) n++;
+      return n;
+    }
+
+    /** The page scrolled by `dy` (down the page is positive) over
+     *  `seconds`. The leaves are on the page, so they go with it, and the
+     *  floor, the bottom of the screen, moves through them. */
+    function scrollBy(dy: number, seconds: number) {
+      if (seconds > 0) rise += (Math.max(0, -dy / seconds) - rise) * (1 - Math.exp(-seconds / RISE_SMOOTH_S));
+      if (!dy) return;
+      // A jump moves the page alone: the leaves stay where they are on
+      // screen, rather than all being dropped or thrown at once.
+      if (Math.abs(dy) > height) {
+        rise = 0;
+        return;
+      }
+      view += dy;
+      if (dy > 0) dropAway();
+      else pushUp();
+      reveal(dy);
+    }
+
+    /** The page beyond the screen has leaves on it too. A scroll uncovers
+     *  a band of it (at the bottom going down, at the top going up), and the
+     *  leaves already falling there come into view with it, at the margin's
+     *  usual density, so a long scroll never leaves the side bare. */
+    function reveal(dy: number) {
+      revealed += (Math.abs(dy) * target) / Math.max(1, height);
+      while (revealed >= 1) {
+        revealed -= 1;
+        if (inPlay() >= FALLING_MAX) continue;
+        const leaf = makeLeaf(true);
+        leaf.y = dy > 0 ? floorY() - rand(0, dy) - leaf.len * 0.5 : view + rand(0, -dy) - leaf.len * 0.5;
+        leaf.vy = leaf.fall;
+        falling.push(leaf);
+      }
+    }
+
+    /** The floor dropped: whatever it held loses its footing and falls. */
+    function dropAway() {
+      if (pile.length) collapse(true);
+      // A leaf headed for a spot nothing holds up any more falls on from
+      // just as it is, and finds a new one lower down. Lowest first, so a
+      // spot on another leaf's spot keeps if that one does.
+      const floor = floorY();
+      const laid = new Map(surface);
+      const under = (c: number) => laid.get(c) ?? floor;
+      const heading = falling
+        .filter((l) => l.approach)
+        .sort((a, b) => bottomOf(b.approach!.cols) - bottomOf(a.approach!.cols));
+      for (const leaf of heading) {
+        const cols = leaf.approach!.cols;
+        let drop = Infinity;
+        for (const [c, e] of cols) drop = Math.min(drop, under(c) - e.bottom + NESTLE);
+        if (drop >= CELL) release(leaf);
+        else for (const [c, e] of cols) laid.set(c, Math.min(under(c), e.top));
+      }
+      // One slipping out under the screen is back on it: it falls on like
+      // any other.
+      for (const leaf of falling) {
+        if (!leaf.leaving || leaf.y > floor - leaf.len) continue;
+        leaf.leaving = false;
+        leaf.flipRate = rand(0.25, 0.7);
+        sway(leaf, rand(0.2, 0.4));
+      }
+    }
+
+    /** The floor came up under the leaves. */
+    function pushUp() {
+      const floor = floorY();
+      const speed = Math.min(FLING_MAX, FLING_SHARE * rise);
+      // How far it has come up into what rests on it, or is about to.
+      let deepest = -Infinity;
+      for (const r of pile) deepest = Math.max(deepest, bottomOf(r.cols));
+      for (const leaf of falling) if (leaf.approach) deepest = Math.max(deepest, bottomOf(leaf.approach.cols));
+      const into = deepest - (floor + NESTLE);
+      if (into > 0) {
+        if (rise < FLING_MIN) {
+          // Slowly: the pile rides up on it, a cell at a time.
+          carry(-Math.ceil(into / CELL));
+        } else {
+          // Briskly: the pile is squeezed up against it and thrown, and no
+          // spot a leaf was headed for is there any more.
+          for (const leaf of falling) release(leaf);
+          const thrown = pile;
+          pile = [];
+          surface = new Map();
+          for (const r of thrown) {
+            const leaf = launch(r, rand(-0.2, 0.2) * speed, -speed * bounce(r.leaf));
+            leaf.flung = speed * 1.25;
+          }
+        }
+      }
+      // Whatever it comes up under is pushed up with it, and flung.
+      for (const leaf of falling) {
+        if (leaf.leaving || leaf.approach) continue;
+        const under = leaf.y + leaf.len * FOOT - floor;
+        if (under <= 0) continue;
+        leaf.y -= under;
+        fling(leaf, speed);
+      }
+    }
+
+    /** Caught by the floor coming up at `speed` px/s: squeezed against it
+     *  (turning edge-on, crumpling a little) and thrown up off it. While
+     *  the floor keeps coming it keeps the leaf pressed to it, so a leaf
+     *  flies off once the scroll eases, as fast as it was carried. */
+    function fling(leaf: Leaf, speed: number) {
+      release(leaf);
+      const vy = -speed * bounce(leaf);
+      if (leaf.vy > vy) {
+        if (leaf.vy > vy / 2) {
+          // Just caught: knocked aside and set spinning.
+          leaf.vx += rand(-0.25, 0.25) * speed;
+          leaf.spinVel += rand(-1, 1) * (1 + speed / 120);
+        }
+        leaf.vy = vy;
+      }
+      leaf.flung = Math.max(leaf.flung, speed * 1.25);
+      leaf.flipBoost = Math.max(leaf.flipBoost, 2 + speed / 100);
+      const edgeOn = (Math.round(leaf.flip / Math.PI - 0.5) + 0.5) * Math.PI;
+      leaf.flip += (edgeOn - leaf.flip) * 0.4;
+      const crushed = Math.min(1, leaf.restCrumple + 0.15);
+      leaf.crumple = Math.min(Math.max(leaf.crumple, crushed), leaf.crumple + 0.04);
     }
 
     function resize() {
@@ -747,9 +965,9 @@
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // Counted over the part of the screen the leaves fall through.
-      target = Math.max(3, Math.min(9, Math.round(((height * (1 - START_SHARE)) / 1000) * DENSITY * 1.4)));
-      while (falling.filter((l) => !l.leaving).length < target) falling.push(makeLeaf(true));
+      // Counted over the whole height of the screen they fall through.
+      target = Math.max(FALLING_MIN, Math.min(FALLING_MAX, Math.round((height / 1000) * DENSITY * 1.4)));
+      while (inPlay() < target) falling.push(makeLeaf(true));
       if (lastWidth && Math.abs(width - lastWidth) > 1) {
         // The pile is laid out on the old grid; start a new one.
         pile = [];
@@ -761,13 +979,7 @@
       } else if (grew) {
         // The pile sits on the bottom edge, so it moves with it, by whole
         // cells; working its footing out again takes up any remainder.
-        const rows = Math.round(grew / CELL);
-        for (const r of pile) {
-          r.pose = { ...r.pose, y: r.pose.y + rows * CELL };
-          r.cols = shifted(r.cols, 0, rows);
-          r.sy += rows * CELL;
-        }
-        rebuildSurface();
+        carry(Math.round(grew / CELL));
         collapse();
         reaim();
       }
@@ -778,6 +990,10 @@
       const breeze = 6 * Math.sin(time * 0.07);
       const stirring = time - pointer.t < 0.1;
       const pointerSpeed = Math.hypot(pointer.vx, pointer.vy);
+      // The pointer, on the page.
+      const px = pointer.x;
+      const py = pointer.y + view;
+      const floor = floorY();
 
       for (const leaf of [...falling]) {
         const a = leaf.approach;
@@ -795,7 +1011,6 @@
           leaf.x = a.to.x;
           falling.splice(falling.indexOf(leaf), 1);
           land(leaf);
-          if (falling.filter((l) => !l.leaving).length < target) falling.push(makeLeaf(false));
           continue;
         }
         const t = a ? smooth(progress(leaf, a)) : 0;
@@ -823,8 +1038,8 @@
         }
 
         // Stirred by a passing pointer, in proportion to how fast it moves.
-        const dx = leaf.x - pointer.x;
-        const dy = leaf.y - pointer.y;
+        const dx = leaf.x - px;
+        const dy = leaf.y - py;
         const reach = leaf.len * 1.3;
         const d2 = dx * dx + dy * dy;
         if (stirring && d2 < reach * reach && pointerSpeed > 40) {
@@ -847,14 +1062,18 @@
           if (leaf.x < lo) leaf.vx += (lo - leaf.x) * 4 * dt;
           if (leaf.x > hi) leaf.vx -= (leaf.x - hi) * 4 * dt;
         }
+        // Thrown by the floor, it may fly faster for a moment; the air
+        // slows it at about the rate that lets it.
+        leaf.flung *= Math.exp(-1.4 * dt);
+        const cap = Math.max(MAX_SPEED, leaf.flung);
         const speed = Math.hypot(leaf.vx, leaf.vy);
-        if (speed > MAX_SPEED) {
-          leaf.vx *= MAX_SPEED / speed;
-          leaf.vy *= MAX_SPEED / speed;
+        if (speed > cap) {
+          leaf.vx *= cap / speed;
+          leaf.vy *= cap / speed;
         }
 
         if (leaf.leaving) {
-          if (leaf.y - leaf.len > height) falling.splice(falling.indexOf(leaf), 1);
+          if (leaf.y - leaf.len > floor) falling.splice(falling.indexOf(leaf), 1);
           continue;
         }
         if (leaf.approach) {
@@ -862,14 +1081,28 @@
           leaf.y = Math.min(leaf.y, leaf.approach.to.y);
         } else if (leaf.vy > 0 && groundUnder(leaf) - (leaf.y + leaf.len * 0.38) < leaf.len * AIM_LENGTHS) {
           aim(leaf);
-        } else if (leaf.y < -height || leaf.x < -width || leaf.x > width * 2) {
-          Object.assign(leaf, makeLeaf(false));
+        } else if (
+          // Left far behind up the page, or blown off the margin: let it go.
+          leaf.y < view - height * KEEP_SCREENS ||
+          leaf.y > floor + height ||
+          leaf.x < -width ||
+          leaf.x > width * 2
+        ) {
+          falling.splice(falling.indexOf(leaf), 1);
         }
+      }
+
+      // Keep new leaves coming into the part of the screen they fall
+      // through, one at a time.
+      spawnWait -= dt;
+      if (spawnWait <= 0 && inPlay() < target) {
+        falling.push(makeLeaf(false));
+        spawnWait = SPAWN_GAP_S;
       }
 
       // A brisk sweep through the pile kicks the leaves it passes back up.
       if (stirring && pointerSpeed > 350) {
-        const kicked = pile.filter((r) => Math.hypot(r.pose.x - pointer.x, r.pose.y - pointer.y) < r.leaf.len * 0.55);
+        const kicked = pile.filter((r) => Math.hypot(r.pose.x - px, r.pose.y - py) < r.leaf.len * 0.55);
         if (kicked.length) {
           pile = pile.filter((r) => !kicked.includes(r));
           for (const r of kicked) launch(r, pointer.vx * 0.3, Math.min(0, pointer.vy * 0.3) - 70);
@@ -883,7 +1116,7 @@
       // it held up fall into the gap.
       const capacity = Math.round((width / 100) * PILE_PER_100PX);
       if (pile.length > capacity && !falling.some((l) => l.leaving)) {
-        const floored = pile.filter((r) => bottomOf(r.cols) >= height - CELL);
+        const floored = pile.filter((r) => bottomOf(r.cols) >= floor - CELL);
         if (floored.length) {
           const out = pick(floored);
           pile = pile.filter((r) => r !== out);
@@ -926,19 +1159,50 @@
     }
 
     function draw() {
-      ctx.clearRect(0, 0, width, height);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // The page as scrolled, to the device pixel, so baked leaves stay
+      // crisp.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, -Math.round(view * dpr));
       const dark = document.documentElement.classList.contains("dark");
       ctx.globalAlpha = dark ? ALPHA.dark : ALPHA.light;
       for (const r of pile) ctx.drawImage(r.sprite, r.sx, r.sy, r.sprite.width / dpr, r.sprite.height / dpr);
       ctx.font = `${CELL * 1.3}px ${font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      for (const leaf of falling) raster(leaf, poseOf(leaf), ctx);
+      // Off the screen there's nothing to see.
+      const top = view;
+      const bottom = floorY();
+      for (const leaf of falling) {
+        const reach = leaf.len * 0.75;
+        if (leaf.y + reach < top || leaf.y - reach > bottom) continue;
+        raster(leaf, poseOf(leaf), ctx);
+      }
+    }
+
+    /** How far the page is scrolled. A modal's scroll lock pins <body> at
+     *  its offset instead of scrolling, which is the same place on the
+     *  page, so locking and unlocking move nothing. */
+    function pageY() {
+      const body = document.body.style;
+      return body.position === "fixed" ? -parseFloat(body.top) || 0 : window.scrollY;
     }
 
     function frame(now: number) {
-      const dt = Math.min(0.05, (now - last) / 1000 || 0);
+      const elapsed = (now - last) / 1000;
+      const dt = Math.max(0, Math.min(0.05, elapsed || 0));
       last = now;
+      const y = pageY();
+      let dy = y - scrollAt;
+      scrollAt = y;
+      // Just after going live, the page may still be moving into place
+      // (its scroll restored, or reset by a navigation): that moves the
+      // page alone.
+      if (now < settleUntil) {
+        if (dy) settleUntil = Math.max(settleUntil, Math.min(liveAt + SETTLE_MAX_MS, now + 120));
+        dy = 0;
+      }
+      scrollBy(dy, elapsed);
       step(dt);
       draw();
       raf = requestAnimationFrame(frame);
@@ -964,9 +1228,15 @@
         for (let t = 0; t < HEAD_START_S; t += 1 / 30) step(1 / 30);
       }
       if (reduce.matches) {
+        // A still frame, which stays put on screen as the page scrolls.
         draw();
       } else {
-        last = performance.now();
+        // Whatever the page did while the leaves were still, they stay
+        // where they are on screen.
+        last = liveAt = performance.now();
+        settleUntil = liveAt + SETTLE_MS;
+        scrollAt = pageY();
+        rise = 0;
         raf = requestAnimationFrame(frame);
       }
     }
@@ -993,7 +1263,7 @@
       const rect = canvas.getBoundingClientRect();
       // Only a click in the margin itself: never one meant for the page.
       if (event.clientX < rect.left || (event.target as Element)?.closest?.("a, button, input, select, textarea, label")) return;
-      gust(event.clientX - rect.left, event.clientY - rect.top);
+      gust(event.clientX - rect.left, event.clientY - rect.top + view);
     }
 
     const onResize = () => {
@@ -1018,6 +1288,8 @@
     window.addEventListener("pointerdown", onDown, { passive: true });
     requestAnimationFrame(() => (canvas.style.opacity = "1"));
     // Dev-only handle for QA: the live leaves, the pile, and the canvas.
+    // Leaf and pile positions are page coordinates: one at y is on screen
+    // at y - view.
     if (dev) {
       (window as unknown as { __leaves?: unknown }).__leaves = {
         canvas,
@@ -1027,12 +1299,31 @@
         get pile() {
           return pile;
         },
-        gust,
+        get view() {
+          return view;
+        },
+        /** The floor, the bottom of the screen, in page coordinates. */
+        get floor() {
+          return floorY();
+        },
+        /** A gust from (x, y), in canvas (screen) coordinates. */
+        gust: (x: number, y: number) => gust(x, y + view),
         poseOf,
         raster,
         /** Fast-forward the simulation by `seconds`. */
         advance(seconds: number) {
           for (let t = 0; t < seconds; t += 1 / 30) step(1 / 30);
+          draw();
+        },
+        /** Scroll the leaves `dy` px (down the page is positive) over
+         *  `seconds`, as if the page had; the page itself stays put. More
+         *  than a screen in one 60th of a second is a jump. */
+        scroll(dy: number, seconds = 0.3) {
+          const n = Math.max(1, Math.round(seconds * 60));
+          for (let i = 0; i < n; i++) {
+            scrollBy(dy / n, 1 / 60);
+            step(1 / 60);
+          }
           draw();
         },
       };
