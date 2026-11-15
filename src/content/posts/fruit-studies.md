@@ -1,13 +1,13 @@
 ---
 id: fruit-studies
-title: "making fruit"
+title: "Making fruit"
 date: "2026-09-10"
 tags: [fun, graphics, experiments]
 excerpt: "A whole variety of fruits, with a few added effects."
 published: true
-seoTitle: "making fruit: nine pointillist fruits you can light and ripple"
+seoTitle: "Making fruit: nine pointillist fruits you can light and ripple"
 seoDescription: "An interactive study of nine fruits, persimmon to banana, each built from a few thousand pigment marks. Move the cursor to light them and drag to ripple the paint."
-imageAlt: "A persimmon drawn from thousands of orange, red, and violet pigment dots on a pale green ground, above the title making fruit."
+imageAlt: "A persimmon drawn from thousands of orange, red, and violet pigment dots on a pale green ground, above the title Making fruit."
 image: "/images/og/fruit-studies.jpg"
 ---
 

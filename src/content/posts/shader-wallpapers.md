@@ -1,13 +1,13 @@
 ---
 id: shader-wallpapers
-title: "wallpapers"
+title: "Wallpapers"
 date: "2026-04-18"
 tags: [fun, graphics, experiments]
 excerpt: "Playing around with shaders"
 published: true
-seoTitle: "wallpapers: two shader backgrounds from a shader beginner"
+seoTitle: "Wallpapers: two shader backgrounds from a shader beginner"
 seoDescription: "Mound and Nebula, two animated grain-and-gradient wallpapers made while trying to recreate a shader from Twitter. Both run live in the post."
-imageAlt: "A grainy gradient wallpaper fading from gold through pink to violet, above the title wallpapers."
+imageAlt: "A grainy gradient wallpaper fading from gold through pink to violet, above the title Wallpapers."
 image: "/images/og/shader-wallpapers.jpg"
 ---
 

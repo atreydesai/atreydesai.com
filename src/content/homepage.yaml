@@ -40,13 +40,13 @@ banner:
   updates:
     - date: "2026-10-09"
       kind: paper
-      text: "New blog post: [prose diff](/blog/prose-diff/)."
+      text: "New blog post: [Prose diff](/blog/prose-diff/)."
     - date: "2026-10-06"
       kind: paper
       text: "New paper: [A Preview of Computational Animal Linguistics](/research/#computational-animal-linguistics) is out in ACM Computing Surveys."
     - date: "2026-09-10"
       kind: paper
-      text: "New blog post: [making fruit](/blog/fruit-studies/)."
+      text: "New blog post: [Making fruit](/blog/fruit-studies/)."
     - date: "2026-08-13"
       kind: paper
       text: "New on the AutoFiction blog: [Behind the curtain of “Eight Tuesdays”](https://www.autofiction.ai/blog/behind-the-curtain-of-eight-tuesdays)."
@@ -55,7 +55,7 @@ banner:
       text: "Co-organized the [EMM-QA workshop](https://qanta-org.github.io/competition/2026/icml/) at ICML 2026 in Seoul."
     - date: "2026-04-18"
       kind: paper
-      text: "New blog post: [wallpapers](/blog/shader-wallpapers/)."
+      text: "New blog post: [Wallpapers](/blog/shader-wallpapers/)."
     - date: "2026-04-15"
       kind: paper
       text: "New paper on arXiv: [Filling in the Mechanisms](/research/#filler-gap), on how LMs learn filler-gap dependencies under developmental constraints."
