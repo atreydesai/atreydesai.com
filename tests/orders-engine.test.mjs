@@ -12,7 +12,7 @@ import {
   FILL_LINE,
   ICE,
   ICE_MAX,
-  ICE_SCOOPS,
+  ICE_CUBES,
   LIVES,
   MAX_TICKETS,
   POUR_MAX,
@@ -25,19 +25,37 @@ import {
   SHAKES_NEEDED,
   SHIFT_SECONDS,
   SPECIAL_BONUS,
+  SUGARS,
+  SUGAR_MAX,
+  SUGAR_STEP,
   TANK_CAPACITY,
   TANK_LOW,
   TEAS,
   TOPPINGS,
+  CROSS_AT,
+  FAST_SERVE,
+  GLANCE_AT,
+  JAR_BONUS,
+  JAR_SIZE,
+  RULES,
+  SHARE_FACES,
+  activePatienceRate,
+  cheer,
+  comboFor,
+  comboProgress,
   criticDue,
   drawFromTank,
+  fillJar,
   gradeDrink,
   gradeWord,
   iceGrade,
+  iceState,
+  jarPayout,
   judgeScoop,
   keepsStreak,
   ladleAt,
   makeOrder,
+  maxTickets,
   mostImpatient,
   nextArrivalIn,
   paceForElapsed,
@@ -50,18 +68,24 @@ import {
   pourRate,
   sampleBoost,
   sampleTarget,
+  samplesFor,
   scoopGrade,
   scoopQueue,
   scoopResult,
   sealGrade,
   sealNeedle,
   sealResult,
+  servedMood,
   shakeGrade,
   stationsFor,
   stepPour,
+  sugarGrade,
+  sugarPumps,
+  sugarState,
   tankState,
   timeRemaining,
   totalScoops,
+  waitingMood,
 } from "../src/lib/arcade/orders-engine.js";
 
 const SEEDS = [1, 3, 7, 42, 1234, 99999];
@@ -157,6 +181,7 @@ test("the cast is 40 unique, lowercase regulars with valid quirks and orders", (
     if (!order) continue;
     if (order.tea !== undefined) assert.ok(TEAS.includes(order.tea), regular.name);
     if (order.ice !== undefined) assert.ok(ICE.includes(order.ice), regular.name);
+    if (order.sugar !== undefined) assert.ok(SUGARS.includes(order.sugar), regular.name);
     if (order.toppings !== undefined) {
       for (const line of order.toppings) {
         assert.ok(TOPPINGS.includes(line.kind), regular.name);
@@ -168,7 +193,7 @@ test("the cast is 40 unique, lowercase regulars with valid quirks and orders", (
   assert.equal(byName("mochi").quirk, "patient");
   assert.equal(byName("clementine").quirk, "tipper");
   assert.equal(byName("pip").quirk, undefined);
-  assert.deepEqual(byName("basil").order, { tea: "matcha", toppings: [] });
+  assert.deepEqual(byName("basil").order, { tea: "matcha", sugar: 0, toppings: [] });
   assert.deepEqual(byName("biscuit").order, { toppings: [{ kind: "pearls", scoops: 2 }] });
 });
 
@@ -229,15 +254,17 @@ test("orders stay inside the phase's scoop range, sorted, without repeated kinds
 test("a split order gives the first kind S - 1 scoops and the second 1", () => {
   // tea milk, ice none, S = 3 (rush), first kind jelly, split, second from the
   // rest (pearls, pudding, redbean) at index 0, so pearls.
-  const order = makeOrder(80, null, scripted(0, 0, 0.9, 0.5, 0.1, 0));
+  // tea, ice, sugar (0.5 of five levels: 50%), then the toppings.
+  const order = makeOrder(80, null, scripted(0, 0, 0.5, 0.9, 0.5, 0.1, 0));
   assert.equal(order.tea, "milk");
   assert.equal(order.ice, "none");
+  assert.equal(order.sugar, 50);
   assert.deepEqual(order.toppings, [
     { kind: "pearls", scoops: 1 },
     { kind: "jelly", scoops: 2 },
   ]);
   // Same draws, but no split: one kind with all three scoops.
-  const single = makeOrder(80, null, scripted(0, 0, 0.9, 0.5, 0.9));
+  const single = makeOrder(80, null, scripted(0, 0, 0.5, 0.9, 0.5, 0.9));
   assert.deepEqual(single.toppings, [{ kind: "jelly", scoops: 3 }]);
   // The opening can hand out a plain drink.
   assert.deepEqual(makeOrder(0, null, scripted(0.99, 0.99, 0)).toppings, []);
@@ -250,7 +277,7 @@ test("a regular's usual order overrides what it names", () => {
       for (let i = 0; i < 40; i++) {
         assert.equal(makeOrder(elapsed, byName("dumpling"), random).tea, "taro");
         assert.equal(makeOrder(elapsed, byName("juniper"), random).ice, "none");
-        assert.equal(makeOrder(elapsed, byName("miso"), random).ice, "full");
+        assert.equal(makeOrder(elapsed, byName("miso"), random).ice, "extra");
 
         const biscuit = makeOrder(elapsed, byName("biscuit"), random);
         assert.deepEqual(biscuit.toppings, [{ kind: "pearls", scoops: 2 }]);
@@ -272,7 +299,7 @@ test("a regular's usual order overrides what it names", () => {
 });
 
 test("patience grows with scoops and bends to quirks", () => {
-  const order = { tea: "milk", ice: "light", toppings: [{ kind: "pearls", scoops: 2 }] };
+  const order = { tea: "milk", sugar: 50, ice: "less", toppings: [{ kind: "pearls", scoops: 2 }] };
   assert.equal(patienceFor(order, plain, 0), 40);
   assert.equal(patienceFor(order, null, 80), 32);
   assert.ok(near(patienceFor(order, byName("tofu"), 0), 40 * 0.7));
@@ -284,14 +311,18 @@ test("patience grows with scoops and bends to quirks", () => {
 });
 
 test("stations skip the ladle for a plain drink, and scoops queue one by one", () => {
-  const plainDrink = { tea: "taro", ice: "none", toppings: [] };
+  const plainDrink = { tea: "taro", sugar: 0, ice: "none", toppings: [] };
   const loaded = {
     tea: "taro",
+    sugar: 0,
     ice: "none",
     toppings: [{ kind: "pearls", scoops: 2 }, { kind: "jelly", scoops: 1 }],
   };
   assert.deepEqual(stationsFor(plainDrink), ["pour", "shake", "seal"]);
   assert.deepEqual(stationsFor(loaded), ["pour", "scoop", "shake", "seal"]);
+  // Ice comes first whenever the order has any.
+  assert.deepEqual(stationsFor({ ...plainDrink, ice: "less" }), ["ice", "pour", "shake", "seal"]);
+  assert.deepEqual(stationsFor({ ...loaded, ice: "extra" }), ["ice", "pour", "scoop", "shake", "seal"]);
   assert.deepEqual(scoopQueue(plainDrink), []);
   assert.deepEqual(scoopQueue(loaded), ["pearls", "pearls", "jelly"]);
   assert.equal(totalScoops(loaded), 3);
@@ -320,30 +351,30 @@ test("a steady hold reaches each fill line in a sane time", () => {
     }
     assert.ok(held > 1 && held < 2.5, `${ice} took ${held}s`);
   }
-  assert.ok(FILL_LINE.none > FILL_LINE.light && FILL_LINE.light > FILL_LINE.full);
+  assert.ok(FILL_LINE.none > FILL_LINE.less && FILL_LINE.less > FILL_LINE.extra);
 });
 
 test("the pour is graded by its distance from the line", () => {
-  const line = FILL_LINE.light;
-  assert.equal(pourGrade(line, "light"), 100);
-  assert.equal(pourGrade(line - 0.03, "light"), 100);
-  assert.equal(pourGrade(line - 0.05, "light"), 90);
-  assert.equal(pourGrade(line - 0.07, "light"), 80);
-  assert.equal(pourGrade(line - 0.14, "light"), 50);
-  assert.equal(pourGrade(line - 0.245, "light"), 25);
-  assert.equal(pourGrade(line - 0.35, "light"), 0);
-  assert.equal(pourGrade(0, "light"), 0);
+  const line = FILL_LINE.less;
+  assert.equal(pourGrade(line, "less"), 100);
+  assert.equal(pourGrade(line - 0.03, "less"), 100);
+  assert.equal(pourGrade(line - 0.05, "less"), 90);
+  assert.equal(pourGrade(line - 0.07, "less"), 80);
+  assert.equal(pourGrade(line - 0.14, "less"), 50);
+  assert.equal(pourGrade(line - 0.245, "less"), 25);
+  assert.equal(pourGrade(line - 0.35, "less"), 0);
+  assert.equal(pourGrade(0, "less"), 0);
 
   // Overfill counts 1.3 times as far off.
-  assert.equal(pourGrade(line + 0.07 / 1.3, "light"), 80);
-  assert.equal(pourGrade(line + 0.14 / 1.3, "light"), 50);
-  assert.ok(pourGrade(line + 0.06, "light") < pourGrade(line - 0.06, "light"));
-  assert.equal(pourGrade(POUR_MAX, "full"), 0);
+  assert.equal(pourGrade(line + 0.07 / 1.3, "less"), 80);
+  assert.equal(pourGrade(line + 0.14 / 1.3, "less"), 50);
+  assert.ok(pourGrade(line + 0.06, "less") < pourGrade(line - 0.06, "less"));
+  assert.equal(pourGrade(POUR_MAX, "extra"), 0);
 
   // Without the spill, short of the line is symmetric across lines.
   for (const ice of ICE) {
     for (const err of [0.02, 0.05, 0.1, 0.2]) {
-      assert.equal(pourGrade(FILL_LINE[ice] - err, ice), pourGrade(FILL_LINE.light - err, "light"));
+      assert.equal(pourGrade(FILL_LINE[ice] - err, ice), pourGrade(FILL_LINE.less - err, "less"));
       assert.equal(
         pourGrade(FILL_LINE[ice] + err / 1.3, ice),
         pourGrade(FILL_LINE[ice] - err, ice),
@@ -414,38 +445,46 @@ test("grades get a word", () => {
 const GOOD_SEAL = (SEAL_BAND[0] + SEAL_BAND[1]) / 2;
 
 test("a perfect drink scores 100", () => {
-  const order = { tea: "taro", ice: "light", toppings: [{ kind: "pearls", scoops: 2 }] };
+  const order = { tea: "taro", sugar: 50, ice: "less", toppings: [{ kind: "pearls", scoops: 2 }] };
   assert.deepEqual(
     gradeDrink({
-      order, tea: "taro", iceCount: 1, level: FILL_LINE.light, drops: [100, 100], shakeSeconds: 1,
+      order, tea: "taro", iceCount: 2, level: FILL_LINE.less, drops: [100, 100], shakeSeconds: 1,
       sealValue: GOOD_SEAL, patienceFraction: 0.9,
     }),
     {
-      accepted: true, reason: null, ice: 100, pour: 100, scoop: 100, shake: 100, seal: 100, wait: 100, total: 100,
+      accepted: true, reason: null, ice: 100, sugar: 100, pour: 100, scoop: 100, shake: 100, seal: 100, wait: 100,
+      total: 100,
     },
   );
 });
 
 test("the wrong ice or a bad seal pulls the total down", () => {
-  const order = { tea: "taro", ice: "light", toppings: [{ kind: "pearls", scoops: 1 }] };
+  const order = { tea: "taro", sugar: 50, ice: "less", toppings: [{ kind: "pearls", scoops: 1 }] };
   const drink = {
-    order, tea: "taro", iceCount: 1, level: FILL_LINE.light, drops: [100], shakeSeconds: 1,
+    order, tea: "taro", iceCount: 2, level: FILL_LINE.less, drops: [100], shakeSeconds: 1,
     sealValue: GOOD_SEAL, patienceFraction: 1,
   };
-  const iced = gradeDrink({ ...drink, iceCount: 2 });
-  assert.equal(iced.ice, 40);
-  // quality = (40 + 4 * 100) / 5 = 88; total = 0.8 * 88 + 20.
-  assert.equal(iced.total, 90);
-  assert.equal(gradeDrink({ ...drink, iceCount: 3 }).ice, 0);
+  const iced = gradeDrink({ ...drink, iceCount: 3 });
+  assert.equal(iced.ice, 60);
+  // quality = (60 + 5 * 100) / 6 = 93.3; total = 0.8 * 93.3 + 20.
+  assert.equal(iced.total, 95);
+  assert.equal(gradeDrink({ ...drink, iceCount: 4 }).ice, 25);
+  assert.equal(gradeDrink({ ...drink, iceCount: 5 }).ice, 0);
 
   const scorched = gradeDrink({ ...drink, sealValue: 1 });
   assert.equal(scorched.seal, 40);
-  assert.equal(scorched.total, 90);
-  assert.equal(gradeDrink({ ...drink, sealValue: SEAL_BAND[1] + 0.05 }).total, 95);
+  assert.equal(scorched.total, 92);
+  assert.equal(gradeDrink({ ...drink, sealValue: SEAL_BAND[1] + 0.05 }).total, 96);
+
+  // Sugar a pump off, or two, pulls it down the same way.
+  const sweet = gradeDrink({ ...drink, sugarCount: 3 });
+  assert.equal(sweet.sugar, 60);
+  assert.equal(sweet.total, 95);
+  assert.equal(gradeDrink({ ...drink, sugarCount: 0 }).sugar, 25);
 });
 
-test("a drink without toppings averages its four other stations", () => {
-  const order = { tea: "milk", ice: "none", toppings: [] };
+test("a drink without toppings averages its five other stations", () => {
+  const order = { tea: "milk", sugar: 50, ice: "none", toppings: [] };
   const result = gradeDrink({
     order, tea: "milk", iceCount: 0, level: FILL_LINE.none - 0.07, drops: [], shakeSeconds: 1,
     sealValue: SEAL_BAND[0], patienceFraction: 1,
@@ -455,27 +494,28 @@ test("a drink without toppings averages its four other stations", () => {
   assert.equal(result.pour, 80);
   assert.equal(result.shake, 100);
   assert.equal(result.seal, 100);
-  // quality = (100 + 80 + 100 + 100) / 4 = 95; total = 0.8 * 95 + 0.2 * 100.
-  assert.equal(result.total, 96);
+  assert.equal(result.sugar, 100);
+  // quality = (100 + 100 + 80 + 100 + 100) / 5 = 96; total = 0.8 * 96 + 0.2 * 100.
+  assert.equal(result.total, 97);
 });
 
 test("the wrong tea is sent back", () => {
-  const order = { tea: "matcha", ice: "full", toppings: [] };
+  const order = { tea: "matcha", sugar: 50, ice: "extra", toppings: [] };
   assert.deepEqual(
     gradeDrink({
-      order, tea: "milk", iceCount: 2, level: FILL_LINE.full, drops: [], shakeSeconds: 1,
+      order, tea: "milk", iceCount: 2, level: FILL_LINE.extra, drops: [], shakeSeconds: 1,
       sealValue: GOOD_SEAL, patienceFraction: 1,
     }),
     {
-      accepted: false, reason: "wrong-tea", ice: 0, pour: 0, scoop: null, shake: 0, seal: 0, wait: 0, total: 0,
+      accepted: false, reason: "wrong-tea", ice: 0, sugar: 0, pour: 0, scoop: null, shake: 0, seal: 0, wait: 0, total: 0,
     },
   );
 });
 
 test("waiting too long costs the wait grade, and the total mixes 80/20", () => {
-  const order = { tea: "milk", ice: "light", toppings: [{ kind: "jelly", scoops: 3 }] };
+  const order = { tea: "milk", sugar: 50, ice: "less", toppings: [{ kind: "jelly", scoops: 3 }] };
   const drink = {
-    order, tea: "milk", iceCount: 1, level: FILL_LINE.light, drops: [100, 60, 0], shakeSeconds: 3,
+    order, tea: "milk", iceCount: 2, level: FILL_LINE.less, drops: [100, 60, 0], shakeSeconds: 3,
     sealValue: GOOD_SEAL,
   };
   assert.equal(gradeDrink({ ...drink, patienceFraction: 0.5 }).wait, 100);
@@ -487,20 +527,20 @@ test("waiting too long costs the wait grade, and the total mixes 80/20", () => {
   assert.equal(result.pour, 100);
   assert.equal(result.scoop, 53);
   assert.equal(result.shake, 60);
-  const quality = (result.ice + result.pour + result.scoop + result.shake + result.seal) / 5;
+  const quality = (result.ice + result.sugar + result.pour + result.scoop + result.shake + result.seal) / 6;
   assert.equal(result.total, Math.round(0.8 * quality + 0.2 * result.wait));
-  // quality = (100 + 100 + 53 + 60 + 100) / 5 = 82.6; total = 66.08 + 14.
-  assert.equal(result.total, 80);
+  // quality = (100 + 100 + 100 + 53 + 60 + 100) / 6 = 85.5; total = 68.4 + 14.
+  assert.equal(result.total, 82);
 });
 
-test("points pay a base, a tip and a streak bonus", () => {
-  const none = { specialBonus: 0, criticBonus: 0 };
-  assert.deepEqual(pointsForDrink(100, plain, 1), { points: 13, base: 10, tip: 3, streakBonus: 0, ...none });
-  assert.deepEqual(pointsForDrink(90, plain, 1), { points: 12, base: 9, tip: 3, streakBonus: 0, ...none });
-  assert.deepEqual(pointsForDrink(89, plain, 1), { points: 10, base: 9, tip: 1, streakBonus: 0, ...none });
-  assert.deepEqual(pointsForDrink(80, null, 1), { points: 9, base: 8, tip: 1, streakBonus: 0, ...none });
-  assert.deepEqual(pointsForDrink(79, plain, 1), { points: 8, base: 8, tip: 0, streakBonus: 0, ...none });
-  assert.deepEqual(pointsForDrink(0, plain, 0), { points: 1, base: 1, tip: 0, streakBonus: 0, ...none });
+test("points pay a base and a tip, and the tip drops into the jar as coins", () => {
+  const none = { specialBonus: 0, criticBonus: 0, multiplier: 1 };
+  assert.deepEqual(pointsForDrink(100, plain, 1), { points: 13, base: 10, tip: 3, coins: 3, ...none });
+  assert.deepEqual(pointsForDrink(90, plain, 1), { points: 12, base: 9, tip: 3, coins: 3, ...none });
+  assert.deepEqual(pointsForDrink(89, plain, 1), { points: 10, base: 9, tip: 1, coins: 1, ...none });
+  assert.deepEqual(pointsForDrink(80, null, 1), { points: 9, base: 8, tip: 1, coins: 1, ...none });
+  assert.deepEqual(pointsForDrink(79, plain, 1), { points: 8, base: 8, tip: 0, coins: 0, ...none });
+  assert.deepEqual(pointsForDrink(0, plain, 0), { points: 1, base: 1, tip: 0, coins: 0, ...none });
   assert.equal(pointsForDrink(4, plain, 0).base, 1);
 });
 
@@ -516,12 +556,62 @@ test("tippers double the tip and hurried regulars tip half again, rounded up", (
   assert.equal(pointsForDrink(95, byName("mochi"), 1).tip, 3);
 });
 
-test("the streak bonus steps up every three good drinks, capped at 3", () => {
-  const bonus = (streak) => pointsForDrink(85, plain, streak).streakBonus;
-  assert.deepEqual([1, 2, 3, 5, 6, 8, 9, 12, 30].map(bonus), [0, 0, 1, 1, 2, 2, 3, 3, 3]);
-  assert.equal(pointsForDrink(79, plain, 9).streakBonus, 0);
+test("a streak of good drinks climbs a combo that multiplies the drink", () => {
+  assert.deepEqual([0, 1, 2, 3, 5, 6, 9, 10, 30].map((streak) => comboFor(streak)), [1, 1, 1, 2, 2, 3, 3, 3, 3]);
+  assert.deepEqual([0, 2, 3, 6, 9, 10, 30].map((streak) => comboFor(streak, true)), [1, 1, 2, 3, 3, 4, 4]);
+  assert.equal(pointsForDrink(85, plain, 2).multiplier, 1);
+  assert.equal(pointsForDrink(85, plain, 3).multiplier, 2);
+  assert.equal(pointsForDrink(85, plain, 3).points, 2 * (9 + 1));
+  assert.equal(pointsForDrink(100, plain, 7).points, 3 * 13);
+  assert.equal(pointsForDrink(100, plain, 12, false, true).points, 4 * 13);
+  // A drink that breaks the streak is never multiplied, whatever came before.
+  assert.equal(pointsForDrink(79, plain, 9).multiplier, 1);
   assert.equal(keepsStreak(80), true);
   assert.equal(keepsStreak(79), false);
+  // Only the points are multiplied: the tip and its coins are not.
+  assert.equal(pointsForDrink(100, plain, 7).tip, 3);
+  assert.equal(pointsForDrink(100, plain, 7).coins, 3);
+});
+
+test("combo progress fills toward the next step, and is empty at the top", () => {
+  assert.deepEqual(comboProgress(0), { multiplier: 1, filled: 0, span: 3 });
+  assert.deepEqual(comboProgress(2), { multiplier: 1, filled: 2, span: 3 });
+  assert.deepEqual(comboProgress(3), { multiplier: 2, filled: 0, span: 3 });
+  assert.deepEqual(comboProgress(5), { multiplier: 2, filled: 2, span: 3 });
+  assert.deepEqual(comboProgress(6), { multiplier: 3, filled: 0, span: 0 });
+  assert.deepEqual(comboProgress(8, true), { multiplier: 3, filled: 2, span: 4 });
+  assert.deepEqual(comboProgress(11, true), { multiplier: 4, filled: 0, span: 0 });
+});
+
+test("the tip jar pays out each time it fills, and buys back a lost pearl", () => {
+  assert.equal(JAR_SIZE, 12);
+  assert.equal(JAR_BONUS, 25);
+  assert.deepEqual(fillJar(0, 3), { jar: 3, payouts: 0 });
+  assert.deepEqual(fillJar(10, 2), { jar: 0, payouts: 1 });
+  assert.deepEqual(fillJar(10, 5), { jar: 3, payouts: 1 });
+  assert.deepEqual(fillJar(11, 26), { jar: 1, payouts: 3 });
+  assert.deepEqual(fillJar(4, 0), { jar: 4, payouts: 0 });
+  assert.deepEqual(fillJar(4, -2), { jar: 4, payouts: 0 });
+  assert.deepEqual(jarPayout(1, 2), { points: 25, lives: 3 });
+  assert.deepEqual(jarPayout(1, 3), { points: 25, lives: LIVES }, "never more than the pearls you start with");
+  assert.deepEqual(jarPayout(2, 1), { points: 50, lives: 3 });
+  assert.deepEqual(jarPayout(0, 1), { points: 0, lives: 1 });
+  // A run of perfect drinks for a plain regular fills the jar in four.
+  let jar = 0;
+  let payouts = 0;
+  for (let drink = 0; drink < 4; drink++) {
+    const filled = fillJar(jar, pointsForDrink(100, plain, drink + 1).coins);
+    jar = filled.jar;
+    payouts += filled.payouts;
+  }
+  assert.equal(payouts, 1);
+});
+
+test("a perfect drink cheers the line: everyone waiting gets patience back", () => {
+  assert.ok(near(cheer(10, 40), 16));
+  assert.equal(cheer(38, 40), 40);
+  assert.ok(near(cheer(10, 40, true), 14), "less in expert");
+  assert.ok(RULES.expert.cheer < RULES.normal.cheer);
 });
 
 test("the day's special adds a flat bonus and changes nothing else", () => {
@@ -531,7 +621,8 @@ test("the day's special adds a flat bonus and changes nothing else", () => {
       const usual = pointsForDrink(total, regular, 4);
       const special = pointsForDrink(total, regular, 4, true);
       assert.equal(special.specialBonus, SPECIAL_BONUS);
-      assert.equal(special.points, usual.points + SPECIAL_BONUS);
+      // Multiplied by the combo along with the rest of the drink.
+      assert.equal(special.points, usual.points + SPECIAL_BONUS * usual.multiplier);
       assert.equal(special.base, usual.base);
       assert.equal(special.tip, usual.tip);
     }
@@ -540,13 +631,13 @@ test("the day's special adds a flat bonus and changes nothing else", () => {
 
 test("the critic doubles base and tip, and raves about a 95 or better", () => {
   assert.deepEqual(pointsForDrink(94, CRITIC, 1), {
-    points: 24, base: 18, tip: 6, streakBonus: 0, specialBonus: 0, criticBonus: 0,
+    points: 24, base: 18, tip: 6, coins: 6, specialBonus: 0, criticBonus: 0, multiplier: 1,
   });
   assert.deepEqual(pointsForDrink(95, CRITIC, 1), {
-    points: 31, base: 20, tip: 6, streakBonus: 0, specialBonus: 0, criticBonus: 5,
+    points: 31, base: 20, tip: 6, coins: 6, specialBonus: 0, criticBonus: 5, multiplier: 1,
   });
   assert.deepEqual(pointsForDrink(100, CRITIC, 3, true), {
-    points: 34, base: 20, tip: 6, streakBonus: 1, specialBonus: 2, criticBonus: 5,
+    points: 66, base: 20, tip: 6, coins: 6, specialBonus: 2, criticBonus: 5, multiplier: 2,
   });
   // Even a bad drink for the critic counts double.
   assert.equal(pointsForDrink(0, CRITIC, 0).base, 2);
@@ -558,17 +649,34 @@ test("the critic doubles base and tip, and raves about a 95 or better", () => {
 
 // --- Ice ---------------------------------------------------------------------------------
 
-test("ice is graded on the number of scoops", () => {
-  assert.deepEqual(ICE_SCOOPS, { none: 0, light: 1, full: 2 });
-  assert.equal(ICE_MAX, 3);
-  for (const ice of ICE) assert.equal(iceGrade(ICE_SCOOPS[ice], ice), 100);
-  assert.equal(iceGrade(0, "light"), 40);
-  assert.equal(iceGrade(2, "light"), 40);
-  assert.equal(iceGrade(1, "none"), 40);
-  assert.equal(iceGrade(3, "full"), 40);
-  assert.equal(iceGrade(2, "none"), 0);
-  assert.equal(iceGrade(0, "full"), 0);
-  assert.equal(iceGrade(3, "light"), 0);
+test("ice is counted in cubes: one press, one cube, one icon on the ticket", () => {
+  assert.deepEqual(ICE, ["none", "less", "regular", "extra"]);
+  assert.deepEqual(ICE_CUBES, { none: 0, less: 2, regular: 3, extra: 4 });
+  assert.equal(ICE_MAX, 6);
+  assert.ok(ICE_MAX > ICE_CUBES.extra, "there is room to put in too much");
+  for (const ice of ICE) assert.equal(iceGrade(ICE_CUBES[ice], ice), 100);
+  assert.equal(iceGrade(1, "less"), 60);
+  assert.equal(iceGrade(3, "less"), 60);
+  assert.equal(iceGrade(0, "less"), 25);
+  assert.equal(iceGrade(1, "none"), 60);
+  assert.equal(iceGrade(2, "none"), 25);
+  assert.equal(iceGrade(3, "none"), 0);
+  assert.equal(iceGrade(5, "extra"), 60);
+  assert.equal(iceGrade(1, "extra"), 0);
+  assert.equal(iceGrade(3, "regular"), 100);
+  // Expert: a cube off costs more, two off is nothing.
+  assert.equal(iceGrade(3, "less", true), 40);
+  assert.equal(iceGrade(0, "less", true), 0);
+  assert.equal(iceGrade(2, "less", true), 100);
+});
+
+test("the ice reads short, right or over against the order", () => {
+  assert.equal(iceState(0, "less"), "short");
+  assert.equal(iceState(2, "less"), "right");
+  assert.equal(iceState(3, "less"), "over");
+  assert.equal(iceState(0, "none"), "right");
+  assert.equal(iceState(1, "none"), "over");
+  assert.equal(iceState(3, "extra"), "short");
 });
 
 // --- Choosing the jar -----------------------------------------------------------------------
@@ -655,7 +763,7 @@ test("a full tank pours three no-ice drinks but not five", () => {
   assert.ok(3 * FILL_LINE.none <= TANK_CAPACITY);
   assert.ok(5 * FILL_LINE.none > TANK_CAPACITY);
   // Lighter drinks stretch it to about four.
-  assert.ok(4 * FILL_LINE.light <= TANK_CAPACITY);
+  assert.ok(4 * FILL_LINE.less <= TANK_CAPACITY);
 });
 
 // --- Samples -----------------------------------------------------------------------------------
@@ -735,4 +843,160 @@ test("a sample only goes to a guest below SAMPLE_WORTH of their patience", () =>
   );
   assert.equal(sampleTarget([{ id: 1, left: 2, patience: 10 }, { id: 2, left: 5, patience: 10 }], 1), 1);
   assert.equal(sampleTarget([]), -1);
+});
+
+// --- Faces -------------------------------------------------------------------------------------
+
+test("a waiting guest is calm, then glances at the clock, then turns cross", () => {
+  assert.equal(GLANCE_AT, 0.6);
+  assert.equal(CROSS_AT, 0.3);
+  assert.equal(waitingMood(1), "calm");
+  assert.equal(waitingMood(0.61), "calm");
+  assert.equal(waitingMood(0.6), "glance");
+  assert.equal(waitingMood(0.31), "glance");
+  assert.equal(waitingMood(0.3), "cross");
+  assert.equal(waitingMood(0), "cross");
+});
+
+test("a served guest reacts to the grade, and to a good drink that came fast", () => {
+  assert.equal(FAST_SERVE, 0.8);
+  assert.equal(servedMood(100, 0.1), "starry");
+  assert.equal(servedMood(95, 1), "starry", "perfect beats fast");
+  assert.equal(servedMood(94, 0.8), "wow");
+  assert.equal(servedMood(80, 0.95), "wow");
+  assert.equal(servedMood(94, 0.79), "content");
+  assert.equal(servedMood(80, 0.2), "content");
+  assert.equal(servedMood(79, 1), "meh", "a fine drink doesn't impress however fast");
+  assert.equal(servedMood(55, 0.5), "meh");
+  assert.equal(servedMood(54, 0.5), "unimpressed");
+  assert.equal(servedMood(0, 1), "unimpressed");
+});
+
+test("every way of leaving has its own share face", () => {
+  const reactions = ["starry", "wow", "content", "meh", "unimpressed", "storm", "sentBack"];
+  assert.deepEqual(Object.keys(SHARE_FACES).sort(), [...reactions].sort());
+  assert.equal(new Set(Object.values(SHARE_FACES)).size, reactions.length);
+  for (const face of Object.values(SHARE_FACES)) assert.ok(face.length > 0 && !/[a-z]/i.test(face));
+});
+
+// --- Expert ------------------------------------------------------------------------------------
+
+test("expert sends more guests, faster, with less patience and bigger orders", () => {
+  assert.equal(maxTickets(), MAX_TICKETS);
+  assert.equal(maxTickets(true), 4);
+  assert.equal(samplesFor(), SAMPLES_PER_SHIFT);
+  assert.equal(samplesFor(true), 2);
+  for (const elapsed of [0, 30, 80]) {
+    const normal = paceForElapsed(elapsed);
+    const expert = paceForElapsed(elapsed, true);
+    assert.equal(expert.phase, normal.phase);
+    assert.ok(expert.arrivalEvery <= normal.arrivalEvery * 0.8, "arrivals at least a fifth quicker");
+    assert.ok(expert.patience <= normal.patience * 0.72, "under three quarters of the patience");
+    assert.ok(expert.swing >= normal.swing * 1.25, "the ladle a quarter faster");
+    assert.ok(expert.minScoops > normal.minScoops && expert.maxScoops > normal.maxScoops);
+  }
+  const order = { tea: "milk", sugar: 50, ice: "less", toppings: [{ kind: "pearls", scoops: 2 }] };
+  assert.equal(patienceFor(order, plain, 0, true), 30);
+  assert.ok(patienceFor(order, plain, 80, true) < patienceFor(order, plain, 80));
+  assert.ok(activePatienceRate(true) > activePatienceRate());
+  for (const seed of SEEDS) {
+    const random = seeded(seed);
+    for (const elapsed of [0, 30, 80]) {
+      const { minScoops, maxScoops } = paceForElapsed(elapsed, true);
+      for (let i = 0; i < 100; i++) {
+        const scoops = totalScoops(makeOrder(elapsed, null, random, true));
+        assert.ok(scoops >= minScoops && scoops <= maxScoops);
+      }
+    }
+  }
+});
+
+test("expert grades tighter at every station", () => {
+  // The ladle: a narrower clean centre and mouth.
+  assert.equal(scoopResult(0.12), "clean");
+  assert.equal(scoopResult(0.12, true), "rim");
+  assert.equal(scoopResult(0.3), "rim");
+  assert.equal(scoopResult(0.3, true), "miss");
+  assert.deepEqual(judgeScoop("pearls", "pearls", 0.12, true), { result: "rim", grade: 60 });
+  assert.equal(scoopGrade(0.05, true), 100);
+  // The pour: a smaller window for spot on.
+  const line = FILL_LINE.less;
+  assert.equal(pourGrade(line - 0.03, "less"), 100);
+  assert.ok(pourGrade(line - 0.03, "less", true) < 100);
+  assert.equal(pourGrade(line - 0.02, "less", true), 100);
+  assert.equal(pourGrade(line - 0.25, "less", true), 0);
+  // The shake: quicker for full marks.
+  assert.equal(shakeGrade(1.4), 100);
+  assert.ok(shakeGrade(1.4, true) < 100);
+  assert.equal(shakeGrade(1.1, true), 100);
+  // The seal: a quicker needle and a narrower band.
+  assert.ok(RULES.expert.sealPeriod < SEAL_PERIOD);
+  assert.ok(near(sealNeedle(RULES.expert.sealPeriod / 2, true), 1));
+  assert.ok(near(sealNeedle(RULES.expert.sealPeriod, true), 0));
+  assert.equal(sealResult(0.69), "sealed");
+  assert.equal(sealResult(0.69, true), "loose");
+  assert.equal(sealResult(0.85, true), "scorched");
+  assert.equal(sealGrade(0.77, true), 100);
+  assert.equal(sealGrade(0.69, true), 70);
+  assert.equal(sealGrade(0.62, true), 40);
+  // The whole drink: the same hands score lower in expert.
+  const order = { tea: "taro", sugar: 50, ice: "less", toppings: [{ kind: "pearls", scoops: 1 }] };
+  const drink = {
+    order, tea: "taro", iceCount: 2, level: line - 0.03, drops: [100], shakeSeconds: 1.4,
+    sealValue: 0.7, patienceFraction: 1,
+  };
+  assert.equal(gradeDrink(drink).total, 100);
+  assert.ok(gradeDrink({ ...drink, expert: true }).total < 95);
+});
+
+test("the critic comes once, or twice in expert", () => {
+  assert.equal(criticDue(39.9, 0), false);
+  assert.equal(criticDue(40, 0), true);
+  assert.equal(criticDue(100, 1), false);
+  assert.equal(criticDue(34.9, 0, true), false);
+  assert.equal(criticDue(35, 0, true), true);
+  assert.equal(criticDue(60, 1, true), false);
+  assert.equal(criticDue(85, 1, true), true);
+  assert.equal(criticDue(110, 2, true), false);
+  assert.equal(criticDue(110, true, true), true, "true counts as once");
+});
+
+// --- Sugar --------------------------------------------------------------------------------------
+
+test("sugar comes in five levels, one pump a quarter", () => {
+  assert.deepEqual(SUGARS, [0, 25, 50, 75, 100]);
+  assert.equal(SUGAR_STEP, 25);
+  assert.deepEqual(SUGARS.map(sugarPumps), [0, 1, 2, 3, 4]);
+  assert.ok(SUGAR_MAX > sugarPumps(100), "there is room to pump too much");
+  for (const sugar of SUGARS) assert.equal(sugarGrade(sugarPumps(sugar), sugar), 100);
+  assert.equal(sugarGrade(3, 50), 60);
+  assert.equal(sugarGrade(1, 50), 60);
+  assert.equal(sugarGrade(4, 50), 25);
+  assert.equal(sugarGrade(3, 0), 0);
+  // Expert: exact amounts matter more.
+  assert.equal(sugarGrade(3, 50, true), 40);
+  assert.equal(sugarGrade(4, 50, true), 0);
+  assert.equal(sugarState(1, 50), "short");
+  assert.equal(sugarState(2, 50), "right");
+  assert.equal(sugarState(3, 50), "over");
+});
+
+test("every order has a sugar level, and the syrup station only when there is some", () => {
+  for (const seed of SEEDS) {
+    const random = seeded(seed);
+    const seen = new Set();
+    for (let i = 0; i < 200; i++) {
+      const order = makeOrder(30, null, random);
+      assert.ok(SUGARS.includes(order.sugar));
+      seen.add(order.sugar);
+      assert.equal(stationsFor(order).includes("sugar"), order.sugar > 0);
+    }
+    assert.equal(seen.size, SUGARS.length);
+  }
+  assert.deepEqual(stationsFor({ tea: "milk", sugar: 75, ice: "regular", toppings: [] }), ["ice", "sugar", "pour", "shake", "seal"]);
+  assert.deepEqual(stationsFor({ tea: "milk", sugar: 0, ice: "none", toppings: [] }), ["pour", "shake", "seal"]);
+  // Regulars keep their sweet tooth.
+  assert.equal(makeOrder(0, byName("basil"), seeded(2)).sugar, 0);
+  assert.equal(makeOrder(0, byName("cocoa"), seeded(2)).sugar, 100);
+  assert.equal(makeOrder(0, byName("peaches"), seeded(2)).sugar, 25);
 });

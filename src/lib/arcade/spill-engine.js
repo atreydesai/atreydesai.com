@@ -77,6 +77,7 @@ const SEG_HOT = 3;
 const SEG_JELLY = 4;
 const SEG_GATE = 5;
 const SEG_CUP = 6;
+const SEG_SIEVE = 7;
 
 /** How hard overlapping particles are pushed apart each step, and the cap. */
 const STIFFNESS = 0.8;
@@ -194,9 +195,12 @@ const BOUNCE_GAP = 1 / 30;
 
 /**
  * @typedef {{ x: number, y: number, w: number, h: number }} Rect
+ * @typedef {{ range: number, period: number, phase?: number }} Rail a kettle
+ *   that slides on a rail while it pours: x = its x + range × sin(2π t / period
+ *   + phase), t counted from when it starts pouring
  * @typedef {{
  *   x: number, y: number, vx: number, vy: number, count: number, rate: number,
- *   delay?: number, kind?: "tea" | "milk"
+ *   delay?: number, kind?: "tea" | "milk", rail?: Rail
  * }} KettleSpec spout at (x, y), pouring with velocity (vx, vy); delay is
  *   seconds after the planning time ends (a stagger), default 0
  * @typedef {{
@@ -214,15 +218,21 @@ const BOUNCE_GAP = 1 / 30;
  * @typedef {{ x: number, y: number, w: number, h: number, need: number, gate: number }} ScaleSpec
  *   a shallow pan, centre x and bottom y; enough weight opens gates[gate]
  * @typedef {{ x1: number, y1: number, x2: number, y2: number }} GateSpec
+ * @typedef {{ x1: number, y1: number, x2: number, y2: number }} SieveSpec a mesh
+ *   that holds pearls and lets tea and milk straight through
  * @typedef {{ x: number, y: number, count: number, interval?: number }} HopperSpec
  * @typedef {{ strokes: Array<Array<[number, number]>>, pourAt?: number }} Solution
  * @typedef {{
  *   id: string, name: string, page: number, idea: string, hint: string, straw: number,
  *   kettles: KettleSpec[], cups: CupSpec[], blocks?: BlockSpec[], fans?: FanSpec[],
  *   pipes?: PipeSpec[], scales?: ScaleSpec[], gates?: GateSpec[], hopper?: HopperSpec,
- *   noDraw?: Rect[], seed?: number, solution: Solution, keep?: [number, number], plan?: number,
+ *   sieves?: SieveSpec[], noDraw?: Rect[], seed?: number, solution: Solution,
+ *   keep?: [number, number], plan?: number, expert?: ExpertSpec | true,
  *   remix?: { difficulty: number, mirrored: boolean, of: string }
  * }} Room
+ * @typedef {{ solution?: Solution, slack?: number }} ExpertSpec a room's own
+ *   route for expert mode, when its normal one no longer fits; set to true on
+ *   a room once it is the expert take
  * @typedef {{ id: number, points: Array<[number, number]>, length: number }} Stroke
  */
 
@@ -350,7 +360,10 @@ export function createWorld(room) {
 
   const plan = room.plan ?? DEFAULT_PLAN;
   const kettles = room.kettles.map((k) => ({
-    x: k.x,
+    x: k.x + (k.rail ? k.rail.range * Math.sin(k.rail.phase ?? 0) : 0),
+    /** Where the rail is centred; x slides about it while a railed kettle pours. */
+    baseX: k.x,
+    rail: k.rail ?? null,
     y: k.y,
     vx: k.vx,
     vy: k.vy,
@@ -363,6 +376,8 @@ export function createWorld(room) {
     startAt: plan + (k.delay ?? 0),
     left: k.count,
     started: false,
+    /** When it actually started pouring, which is when its rail starts sliding. */
+    pourFrom: -1,
     acc: 0,
   }));
   const cups = room.cups.map((c) => ({
@@ -382,13 +397,17 @@ export function createWorld(room) {
   }));
   const scales = (room.scales ?? []).map((s) => ({ ...s, weight: 0, tripped: false }));
   const gates = (room.gates ?? []).map((g) => ({ ...g, open: false }));
+  /** @type {SieveSpec[]} */
+  const sieves = room.sieves ?? [];
   const hopper = room.hopper
     ? { ...room.hopper, interval: room.hopper.interval ?? 0.22, left: room.hopper.count, next: 0 }
     : null;
 
   const noDraw = [...(room.noDraw ?? [])];
   for (const k of room.kettles) {
-    noDraw.push({ x: k.x - SPOUT_CLEAR, y: k.y - SPOUT_CLEAR, w: SPOUT_CLEAR * 2, h: SPOUT_CLEAR * 2 });
+    // A kettle on a rail keeps the whole run of its spout clear.
+    const reach = Math.abs(k.rail?.range ?? 0);
+    noDraw.push({ x: k.x - reach - SPOUT_CLEAR, y: k.y - SPOUT_CLEAR, w: (reach + SPOUT_CLEAR) * 2, h: SPOUT_CLEAR * 2 });
   }
 
   const world = {
@@ -409,6 +428,7 @@ export function createWorld(room) {
     cups,
     scales,
     gates,
+    sieves,
     hopper,
     /** @type {FanSpec[]} */
     fans: room.fans ?? [],
@@ -554,6 +574,9 @@ function rebuildSegments(world) {
   });
   world.gates.forEach((gate, g) => {
     if (!gate.open) addSegment(world, gate.x1, gate.y1, gate.x2, gate.y2, 2, SEG_GATE, g);
+  });
+  world.sieves.forEach((sieve, k) => {
+    addSegment(world, sieve.x1, sieve.y1, sieve.x2, sieve.y2, 1, SEG_SIEVE, k);
   });
   world.strokes.forEach((stroke) => {
     for (let i = 1; i < stroke.points.length; i++) {
@@ -1050,8 +1073,16 @@ function pour(world, dt) {
     if (!kettle.started) {
       if (world.time < kettle.startAt) continue;
       kettle.started = true;
+      kettle.pourFrom = world.time;
       if (world.pourStartedAt < 0) world.pourStartedAt = world.time;
       emit(world, EVENTS.POUR_START, kettle.x, kettle.y, k, kettle.kind);
+    }
+    const rail = kettle.rail;
+    if (rail) {
+      // It slides from where it waited, whenever the pour began, so a room
+      // plays the same whatever the moment "pour now" is pressed.
+      const t = world.time - kettle.pourFrom;
+      kettle.x = kettle.baseX + rail.range * Math.sin((2 * Math.PI * t) / rail.period + (rail.phase ?? 0));
     }
     kettle.acc += kettle.rate * dt;
     const speed = Math.hypot(kettle.vx, kettle.vy) || 1;
@@ -1314,6 +1345,8 @@ function collideOne(world, i, k) {
   const dy = s.by[k] - ay;
   const len2 = dx * dx + dy * dy;
   if (len2 < 1e-9) return;
+  // A sieve's mesh holds pearls; droplets go straight through it.
+  if (s.kind[k] === SEG_SIEVE && p.kind[i] !== PEARL) return;
   const reach = RADIUS[p.kind[i]] + s.half[k];
   const x = p.x[i];
   const y = p.y[i];
@@ -1903,18 +1936,72 @@ export function simulate(room, strokes = [], options = {}) {
 
 // --- Rooms, after hours, and progress ----------------------------------------------------
 
+// --- Expert mode -------------------------------------------------------------------------
+// The same rooms, a lot harder: hardly any planning time, only just enough
+// straw for the room's own route (so the route has to be found, not
+// approximated), fuller orders, higher keep marks for the stars, and a ratio
+// that has to be closer. The tests prove every room still clears this way.
+
+/** Seconds of planning in expert: enough to draw a known route, no more. */
+export const EXPERT_PLAN = 5;
+/** Expert straw: the expert route's length and this much over, no more. */
+export const EXPERT_SLACK = 1.03;
+/** How much higher the keep marks sit for two and three stars. */
+const EXPERT_KEEP_RISE = 0.1;
+/** A ratio's tolerance shrinks to this share of its own. */
+const EXPERT_TOLERANCE = 0.6;
+/** An order's minimum moves this share of the way up to its full line. */
+const EXPERT_FILL = 0.5;
+
 /**
- * The room at a level index: the eighteen authored rooms, then (after hours)
- * remixes of them forever, a little harder each time round.
- * @param {number} index
- * @param {number} [seed]
+ * The expert take on a room. A room may carry its own expert route (when its
+ * normal one is longer than it needs to be); otherwise its normal route sets
+ * the straw. Already expert, a room comes back unchanged.
+ * @param {Room} room
  * @returns {Room}
  */
-export function roomAt(index, seed = 1) {
-  if (index < ROOMS.length) return ROOMS[index];
+export function expertRoom(room) {
+  if (room.expert === true) return room;
+  const spec = room.expert ?? {};
+  const solution = spec.solution ?? room.solution;
+  const length = solution.strokes.reduce((sum, line) => sum + polylineLength(line), 0);
+  const straw = Math.min(room.straw, Math.ceil(length * (spec.slack ?? EXPERT_SLACK)));
+  const keep = room.keep ?? DEFAULT_KEEP;
+  return {
+    ...room,
+    straw,
+    plan: Math.min(room.plan ?? DEFAULT_PLAN, EXPERT_PLAN),
+    keep: [Math.min(0.9, keep[0] + EXPERT_KEEP_RISE), Math.min(0.95, keep[1] + EXPERT_KEEP_RISE)],
+    cups: room.cups.map((cup) => {
+      const order = { ...cup.order, need: Math.round(cup.order.need + (cup.order.full - cup.order.need) * EXPERT_FILL) };
+      if (order.milk !== undefined) order.tol = Math.round((order.tol ?? 0.1) * EXPERT_TOLERANCE * 1000) / 1000;
+      return { ...cup, order };
+    }),
+    solution,
+    expert: true,
+  };
+}
+
+/** After hours steps up a difficulty every this many remixes, three steps a lap. */
+const REMIX_STEP = 16;
+/** The difficulty steps in one lap of after hours. */
+const LAP_STEPS = Math.ceil(ROOMS.length / REMIX_STEP);
+
+/**
+ * The room at a level index: the authored rooms, then (after hours) remixes
+ * of them forever, a little harder each time round. Expert takes every room,
+ * remixes included, the expert way.
+ * @param {number} index
+ * @param {number} [seed]
+ * @param {boolean} [expert]
+ * @returns {Room}
+ */
+export function roomAt(index, seed = 1, expert = false) {
+  const base = (/** @type {Room} */ room) => (expert ? expertRoom(room) : room);
+  if (index < ROOMS.length) return base(ROOMS[index]);
   const past = index - ROOMS.length;
-  const difficulty = 1 + Math.floor(past / 6);
-  return remix(ROOMS[past % ROOMS.length], difficulty, seed * 7919 + index);
+  const difficulty = 1 + Math.floor(past / REMIX_STEP);
+  return remix(base(ROOMS[past % ROOMS.length]), difficulty, seed * 7919 + index);
 }
 
 /** The level-select index of after hours: the first remix, after the authored rooms. */
@@ -1953,7 +2040,10 @@ export function cleanProgress(value) {
     progress.stars[i] = Number.isFinite(s) ? clamp(Math.floor(s), 0, 3) : 0;
     progress.points[i] = progress.stars[i] > 0 && Number.isFinite(p) ? Math.max(0, Math.floor(p)) : 0;
   }
-  progress.afterHours = raw.afterHours === true || progress.stars[ROOMS.length - 1] > 0;
+  // After hours opens with the last room, whatever an older save said: a
+  // device that finished when there were fewer rooms keeps every star it
+  // earned, and the rooms added since open in order before after hours does.
+  progress.afterHours = progress.stars[ROOMS.length - 1] > 0;
   return progress;
 }
 
@@ -1992,6 +2082,30 @@ export function recordRoomResult(progress, index, result) {
  */
 export function progressTotal(progress) {
   return progress.points.reduce((sum, points) => sum + points, 0);
+}
+
+/** Grades for the share text, one per star count: not cleared, then 1 to 3 stars. */
+const SHARE_CELLS = ["⬜", "🟧", "🟨", "🟩"];
+/** Pages to a line of the share text, so all sixteen fit in four lines. */
+const SHARE_PAGES_PER_LINE = 4;
+
+/**
+ * Progress as a few lines of emoji for sharing, the way a word game shares
+ * its grid: one square per room by its best stars, three rooms to a page and
+ * four pages to a line.
+ * @param {Progress} progress
+ * @returns {string[]}
+ */
+export function shareLines(progress) {
+  /** @type {string[]} */
+  const pages = [];
+  for (let start = 0; start < ROOMS.length; start += 3) {
+    pages.push(progress.stars.slice(start, start + 3).map((stars) => SHARE_CELLS[clamp(stars, 0, 3)]).join(""));
+  }
+  /** @type {string[]} */
+  const lines = [];
+  for (let i = 0; i < pages.length; i += SHARE_PAGES_PER_LINE) lines.push(pages.slice(i, i + SHARE_PAGES_PER_LINE).join(" "));
+  return lines;
 }
 
 /**
@@ -2045,7 +2159,12 @@ export function mirrorRoom(room) {
   const flipEnd = (end) => ({ x: flipX(end.x), y: end.y, nx: -end.nx, ny: end.ny });
   return {
     ...room,
-    kettles: room.kettles.map((k) => ({ ...k, x: flipX(k.x), vx: -k.vx })),
+    kettles: room.kettles.map((k) => ({
+      ...k,
+      x: flipX(k.x),
+      vx: -k.vx,
+      rail: k.rail ? { ...k.rail, range: -k.rail.range } : undefined,
+    })),
     cups: room.cups.map((c) => ({
       ...c,
       x: flipX(c.x),
@@ -2060,6 +2179,7 @@ export function mirrorRoom(room) {
     })),
     scales: (room.scales ?? []).map((s) => ({ ...s, x: flipX(s.x) })),
     gates: (room.gates ?? []).map((g) => ({ ...g, x1: flipX(g.x1), x2: flipX(g.x2) })),
+    sieves: (room.sieves ?? []).map((g) => ({ ...g, x1: flipX(g.x1), x2: flipX(g.x2) })),
     hopper: room.hopper ? { ...room.hopper, x: flipX(room.hopper.x) } : undefined,
     noDraw: (room.noDraw ?? []).map((r) => ({ ...r, x: WIDTH - r.x - r.w })),
     solution: { ...room.solution, strokes: mirrorStrokes(room.solution.strokes) },
@@ -2086,13 +2206,22 @@ export function remix(room, difficulty, seed) {
   // squeezes join in more often as it goes.
   const squeezes = ["order", "belt"].filter(() => random() < 0.35 + 0.15 * d);
   const strawFactor = Math.max(0.55, 1 - 0.06 * d);
-  const orderFactor = squeezes.includes("order") ? 1 + 0.04 * d : 1;
-  const beltFactor = squeezes.includes("belt") ? 1 + 0.12 * d : 1;
+  // An expert room is already squeezed to its route, so an expert remix never
+  // cuts straw below the route, pours the room's own droplets, and starts the
+  // other squeezes a lap later: its first lap is every expert room, mirrored
+  // or not, on just the route's straw.
+  const expert = room.expert === true;
+  const routeLength = room.solution.strokes.reduce((sum, line) => sum + polylineLength(line), 0);
+  const strawFloor = expert ? Math.ceil(routeLength) : 0;
+  const strength = expert ? Math.max(0, d - LAP_STEPS) : d;
+  const orderFactor = squeezes.includes("order") ? 1 + 0.04 * strength : 1;
+  const beltFactor = squeezes.includes("belt") ? 1 + 0.12 * strength : 1;
   return {
     ...base,
     id: `${room.id}-remix-${d}-${seed}`,
     name: `${room.name}, again`,
-    straw: Math.round(room.straw * strawFactor),
+    seed: expert ? (room.seed ?? hashString(room.id)) : room.seed,
+    straw: Math.max(strawFloor, Math.round(room.straw * strawFactor)),
     cups: base.cups.map((cup) => ({
       ...cup,
       order: {
@@ -2149,7 +2278,8 @@ export function describeRoom(room) {
   const lines = [`${room.name}.`];
   for (const k of room.kettles) {
     const what = k.kind === "milk" ? "A milk jug" : "A kettle";
-    lines.push(`${what} at ${where(k.x, k.y)} pours ${count(k.count, "droplet")} toward the ${k.vx < 0 ? "left" : "right"}.`);
+    const rail = k.rail ? ", sliding back and forth on a rail as it goes" : "";
+    lines.push(`${what} at ${where(k.x, k.y)} pours ${count(k.count, "droplet")} toward the ${k.vx < 0 ? "left" : "right"}${rail}.`);
   }
   room.cups.forEach((cup, i) => {
     const name = room.cups.length > 1 ? `Cup ${i + 1}` : "The cup";
@@ -2170,6 +2300,9 @@ export function describeRoom(room) {
     lines.push(`A scale pan at ${where(scale.x, scale.y)} opens a gate once it holds ${scale.need}.`);
   }
   for (const gate of room.gates ?? []) lines.push(`A closed gate at ${where((gate.x1 + gate.x2) / 2, (gate.y1 + gate.y2) / 2)}.`);
+  for (const sieve of room.sieves ?? []) {
+    lines.push(`A sieve at ${where((sieve.x1 + sieve.x2) / 2, (sieve.y1 + sieve.y2) / 2)} holds pearls and lets tea through.`);
+  }
   if (room.hopper) lines.push(`A hopper at ${where(room.hopper.x, room.hopper.y)} drops ${count(room.hopper.count, "pearl")} when the pour starts.`);
   lines.push(`${Math.round(room.straw)} units of straw, and ${Math.round(room.plan ?? DEFAULT_PLAN)} seconds to plan.`);
   return lines.join(" ");

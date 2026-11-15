@@ -31,6 +31,13 @@
   export function focusPause() {
     pauseButton?.focus();
   }
+
+  // Space on these buttons is the game's (see isOnControl): it must not
+  // also press the button, or a resumed game pauses on its first Space.
+  // A button is pressed by Space on keyup, so both are held back.
+  function keepSpace(event: KeyboardEvent) {
+    if (event.key === " ") event.preventDefault();
+  }
 </script>
 
 <span class="boba-hud-buttons">
@@ -39,6 +46,8 @@
     type="button"
     class="boba-icon-btn"
     {disabled}
+    on:keydown={keepSpace}
+    on:keyup={keepSpace}
     on:click={() => dispatch("pause")}
     aria-label={paused ? "Resume game" : "Pause game"}
     title={paused ? "Resume (P)" : "Pause (P)"}
@@ -48,6 +57,8 @@
   <button
     type="button"
     class="boba-icon-btn"
+    on:keydown={keepSpace}
+    on:keyup={keepSpace}
     on:click={toggleMute}
     aria-pressed={muted}
     aria-label="Mute game audio"

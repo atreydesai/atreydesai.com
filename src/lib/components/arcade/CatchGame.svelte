@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from "svelte";
+  import { get } from "svelte/store";
 
   import {
     setMusicPaused,
@@ -15,15 +16,22 @@
     stopMusic,
   } from "$lib/sfx";
   import {
-    GAME_DURATION_SECONDS,
     PLAYFIELD_TOP,
     bounceHorizontal,
+    catchGolden,
+    catchRules,
     clampSpawnCenter,
-    difficultyForElapsed,
+    createLives,
+    demoTarget,
+    difficultyAt,
+    dropPearl,
+    formatShift,
     isGoldenSpawn,
     isPerfectCatch,
+    planThrow,
     pointsForCatch,
-    timeRemaining,
+    shiftCells,
+    volleySize,
   } from "$lib/boba-engine";
   import {
     DRINKS,
@@ -44,11 +52,16 @@
     type Popup,
   } from "$lib/arcade/art";
   import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
-  import { firstVisit } from "$lib/arcade/scores";
+  import { demoIntro, firstVisit } from "$lib/arcade/scores";
+  import { emojiRows } from "$lib/arcade/share";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
+  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
-  import CupTimer from "./CupTimer.svelte";
+  import { REVIVE_BLINK_SECONDS, blinkShows } from "$lib/arcade/blink";
+  import DemoBar from "./DemoBar.svelte";
+  import DemoCard from "./DemoCard.svelte";
+  import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
   import Pearls from "./Pearls.svelte";
@@ -57,6 +70,12 @@
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
   type GamePhase = "opening" | "steady" | "rush";
+  type Difficulty = ReturnType<typeof difficultyAt>;
+  type Rules = ReturnType<typeof catchRules>;
+
+  // Read once: the switch lives on the menu. The demo always plays normal.
+  const PLAY_RULES = catchRules(get(arcadeExpert));
+  const DEMO_RULES = catchRules(false);
 
   // --- Pixel sprites -------------------------------------------------------
 
@@ -77,6 +96,9 @@
     ["..S....", "...S..."],
     [".S.....", "..S...."],
   ];
+  // Thirteen cells at 6px is normal's 78px basket; expert's is nine (54px).
+  // The engine's basketWidth is the same number, so a cup is caught exactly
+  // where the basket is drawn.
   const BASKET = [
     "DDDDDDDDDDDDD",
     "DgggggggggggD",
@@ -87,6 +109,17 @@
     "..Dg.g.g.gD..",
     "...DgggggD...",
     "...DDDDDDD...",
+  ];
+  const BASKET_SMALL = [
+    "DDDDDDDDD",
+    "DgggggggD",
+    ".DgggggD.",
+    ".Dg.g.gD.",
+    ".Dg.g.gD.",
+    "..Dg.gD..",
+    "..Dg.gD..",
+    "...DgD...",
+    "...DDD...",
   ];
 
   const PAL: Record<string, string> = {
@@ -111,54 +144,103 @@
   const BASKET_PX = 6;
   const BOBA_W = CUP[0].length * BOBA_PX;
   const BOBA_H = (STRAWS[0].length + CUP.length) * BOBA_PX;
-  const BASKET_W = BASKET[0].length * BASKET_PX;
   const BASKET_H = BASKET.length * BASKET_PX;
-  const TELEGRAPH_SECONDS = 0.44;
+  const BOBA_SPRITE = { width: BOBA_W, height: BOBA_H };
   const MIN_SPAWN_CENTER_Y = PLAYFIELD_TOP + BOBA_H / 2 + 74;
+  /** The cups of a volley leave their links a beat apart. */
+  const VOLLEY_STAGGER = 0.12;
+  /** A throw with nowhere fair to land waits on its link in steps this long… */
+  const HOLD_STEP = 0.08;
+  /** …and gives up after this long, rather than ever being thrown unfairly. */
+  const MAX_HOLD = 1.2;
 
   interface Boba {
     x: number;
     y: number;
     vx: number;
     vy: number;
+    gravity: number;
     liquid: string;
     grid: string[];
     golden: boolean;
+    /** When (on the sim clock) and where it reaches the catch line. */
+    landAt: number;
+    landCenter: number;
+    launchedAt: number;
+    /** The demo's aim error for this cup, and whether the demo lets it fall. */
+    aim: number;
+    skip: boolean;
   }
 
   interface PendingSpawn {
     x: number;
     y: number;
     remaining: number;
+    telegraph: number;
+    held: number;
     golden: boolean;
     source: HTMLElement | null;
   }
 
+  // --- The demo's script ---------------------------------------------------
+
+  // The demo plays normal at forty seconds in, then jumps to rush hour for
+  // its last stretch to show the pace climbing.
+  const DEMO_RAMP_START = 40;
+  const DEMO_PACE_OFFSET = 95;
+  const DEMO_REACTION = 0.2;
+  const DEMO_SPEED = 1500;
+  const DEMO_CAPTIONS = [
+    "Move the mouse to catch the cups the links throw.",
+    "Catch near the middle of the basket for a bonus point.",
+    "Golden cups are worth three points.",
+    "Golden cups are worth three points.",
+    "Missing a cup drops one of your three pearls.",
+    "Three golden cups in a row win a dropped pearl back.",
+    "It keeps speeding up until the last pearl drops.",
+    "It keeps speeding up until the last pearl drops.",
+  ];
+
   // --- Reactive UI state ---------------------------------------------------
 
+  let rules: Rules = PLAY_RULES;
+  let basketW = rules.basketWidth;
+  let basketGrid = rules.expert ? BASKET_SMALL : BASKET;
   let score = 0;
-  let hearts = 3;
+  let lives = createLives(rules);
   let combo = 0;
   let bestCombo = 0;
   let caughtCount = 0;
   let perfectCatches = 0;
+  let goldenCaught = 0;
   let gameOver = false;
-  let endReason: "hearts" | "time" = "hearts";
   let paused = false;
   let countdown = COUNTDOWN_SECONDS;
   let goVisible = false;
-  let timeLeft = GAME_DURATION_SECONDS;
+  let shiftLabel = formatShift(0);
   let phase: GamePhase = "opening";
-  // Initialized after mount to avoid flashing first-run guidance for returning
-  // players before their cookie can be read.
+  // Shown on the first real run on this device, never in the demo.
   let tipVisible = false;
+  let tipChecked = false;
   let missPulse = 0;
   let missFlash = false;
   let liveMessage = "Boba catch starting";
   let localBest = 0;
   let newBest = false;
-  // Bumped on restart so the song flag starts fresh with the new run.
+  let share: string[] = [];
+  // Bumped on every start so the song flag starts fresh with the new run.
   let run = 0;
+
+  /** First time here: asked whether to watch the demo before the countdown. */
+  let asking = false;
+  let demoOn = false;
+  let demoEnded = false;
+  let demoCaption = "";
+  let demoStep = 0;
+  let demoStepAt = 0;
+  let demoClock = 0;
+  let demoSkipNext = false;
+  let demoBar: DemoBar;
 
   // --- Canvas and lifecycle state -----------------------------------------
 
@@ -173,15 +255,22 @@
   let pendingSpawns: PendingSpawn[] = [];
   let particles: Particle[] = [];
   let popups: Popup[] = [];
+  /** What happened when, for the share strip. */
+  let events: Array<{ time: number; kind: "drop" | "back" | "golden" }> = [];
   let viewW = 0;
   let viewH = 0;
   let basketY = 0;
   let pointerX = 0;
+  let mouseX = 0;
+  /** Seconds on shift. The ramp reads it (plus the demo's offset). */
   let elapsed = 0;
+  let rampOffset = 0;
   let countdownElapsed = 0;
   let spawnTimer = 0;
   let spawnNumber = 0;
   let basketSquash = 0;
+  /** Seconds the basket has left to flicker after a pearl drops or comes back. */
+  let basketBlink = 0;
   let last = 0;
   let raf = 0;
   let active = true;
@@ -196,6 +285,8 @@
     if (value === "steady") return "steady pour";
     return "opening shift";
   };
+
+  const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
   // The stage sits over the page: nothing it receives should reach the page.
   function swallow(event: Event) {
@@ -220,11 +311,11 @@
   }
 
   function drawBasket(basketX: number) {
-    if (!ctx) return;
+    if (!ctx || !blinkShows(basketBlink)) return;
     const context = ctx;
     const drawAt = (x: number, y: number) => {
-      drawHalo(context, BASKET, x, y, BASKET_PX, "rgba(253, 248, 243, 0.62)");
-      drawSprite(context, BASKET, x, y, BASKET_PX, BPAL);
+      drawHalo(context, basketGrid, x, y, BASKET_PX, "rgba(253, 248, 243, 0.62)");
+      drawSprite(context, basketGrid, x, y, BASKET_PX, BPAL);
     };
 
     if (basketSquash <= 0) {
@@ -234,15 +325,15 @@
 
     const amount = Math.min(1, basketSquash / 0.13);
     context.save();
-    context.translate(basketX + BASKET_W / 2, basketY + BASKET_H);
+    context.translate(basketX + basketW / 2, basketY + BASKET_H);
     context.scale(1 + amount * 0.1, 1 - amount * 0.08);
-    drawAt(-BASKET_W / 2, -BASKET_H);
+    drawAt(-basketW / 2, -BASKET_H);
     context.restore();
   }
 
   function drawTelegraph(spawn: PendingSpawn) {
     if (!ctx) return;
-    const progress = 1 - spawn.remaining / TELEGRAPH_SECONDS;
+    const progress = spawn.held > 0 ? 1 : clamp(1 - spawn.remaining / spawn.telegraph, 0, 1);
     const centerX = spawn.x + BOBA_W / 2;
     const centerY = spawn.y + BOBA_H / 2;
     const radius = 9 + progress * 17;
@@ -266,6 +357,10 @@
     ctx.restore();
   }
 
+  function basketLeft() {
+    return clamp(pointerX - basketW / 2, 0, viewW - basketW);
+  }
+
   function drawScene() {
     if (!ctx) return;
     ctx.clearRect(0, 0, viewW, viewH);
@@ -273,14 +368,23 @@
     for (const boba of bobas) drawBoba(boba);
     drawParticles(ctx, particles);
     drawPopups(ctx, popups, popupFont);
-    drawBasket(clamp(pointerX - BASKET_W / 2, 0, viewW - BASKET_W));
+    drawBasket(basketLeft());
   }
 
   // --- Spawning and effects ------------------------------------------------
 
   function eligibleLinks() {
+    // The demo's strip sits under the tickets; nothing is thrown from behind it.
+    const strip = demoOn
+      ? document.querySelector('.boba-ui[role="region"][aria-label="Demo"]')?.getBoundingClientRect()
+      : null;
     return Array.from(document.querySelectorAll<HTMLElement>("a[href]"))
-      .filter((element) => !element.closest(".boba-ui"))
+      .filter(
+        (element) =>
+          !element.closest(".boba-ui") &&
+          !element.classList.contains("boba-source") &&
+          !element.classList.contains("boba-source-gold"),
+      )
       .map((element) => ({ element, rect: element.getBoundingClientRect() }))
       .filter(
         ({ rect }) =>
@@ -289,18 +393,27 @@
           rect.top > MIN_SPAWN_CENTER_Y - 12 &&
           rect.bottom < basketY - 12 &&
           rect.right > 0 &&
-          rect.left < viewW,
+          rect.left < viewW &&
+          !(strip && rect.top < strip.bottom + 12 && rect.bottom > strip.top - 12),
       );
   }
 
-  function queueSpawn() {
+  /** One throw: a single cup, or a volley from several links at once. */
+  function queueVolley(size: number, difficulty: Difficulty) {
+    const links = eligibleLinks();
+    for (let index = 0; index < size; index++) {
+      queueSpawn(links, difficulty.telegraph + index * VOLLEY_STAGGER);
+    }
+  }
+
+  function queueSpawn(links: ReturnType<typeof eligibleLinks>, telegraph: number) {
     let centerX = BOBA_W / 2 + Math.random() * Math.max(1, viewW - BOBA_W);
     let centerY = MIN_SPAWN_CENTER_Y + Math.random() * Math.max(1, viewH * 0.2);
     let source: HTMLElement | null = null;
-    const links = eligibleLinks();
 
     if (links.length) {
-      const choice = links[(Math.random() * links.length) | 0];
+      // Each link throws one cup at a time.
+      const [choice] = links.splice((Math.random() * links.length) | 0, 1);
       centerX = choice.rect.left + choice.rect.width / 2;
       centerY = choice.rect.top + choice.rect.height / 2;
       source = choice.element;
@@ -319,28 +432,46 @@
     pendingSpawns.push({
       x: centerX - BOBA_W / 2,
       y: centerY - BOBA_H / 2,
-      remaining: TELEGRAPH_SECONDS,
+      remaining: telegraph,
+      telegraph,
+      held: 0,
       golden,
       source,
     });
+
+    if (demoOn && golden && demoStep === 1) goDemoStep(2);
   }
 
-  function activateSpawn(spawn: PendingSpawn, gravity: number) {
-    spawn.source?.classList.remove("boba-source", "boba-source-gold");
-    const bottom = spawn.y + BOBA_H;
-    const catchLine = basketY + BASKET_PX;
-    const apexBottom = Math.min(bottom - 60, catchLine - 150);
-    const rise = Math.max(50, bottom - apexBottom);
+  /**
+   * The cup a link throws, or null if it would land where the basket can't
+   * also get to every other cup in time; the link then holds it a moment.
+   */
+  function launch(spawn: PendingSpawn, difficulty: Difficulty, now: number): Boba | null {
+    const others = bobas
+      .filter((boba) => boba.landAt > now)
+      .map((boba) => ({ time: boba.landAt, center: boba.landCenter }));
+    const field = { catchLine: basketY + BASKET_PX, sprite: BOBA_SPRITE, viewportWidth: viewW, basketWidth: basketW };
+    const plan = planThrow(difficulty, spawn, field, others, now);
+    if (!plan) return null;
+
     const straw = STRAWS[(Math.random() * STRAWS.length) | 0];
-    bobas.push({
+    const skip = demoOn && demoSkipNext && !spawn.golden;
+    if (skip) demoSkipNext = false;
+    return {
       x: spawn.x,
       y: spawn.y,
-      vx: (Math.random() - 0.5) * 110,
-      vy: -Math.sqrt(2 * gravity * rise) - Math.random() * 24,
+      vx: plan.vx,
+      vy: plan.vy,
+      gravity: difficulty.gravity,
       liquid: DRINKS[(Math.random() * DRINKS.length) | 0],
       grid: [...straw, ...CUP],
       golden: spawn.golden,
-    });
+      landAt: plan.landAt,
+      landCenter: plan.landCenter,
+      launchedAt: now,
+      aim: demoOn ? (Math.random() - 0.5) * basketW * 0.62 : 0,
+      skip,
+    };
   }
 
   function addCatchEffects(boba: Boba, centerX: number, perfect: boolean, points: number) {
@@ -363,39 +494,21 @@
     addPopup(popups, centerX, basketY - 14, text, boba.golden ? "gold" : perfect ? "perfect" : "plain");
   }
 
-  function addMissEffects(boba: Boba, centerX: number, lostCombo: number) {
+  function addMissEffects(boba: Boba, centerX: number) {
     const primary = boba.golden ? "#f2b84b" : boba.liquid;
     for (let i = 0; i < 10; i++) {
       addParticle(particles, centerX, viewH - 9, i % 3 === 0 ? PEARL : primary, 118, 340);
     }
-    addPopup(
-      popups,
-      clamp(centerX, 65, viewW - 65),
-      viewH - 46,
-      lostCombo > 1 ? "splat" : "splat",
-      "miss",
-      0.8,
-    );
+    addPopup(popups, clamp(centerX, 65, viewW - 65), viewH - 46, "splat", "miss", 0.8);
     missPulse += 1;
     missFlash = true;
     later(() => (missFlash = false), 250);
   }
 
-  // --- Game loop -----------------------------------------------------------
-
-  function beginRound() {
-    countdown = 0;
-    goVisible = true;
-    phase = "opening";
-    setMusicPhase("opening");
-    startMusic();
-    sfxStart();
-    liveMessage = "Go. Opening shift.";
-    later(() => (goVisible = false), 620);
-  }
+  // --- Catches and misses --------------------------------------------------
 
   function registerCatch(boba: Boba, centerX: number, basketX: number) {
-    const perfect = isPerfectCatch(centerX, basketX, BASKET_W);
+    const perfect = isPerfectCatch(centerX, basketX, basketW, rules.perfectRadius);
     const points = pointsForCatch(boba.golden, perfect);
     combo += 1;
     bestCombo = Math.max(bestCombo, combo);
@@ -406,12 +519,34 @@
     addCatchEffects(boba, centerX, perfect, points);
 
     const pan = viewW > 0 ? (centerX / viewW) * 2 - 1 : 0;
-    if (boba.golden) sfxGolden(combo, pan);
+    let restored = false;
+    if (boba.golden) {
+      goldenCaught += 1;
+      events.push({ time: elapsed, kind: "golden" });
+      const result = catchGolden(lives, rules);
+      lives = result.lives;
+      restored = result.restored;
+      if (restored) {
+        events.push({ time: elapsed, kind: "back" });
+        addPopup(popups, centerX, basketY - 38, "a pearl back", "gold", 1.1);
+      } else if (result.toGo > 0) {
+        const more = result.toGo === 1 ? "one more" : result.toGo === 2 ? "two more" : `${result.toGo} more`;
+        addPopup(popups, centerX, basketY - 38, `${more} for a pearl`, "gold", 1);
+      }
+    }
+
+    if (restored) {
+      basketBlink = REVIVE_BLINK_SECONDS;
+      sfxMilestone(pan);
+    } else if (boba.golden) sfxGolden(combo, pan);
     else if (caughtCount % 10 === 0) sfxMilestone(pan);
     else sfxCatch(combo, perfect, pan);
 
-    if (boba.golden) {
-      liveMessage = `Golden boba caught for ${points} points`;
+    if (demoOn) return;
+    if (restored) {
+      liveMessage = `Golden cup caught. A pearl is back, ${lives.left} left.`;
+    } else if (boba.golden) {
+      liveMessage = `Golden cup caught for ${points} points`;
     } else if (perfect) {
       liveMessage = `Perfect catch for ${points} points`;
     } else if (caughtCount % 5 === 0) {
@@ -420,85 +555,145 @@
   }
 
   function registerMiss(boba: Boba, centerX: number) {
-    const lostCombo = combo;
     combo = 0;
-    hearts -= 1;
-    addMissEffects(boba, centerX, lostCombo);
+    addMissEffects(boba, centerX);
     sfxMiss(viewW > 0 ? (centerX / viewW) * 2 - 1 : 0);
+
+    if (demoOn) {
+      // The demo shows a pearl dropping but never ends on one.
+      if (lives.left > 1) lives = dropPearl(lives);
+      else lives = { ...lives, goldens: 0 };
+      basketBlink = REVIVE_BLINK_SECONDS;
+      if (demoStep === 3) goDemoStep(4);
+      return;
+    }
+
+    lives = dropPearl(lives);
+    if (lives.left > 0) basketBlink = REVIVE_BLINK_SECONDS;
+    events.push({ time: elapsed, kind: "drop" });
     liveMessage =
-      hearts > 0
-        ? `Miss. ${hearts} ${hearts === 1 ? "pearl" : "pearls"} left.`
+      lives.left > 0
+        ? `Miss. ${lives.left} ${lives.left === 1 ? "pearl" : "pearls"} left.`
         : "No pearls left.";
 
-    if (hearts <= 0) void endGame("hearts");
+    if (lives.left <= 0) void endGame();
   }
 
-  function frame(timestamp: number) {
-    if (!active || gameOver) return;
-    if (!last) last = timestamp;
-    const rawDt = (timestamp - last) / 1000;
-    last = timestamp;
-    const dt = Math.min(rawDt, 0.05);
-    const clockDt = Math.min(rawDt, 0.25);
+  // --- The demo ------------------------------------------------------------
 
-    if (paused) {
-      raf = requestAnimationFrame(frame);
-      return;
+  function goDemoStep(step: number) {
+    demoStep = step;
+    demoStepAt = demoClock;
+    demoCaption = DEMO_CAPTIONS[step] ?? demoCaption;
+    if (step !== 3) demoSkipNext = false;
+    if (step === 3) demoSkipNext = true;
+    if (step === 6) rampOffset = DEMO_PACE_OFFSET;
+  }
+
+  /** The script: each step waits for its moment, or for time to run out. */
+  function stepDemo(dt: number) {
+    demoClock += dt;
+    if (demoEnded) return;
+    const inStep = demoClock - demoStepAt;
+    if (demoStep === 0 && demoClock >= 5.5) goDemoStep(1);
+    // Step 1 moves on when the first golden cup is about to fly.
+    else if (demoStep === 1 && demoClock >= 13) goDemoStep(2);
+    else if (demoStep === 2 && inStep >= 3.5) goDemoStep(3);
+    // Step 3 lets one cup fall, and moves on when it lands.
+    else if (demoStep === 3 && inStep >= 5) goDemoStep(4);
+    else if (demoStep === 4 && inStep >= 4) goDemoStep(5);
+    else if (demoStep === 5 && inStep >= 4) goDemoStep(6);
+    else if (demoStep === 6 && inStep >= 5) goDemoStep(7);
+    else if (demoStep === 7 && ((!bobas.length && !pendingSpawns.length) || inStep >= 3)) {
+      // Idle now: no more throws, and the music settles back down.
+      demoEnded = true;
+      phase = "opening";
+      setMusicPhase(phase);
     }
+  }
 
-    if (countdown > 0) {
-      const step = stepCountdown(countdownElapsed, countdown, clockDt);
-      countdownElapsed = step.elapsed;
-      if (step.beep) {
-        countdown = step.count;
-        sfxCountdown(countdown);
-      }
-      if (step.done) beginRound();
-      drawScene();
-      raf = requestAnimationFrame(frame);
-      return;
-    }
+  /** The demo's hand on the mouse: it moves the basket the way a player would. */
+  function steerDemo(dt: number, now: number) {
+    const seen = bobas
+      .filter((boba) => !boba.skip && now - boba.launchedAt >= DEMO_REACTION)
+      .map((boba) => ({ time: boba.landAt, center: boba.landCenter + boba.aim, golden: boba.golden }));
+    const target = demoTarget(seen, now);
+    const goal = target ? target.center : demoEnded && !bobas.length ? viewW / 2 : pointerX;
+    const gap = goal - pointerX;
+    const step = Math.min(Math.abs(gap) * Math.min(1, dt * 10), DEMO_SPEED * dt);
+    pointerX = clamp(pointerX + Math.sign(gap) * step, basketW / 2, viewW - basketW / 2);
+  }
 
-    elapsed += clockDt;
-    timeLeft = timeRemaining(elapsed);
-    if (elapsed >= GAME_DURATION_SECONDS) {
-      timeLeft = 0;
-      drawScene();
-      void endGame("time");
-      return;
-    }
+  // --- Game loop -----------------------------------------------------------
 
-    const difficulty = difficultyForElapsed(elapsed);
-    if (difficulty.phase !== phase) {
+  /** One clock for the cups' flights and the fairness check. */
+  let simTime = 0;
+
+  function beginRound() {
+    countdown = 0;
+    goVisible = true;
+    phase = difficultyAt(0, rules).phase;
+    setMusicPhase(phase);
+    startMusic();
+    sfxStart();
+    liveMessage = `Go. ${sentence(phaseLabel(phase))}.`;
+    later(() => (goVisible = false), 620);
+  }
+
+  function step(dt: number) {
+    elapsed += dt;
+    simTime += dt;
+    if (demoOn) stepDemo(dt);
+
+    const difficulty = difficultyAt(elapsed + rampOffset, rules);
+    if (difficulty.phase !== phase && !(demoOn && demoEnded)) {
       phase = difficulty.phase;
       setMusicPhase(phase);
-      liveMessage = phase === "rush" ? "Rush hour. Final fifteen seconds." : "Steady pour.";
+      if (!demoOn) liveMessage = `${sentence(phaseLabel(phase))}.`;
     }
+    const shown = formatShift(elapsed);
+    if (shown !== shiftLabel) shiftLabel = shown;
 
-    spawnTimer += clockDt;
-    if (
-      spawnTimer >= difficulty.spawnInterval &&
-      bobas.length + pendingSpawns.length < difficulty.maxActive
-    ) {
-      spawnTimer -= difficulty.spawnInterval;
-      queueSpawn();
-    }
-
-    for (let index = pendingSpawns.length - 1; index >= 0; index--) {
-      const spawn = pendingSpawns[index];
-      spawn.remaining -= dt;
-      if (spawn.remaining <= 0) {
-        pendingSpawns.splice(index, 1);
-        activateSpawn(spawn, difficulty.gravity);
+    const throwing = !demoOn || demoStep < 7;
+    if (throwing) {
+      spawnTimer += dt;
+      const inPlay = bobas.length + pendingSpawns.length;
+      if (spawnTimer >= difficulty.spawnInterval) {
+        if (inPlay < difficulty.maxActive) {
+          spawnTimer -= difficulty.spawnInterval;
+          queueVolley(Math.min(volleySize(difficulty), difficulty.maxActive - inPlay), difficulty);
+        } else {
+          // Full: throw as soon as a cup lands, not a burst of saved-up ones.
+          spawnTimer = difficulty.spawnInterval;
+        }
       }
     }
 
-    const basketX = clamp(pointerX - BASKET_W / 2, 0, viewW - BASKET_W);
+    for (let index = 0; index < pendingSpawns.length; index++) {
+      const spawn = pendingSpawns[index];
+      spawn.remaining -= dt;
+      if (spawn.remaining > 0) continue;
+      const boba = launch(spawn, difficulty, simTime);
+      if (!boba && spawn.held < MAX_HOLD) {
+        spawn.held += HOLD_STEP;
+        spawn.remaining = HOLD_STEP;
+        continue;
+      }
+      // Thrown, or (rarely, at the top of the ramp) never fair: the link lets it go.
+      spawn.source?.classList.remove("boba-source", "boba-source-gold");
+      pendingSpawns.splice(index, 1);
+      index -= 1;
+      if (boba) bobas.push(boba);
+    }
+
+    if (demoOn) steerDemo(dt, simTime);
+
+    const basketX = basketLeft();
     const catchLine = basketY + BASKET_PX;
 
     for (let index = bobas.length - 1; index >= 0; index--) {
       const boba = bobas[index];
-      boba.vy += difficulty.gravity * dt;
+      boba.vy += boba.gravity * dt;
       boba.x += boba.vx * dt;
       boba.y += boba.vy * dt;
       bounceHorizontal(boba, BOBA_W, viewW);
@@ -512,7 +707,7 @@
         previousBottom <= catchLine &&
         bottom >= catchLine &&
         centerX >= basketX &&
-        centerX <= basketX + BASKET_W
+        centerX <= basketX + basketW
       ) {
         bobas.splice(index, 1);
         registerCatch(boba, centerX, basketX);
@@ -522,18 +717,60 @@
       if (boba.y > viewH + 10) {
         bobas.splice(index, 1);
         registerMiss(boba, centerX);
-        if (gameOver) break;
+        if (gameOver) return;
       }
     }
 
     basketSquash = Math.max(0, basketSquash - dt);
+    basketBlink = Math.max(0, basketBlink - dt);
     stepParticles(particles, dt);
     stepPopups(popups, dt);
-    drawScene();
-    if (active && !gameOver) raf = requestAnimationFrame(frame);
   }
 
-  // --- Pause, restart, and finish -----------------------------------------
+  function frame(timestamp: number) {
+    if (!active || gameOver) return;
+    if (!last) last = timestamp;
+    const rawDt = (timestamp - last) / 1000;
+    last = timestamp;
+    const dt = Math.min(rawDt, 0.05);
+    const clockDt = Math.min(rawDt, 0.25);
+
+    if (paused || asking) {
+      drawScene();
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    if (countdown > 0) {
+      const next = stepCountdown(countdownElapsed, countdown, clockDt);
+      countdownElapsed = next.elapsed;
+      if (next.beep) {
+        countdown = next.count;
+        sfxCountdown(countdown);
+      }
+      if (next.done) beginRound();
+      drawScene();
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    step(dt);
+    if (gameOver) {
+      drawScene();
+      return;
+    }
+    drawScene();
+    if (active) raf = requestAnimationFrame(frame);
+  }
+
+  function runLoop() {
+    cancelAnimationFrame(raf);
+    last = 0;
+    active = true;
+    raf = requestAnimationFrame(frame);
+  }
+
+  // --- Starting, pausing, and finishing -------------------------------------
 
   function clearSpawnSources() {
     document
@@ -541,11 +778,95 @@
       .forEach((element) => element.classList.remove("boba-source", "boba-source-gold"));
   }
 
+  /** A clean counter for a new run or demo, on `next`'s rules. */
+  function resetRun(next: Rules) {
+    stopMusic();
+    clearSpawnSources();
+    timers.clear();
+    rules = next;
+    basketW = rules.basketWidth;
+    basketGrid = rules.expert ? BASKET_SMALL : BASKET;
+    bobas = [];
+    pendingSpawns = [];
+    particles = [];
+    popups = [];
+    events = [];
+    score = 0;
+    lives = createLives(rules);
+    combo = 0;
+    bestCombo = 0;
+    caughtCount = 0;
+    perfectCatches = 0;
+    goldenCaught = 0;
+    elapsed = 0;
+    simTime = 0;
+    rampOffset = 0;
+    countdownElapsed = 0;
+    spawnTimer = 0;
+    spawnNumber = 0;
+    basketSquash = 0;
+    basketBlink = 0;
+    shiftLabel = formatShift(0);
+    phase = difficultyAt(0, rules).phase;
+    missPulse = 0;
+    missFlash = false;
+    goVisible = false;
+    gameOver = false;
+    paused = false;
+    newBest = false;
+    share = [];
+    asking = false;
+    demoOn = false;
+    demoEnded = false;
+    run += 1;
+  }
+
+  /** A real run, after the countdown. */
+  function startRun() {
+    resetRun(PLAY_RULES);
+    countdown = COUNTDOWN_SECONDS;
+    pointerX = clamp(mouseX, basketW / 2, viewW - basketW / 2);
+    // The first-run tip shows on the first real run on this device.
+    if (!tipChecked) {
+      tipChecked = true;
+      tipVisible = firstVisit("catch");
+    } else {
+      tipVisible = false;
+    }
+    sfxCountdown(COUNTDOWN_SECONDS);
+    liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+    drawScene();
+    runLoop();
+  }
+
+  /** The demo: normal rules, played by an autopilot on the real engine. */
+  async function startDemo() {
+    resetRun(DEMO_RULES);
+    demoOn = true;
+    countdown = 0;
+    tipVisible = false;
+    rampOffset = DEMO_RAMP_START;
+    demoClock = 0;
+    goDemoStep(0);
+    pointerX = viewW / 2;
+    const difficulty = difficultyAt(rampOffset, rules);
+    phase = difficulty.phase;
+    // The first cup flies almost at once.
+    spawnTimer = difficulty.spawnInterval - 0.35;
+    setMusicPhase(phase);
+    startMusic();
+    liveMessage = "Demo playing.";
+    drawScene();
+    runLoop();
+    await tick();
+    demoBar?.focus();
+  }
+
   async function pauseGame() {
-    if (gameOver || !active || paused) return;
+    if (gameOver || !active || paused || asking) return;
     paused = true;
     setMusicPaused(true);
-    liveMessage = "Game paused";
+    liveMessage = demoOn ? "Demo paused" : "Game paused";
     await tick();
     pauseCard?.focus();
   }
@@ -556,7 +877,7 @@
     last = 0;
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = countdown > 0 ? `Countdown ${countdown}` : "Game resumed";
+    liveMessage = countdown > 0 ? `Countdown ${countdown}` : demoOn ? "Demo resumed" : "Game resumed";
     hudButtons?.focusPause();
   }
 
@@ -565,62 +886,21 @@
     else void pauseGame();
   }
 
-  async function endGame(reason: "hearts" | "time") {
-    if (gameOver) return;
+  async function endGame() {
+    if (gameOver || demoOn) return;
     active = false;
     gameOver = true;
     paused = false;
-    endReason = reason;
     cancelAnimationFrame(raf);
     clearSpawnSources();
-    const result = concludeRun("catch", score, reason);
+    const result = concludeRun("catch", score);
     localBest = result.best;
     newBest = result.newBest;
-    liveMessage =
-      reason === "time"
-        ? `Shift complete. Final score ${score}.`
-        : `Game over. Final score ${score}.`;
+    const cells = shiftCells(events, elapsed);
+    share = [...emojiRows(cells, cells.length <= 12 ? 12 : 10, 3), `⏱️ ${formatShift(elapsed)} on shift`];
+    liveMessage = `Game over after ${formatShift(elapsed)} on shift. Final score ${score}.`;
     await tick();
     slip?.focus();
-  }
-
-  function restart() {
-    stopMusic();
-    clearSpawnSources();
-    bobas = [];
-    pendingSpawns = [];
-    particles = [];
-    popups = [];
-    score = 0;
-    hearts = 3;
-    combo = 0;
-    bestCombo = 0;
-    caughtCount = 0;
-    perfectCatches = 0;
-    elapsed = 0;
-    countdownElapsed = 0;
-    spawnTimer = 0;
-    spawnNumber = 0;
-    basketSquash = 0;
-    last = 0;
-    countdown = COUNTDOWN_SECONDS;
-    goVisible = false;
-    timeLeft = GAME_DURATION_SECONDS;
-    phase = "opening";
-    // A restart is still part of the same visit; first-run guidance should not
-    // return once the player has completed or abandoned their first run.
-    tipVisible = false;
-    missPulse = 0;
-    missFlash = false;
-    gameOver = false;
-    paused = false;
-    newBest = false;
-    run += 1;
-    active = true;
-    sfxCountdown(COUNTDOWN_SECONDS);
-    liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
-    drawScene();
-    raf = requestAnimationFrame(frame);
   }
 
   // --- Sizing and lifecycle ------------------------------------------------
@@ -630,27 +910,34 @@
     viewH = window.innerHeight;
     ctx = fitCanvas(canvas, viewW, viewH);
     basketY = viewH - BASKET_H - 16;
-    pointerX = clamp(pointerX, BASKET_W / 2, viewW - BASKET_W / 2);
+    pointerX = clamp(pointerX, basketW / 2, viewW - basketW / 2);
     drawScene();
   }
 
   onMount(() => {
-    pointerX = window.innerWidth / 2;
+    mouseX = window.innerWidth / 2;
+    pointerX = mouseX;
     popupFont = arcadeFont();
     sizeCanvas();
-    tipVisible = firstVisit("catch");
-    sfxCountdown(COUNTDOWN_SECONDS);
 
     const onMove = (event: MouseEvent) => {
-      pointerX = event.clientX;
+      mouseX = event.clientX;
+      // The demo moves the basket itself.
+      if (!demoOn) pointerX = mouseX;
     };
     const unmountShell = mountShell({
       isOver: () => gameOver,
       isPaused: () => paused,
       pause: () => void pauseGame(),
       togglePause,
-      playScope: () => document.querySelector(".boba-hud"),
+      playScope: () =>
+        asking
+          ? document.querySelector('[aria-labelledby="boba-demo-title"]')
+          : demoOn
+            ? document.querySelector(".boba-arcade")
+            : document.querySelector(".boba-hud"),
       onKey: (event) => {
+        if (asking) return;
         // Space pauses too, unless a focused control keeps it for itself.
         if (event.key === " " && !isOnControl(event)) {
           event.preventDefault();
@@ -661,7 +948,14 @@
       pauseOnPointerLeave: true,
     });
     window.addEventListener("mousemove", onMove, { passive: true });
-    raf = requestAnimationFrame(frame);
+
+    const intro = demoIntro("catch", takeDemoRequest("catch"));
+    if (intro === "demo") void startDemo();
+    else if (intro === "ask") {
+      asking = true;
+      liveMessage = "Watch the demo, or play.";
+      runLoop();
+    } else startRun();
 
     return () => {
       active = false;
@@ -677,6 +971,7 @@
 
 <div
   class="boba-stage is-page"
+  class:is-demo={demoOn || asking}
   on:click={swallow}
   on:pointerdown={swallow}
   on:wheel={swallow}
@@ -699,25 +994,28 @@
           </span>
         {/key}
       </span>
+      {#if !demoOn}
+        <ExpertTag />
+      {/if}
     </div>
 
+    <!-- No clock to beat: how long this shift has lasted, and the pace. -->
     <div
       class="boba-ticket boba-ticket-center boba-riso"
       class:is-rush={phase === "rush"}
       style="--tilt: 1deg"
       role="timer"
-      aria-label={`${timeLeft} seconds remaining, ${phaseLabel(phase)}`}
+      aria-label={`${shiftLabel} on shift, ${phaseLabel(phase)}`}
     >
-      <CupTimer fraction={timeLeft / GAME_DURATION_SECONDS} rush={phase === "rush"} />
-      <span class="boba-big">{String(timeLeft).padStart(2, "0")}</span>
+      <span class="boba-big">{shiftLabel}</span>
       <span class="boba-stack">
-        <span class="boba-meta">seconds</span>
+        <span class="boba-meta">on shift</span>
         <span class="boba-phase">{phaseLabel(phase)}</span>
       </span>
     </div>
 
     <div class="boba-ticket boba-ticket-end boba-riso">
-      <Pearls left={hearts} pulse={missPulse} />
+      <Pearls left={lives.left} total={lives.max} pulse={missPulse} />
       {#key run}
         <TrackFlag />
       {/key}
@@ -725,14 +1023,14 @@
     </div>
   </div>
 
-  {#if tipVisible && !paused}
+  {#if tipVisible && !paused && !gameOver}
     <div class="boba-tip" role="note" aria-label="How to play">
       <span>move the basket to catch the cups</span>
     </div>
   {/if}
 </header>
 
-{#if countdown > 0 || goVisible}
+{#if !asking && !demoOn && (countdown > 0 || goVisible)}
   <Countdown value={countdown} />
 {/if}
 
@@ -740,10 +1038,25 @@
   <div class="boba-miss-flash" aria-hidden="true"></div>
 {/if}
 
+{#if asking}
+  <DemoCard on:watch={() => void startDemo()} on:play={startRun} />
+{/if}
+
+{#if demoOn && !paused}
+  <DemoBar
+    bind:this={demoBar}
+    caption={demoCaption}
+    ended={demoEnded}
+    placement="top"
+    on:play={startRun}
+    on:again={() => void startDemo()}
+  />
+{/if}
+
 {#if paused && !gameOver}
   <PauseCard
     bind:this={pauseCard}
-    resumeLabel="Resume shift"
+    resumeLabel={demoOn ? "Resume demo" : "Resume shift"}
     on:resume={resumeGame}
     on:menu={toMenu}
     on:exit={exit}
@@ -754,19 +1067,19 @@
   <ResultsSlip
     bind:this={slip}
     game="catch"
-    title={endReason === "time" ? "shift complete" : "game over"}
-    deck={endReason === "time"
-      ? "Sixty seconds served. Wipe down the counter."
-      : "Three pearls dropped. The floor is sticky now."}
+    title="game over"
+    deck="The last pearl dropped. The floor is sticky now."
     {score}
     {newBest}
+    {share}
     stats={[
+      { label: "time on shift", value: formatShift(elapsed) },
       { label: "cups caught", value: caughtCount },
       { label: "perfect catches", value: perfectCatches },
-      { label: "best combo", value: `×${bestCombo}` },
+      { label: "golden cups", value: goldenCaught },
       { label: "personal best", value: localBest },
     ]}
-    on:restart={restart}
+    on:restart={startRun}
     on:menu={toMenu}
     on:exit={exit}
   />
@@ -775,6 +1088,11 @@
 <div class="sr-only" aria-live="polite" aria-atomic="true">{liveMessage}</div>
 
 <style>
+  /* The demo plays itself, so the pointer is free for its buttons. */
+  .boba-stage.is-demo {
+    cursor: default;
+  }
+
   /* Links that are about to throw a cup glow in the accent (gold for a
      golden cup), a beat before it appears. */
   :global(a.boba-source),

@@ -3,9 +3,13 @@
 // planning before the pour; a kettle's `delay` is its stagger after that.
 // A solution's `pourAt` is the room time "pour now" is pressed, which also
 // fixes where a belt is when the tea arrives.
+//
+// The first eighteen rooms live here; rooms 19 to 48 in spill-rooms-late.js.
+
+import { LATE_ROOMS } from "./spill-rooms-late.js";
 
 /** @type {Array<import("./spill-engine.js").Room>} */
-export const ROOMS = [
+const FIRST_ROOMS = [
   {
     id: "first-pour",
     name: "first pour",
@@ -348,3 +352,6 @@ export const ROOMS = [
     },
   },
 ];
+
+/** Every authored room, in order. */
+export const ROOMS = [...FIRST_ROOMS, ...LATE_ROOMS];

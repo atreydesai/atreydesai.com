@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from "svelte";
+  import { get } from "svelte/store";
 
   import {
     setMusicPaused,
@@ -56,6 +57,7 @@
     recordRoomResult,
     removeStroke,
     roomAt,
+    shareLines,
     step,
     strawLeft,
     strokeAt,
@@ -63,10 +65,14 @@
   } from "$lib/arcade/spill-engine.js";
   import type { Progress, Room, RoomResult, World } from "$lib/arcade/spill-engine.js";
   import { ICON_AUDIO_PAL, ICON_LEVELS, ICON_LOCK, MENU_ICONS, fitCanvas, arcadeFont } from "$lib/arcade/art";
-  import { firstVisit, readSpillProgress, writeSpillProgress } from "$lib/arcade/scores";
+  import { demoIntro, firstVisit, readSpillProgress, writeSpillProgress } from "$lib/arcade/scores";
+  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
+  import DemoBar from "./DemoBar.svelte";
+  import DemoCard from "./DemoCard.svelte";
+  import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
   import ResultsSlip from "./ResultsSlip.svelte";
@@ -77,11 +83,16 @@
   // simulates, and turns pointer and keys into strokes.
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
+  /** Expert is read once, as the game opens, and kept: its rooms, its progress, its board. */
+  const expert = get(arcadeExpert);
+  const mode = expert ? "expert" : "normal";
+  /** The last authored room: clearing it signs the board and opens after hours. */
+  const LAST_ROOM = ROOMS.length - 1;
 
   /**
    * idle: no room started yet (the level select is up over the next room);
    * countdown, play, and result (the verdict is in, the tea still moves);
-   * done: the closing-time slip after room 18.
+   * done: the closing-time slip after the last room.
    */
   type Phase = "idle" | "countdown" | "play" | "result" | "done";
   type Kettle = World["kettles"][number];
@@ -123,7 +134,7 @@
   const LOW_SHARE = 0.2;
   /** The reach ring shows below this share, and is at full strength by LOW_SHARE. */
   const RING_SHARE = 0.6;
-  /** The level select lays rooms out a page to a row. */
+  /** Rooms to a page: the level select keeps a page's rooms side by side. */
   const ROOM_COLUMNS = 3;
 
   // --- Colour ---------------------------------------------------------------------
@@ -180,8 +191,12 @@
   const LIQ_DULL_TOP = Uint32Array.from(LIQ_HEX.map((hex) => mix32(hex, "#b4aca2", 0.4)));
   const LIQ_DULL_EDGE = Uint32Array.from(LIQ_HEX.map((hex) => mix32(mixHex(hex, "#857b70", 0.42), "#3a2414", 0.45)));
 
-  /** Six quiet tile colours, one per page of rooms, so progress is felt. */
-  const TILE_TINTS = ["#a9bcb2", "#a7b9c9", "#b6b0c4", "#c2aca7", "#b7a9b8", "#9aa7b5"];
+  /** Sixteen quiet tile colours, one per page of rooms, so progress is felt. */
+  const TILE_TINTS = [
+    "#a9bcb2", "#a7b9c9", "#b6b0c4", "#c2aca7", "#b7a9b8", "#9aa7b5",
+    "#b3bfa6", "#a3b7bd", "#c4b59f", "#abb3c8", "#c6bf9f", "#c0a9b3",
+    "#cbbfac", "#a8b1a2", "#b8aa9c", "#8f9aab",
+  ];
   /** The kitchen's back wall, from OrderUp's family but a step dimmer. */
   const WALL_HEX = "#a68f77";
   const WAINSCOT_HEX = "#7b604f";
@@ -189,7 +204,7 @@
   const BEAM_HEX = "#4f3a33";
   const WOOD_HEX = "#5e3d2a";
   const FLOOR_HEX = ["#4a3c35", "#56473e"];
-  /** The window slit: the time of day by page, then night after hours. */
+  /** The window slit: the day passing over the pages, then night after hours. */
   const SKIES = [
     { top: "#cfe3ea", low: "#f5e6d3", sun: "#fff6d8", night: false },
     { top: "#8fb9de", low: "#cfe3ea", sun: "#fff6d8", night: false },
@@ -388,7 +403,7 @@
   /** A room has been started this visit, so the level select can close back to it. */
   let roomStarted = false;
   let musicStarted = false;
-  /** The slip has been shown for this clear of room 18, so the result waits for Next. */
+  /** The slip has been shown for this clear of the last room, so the result waits for Next. */
   let holdResult = false;
   let focusedTile = 0;
 
@@ -420,7 +435,7 @@
   let threeStarRooms = 0;
   let teaSpilled = 0;
 
-  let room: Room = roomAt(0);
+  let room: Room = roomAt(0, 1, expert);
   let world: World = createWorld(room);
   let resultAge = 0;
   let lastCleared = false;
@@ -600,6 +615,11 @@
     return clamp((room.page ?? 1) - 1, 0, TILE_TINTS.length - 1);
   }
 
+  /** The window's sky for the page: the day runs once over all the pages. */
+  function skyIndex() {
+    return Math.min(SKIES.length - 1, Math.floor((pageIndex() * SKIES.length) / TILE_TINTS.length));
+  }
+
   /** Paints the back kitchen in 4px cells around wherever the room sits. */
   function bakeKitchen() {
     const cols = Math.ceil(viewW / SC) + 1;
@@ -728,7 +748,7 @@
   /** A narrow window high on the wall: the time of day by page. */
   function paintWindow(x: number, y: number, w: number, h: number) {
     const remix = !!room.remix;
-    const sky = SKIES[remix ? SKIES.length - 1 : pageIndex()];
+    const sky = SKIES[remix ? SKIES.length - 1 : skyIndex()];
     const frame = c32(WOOD_HEX);
     rect(x - 1, y - 1, w + 2, h + 2, frame);
     const top = c32(sky.top);
@@ -737,8 +757,8 @@
       const t = yy / Math.max(1, h - 1);
       for (let xx = 0; xx < w; xx++) put(x + xx, y + yy, t > bayer(xx, yy) * 0.6 + 0.3 ? low : top);
     }
-    const sunX = x + Math.round(w * (0.25 + pageIndex() * 0.1));
-    const sunY = y + 1 + Math.min(h - 2, Math.floor(pageIndex() / 2));
+    const sunX = x + Math.round(w * (0.25 + skyIndex() * 0.1));
+    const sunY = y + 1 + Math.min(h - 2, Math.floor(skyIndex() / 2));
     if (sky.night) {
       for (let i = 0; i < 6; i++) put(x + 1 + Math.floor(hash2(i, 5) * (w - 2)), y + Math.floor(hash2(i, 9) * (h - 1)), CREAM);
       put(sunX, y + 1, CREAM);
@@ -836,10 +856,12 @@
     paintPipes();
     paintBelts(true);
     paintScalesStatic();
+    paintSieves();
     world.blocks.forEach((block, index) => {
       if (block.type === "ice") paintBlock(block, index);
     });
     paintFanHousings();
+    paintRails();
 
     roomCanvas ??= makeCanvas(RW, RH);
     roomImage ??= new ImageData(RW, RH);
@@ -1153,6 +1175,56 @@
   }
 
   const easeOut = (t: number) => 1 - (1 - t) * (1 - t);
+
+  // --- Sieves and rails ----------------------------------------------------------------
+
+  /**
+   * A sieve: a steel mesh with an ink edge, wires across it every few units
+   * and pale gaps between, so it reads as something tea falls through.
+   */
+  function paintSieves() {
+    for (const sieve of world.sieves) {
+      const { x1, y1, x2, y2 } = sieve;
+      const length = Math.hypot(x2 - x1, y2 - y1) || 1;
+      for (let y = Math.floor(Math.min(y1, y2) - 4); y <= Math.max(y1, y2) + 4; y++) {
+        for (let x = Math.floor(Math.min(x1, x2) - 4); x <= Math.max(x1, x2) + 4; x++) {
+          const d = segDist(x + 0.5, y + 0.5, x1, y1, x2, y2);
+          if (d > 2.4) continue;
+          const along = ((x + 0.5 - x1) * (x2 - x1) + (y + 0.5 - y1) * (y2 - y1)) / length;
+          if (d > 1.6) blend(x, y, INK, 0.7);
+          else if (Math.floor(along) % 3 === 0) put(x, y, STEEL_DARK);
+          else blend(x, y, STEEL_LIGHT, 0.45);
+        }
+      }
+      for (const [px, py] of [
+        [x1, y1],
+        [x2, y2],
+      ]) {
+        disc(px, py, 2.4, INK);
+        disc(px, py, 1.4, STEEL);
+      }
+    }
+  }
+
+  /** Where a kettle's chain meets its trolley, relative to the spout, hanging level. */
+  function handleOffset(kettle: Kettle) {
+    const sp = kettleSprite(kettle);
+    return spriteToWorld(sp, { ...kettle, x: 0, y: 0 }, 0, sp.hx, sp.hy).x;
+  }
+
+  /** The slot in the top trim that a kettle on a rail runs along. */
+  function paintRails() {
+    for (const kettle of world.kettles) {
+      if (!kettle.rail) continue;
+      const reach = Math.abs(kettle.rail.range);
+      const centre = kettle.baseX + handleOffset(kettle);
+      const x0 = Math.round(centre - reach - 7);
+      const x1 = Math.round(centre + reach + 7);
+      rect(x0, -MT + 1, x1 - x0, 4, INK);
+      rect(x0 + 1, -MT + 2, x1 - x0 - 2, 2, STEEL_DEEP);
+      rect(x0, -MT + 5, x1 - x0, 1, STEEL_LIGHT);
+    }
+  }
 
   // --- Blocks -----------------------------------------------------------------------
 
@@ -1660,6 +1732,14 @@
       if (waiting && y > dialY - 8 && y < dialY + 8) continue;
       put(handle.x, y, (y & 1) === 0 ? STEEL_DARK : STEEL_LIGHT);
     }
+    if (kettle.rail) {
+      // The trolley it hangs from, running in the slot in the trim.
+      const tx = Math.round(handle.x);
+      rect(tx - 4, -MT + 1, 9, 5, INK);
+      rect(tx - 3, -MT + 2, 7, 3, STEEL);
+      put(tx - 2, -MT + 2, STEEL_LIGHT);
+      put(tx + 2, -MT + 2, STEEL_LIGHT);
+    }
 
     const reach = Math.ceil(Math.hypot(Math.max(sp.px, sp.w - sp.px), Math.max(sp.py, sp.h - sp.py))) + 1;
     const kx = Math.floor(kettle.x);
@@ -2096,11 +2176,11 @@
   }
 
   /** A fresh world for a level: straws cleared, kettles full. */
-  function enterRoom(index: number) {
+  function enterRoom(index: number, override?: Room) {
     const previousPage = room ? pageIndex() : -1;
     const wasRemix = !!room?.remix;
     levelIndex = index;
-    room = roomAt(index, remixSeed);
+    room = override ?? roomAt(index, remixSeed, expert);
     world = createWorld(room);
     accumulator = 0;
     alpha = 1;
@@ -2155,13 +2235,22 @@
     penDrawing = false;
     setPour(0);
     lastCleared = result.cleared;
+    if (demo) {
+      // The demo's room clears, and nothing is booked.
+      verdictCount += 1;
+      verdict = { id: verdictCount, stars: result.stars, points: result.points };
+      sfxRoomClear(result.stars);
+      liveMessage = `Room cleared with ${result.stars} ${result.stars === 1 ? "star" : "stars"}.`;
+      syncHud();
+      return;
+    }
     teaSpilled += result.spilled;
     if (result.cleared) {
       let note = "";
       if (levelIndex < AFTER_HOURS) {
         const before = progress;
         progress = recordRoomResult(progress, levelIndex, result);
-        writeSpillProgress(progress);
+        writeSpillProgress(progress, mode);
         const opened = unlockedRooms(progress);
         if (levelIndex + 1 < ROOMS.length && opened[levelIndex + 1] && !unlockedRooms(before)[levelIndex + 1]) {
           note = ` Room ${levelIndex + 2} is open.`;
@@ -2191,9 +2280,9 @@
     syncHud();
   }
 
-  /** On from a result: the next room after a clear (or the slip after room 18), the same room after a spill. */
+  /** On from a result: the next room after a clear (or the slip after the last room), the same room after a spill. */
   function advance() {
-    if (lastCleared && levelIndex === ROOMS.length - 1 && !holdResult) {
+    if (lastCleared && levelIndex === LAST_ROOM && !holdResult) {
       void openSlip();
       return;
     }
@@ -2203,7 +2292,7 @@
       playLevel(nextIndex);
       return;
     }
-    if (lastCleared) setMusicPhase(phaseFor(roomAt(nextIndex, remixSeed)));
+    if (lastCleared) setMusicPhase(phaseFor(roomAt(nextIndex, remixSeed, expert)));
     const keepHint = !lastCleared ? caption : null;
     enterRoom(nextIndex);
     phase = "play";
@@ -2248,9 +2337,9 @@
 
   function syncHud() {
     const live = phase === "play" && !settled();
-    canPour = live && world.status === "waiting";
-    canClear = live && world.strokes.length > 0;
-    canNext = phase === "result" && lastCleared && !levelsOpen;
+    canPour = live && world.status === "waiting" && !demo;
+    canClear = live && world.strokes.length > 0 && !demo;
+    canNext = phase === "result" && lastCleared && !levelsOpen && !demo;
     const judged = world.result ?? judgeRoom(world);
     previewStars = world.status === "waiting" ? 0 : judged.stars;
     cupOk = judged.cups.map((cup) => cup.ok);
@@ -2618,6 +2707,7 @@
   }
 
   function onStageDown(event: PointerEvent) {
+    if (demo) return;
     if (phase === "result") {
       if (event.button === 0 || event.pointerType !== "mouse") {
         event.preventDefault();
@@ -2650,6 +2740,7 @@
   }
 
   function onStageMove(event: PointerEvent) {
+    if (demo) return;
     if (!gesture) {
       if (event.pointerType !== "mouse" || !playable()) {
         overRoom = false;
@@ -2727,6 +2818,9 @@
     const key = event.key;
     const lower = key.toLowerCase();
     if (event.metaKey || event.ctrlKey || event.altKey) return;
+    // The demo and its question take none of the game's keys; Enter and
+    // Space reach their focused buttons.
+    if (demo || asking) return;
     if (levelsOpen) {
       // The dialog's tiles take their own keys; L closes it again.
       if (lower === "l") {
@@ -2778,6 +2872,7 @@
   }
 
   function onKeyUp(event: KeyboardEvent) {
+    if (demo) return;
     const arrow = ARROWS[event.key];
     if (arrow) held[arrow] = false;
     if (event.key === " " && penDrawing) {
@@ -2810,6 +2905,8 @@
 
   function releaseAll() {
     held.left = held.right = held.up = held.down = false;
+    // The demo's pen is the script's, and carries on after a pause.
+    if (demo) return;
     if (penDrawing) {
       penDrawing = false;
       cancelStroke(world);
@@ -2820,7 +2917,7 @@
   // --- Actions -----------------------------------------------------------------------
 
   function pour() {
-    if (!playable() || world.status !== "waiting") return;
+    if (demo || !playable() || world.status !== "waiting") return;
     if (pourNow(world)) {
       liveMessage = "Pouring early.";
       syncHud();
@@ -2828,7 +2925,7 @@
   }
 
   function clearAll() {
-    if (!playable() || !world.strokes.length) return;
+    if (demo || !playable() || !world.strokes.length) return;
     for (const stroke of world.strokes) crumbs(stroke.points);
     clearStrokes(world);
     sfxErase();
@@ -2837,7 +2934,7 @@
   }
 
   function next() {
-    if (phase !== "result" || !lastCleared || paused || levelsOpen) return;
+    if (demo || phase !== "result" || !lastCleared || paused || levelsOpen) return;
     advance();
   }
 
@@ -2850,7 +2947,7 @@
   // --- Pause, the level select, and closing time ---------------------------------------------
 
   async function pauseGame() {
-    if (paused || levelsOpen || phase === "idle" || phase === "done") return;
+    if (paused || levelsOpen || asking || phase === "idle" || phase === "done") return;
     paused = true;
     releaseAll();
     setPour(0);
@@ -2867,7 +2964,8 @@
     setMusicPaused(false);
     sfxBlip();
     liveMessage = "Game resumed";
-    focusPlayfield();
+    if (demo) void tick().then(() => demoBar?.focus());
+    else focusPlayfield();
   }
 
   function togglePause() {
@@ -2900,7 +2998,7 @@
   $: nextLevel = nextRoom(progress);
   $: isAfterHours = levelIndex >= AFTER_HOURS;
 
-  /** Whether a level-select tile (0 to 17, or after hours) can be played. */
+  /** Whether a level-select tile (an authored room, or after hours) can be played. */
   function tileOpen(index: number) {
     return index >= AFTER_HOURS ? progress.afterHours : !!openRooms[index];
   }
@@ -2916,7 +3014,7 @@
 
   /** Opens the level select over the room, which waits until it closes. */
   async function openLevels() {
-    if (levelsOpen || paused || phase === "countdown" || phase === "done") return;
+    if (demo || asking || levelsOpen || paused || phase === "countdown" || phase === "done") return;
     levelsOpen = true;
     releaseAll();
     setPour(0);
@@ -2948,7 +3046,7 @@
 
   function chooseLevel(index: number) {
     if (!tileOpen(index)) {
-      liveMessage = index >= AFTER_HOURS ? "After hours opens once room 18 is cleared." : `Room ${index + 1} opens once room ${index} is cleared.`;
+      liveMessage = index >= AFTER_HOURS ? `After hours opens once room ${ROOMS.length} is cleared.` : `Room ${index + 1} opens once room ${index} is cleared.`;
       return;
     }
     levelsOpen = false;
@@ -2958,13 +3056,40 @@
     focusPlayfield();
   }
 
+  /**
+   * The tile straight above or below another, by where they sit on screen:
+   * the grid shows one page to a row on a phone and two on a wider screen.
+   */
+  function tileAcross(index: number, direction: 1 | -1) {
+    const from = tileButtons[index]?.getBoundingClientRect();
+    if (!from) return index;
+    const centre = from.left + from.width / 2;
+    let best = index;
+    let bestGap = Infinity;
+    let bestOff = Infinity;
+    tileButtons.forEach((button, i) => {
+      if (!button || i === index) return;
+      const box = button.getBoundingClientRect();
+      const gap = direction > 0 ? box.top - from.bottom : from.top - box.bottom;
+      if (gap < -2) return;
+      const off = Math.abs(box.left + box.width / 2 - centre);
+      // The nearest row first, then the tile closest under the one we left.
+      if (gap < bestGap - 4 || (Math.abs(gap - bestGap) <= 4 && off < bestOff)) {
+        best = i;
+        bestGap = gap;
+        bestOff = off;
+      }
+    });
+    return best;
+  }
+
   function onTileKey(event: KeyboardEvent, index: number) {
     const last = AFTER_HOURS;
     let to = -1;
     if (event.key === "ArrowRight") to = Math.min(last, index + 1);
     else if (event.key === "ArrowLeft") to = Math.max(0, index - 1);
-    else if (event.key === "ArrowDown") to = index >= last ? last : Math.min(last, index + ROOM_COLUMNS);
-    else if (event.key === "ArrowUp") to = index >= last ? last - 2 : Math.max(0, index - ROOM_COLUMNS);
+    else if (event.key === "ArrowDown") to = tileAcross(index, 1);
+    else if (event.key === "ArrowUp") to = tileAcross(index, -1);
     else if (event.key === "Home") to = 0;
     else if (event.key === "End") to = last;
     if (to < 0) return;
@@ -2982,7 +3107,7 @@
     closeLevels();
   }
 
-  /** Closing time: room 18 is cleared, and the slip scores every room's best. */
+  /** Closing time: the last room is cleared, and the slip scores every room's best. */
   async function openSlip() {
     phase = "done";
     holdResult = true;
@@ -2992,7 +3117,7 @@
     musicStarted = false;
     localBest = result.best;
     newBest = result.newBest;
-    liveMessage = `Closing time. ${score} points across the eighteen rooms.`;
+    liveMessage = `Closing time. ${score} points across all ${ROOMS.length} rooms.`;
     await tick();
     slip?.focus();
   }
@@ -3021,15 +3146,188 @@
 
   /** First visit: straight into room 1. Later visits: the level select, next room in focus. */
   function openGame() {
-    progress = cleanProgress(readSpillProgress());
+    progress = cleanProgress(readSpillProgress(mode));
     const start = nextRoom(progress);
     if (progressSummary(progress).cleared === 0) {
       playLevel(0);
       return;
     }
-    enterRoom(start >= AFTER_HOURS ? ROOMS.length - 1 : start);
+    enterRoom(start >= AFTER_HOURS ? LAST_ROOM : start);
     phase = "idle";
     void openLevels();
+  }
+
+  // --- The demo ---------------------------------------------------------------------
+  // Room 1 plays itself on its real rules: a pen draws a straw the wrong way,
+  // takes it back, draws the room's own route, presses pour, and the tea runs
+  // into the cup. The script runs on the game's clock, so a pause holds it;
+  // it records nothing and takes none of the player's input.
+
+  /** The first time here, the game asks before the first room. */
+  let asking = false;
+  let demo = false;
+  let demoEnded = false;
+  let demoCaption = "";
+  let demoClock = 0;
+  let demoStep = 0;
+  let demoSettledAt = -1;
+  let demoBar: DemoBar;
+  let demoCard: DemoCard;
+  /** The pen's glide between two points, drawing a straw along it or not. */
+  let demoMove: { x0: number; y0: number; x1: number; y1: number; start: number; duration: number; draw: boolean } | null = null;
+  let demoStraw = -1;
+  /** Whether the first-run tip is due, read once as the game opens. */
+  let firstTip = false;
+  /** Where Tab cycles while the demo or its question is up. */
+  let demoScope: HTMLElement;
+
+  /** Room 1, with time enough that the pen, not the dial, decides when it pours. */
+  const DEMO_ROOM: Room = { ...ROOMS[0], plan: 30 };
+  const DEMO_WRONG: Array<[number, number]> = [
+    [56, 142],
+    [22, 186],
+  ];
+  const DEMO_ROUTE = ROOMS[0].solution.strokes[0];
+
+  function demoGlide(x1: number, y1: number, duration: number, draw = false) {
+    demoMove = { x0: pen.x, y0: pen.y, x1, y1, start: demoClock, duration, draw };
+  }
+
+  /** The script: each step fires once, when the demo's clock reaches it. */
+  const DEMO_SCRIPT: Array<{ at: number; run: () => void }> = [
+    { at: 0, run: () => ((demoCaption = "a kettle is about to pour; steer its tea into the cup"), (penVisible = true)) },
+    { at: 0.8, run: () => demoGlide(DEMO_WRONG[0][0], DEMO_WRONG[0][1], 0.7) },
+    {
+      at: 1.7,
+      run: () => {
+        demoCaption = "drag to draw a straw";
+        penDrawing = startDraft(pen.x, pen.y);
+        demoGlide(DEMO_WRONG[1][0], DEMO_WRONG[1][1], 0.8, true);
+      },
+    },
+    {
+      at: 2.6,
+      run: () => {
+        penDrawing = false;
+        finishDraft(pen.x, pen.y);
+        demoStraw = world.strokes.at(-1)?.id ?? -1;
+      },
+    },
+    {
+      at: 3.6,
+      run: () => {
+        demoCaption = "that one runs the wrong way; tap a straw to take it back";
+        demoGlide((DEMO_WRONG[0][0] + DEMO_WRONG[1][0]) / 2, (DEMO_WRONG[0][1] + DEMO_WRONG[1][1]) / 2, 0.6);
+      },
+    },
+    { at: 4.6, run: () => removeById(demoStraw) },
+    {
+      at: 5.6,
+      run: () => {
+        demoCaption = "straw is limited, and the gauge below shows what is left";
+        demoGlide(DEMO_ROUTE[0][0], DEMO_ROUTE[0][1], 0.6);
+      },
+    },
+    {
+      at: 6.3,
+      run: () => {
+        penDrawing = startDraft(pen.x, pen.y);
+        const end = DEMO_ROUTE[DEMO_ROUTE.length - 1];
+        demoGlide(end[0], end[1], 1.4, true);
+      },
+    },
+    {
+      at: 7.8,
+      run: () => {
+        penDrawing = false;
+        finishDraft(pen.x, pen.y);
+        penVisible = false;
+      },
+    },
+    { at: 8.6, run: () => (demoCaption = "the kettle pours on its own, or press pour to start early") },
+    {
+      at: 10.6,
+      run: () => {
+        if (pourNow(world)) syncHud();
+        demoCaption = "fill the cup past its line to clear the room";
+      },
+    },
+  ];
+
+  function stepDemo(dt: number) {
+    demoClock += dt;
+    while (demoStep < DEMO_SCRIPT.length && demoClock >= DEMO_SCRIPT[demoStep].at) DEMO_SCRIPT[demoStep++].run();
+    if (demoMove) {
+      const t = clamp((demoClock - demoMove.start) / demoMove.duration, 0, 1);
+      const ease = t * t * (3 - 2 * t);
+      pen.x = demoMove.x0 + (demoMove.x1 - demoMove.x0) * ease;
+      pen.y = demoMove.y0 + (demoMove.y1 - demoMove.y0) * ease;
+      if (demoMove.draw && penDrawing) extendTo(pen.x, pen.y);
+      if (t >= 1) demoMove = null;
+    }
+    // A moment on the cleared room, then the strip offers it again.
+    if (phase === "result" && demoSettledAt < 0) demoSettledAt = demoClock;
+    if (demoSettledAt >= 0 && !demoEnded && demoClock - demoSettledAt > 2.4) {
+      demoEnded = true;
+      liveMessage = "The demo is over.";
+    }
+  }
+
+  /** Starts (or restarts) the demo on room 1. */
+  async function startDemo() {
+    asking = false;
+    demo = true;
+    demoEnded = false;
+    demoClock = 0;
+    demoStep = 0;
+    demoSettledAt = -1;
+    demoMove = null;
+    demoStraw = -1;
+    demoCaption = "";
+    levelsOpen = false;
+    caption = null;
+    tipVisible = false;
+    pen.x = WIDTH / 2;
+    pen.y = HEIGHT / 2;
+    enterRoom(0, DEMO_ROOM);
+    phase = "play";
+    last = 0;
+    liveMessage = "Demo: room 1 plays itself.";
+    await tick();
+    demoBar?.focus();
+  }
+
+  /** Out of the demo (or past the question) into the game as it opens normally. */
+  function leaveDemo() {
+    demo = false;
+    asking = false;
+    demoEnded = false;
+    demoMove = null;
+    penVisible = false;
+    penDrawing = false;
+    verdict = null;
+    setPour(0);
+    tipVisible = firstTip;
+    openGame();
+    focusPlayfieldIfIdle();
+  }
+
+  /** How the game opens: its demo, the question, or straight in. */
+  async function openWithIntro() {
+    const intro = demoIntro("spill", takeDemoRequest("spill"));
+    if (intro === "demo") {
+      void startDemo();
+      return;
+    }
+    if (intro === "ask") {
+      asking = true;
+      enterRoom(0, roomAt(0, 1, expert));
+      phase = "idle";
+      await tick();
+      demoCard?.focus();
+      return;
+    }
+    openGame();
   }
 
   // --- The loop ----------------------------------------------------------------------
@@ -3052,13 +3350,15 @@
         }
         if (nextCount.done) beginRun();
       } else if (phase === "play") {
-        stepPen(dt);
+        if (demo) stepDemo(dt);
+        else stepPen(dt);
         simulate(dt);
       } else if (phase === "result") {
         // The verdict is in, and the tea keeps moving until the room changes.
         simulate(dt);
         resultAge += dt;
-        if (!holdResult && resultAge >= (lastCleared ? CLEAR_SECONDS : FAIL_SECONDS)) advance();
+        if (demo) stepDemo(dt);
+        else if (!holdResult && resultAge >= (lastCleared ? CLEAR_SECONDS : FAIL_SECONDS)) advance();
       }
       if (phase !== "idle") stepVisuals(dt);
       if (caption) {
@@ -3112,7 +3412,7 @@
       isPaused: () => paused || levelsOpen,
       pause: () => void pauseGame(),
       togglePause,
-      playScope: () => playScope,
+      playScope: () => (demo || asking ? demoScope : playScope),
       onKey,
       onResize: layout,
       observe: hudRow,
@@ -3132,8 +3432,9 @@
       if (!active) return;
       layout();
       dialFont = arcadeFont(Math.max(10, Math.round(10 + S * 1.2)), 700);
-      tipVisible = firstVisit("spill");
-      openGame();
+      firstTip = firstVisit("spill");
+      tipVisible = firstTip;
+      void openWithIntro();
       raf = requestAnimationFrame(frame);
     });
 
@@ -3186,6 +3487,7 @@
           <PixelIcon grid={MENU_ICONS.spill.grid} palette={MENU_ICONS.spill.palette} px={3} />
         </span>
         <span class="boba-big" aria-label="Score {score}">{String(score).padStart(4, "0")}</span>
+        <ExpertTag />
       </div>
 
       <div class="boba-ticket boba-ticket-center boba-riso sp-room-ticket" style="--tilt: 0.8deg">
@@ -3214,7 +3516,7 @@
           <button
             type="button"
             class="boba-icon-btn"
-            disabled={phase === "countdown" || phase === "done" || paused}
+            disabled={phase === "countdown" || phase === "done" || paused || demo || asking}
             aria-label="Levels"
             aria-keyshortcuts="L"
             aria-haspopup="dialog"
@@ -3337,13 +3639,14 @@
           <span><strong>{summary.stars}</strong> of {summary.maxStars} stars</span>
         </p>
       </div>
-      <div class="sp-rooms" role="group" aria-label="Rooms, a page to a row">
+      <div class="sp-rooms" role="group" aria-label="Rooms, three to a page">
         {#each ROOMS as level, index}
           {@const open = tileOpen(index)}
           <button
             bind:this={tileButtons[index]}
             type="button"
             class="sp-tile"
+            class:is-page-right={index % (ROOM_COLUMNS * 2) === ROOM_COLUMNS}
             class:is-locked={!open}
             class:is-next={index === nextLevel}
             class:is-current={roomStarted && index === levelIndex}
@@ -3391,7 +3694,7 @@
               <span class="sp-tile-lock"><PixelIcon grid={ICON_LOCK} palette={LOCK_PAL} px={2} /></span>
             {/if}
           </span>
-          <span class="boba-meta">{progress.afterHours ? "every room again, remixed" : "opens when room 18 is cleared"}</span>
+          <span class="boba-meta">{progress.afterHours ? "every room again, remixed" : `opens when room ${ROOMS.length} is cleared`}</span>
         </button>
       </div>
       <div class="boba-actions">
@@ -3403,6 +3706,26 @@
     </div>
   </div>
 {/if}
+
+<div bind:this={demoScope}>
+  {#if asking}
+    <DemoCard
+      bind:this={demoCard}
+      deck="Watch room 1 play itself for a few seconds, or go straight in."
+      on:watch={() => void startDemo()}
+      on:play={leaveDemo}
+    />
+  {:else if demo && !paused}
+    <DemoBar
+      bind:this={demoBar}
+      caption={demoCaption}
+      ended={demoEnded}
+      placement="top"
+      on:play={leaveDemo}
+      on:again={() => void startDemo()}
+    />
+  {/if}
+</div>
 
 {#if countdown > 0 && phase === "countdown"}
   <Countdown value={countdown} caption="kettle's on" goCaption="pour" />
@@ -3419,10 +3742,11 @@
     bind:this={slip}
     game="spill"
     title="closing time"
-    deck="All eighteen rooms poured."
+    deck="Every room poured."
     {score}
     unit="points"
     {newBest}
+    share={shareLines(progress)}
     stats={[
       { label: "rooms cleared", value: summary.cleared },
       { label: "stars", value: `${summary.stars} of ${summary.maxStars}` },
@@ -3698,7 +4022,7 @@
   /* --- The level select: a page of rooms to a row --- */
 
   .sp-levels-card {
-    width: min(100%, 34rem);
+    width: min(100%, 46rem);
   }
 
   .sp-levels-head {
@@ -3724,11 +4048,29 @@
     font-weight: 500;
   }
 
+  /* A page of three to a row on a phone, two pages to a row on a wider
+     screen, with a little more room between the two. The tiles scroll inside
+     the card, so its title and its way out stay in view. */
   .sp-rooms {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-2);
+    max-height: calc(100dvh - 15rem);
     margin-top: var(--space-5);
+    margin-inline: calc(var(--space-1) * -1);
+    padding: var(--space-1);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  @media (min-width: 720px) {
+    .sp-rooms {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .sp-tile.is-page-right {
+      margin-left: var(--space-3);
+    }
   }
 
   .sp-tile {
@@ -3882,15 +4224,6 @@
     .sp-bar-btn {
       flex: 1;
       min-width: 0;
-    }
-
-    /* Tiles scroll inside the card, so its title and its way out stay in view. */
-    .sp-rooms {
-      max-height: calc(100dvh - 15rem);
-      margin-inline: calc(var(--space-1) * -1);
-      padding: var(--space-1);
-      overflow-y: auto;
-      overscroll-behavior: contain;
     }
 
     .sp-tile {

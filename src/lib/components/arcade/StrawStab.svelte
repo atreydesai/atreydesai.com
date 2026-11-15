@@ -1,6 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from "svelte";
+  import { get } from "svelte/store";
 
+  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
   import {
     audioClock,
     resumeAudio,
@@ -21,20 +23,34 @@
   import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import {
     BEATS_PER_BAR,
-    LIVES,
+    DEMO_END_BAR,
+    DEMO_SEED,
     MAX_TIER,
-    WINDOWS,
+    NORMAL,
+    STAB_COOLDOWN,
     barAtTime,
     barPosition,
     barSeconds,
     barStart,
+    beltX,
+    createAutopilot,
     cupBeats,
+    demoCaption,
+    inputSeconds,
     isGoldenCup,
-    isLate,
+    isMissed,
     judgeStab,
+    markBar,
     nearestCup,
     pointsForStab,
+    presentSeconds,
+    seededRandom,
+    shareRows,
+    songTime,
+    stabMode,
+    steadyOffset,
     tierForBar,
+    type StabMode,
   } from "$lib/arcade/stab-engine.js";
   import {
     DRINKS,
@@ -55,10 +71,14 @@
     type Particle,
     type Popup,
   } from "$lib/arcade/art";
-  import { firstVisit } from "$lib/arcade/scores";
+  import { demoIntro, firstVisit } from "$lib/arcade/scores";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
+  import { REVIVE_BLINK_SECONDS, blinkShows } from "$lib/arcade/blink";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
+  import DemoBar from "./DemoBar.svelte";
+  import DemoCard from "./DemoCard.svelte";
+  import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
   import Pearls from "./Pearls.svelte";
@@ -72,7 +92,7 @@
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
   // Four songs, one from each tempo band, slowest first, so the tempo
-  // climbs through each loop. Drawn afresh for every run (see restart).
+  // climbs through each loop. Drawn afresh for every run (see resetRun).
   let PLAYLIST = stabPlaylist();
   let TEMPOS = songTempos(PLAYLIST);
   const PLUNGE_SECONDS = 0.05;
@@ -86,8 +106,17 @@
     "no breaks",
     "chaos shift",
     "last call",
+    "after hours",
   ];
   const STAB_KEYS = new Set([" ", "Enter", "ArrowDown", "j", "k", "f", "d"]);
+  /** Keys a focused button keeps for itself; the letter and arrow keys always stab. */
+  const BUTTON_KEYS = new Set([" ", "Enter"]);
+  const LIVES_WORDS = ["No", "One", "Two", "Three", "Four"];
+
+  /** Expert is read once, when the game opens; the switch lives on the menu. */
+  const expert = get(arcadeExpert);
+  /** The rules of the run being played: expert or not, and always normal in the demo. */
+  let mode: StabMode = stabMode(expert);
 
   // --- The scene: a night-market stall at dusk ------------------------------
   //
@@ -100,21 +129,46 @@
   const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
   const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
 
+  // The market is the backdrop, not the game: every colour behind the belt
+  // is printed with most of its saturation and a little of its light taken
+  // out, so the cups, belt, straw, and notes are always the loudest things.
+  const SCENE_SATURATION = 0.6;
+  const SCENE_LIGHT = 0.82;
+  function calm(hex: string, saturation = SCENE_SATURATION, light = SCENE_LIGHT) {
+    const values = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
+    const grey = 0.3 * values[0] + 0.59 * values[1] + 0.11 * values[2];
+    const channel = (value: number) =>
+      Math.round(Math.max(0, Math.min(255, (grey + (value - grey) * saturation) * light)))
+        .toString(16)
+        .padStart(2, "0");
+    return `#${values.map(channel).join("")}`;
+  }
+
   // The sky's five bands, top to horizon. Dusk runs through a deep twilight
   // (the warm bands sinking toward the horizon) on its way to night.
-  const SKY_DUSK = ["#2a2748", "#5a3a6a", "#b85a5a", "#e8915a", "#f4c27a"];
-  const SKY_TWILIGHT = ["#1d1f3d", "#2a2748", "#4a3462", "#7a4262", "#a8545e"];
-  const SKY_NIGHT = ["#141a2e", "#1a2040", "#1f2547", "#2c2a52", "#3b2a52"];
+  const SKY_DUSK = ["#2a2748", "#5a3a6a", "#b85a5a", "#e8915a", "#f4c27a"].map((c) => calm(c));
+  const SKY_TWILIGHT = ["#1d1f3d", "#2a2748", "#4a3462", "#7a4262", "#a8545e"].map((c) => calm(c));
+  const SKY_NIGHT = ["#141a2e", "#1a2040", "#1f2547", "#2c2a52", "#3b2a52"].map((c) => calm(c));
   /** Where each band starts, as a share of the height down to the horizon. */
   const SKY_STOPS = [0, 0.24, 0.48, 0.7, 0.9];
-  const SUN = "#fde9b8";
+  const SUN = calm("#fde9b8", 0.6, 0.8);
   const STAR = "#fdf8f3";
-  const FAR = ["#3a2f52", "#1c1d38"];
-  const NEAR = ["#2b2440", "#12142a"];
-  const WINDOW_LIT = "#f4c27a";
-  const WINDOW_WARM = "#e8915a";
-  const LANTERN_CORE = "#fde9b8";
+  /** Stars print at most this bright. */
+  const STAR_LEVEL = 0.6;
+  const FAR = ["#3a2f52", "#1c1d38"].map((c) => calm(c, 0.6, 0.9));
+  const NEAR = ["#2b2440", "#12142a"].map((c) => calm(c, 0.6, 0.9));
+  const WINDOW_LIT = calm("#f4c27a", 0.55, 0.72);
+  const WINDOW_WARM = calm("#e8915a", 0.55, 0.72);
+  const AWNING = calm("#b85a5a");
+  const ANTENNA = calm("#e85d4c", 0.7, 0.8);
+  const LANTERN_CORE = calm("#fde9b8", 0.7, 0.86);
   const CORD = "#2b2320";
+  /**
+   * A flat dark band behind the play lane, from above the straw down to the
+   * belt, laid over whatever the market has there.
+   */
+  const LANE_SHADE = "#0e111c";
+  const LANE_ALPHA = 0.5;
   const COUNTER_TOP = "#e9dfd0";
   const COUNTER_TOP_SHADE = "#d8ccba";
   const COUNTER_LIP = "#b9ab98";
@@ -135,10 +189,11 @@
   const NOTE_BACK = "#141a2e";
   const NOTE_GOLD = "#ffd166";
   const GOLD = "#f2b84b";
-  /** Lantern and firework colours: the drinks, then gold for golden cups. */
-  const LANTERN_COLORS = [...DRINKS, GOLD];
+  /** Lantern and firework colours: the drinks, then gold for golden cups, all quietened. */
+  const LANTERN_COLORS = [...DRINKS, GOLD].map((c) => calm(c, 0.6, 0.78));
   const GOLD_INDEX = DRINKS.length;
-  const PENNANT_COLORS = [CREAM, ACCENT, DRINKS[4], DRINKS[5]];
+  const PENNANT_COLORS = [CREAM, ACCENT, DRINKS[4], DRINKS[5]].map((c) => calm(c, 0.55, 0.7));
+  const EMBER_CALM = calm(EMBER);
 
   /** Belt rows: an ink lip, the cream face the beats are notched into, an ink lip. */
   const BELT_LIP = SC;
@@ -152,11 +207,11 @@
   const FLASH_SECONDS = 0.36;
   const MAX_SPARKS = 200;
 
-  // Lanterns as cell grids: k cap, b paper, s shade, c core, t tassel. A lit
-  // lantern (the running light, or every lantern on a downbeat) is the big one.
-  const LANTERN_SMALL = [".k.", "sbs", "bcb", "sbs", ".t."];
-  const LANTERN_BIG = ["..k..", ".sbs.", "sbcbs", "bcccb", "sbcbs", ".sbs.", "..t.."];
-  const LANTERN_BIG_ROWS = LANTERN_BIG.length;
+  // A lantern as a cell grid: k cap, b paper, s shade, c core, t tassel.
+  // The running light only brightens a core; lanterns never change size.
+  const LANTERN = [".k.", "sbs", "bcb", "sbs", ".t."];
+  /** Rows kept clear under the lowest cord, so the strings stay well above the straw. */
+  const LANTERN_CLEARANCE = 7;
 
   // A roller seen end on, with one spoke. Frames turn it counter-clockwise,
   // the way a roller under a leftward belt turns.
@@ -200,6 +255,10 @@
   interface Cup {
     /** Song time when the cup is dead under the straw. */
     time: number;
+    /** The bar it rides in, for the share. */
+    bar: number;
+    /** The demo's autopilot: seconds off the beat it stabs this cup, or null to let it go by. */
+    aim: number | null;
     drink: number;
     golden: boolean;
     resolved: boolean;
@@ -218,7 +277,6 @@
   // --- Reactive UI state ---------------------------------------------------
 
   let score = 0;
-  let lives = LIVES;
   let combo = 0;
   let bestCombo = 0;
   let hits = 0;
@@ -229,6 +287,18 @@
   let paused = false;
   let gameOver = false;
   let tipVisible = false;
+  /** This device's first run: the tip waits for the first real run, never the demo. */
+  let tipPending = false;
+  /** The first time here: asked whether to watch the demo before the countdown. */
+  let askFirst = false;
+  /** The demo is playing: the belt runs itself, scores nothing, and ignores game keys. */
+  let demoOn = false;
+  let demoEnded = false;
+  let demoText = "";
+  let autopilot = createAutopilot();
+  let lives = NORMAL.lives;
+  /** Seconds the straw in hand has left to flicker after a pearl is lost. */
+  let strawBlink = 0;
   let missPulse = 0;
   let missFlash = false;
   let beatInBar = -1;
@@ -249,6 +319,9 @@
   let hudButtons: HudButtons;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
+  let demoBar: DemoBar;
+  /** The run as emoji lines for the results slip's share. */
+  let share: string[] = [];
   let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
   let reduceMotion = false;
 
@@ -275,6 +348,10 @@
   let currentBar = -1;
   let beatPhase = 1;
   let lastStab = -Infinity;
+  /** The worst stab in each bar, for the share. */
+  let marks: number[] = [];
+  /** Cup patterns: Math.random in a run, a fixed seed in the demo so it plays the same. */
+  let patternRandom: () => number = Math.random;
 
   // The scene. Its layout is worked out once per resize, its colours once
   // per visible step of the time of day, and nothing is allocated per frame.
@@ -290,9 +367,12 @@
   let lanternMissAt = -Infinity;
   let fireBar = -1;
 
-  // The clock. With audio, song time is the heard audio time minus the first
-  // downbeat, smoothed against performance.now() so motion stays fluid.
-  // Without audio it is plain performance time.
+  // The clock. Song time is the heard audio time minus the first downbeat.
+  // The page clock (performance.now, which event and frame timestamps share)
+  // is mapped onto it by one steady offset, read from the audio clock once a
+  // frame; so a stab is placed by its event's timestamp, a frame by when it
+  // reaches the screen, and both against what is heard. Without audio the
+  // offset is zero and song time is plain page time.
   let useAudio = false;
   let origin = 0;
   let clockOffset = 0;
@@ -300,6 +380,10 @@
   let waitingForAudio = false;
   let waitStarted = 0;
   let heldSong = 0;
+  /** The song time last drawn, held while paused so the belt doesn't step back. */
+  let lastShown = 0;
+  /** The measured frame interval, in seconds: how far ahead a frame is drawn. */
+  let frameInterval = 1 / 60;
 
   let countdownElapsed = 0;
   let last = 0;
@@ -312,28 +396,24 @@
     Math.max(low, Math.min(high, value));
   const perfSeconds = () => performance.now() / 1000;
 
-  function clockNow() {
+  /** Reads the audio clock and steadies the page-to-audio offset. */
+  function syncClock() {
+    if (!useAudio) return;
     const perf = perfSeconds();
-    if (useAudio) {
-      const heard = audioClock();
-      if (heard !== null) {
-        const raw = heard - perf;
-        if (!clockSynced || Math.abs(raw - clockOffset) > 0.03) {
-          clockOffset = raw;
-          clockSynced = true;
-        } else {
-          clockOffset += (raw - clockOffset) * 0.05;
-        }
-      }
-    }
-    return perf + clockOffset;
+    const heard = audioClock();
+    if (heard === null) return;
+    clockOffset = steadyOffset(clockSynced ? clockOffset : null, heard - perf);
+    clockSynced = true;
   }
 
-  const songNow = () => clockNow() - origin;
+  /** Song time at a moment on the page clock, in seconds. */
+  const songAt = (pageSeconds: number) => songTime(pageSeconds, clockOffset, origin);
+  /** Song time as heard right now. */
+  const songNow = () => songAt(perfSeconds());
 
   // --- Layout helpers --------------------------------------------------------
 
-  const cupX = (cup: Cup, now: number) => strawX + (cup.time - now) * speed;
+  const cupX = (cup: Cup, now: number) => beltX(strawX, speed, cup.time, now);
   const restBottom = () => beltY - cupH - 14;
   const stuckBottom = () => beltY - cupH + px * 6;
   const pan = (x: number) => (viewW > 0 ? (x / viewW) * 2 - 1 : 0);
@@ -398,10 +478,13 @@
     }
   }
 
-  /** A small stepped accent notch on the belt line, under the straw. */
+  /**
+   * A small stepped accent notch on the belt line, centred exactly where a
+   * cup's centre is at its beat (strawX sits on the scene grid for this).
+   */
   function drawStabMark() {
     if (!ctx) return;
-    const x = snap(strawX);
+    const x = strawX;
     ctx.fillStyle = ACCENT;
     ctx.fillRect(x - 6, beltY - 12, 12, 4);
     ctx.fillRect(x - 4, beltY - 8, 8, 4);
@@ -475,35 +558,70 @@
 
   // Where the beat is, for everything that plays along. Set once per frame.
   let sceneBeat = -1;
-  let sceneBeatInBar = -1;
-  let sceneBeatPhase = 1;
 
   function readBeat(now: number) {
     if (now <= 0) {
       sceneBeat = -1;
-      sceneBeatInBar = -1;
-      sceneBeatPhase = 1;
       return;
     }
     const bar = barAtTime(TEMPOS, now);
     const beats = (now - barStart(TEMPOS, bar)) / (60 / barPosition(TEMPOS, bar).bpm);
-    sceneBeatInBar = Math.min(BEATS_PER_BAR - 1, Math.floor(beats));
-    sceneBeat = bar * BEATS_PER_BAR + sceneBeatInBar;
-    sceneBeatPhase = beats - Math.floor(beats);
+    sceneBeat = bar * BEATS_PER_BAR + Math.min(BEATS_PER_BAR - 1, Math.floor(beats));
   }
 
   function sizeScene() {
     span = Math.max(80, beltY - stageTop);
     skyBottom = beltY + BELT_H;
-    horizonY = snap(beltY - span * 0.3);
-    sunR = clamp(Math.round((span * 0.1) / SC), 6, 13);
-    sunX = snap(viewW * 0.72);
+    // The play lane: from a little above the resting straw down to the belt.
+    laneTop = snap(restBottom() - strawH - 3 * SC);
+    // The horizon sits at or above the lane, so the sun sets over it, not behind the cups.
+    horizonY = snap(Math.min(beltY - span * 0.3, laneTop - SC));
+    sunR = clamp(Math.round((span * 0.07) / SC), 5, 9);
+    sunX = snap(viewW * 0.86);
     buildSun();
     far = buildFar();
     near = buildNear();
     buildRigs();
     buildStall();
+    buildLane();
     sceneStep = -1;
+  }
+
+  // --- The lane shade ----------------------------------------------------------------
+
+  /** Top of the play lane, in px. */
+  let laneTop = 0;
+  let laneCanvas: HTMLCanvasElement | null = null;
+
+  /** The lane's band at cell scale: solid, with a two-row dithered top edge. */
+  function buildLane() {
+    const columns = Math.max(1, Math.ceil(viewW / SC));
+    const rows = Math.max(1, Math.round((beltY - laneTop) / SC));
+    laneCanvas ??= document.createElement("canvas");
+    laneCanvas.width = columns;
+    laneCanvas.height = rows;
+    const context = laneCanvas.getContext("2d");
+    if (!context) return;
+    const image = context.createImageData(columns, rows);
+    const [r, g, b] = rgb(LANE_SHADE);
+    for (let row = 0; row < rows; row++) {
+      const cover = row === 0 ? 0.34 : row === 1 ? 0.67 : 1;
+      for (let col = 0; col < columns; col++) {
+        const o = (row * columns + col) * 4;
+        image.data[o] = r;
+        image.data[o + 1] = g;
+        image.data[o + 2] = b;
+        image.data[o + 3] = cover > bayer(col, row) ? 255 : 0;
+      }
+    }
+    context.putImageData(image, 0, 0);
+  }
+
+  function drawLane() {
+    if (!ctx || !laneCanvas) return;
+    ctx.globalAlpha = LANE_ALPHA;
+    ctx.drawImage(laneCanvas, 0, laneTop, laneCanvas.width * SC, laneCanvas.height * SC);
+    ctx.globalAlpha = 1;
   }
 
   /** Repaints the sky and skylines when the time of day has moved a visible step. */
@@ -531,7 +649,7 @@
       near,
       nearFill,
       mix(nearFill, bands[3], 0.18),
-      mix(nearFill, mix(rgb("#b85a5a"), rgb("#4a2e4e"), n), 0.45),
+      mix(nearFill, mix(rgb(AWNING), rgb("#4a2e4e"), n), 0.3),
       mix(nearFill, rgb("#0a0b16"), 0.35),
     );
   }
@@ -633,7 +751,7 @@
   })();
   const starLevel = new Uint8Array(STARS.length);
 
-  /** Stars come out from the top down as night falls; a dozen twinkle. */
+  /** Stars come out from the top down as night falls, dimmed; a dozen twinkle slowly. */
   function drawStars(now: number) {
     if (!ctx) return;
     const night = nightAt();
@@ -647,13 +765,13 @@
       let alpha = quarters((night - (0.3 + 0.42 * star.y + 0.14 * star.wake)) / 0.12);
       if (star.kind === 0) alpha *= 0.5;
       if (twinkling && star.twinkle && alpha > 0) {
-        alpha *= Math.max(0.25, quarters(0.5 + 0.5 * Math.sin(now * star.speed + star.phase)));
+        alpha *= Math.max(0.25, quarters(0.5 + 0.5 * Math.sin(now * star.speed * 0.5 + star.phase)));
       }
       starLevel[index] = Math.round(alpha * 8);
     }
     ctx.fillStyle = STAR;
     for (let level = 1; level <= 8; level++) {
-      ctx.globalAlpha = level / 8;
+      ctx.globalAlpha = (level / 8) * STAR_LEVEL;
       ctx.beginPath();
       for (let index = 0; index < STARS.length; index++) {
         if (starLevel[index] !== level) continue;
@@ -670,7 +788,7 @@
       if (star.kind !== 2 || !starLevel[index]) continue;
       const x = Math.floor(star.x * columns) * SC;
       const y = Math.floor(star.y * rows) * SC;
-      ctx.globalAlpha = (starLevel[index] / 8) * 0.45;
+      ctx.globalAlpha = (starLevel[index] / 8) * 0.45 * STAR_LEVEL;
       ctx.fillRect(x - SC, y, SC, SC);
       ctx.fillRect(x + SC, y, SC, SC);
       ctx.fillRect(x, y - SC, SC, SC);
@@ -683,7 +801,7 @@
 
   // Two periodic silhouettes, built cell by cell into a bitmap once per
   // resize and painted into a strip canvas once per colour step. Windows are
-  // kept apart as single cells, so they can come on one by one and blink.
+  // kept apart as single cells, so they can come on one by one as night falls.
   const W_WARM = 1;
   const W_BLINK = 2;
   const W_RED = 4;
@@ -923,14 +1041,16 @@
     }
   }
 
-  /** 0 dark, 1 lit, 2 warm, 3 the red light on an antenna. */
-  function windowState(strip: Strip, index: number, x: number, lit: number, blinking: boolean) {
+  /**
+   * 0 dark, 1 lit, 2 warm, 3 the red light on an antenna. Windows only ever
+   * come on as night falls; none blink (the W_BLINK cells from the old
+   * market stay in the seed so the city is drawn the same).
+   */
+  function windowState(strip: Strip, index: number, lit: number) {
     const flags = strip.wf[index];
     const u = strip.wu[index];
     if (flags & W_RED) return nightAt() > 0.42 + u * 0.25 ? 3 : 0;
-    let on = flags & W_STALL ? lit * 2.2 > u : lit > u;
-    // From the upper tiers a few blink on the beat, never behind the cup.
-    if (blinking && flags & W_BLINK && Math.abs(x - strawX) > cupW) on = ((sceneBeat + index) & 1) === 0;
+    const on = flags & W_STALL ? lit * 2.2 > u : lit > u;
     return on ? (flags & W_WARM ? 2 : 1) : 0;
   }
 
@@ -939,19 +1059,18 @@
     const width = strip.period * SC;
     const top = skyBottom - strip.rows * SC;
     const offset = stripOffset(strip, scroll);
-    // Few lit at dusk, nearly all at night, each by its own seed.
-    const lit = 0.05 + 0.85 * nightAt();
-    const blinking = !reduceMotion && sceneBeat >= 0 && tierLevel >= 3.5;
+    // Few lit at dusk, about two in three at night, each by its own seed.
+    const lit = 0.05 + 0.6 * nightAt();
     for (let state = 1; state <= 3; state++) {
       if (state === 3 && !distant) break;
       ctx.fillStyle =
-        state === 3 ? ACCENT : state === 1 ? (distant ? farLit : WINDOW_LIT) : distant ? farWarm : WINDOW_WARM;
+        state === 3 ? ANTENNA : state === 1 ? (distant ? farLit : WINDOW_LIT) : distant ? farWarm : WINDOW_WARM;
       ctx.beginPath();
       for (let tile = -offset; tile < viewW; tile += width) {
         for (let index = 0; index < strip.count; index++) {
           const x = tile + strip.wx[index] * SC;
           if (x < -SC || x > viewW) continue;
-          if (windowState(strip, index, x, lit, blinking) !== state) continue;
+          if (windowState(strip, index, lit) !== state) continue;
           ctx.rect(x, top + strip.wy[index] * SC, SC, SC);
         }
       }
@@ -998,7 +1117,7 @@
     const strawTop = beltY - cupH - 14 - strawH;
     const bandTop = snap(stageTop) + 2 * SC;
     // The cord's lowest point leaves room for a swelled lantern above the straw.
-    const lowest = strawTop - 16 - (LANTERN_BIG_ROWS + 1) * SC;
+    const lowest = strawTop - 16 - (LANTERN_CLEARANCE + 1) * SC;
     const usable = Math.max(SC * 6, lowest - bandTop);
     const fit = usable >= 150 ? 3 : usable >= 80 ? 2 : 1;
     // [attach, lowest] per string as shares of the band, in the order they arrive.
@@ -1087,12 +1206,12 @@
 
   const lanternSprites: Array<HTMLCanvasElement | undefined> = [];
 
-  /** A lantern at cell scale: colour, size, core (0 paper, 1 glowing, 2 lit), dim (0–2). */
-  function lanternSprite(color: number, big: number, core: number, dim: number) {
-    const index = ((color * 2 + big) * 3 + core) * 3 + dim;
+  /** A lantern at cell scale: colour, core (0 paper, 1 glowing, 2 lit), dim (0–2). */
+  function lanternSprite(color: number, core: number, dim: number) {
+    const index = (color * 3 + core) * 3 + dim;
     const cached = lanternSprites[index];
     if (cached) return cached;
-    const grid = big ? LANTERN_BIG : LANTERN_SMALL;
+    const grid = LANTERN;
     const sprite = document.createElement("canvas");
     sprite.width = grid[0].length;
     sprite.height = grid.length;
@@ -1103,8 +1222,8 @@
       const palette: Record<string, string> = {
         k: fade(CORD),
         b: fade(body),
-        // Small lanterns shade their corners only lightly, so they read round, not as a plus.
-        s: fade(mixHex(body, CORD, big ? 0.3 : 0.16)),
+        // The corners shade only lightly, so a lantern reads round, not as a plus.
+        s: fade(mixHex(body, CORD, 0.16)),
         t: fade(mixHex(body, CORD, 0.15)),
         c: fade(core === 2 ? LANTERN_CORE : core === 1 ? mixHex(body, LANTERN_CORE, 0.5) : body),
       };
@@ -1179,8 +1298,6 @@
     drawPoles();
     const night = nightAt();
     const motion = !reduceMotion && sceneBeat >= 0;
-    // Every lantern swells for a moment on each bar's downbeat.
-    const swell = motion && sceneBeatInBar === 0 && sceneBeatPhase < 0.28;
     let dim = 0;
     if (!reduceMotion) {
       const t = (now - lanternMissAt) / MISS_DIM_SECONDS;
@@ -1188,8 +1305,9 @@
     }
     const haloWeight = smooth((night - 0.3) / 0.45) * (dim ? 0.4 : 1);
     const bunting = quarters(layerWeight(3));
-    const flutter = motion && sceneBeat & 1 ? 1 : 0;
     const flashAge = flash ? now - flash.at : -1;
+    // The running light steps one lantern along each string per bar.
+    const sceneBar = Math.floor(sceneBeat / BEATS_PER_BAR);
 
     for (let s = 0; s < rigs.length; s++) {
       const rig = rigs[s];
@@ -1199,7 +1317,7 @@
       ctx.drawImage(rig.canvas, 0, 0, rig.canvas.width * SC, rig.canvas.height * SC);
 
       const count = rig.lanterns.length;
-      const litIndex = motion && count ? count - 1 - ((sceneBeat + rig.offset) % count) : -1;
+      const litIndex = motion && count ? count - 1 - ((sceneBar + rig.offset) % count) : -1;
       const flashing = flash !== null && flash.string === s && flashAge >= 0 && flashAge < FLASH_SECONDS;
 
       if (haloWeight > 0.01) {
@@ -1208,11 +1326,10 @@
         const glow = halo();
         for (let k = 0; k < count; k++) {
           const lantern = rig.lanterns[k];
-          const big = k === litIndex || swell;
-          const r = (big ? 9 : 6) * SC;
-          ctx.globalAlpha = weight * haloWeight * (k === litIndex ? 0.55 : 0.32);
+          const r = 5 * SC;
+          ctx.globalAlpha = weight * haloWeight * (k === litIndex ? 0.26 : 0.16);
           const cx = lantern.col * SC + SC / 2;
-          const cy = (lantern.row + (big ? 4.5 : 3.5)) * SC;
+          const cy = (lantern.row + 3.5) * SC;
           ctx.drawImage(glow, cx - r, cy - r, r * 2, r * 2);
         }
         ctx.globalCompositeOperation = "source-over";
@@ -1230,8 +1347,7 @@
             ctx.rect(x - SC, (pennant.r0 + 1) * SC, SC, SC);
             ctx.rect(x, (pennant.r1 + 1) * SC, SC, SC);
             ctx.rect(x + SC, (pennant.r2 + 1) * SC, SC, SC);
-            // The tip catches the breeze on alternate beats.
-            ctx.rect(x - flutter * SC, (pennant.r1 + 2) * SC, SC, SC);
+            ctx.rect(x, (pennant.r1 + 2) * SC, SC, SC);
           }
           ctx.fill();
         }
@@ -1241,13 +1357,12 @@
       for (let k = 0; k < count; k++) {
         const lantern = rig.lanterns[k];
         const lit = k === litIndex;
-        const big = lit || swell ? 1 : 0;
         const color = flashing && flash ? flash.color : lantern.color;
         const core = lit || (flashing && flashAge < 0.12) ? 2 : night >= lantern.glow ? 1 : 0;
-        const sprite = lanternSprite(color, big, core, dim);
+        const sprite = lanternSprite(color, core, dim);
         ctx.drawImage(
           sprite,
-          (lantern.col - (big ? 2 : 1)) * SC,
+          (lantern.col - 1) * SC,
           (lantern.row + 1) * SC,
           sprite.width * SC,
           sprite.height * SC,
@@ -1276,9 +1391,9 @@
   /** Each colour cooling to ember in four printed steps. */
   const COOLING = LANTERN_COLORS.map((color) => [
     color,
-    mixHex(color, EMBER, 0.35),
-    mixHex(color, EMBER, 0.7),
-    EMBER,
+    mixHex(color, EMBER_CALM, 0.35),
+    mixHex(color, EMBER_CALM, 0.7),
+    EMBER_CALM,
   ]);
 
   function spawnSpark(kind: number, x: number, y: number, vx: number, vy: number, life: number, color: number) {
@@ -1294,9 +1409,13 @@
     p.color = color;
   }
 
-  const fireworkReach = () => Math.min(96, viewW * 0.12);
+  const fireworkReach = () => Math.min(64, viewW * 0.08);
+  const FIREWORK_ALPHA = 0.7;
 
-  /** A rocket from behind the rooftops, timed to burst on the next beat. */
+  /**
+   * A small rocket from the top of the lane, timed to burst on the next beat
+   * high in the sky: never over the lane, never in the straw's column.
+   */
   function launchFirework(beatLength: number) {
     const keepOut = cupW * 1.5 + fireworkReach();
     const leftEnd = strawX - keepOut;
@@ -1307,9 +1426,10 @@
     const pick = Math.random() * (leftSpan + rightSpan);
     const x = pick < leftSpan ? viewW * 0.06 + pick : rightStart + (pick - leftSpan);
     const top = stageTop + 24;
-    const bottom = Math.max(top, beltY - span * 0.45);
+    // Room under the burst for its sparks to fall before they would reach the lane.
+    const bottom = Math.max(top, Math.min(beltY - span * 0.45, laneTop - fireworkReach() * 1.2 - 48));
     const burstY = top + Math.random() * (bottom - top);
-    const startY = beltY - span * 0.12;
+    const startY = laneTop - SC;
     const life = beatLength * 0.9;
     spawnSpark(P_ROCKET, x, startY, (Math.random() - 0.5) * 16, (burstY - startY) / life, life, (Math.random() * DRINKS.length) | 0);
   }
@@ -1317,13 +1437,13 @@
   function burst(x: number, y: number, color: number) {
     spawnSpark(P_FLASH, x, y, 0, 0, 0.09, color);
     const speed = fireworkReach() * 1.5;
-    for (let i = 0; i < 22; i++) {
-      const angle = (i / 22) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2 + (Math.random() - 0.5) * 0.08;
       const v = speed * (0.92 + Math.random() * 0.16);
       spawnSpark(P_SPARK, x, y, Math.cos(angle) * v, Math.sin(angle) * v, 1.1 + Math.random() * 0.3, color);
     }
-    for (let i = 0; i < 10; i++) {
-      const angle = (i / 10) * Math.PI * 2 + 0.3;
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + 0.3;
       const v = speed * 0.5;
       spawnSpark(P_SPARK, x, y, Math.cos(angle) * v, Math.sin(angle) * v, 0.9, color);
     }
@@ -1357,23 +1477,24 @@
       const p = sparks[index];
       const x = snap(p.x);
       const y = snap(p.y);
+      // Printed at most at FIREWORK_ALPHA, so a burst stays behind the play.
       if (p.kind === P_ROCKET) {
         ctx.fillStyle = LANTERN_CORE;
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = FIREWORK_ALPHA;
         ctx.fillRect(x, y, SC, SC);
-        ctx.globalAlpha = 0.5;
+        ctx.globalAlpha = FIREWORK_ALPHA * 0.5;
         ctx.fillRect(x, y + SC, SC, SC);
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = FIREWORK_ALPHA * 0.25;
         ctx.fillRect(x, y + SC * 2, SC, SC);
       } else if (p.kind === P_FLASH) {
         ctx.fillStyle = LANTERN_CORE;
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = FIREWORK_ALPHA;
         ctx.fillRect(x - SC, y, SC * 3, SC);
         ctx.fillRect(x, y - SC, SC, SC * 3);
       } else {
         const t = p.age / p.life;
         ctx.fillStyle = COOLING[p.color][Math.min(3, Math.floor(t * 4))];
-        ctx.globalAlpha = t > 0.85 ? 0.5 : 1;
+        ctx.globalAlpha = FIREWORK_ALPHA * (t > 0.85 ? 0.5 : 1);
         ctx.fillRect(x, y, SC, SC);
       }
     }
@@ -1539,7 +1660,7 @@
   }
 
   function drawHand() {
-    if (plunge || gameOver) return;
+    if (plunge || gameOver || !blinkShows(strawBlink)) return;
     let bottom = restBottom();
     if (reload > 0) bottom -= (reload / RELOAD_SECONDS) * (strawH + 30);
     else if (running && !reduceMotion) bottom -= Math.max(0, 1 - beatPhase * 3) * 3;
@@ -1554,7 +1675,7 @@
     syncScene();
     readBeat(now);
     // Back to front: sky, sun and stars, the city, fireworks, the market's
-    // rooftops, its lantern strings, then the stall and the belt.
+    // rooftops, its lantern strings, the lane's shade, then the stall and the belt.
     ctx.fillStyle = skyTop;
     ctx.fillRect(0, 0, viewW, viewH);
     if (skyCanvas) ctx.drawImage(skyCanvas, 0, 0, skyCanvas.width * SC, skyCanvas.height * SC);
@@ -1567,6 +1688,8 @@
     drawStrip(near, nearScroll);
     drawWindows(near, nearScroll, false);
     drawRigs(now);
+    // Everything behind the cups' lane is laid under one flat dark band.
+    drawLane();
     drawStall(now);
     drawBelt(now);
     // A notch on the belt marks where a cup should be when you stab.
@@ -1586,12 +1709,15 @@
 
   function planAhead(now: number) {
     while (barStart(TEMPOS, plannedBars) < now + leadSeconds + 0.6) {
-      const start = barStart(TEMPOS, plannedBars);
-      const beatLength = 60 / barPosition(TEMPOS, plannedBars).bpm;
-      for (const beat of cupBeats(TEMPOS, plannedBars)) {
+      const bar = plannedBars;
+      const start = barStart(TEMPOS, bar);
+      const beatLength = 60 / barPosition(TEMPOS, bar).bpm;
+      for (const beat of cupBeats(TEMPOS, bar, patternRandom, mode)) {
         cupCount += 1;
         cups.push({
           time: start + beat * beatLength,
+          bar,
+          aim: demoOn ? autopilot(bar) : 0,
           drink: (Math.random() * DRINKS.length) | 0,
           golden: isGoldenCup(cupCount),
           resolved: false,
@@ -1611,39 +1737,48 @@
     beatPhase = now < 0 ? 1 : beats - Math.floor(beats);
     const beat = now < 0 ? -1 : Math.min(BEATS_PER_BAR - 1, Math.floor(beats));
     if (beat !== beatInBar) beatInBar = beat;
+    if (demoOn) {
+      const bars = bar + clamp(beats / BEATS_PER_BAR, 0, 1);
+      const text = demoCaption(now < 0 ? 0 : bars);
+      if (text !== demoText) demoText = text;
+      if (!demoEnded && bar >= DEMO_END_BAR) demoEnded = true;
+    }
     if (bar === currentBar) return;
 
     currentBar = bar;
     currentBpm = position.bpm;
     songsReached = position.loop * TEMPOS.length + position.song + 1;
-    const nextTier = tierForBar(TEMPOS, bar);
+    const nextTier = tierForBar(TEMPOS, bar, mode);
     if (nextTier !== tier) {
       tier = nextTier;
       setMusicPhase(tier >= 2 ? "rush" : "steady");
-      liveMessage = `${TIER_LABELS[tier]}.`;
+      if (!demoOn) liveMessage = `${TIER_LABELS[tier]}.`;
     }
   }
 
   /**
    * Eases the time of day toward the current tier over about a bar, drifts
-   * the skylines, and runs the fireworks. Reduced motion steps the sky
+   * the skylines slowly, and runs the fireworks. Reduced motion steps the sky
    * between tiers and leaves everything else still.
    */
   function stepScene(now: number, dt: number) {
+    const shownTier = Math.min(tier, MAX_TIER);
     if (reduceMotion) {
-      tierLevel = tier;
+      tierLevel = shownTier;
       sparkCount = 0;
       return;
     }
     const step = dt / barSeconds(currentBpm);
-    tierLevel += clamp(tier - tierLevel, -step, step);
-    farScroll = (farScroll + dt * speed * 0.012) % (FAR_PERIOD * SC);
-    nearScroll = (nearScroll + dt * speed * 0.035) % (NEAR_PERIOD * SC);
+    tierLevel += clamp(shownTier - tierLevel, -step, step);
+    farScroll = (farScroll + dt * speed * 0.006) % (FAR_PERIOD * SC);
+    nearScroll = (nearScroll + dt * speed * 0.018) % (NEAR_PERIOD * SC);
     stepSparks(dt);
     if (now > 0 && currentBar !== fireBar) {
       fireBar = currentBar;
-      // At full night a firework goes up on every downbeat.
-      if (tier === MAX_TIER && tierLevel > MAX_TIER - 0.5) launchFirework(60 / currentBpm);
+      // At full night a small firework goes up every other bar.
+      if (tier >= MAX_TIER && tierLevel > MAX_TIER - 0.5 && currentBar % 2 === 0) {
+        launchFirework(60 / currentBpm);
+      }
     }
     if (flash && now - flash.at > FLASH_SECONDS) flash = null;
   }
@@ -1658,42 +1793,60 @@
 
   function loseLife(x: number) {
     combo = 0;
-    lives -= 1;
+    // The demo shows a pearl going, never the last one.
+    if (!demoOn || lives > 1) lives -= 1;
+    if (lives > 0) strawBlink = REVIVE_BLINK_SECONDS;
     missPulse += 1;
     missFlash = true;
     later(() => (missFlash = false), 250);
     if (lives <= 0) void endGame();
-    else liveMessage = `${lives} ${lives === 1 ? "pearl" : "pearls"} left.`;
+    else if (!demoOn) liveMessage = `${lives} ${lives === 1 ? "pearl" : "pearls"} left.`;
     return pan(x);
   }
 
-  function stab() {
-    if (!running || paused || gameOver || waitingForAudio) return;
-    const now = songNow();
-    if (now - lastStab < 0.06) return;
-    lastStab = now;
+  /** Stab input can act: a live run, not the demo, not waiting on audio. */
+  const canStab = () =>
+    running && !paused && !gameOver && !waitingForAudio && !demoOn && !askFirst;
+
+  /** A key or tap, judged at the moment it happened, not when it was handled. */
+  function stabFromEvent(event: Event) {
+    if (!canStab()) return;
+    stab(songAt(inputSeconds(event.timeStamp, performance.now())));
+  }
+
+  /**
+   * Stabs at song time `at`: the straw goes into the nearest cup still
+   * waiting within the graze window, or hits the belt. Input and the demo's
+   * autopilot both come through here.
+   */
+  function stab(at: number) {
+    if (at - lastStab < STAB_COOLDOWN) return;
+    lastStab = at;
     settlePlunge();
     reload = 0;
     tipVisible = false;
 
-    const index = nearestCup(cups, now);
+    const index = nearestCup(cups, at, mode);
     const impactY = beltY - cupH + px * 1.5;
+    const noteY = restBottom() - strawH - 8;
     if (index < 0) {
       // Nothing under the straw: it hits the belt.
       plunge = { cup: null, offset: 0, age: 0 };
       for (let i = 0; i < 7; i++) addParticle(particles, strawX, beltY, i % 2 ? INK : ROLLER, 70, 300);
-      addPopup(popups, strawX, restBottom() - strawH - 8, "bonk", "miss");
-      lanternMissAt = now;
+      addPopup(popups, strawX, noteY, "bonk", "miss");
+      lanternMissAt = at;
+      markBar(marks, barAtTime(TEMPOS, at), "miss");
       sfxWhiff(loseLife(strawX));
       return;
     }
 
     const cup = cups[index];
-    const error = now - cup.time;
-    const rating = judgeStab(error) ?? "graze";
+    const error = at - cup.time;
+    const rating = judgeStab(error, mode) ?? "graze";
     cup.resolved = true;
+    markBar(marks, cup.bar, rating);
     // Early stabs land left of center and late ones right, as the cup moves.
-    const offset = clamp(error / WINDOWS.graze, -1, 1) * (cupW / 2 - px * 1.5);
+    const offset = clamp(error / mode.windows.graze, -1, 1) * (cupW / 2 - px * 1.5);
     plunge = { cup, offset, age: 0 };
 
     combo += 1;
@@ -1703,10 +1856,10 @@
     const points = pointsForStab(rating, cup.golden, combo);
     score += points;
 
-    const x = cupX(cup, now) + offset;
+    const x = cupX(cup, lastShown) + offset;
     const liquid = cup.golden ? "#f2b84b" : DRINKS[cup.drink];
     const count = rating === "perfect" ? 10 : rating === "good" ? 7 : 5;
-    if (rating === "perfect" && !reduceMotion) flashString(now, cup.golden ? GOLD_INDEX : cup.drink);
+    if (rating === "perfect" && !reduceMotion) flashString(at, cup.golden ? GOLD_INDEX : cup.drink);
     for (let i = 0; i < count; i++) {
       addParticle(particles, x, impactY, i % 3 === 0 ? PAPER_WHITE : i % 3 === 1 ? "#e85d4c" : liquid, 80, 320);
     }
@@ -1714,16 +1867,27 @@
     addPopup(
       popups,
       strawX,
-      restBottom() - strawH - 8,
+      noteY,
       combo > 4 ? `${label} +${points} ×${combo}` : `${label} +${points}`,
       cup.golden ? "gold" : rating === "perfect" ? "perfect" : "plain",
     );
+    // Off the notch, a second note says which way, so the timing can be trusted.
+    if (rating !== "perfect") addPopup(popups, strawX, noteY - 22, error < 0 ? "early" : "late", "plain");
     if (combo % 20 === 0) {
       sfxMilestone(pan(x));
-      liveMessage = `${combo} in a row. Score ${score}.`;
+      if (!demoOn) liveMessage = `${combo} in a row. Score ${score}.`;
     } else {
       sfxStab(rating, combo, pan(x));
-      if (cup.golden) liveMessage = `Golden cup, ${points} points.`;
+      if (cup.golden && !demoOn) liveMessage = `Golden cup, ${points} points.`;
+    }
+  }
+
+  /** The demo's hand: stabs each cup as the screen shows it reaching its aim. */
+  function steer(shown: number) {
+    for (const cup of cups) {
+      if (cup.resolved || cup.aim === null) continue;
+      const at = cup.time + cup.aim;
+      if (at <= shown) stab(at);
     }
   }
 
@@ -1747,16 +1911,20 @@
 
   function beginRun() {
     countdown = 0;
-    goVisible = true;
-    later(() => (goVisible = false), 620);
-    // Drums from the first bar: the beat is the whole game here.
-    setMusicPhase("steady");
+    if (!demoOn) {
+      goVisible = true;
+      later(() => (goVisible = false), 620);
+    }
+    // Drums from the first bar: the beat is the whole game here. Expert
+    // opens in a busy tier, so it opens in the rush arrangement too.
+    setMusicPhase(tier >= 2 ? "rush" : "steady");
     const downbeat = startMusic(PLAYLIST);
     useAudio = downbeat !== null && audioClock() !== null;
     clockSynced = false;
     clockOffset = 0;
     if (useAudio && downbeat !== null) {
       origin = downbeat;
+      syncClock();
     } else {
       // No running audio: play silently on the page clock instead of
       // letting unsynced music drift against the belt.
@@ -1765,7 +1933,7 @@
     }
     sfxStart();
     running = true;
-    liveMessage = "Go. Stab on the beat.";
+    liveMessage = demoOn ? "Demo playing." : "Go. Stab on the beat.";
   }
 
   function frame(timestamp: number) {
@@ -1773,13 +1941,16 @@
     if (!last) last = timestamp;
     const rawDt = (timestamp - last) / 1000;
     last = timestamp;
+    // How long frames take here, so each is drawn for when it will be seen.
+    if (rawDt > 0.002 && rawDt < 0.1) frameInterval += (rawDt - frameInterval) * 0.1;
     const dt = Math.min(rawDt, 0.05);
 
-    if (paused) {
-      draw(running ? heldSong : 0);
+    if (paused || askFirst) {
+      draw(running ? lastShown : 0);
       raf = requestAnimationFrame(frame);
       return;
     }
+    strawBlink = Math.max(0, strawBlink - dt);
 
     if (!running) {
       const step = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
@@ -1806,38 +1977,45 @@
         clockOffset = 0;
         origin = perfSeconds() - heldSong;
       } else {
-        draw(heldSong);
+        draw(lastShown);
         raf = requestAnimationFrame(frame);
         return;
       }
     }
 
+    syncClock();
+    // Heard now: misses are called against this.
     const now = songNow();
-    planAhead(now);
+    // On screen at the next refresh: everything is drawn for this.
+    const shown = songAt(presentSeconds(timestamp, performance.now(), frameInterval));
+    lastShown = shown;
+    planAhead(shown);
+    if (demoOn) steer(shown);
     for (const cup of cups) {
-      if (!isLate(cup, now)) continue;
+      if (!isMissed(cup, now, mode)) continue;
       cup.resolved = true;
       cup.missed = true;
-      const x = cupX(cup, now);
+      const x = cupX(cup, shown);
       addPopup(popups, x, beltY - cupH - 18, "no straw", "miss", 0.8);
       lanternMissAt = now;
+      markBar(marks, cup.bar, "miss");
       sfxMiss(loseLife(x));
       if (gameOver) return;
     }
-    cups = cups.filter((cup) => cupX(cup, now) > -cupW * 2);
-    updateBeat(now);
-    stepScene(now, dt);
+    cups = cups.filter((cup) => cupX(cup, shown) > -cupW * 2);
+    updateBeat(shown);
+    stepScene(shown, dt);
     stepStraws(dt);
     stepParticles(particles, dt);
     stepPopups(popups, dt);
-    draw(now);
+    draw(shown);
     if (active && !gameOver) raf = requestAnimationFrame(frame);
   }
 
   // --- Pause, restart, and finish -----------------------------------------
 
   async function pauseGame() {
-    if (gameOver || paused) return;
+    if (gameOver || paused || askFirst) return;
     paused = true;
     if (running && !waitingForAudio) {
       heldSong = songNow();
@@ -1863,7 +2041,8 @@
     }
     sfxBlip();
     liveMessage = "Game resumed";
-    hudButtons?.focusPause();
+    if (demoOn) void tick().then(() => demoBar?.focus());
+    else hudButtons?.focusPause();
   }
 
   function togglePause() {
@@ -1880,18 +2059,26 @@
     const result = concludeRun("stab", score);
     localBest = result.best;
     newBest = result.newBest;
+    share = shareRows(marks);
     liveMessage = `Last call. Final score ${score}.`;
-    draw(songNow());
+    draw(lastShown);
     await tick();
     slip?.focus();
   }
 
-  function restart() {
+  /** A fresh belt: new songs, nothing on it, the clock stopped. */
+  function resetRun() {
+    cancelAnimationFrame(raf);
     stopMusic();
+    timers.clear();
     PLAYLIST = stabPlaylist();
     TEMPOS = songTempos(PLAYLIST);
+    mode = demoOn ? NORMAL : stabMode(expert);
+    patternRandom = demoOn ? seededRandom(DEMO_SEED) : Math.random;
+    autopilot = createAutopilot();
     score = 0;
-    lives = LIVES;
+    lives = mode.lives;
+    strawBlink = 0;
     combo = 0;
     bestCombo = 0;
     hits = 0;
@@ -1907,7 +2094,8 @@
     missFlash = false;
     beatInBar = -1;
     currentBpm = TEMPOS[0];
-    tier = 0;
+    tier = tierForBar(TEMPOS, 0, mode);
+    tierLevel = Math.min(tier, MAX_TIER);
     songsReached = 1;
     newBest = false;
     cups = [];
@@ -1920,7 +2108,9 @@
     cupCount = 0;
     currentBar = -1;
     lastStab = -Infinity;
-    tierLevel = 0;
+    lastShown = 0;
+    marks = [];
+    share = [];
     farScroll = 0;
     nearScroll = 0;
     flash = null;
@@ -1932,8 +2122,30 @@
     last = 0;
     run += 1;
     active = true;
+  }
+
+  /** A real run: the countdown, then the belt. */
+  function restart() {
+    demoOn = false;
+    demoEnded = false;
+    askFirst = false;
+    resetRun();
+    // The first-run tip waits for the first real run.
+    tipVisible = tipPending;
+    tipPending = false;
     sfxCountdown(COUNTDOWN_SECONDS);
     liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+    raf = requestAnimationFrame(frame);
+  }
+
+  /** The demo: the belt starts at once and the autopilot stabs on the real rules. */
+  function startDemo() {
+    demoOn = true;
+    demoEnded = false;
+    askFirst = false;
+    demoText = demoCaption(0);
+    resetRun();
+    beginRun();
     raf = requestAnimationFrame(frame);
   }
 
@@ -1959,35 +2171,48 @@
         viewH - Math.max(48, viewH * 0.12),
       ),
     );
-    strawX = Math.round(viewW * (viewW < 640 ? 0.24 : 0.3));
+    // On the grid too, so the notch (drawn on the grid) is exactly where a
+    // cup's centre is at its beat.
+    strawX = snap(viewW * (viewW < 640 ? 0.24 : 0.3));
     speed = clamp((viewW - strawX) / 1.7, 220, 620);
     leadSeconds = (viewW - strawX + cupW) / speed;
     stageTop = playTop;
     sizeScene();
-    draw(running ? (paused ? heldSong : songNow()) : 0);
+    draw(running ? lastShown : 0);
   }
 
   function onPointer(event: PointerEvent) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
-    stab();
+    stabFromEvent(event);
+  }
+
+  function onKey(event: KeyboardEvent) {
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    if (!STAB_KEYS.has(key)) return;
+    if (isOnControl(event) && BUTTON_KEYS.has(key)) {
+      // A focused button keeps Space and Enter, except the HUD's own pause and
+      // mute buttons in the middle of a run: there Space is the stab, and the
+      // button lets go of focus so it isn't pressed on the key's release.
+      const hudButton = event.target instanceof HTMLElement && event.target.closest(".boba-hud button");
+      if (!(key === " " && hudButton && canStab())) return;
+      (event.target as HTMLElement).blur();
+    }
+    event.preventDefault();
+    stabFromEvent(event);
   }
 
   onMount(() => {
     popupFont = arcadeFont();
     const unmountShell = mountShell({
       isOver: () => gameOver,
-      isPaused: () => paused,
+      // The demo question is a card like the pause card, and Tab stays in it.
+      isPaused: () => paused || askFirst,
       pause: () => void pauseGame(),
       togglePause,
-      playScope: () => hud,
-      onKey: (event) => {
-        const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-        // A focused control keeps Space and Enter for itself.
-        if (!STAB_KEYS.has(key) || isOnControl(event)) return;
-        event.preventDefault();
-        stab();
-      },
+      // During the demo, Tab cycles its bar's buttons (P still pauses).
+      playScope: () => (demoOn ? document.querySelector(".boba-ui.demo") : hud),
+      onKey,
       onResize: sizeCanvas,
       // The ticket row can change height (a font loading, a narrow screen
       // wrapping it), and the belt sits below it.
@@ -1995,9 +2220,16 @@
       onReduceMotion: (reduce) => (reduceMotion = reduce),
     });
     sizeCanvas();
-    tipVisible = firstVisit("stab");
-    sfxCountdown(COUNTDOWN_SECONDS);
-    raf = requestAnimationFrame(frame);
+    tipPending = firstVisit("stab");
+    const intro = demoIntro("stab", takeDemoRequest("stab"));
+    if (intro === "demo") {
+      startDemo();
+    } else if (intro === "ask") {
+      askFirst = true;
+      raf = requestAnimationFrame(frame);
+    } else {
+      restart();
+    }
 
     return () => {
       active = false;
@@ -2022,7 +2254,10 @@
       </span>
       <span class="boba-big">{String(score).padStart(3, "0")}</span>
       <span class="boba-stack">
-        <span class="boba-meta">points</span>
+        <span class="ss-meta">
+          <span class="boba-meta">points</span>
+          {#if !demoOn}<ExpertTag />{/if}
+        </span>
         {#key combo}
           <span class="boba-combo" class:active={combo > 1}>
             {combo > 1 ? `×${combo} combo` : "no combo yet"}
@@ -2051,21 +2286,35 @@
     </div>
 
     <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.7deg">
-      <Pearls left={lives} total={LIVES} pulse={missPulse} />
+      <Pearls left={lives} total={mode.lives} pulse={missPulse} />
       <HudButtons bind:this={hudButtons} {paused} on:pause={togglePause} />
     </div>
   </div>
 
   {#if tipVisible && !paused}
     <div class="boba-tip" role="note" aria-label="How to play">
-      <span>stab each cup as it passes under the straw</span>
+      <span>stab each cup as it reaches the red notch</span>
       <span class="boba-keys"><kbd>Space</kbd> stab</span>
     </div>
   {/if}
 </header>
 
-{#if countdown > 0 || goVisible}
+{#if !askFirst && !demoOn && (countdown > 0 || goVisible)}
   <Countdown value={countdown} caption="the belt starts in" goCaption="find the beat" />
+{/if}
+
+{#if askFirst}
+  <DemoCard on:watch={startDemo} on:play={restart} />
+{/if}
+
+{#if demoOn && !paused}
+  <DemoBar
+    bind:this={demoBar}
+    caption={demoText}
+    ended={demoEnded}
+    on:play={restart}
+    on:again={startDemo}
+  />
 {/if}
 
 {#if missFlash}
@@ -2087,9 +2336,10 @@
     bind:this={slip}
     game="stab"
     title="last call"
-    deck={`Three cups went out strawless. You got ${songsReached} ${songsReached === 1 ? "song" : "songs"} in.`}
+    deck={`${LIVES_WORDS[mode.lives]} cups went out strawless. You got ${songsReached} ${songsReached === 1 ? "song" : "songs"} in.`}
     {score}
     {newBest}
+    {share}
     stats={[
       { label: "cups strawed", value: hits },
       { label: "perfect stabs", value: perfects },
@@ -2108,7 +2358,14 @@
   /* The scene has no light mode: the stage wears the sky's top colour in
      both themes, so the site never shows through behind the canvas. */
   .ss-stage {
-    background: #2a2748;
+    background: #232132;
+  }
+
+  /* The score's unit, and "expert" beside it in an expert run. */
+  .ss-meta {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-1);
   }
 
   /* Four beat lights, one per beat of the bar. */

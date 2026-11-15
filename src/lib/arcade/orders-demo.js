@@ -1,12 +1,16 @@
 // The order up demo: one drink made by a script on the real bench, so a new
-// player sees every station once before their shift. This file is the
+// player sees every station once before their shift: the guest walking up
+// to the counter and handing over a ticket that goes up on the rail, the ice
+// going in cube by cube, the syrup pump by pump, the pour, the ladle, the
+// shake, the seal, and the tip landing in a jar that it fills. This file is the
 // script and its timings, kept free of the DOM so the numbers are easy to
 // adjust and can be checked with node; the component plays it by calling the
 // same functions the player's own input calls.
 
 import {
   FILL_LINE,
-  ICE_SCOOPS,
+  ICE_CUBES,
+  JAR_SIZE,
   REGULARS,
   SEAL_BAND,
   SEAL_PERIOD,
@@ -14,7 +18,9 @@ import {
   TOPPINGS,
   ladleAt,
   paceForElapsed,
+  pointsForDrink,
   stepPour,
+  sugarPumps,
 } from "./orders-engine.js";
 
 /** @typedef {import("./orders-engine.js").Order} Order */
@@ -23,9 +29,10 @@ import {
 /**
  * One beat of the script. `wait` is the pause before it starts, in seconds;
  * `caption`, when given, replaces the caption as it starts.
- * - arrive: the guest clips onto the rail.
+ * - arrive: the guest walks up; done once their ticket hangs on the rail.
  * - take: their ticket is pressed.
- * - ice: the ice button is pressed `ICE_SCOOPS[order.ice]` times, `every` apart.
+ * - ice: the hand is pressed once per cube the order wants, `every` apart.
+ * - sugar: the hand is pressed once per pump of syrup, `every` apart.
  * - pour: the tap is held until the tea reaches the order's line.
  * - jar: the jar marker moves one jar in `dir`.
  * - drop: the hand is pressed once the ladle is over the middle of the cup.
@@ -34,7 +41,7 @@ import {
  * - receipt: waits for the receipt, then holds it for `hold` seconds.
  * - end: the end card.
  * @typedef {{
- *   act: "arrive" | "take" | "ice" | "pour" | "jar" | "drop" | "shake" | "seal" | "receipt" | "end",
+ *   act: "arrive" | "take" | "ice" | "sugar" | "pour" | "jar" | "drop" | "shake" | "seal" | "receipt" | "end",
  *   wait: number,
  *   caption?: string,
  *   tap?: number,
@@ -49,10 +56,15 @@ import {
 export const DEMO_REGULAR = /** @type {Regular} */ (REGULARS.find((regular) => regular.name === "pip") ?? REGULARS[0]);
 
 /** @type {Order} */
-export const DEMO_ORDER = { tea: "milk", ice: "light", toppings: [{ kind: "pearls", scoops: 1 }] };
+export const DEMO_ORDER = { tea: "milk", sugar: 50, ice: "less", toppings: [{ kind: "pearls", scoops: 1 }] };
 
 /** Long enough that the guest never gets restless and the wait grades well. */
 export const DEMO_PATIENCE = 40;
+
+/** Roughly how long the guest takes to walk up and send the ticket up to the rail. */
+export const DEMO_WALK = 1.6;
+/** From the last cube's press (or pump) to the next station: it lands, then a beat. */
+export const DEMO_ICE_SETTLE = 0.4;
 
 /** The cup and the jar marker start away from where they are needed, so the moves show. */
 export const DEMO_START_TAP = 2;
@@ -72,18 +84,25 @@ export const DEMO_POUR_LEAD = 0.008;
 
 /** @type {DemoStep[]} */
 export const DEMO_SCRIPT = [
-  { act: "arrive", wait: 0.6, caption: "take a ticket" },
-  { act: "take", wait: 2.2 },
-  { act: "ice", wait: 1.6, caption: "add ice to match the ticket", every: 0.5 },
-  { act: "pour", wait: 2.0, caption: "hold the tea's tap, let go at the line", tap: 0 },
-  { act: "jar", wait: 1.6, caption: "pick the jar, drop when the ladle is over the cup", dir: -1 },
+  { act: "arrive", wait: 0.4, caption: "a guest walks up and hands you a ticket" },
+  { act: "take", wait: 1.2, caption: "take a ticket" },
+  { act: "ice", wait: 1.3, caption: "add ice until the cup's marks are full", every: 0.45 },
+  { act: "sugar", wait: 1.1, caption: "pump syrup until the bottle's marks are full", every: 0.45 },
+  { act: "pour", wait: 1.4, caption: "hold the tea's tap, let go at the line", tap: 0 },
+  { act: "jar", wait: 1.5, caption: "pick the jar, drop when the ladle is over the cup", dir: -1 },
   { act: "jar", wait: 0.6, dir: -1 },
   { act: "drop", wait: 0.8 },
-  { act: "shake", wait: 1.5, caption: "shake", count: SHAKES_NEEDED, every: 0.16 },
-  { act: "seal", wait: 1.6, caption: "stamp when the needle is in the band" },
-  { act: "receipt", wait: 0, caption: "every step is graded", hold: 2.5 },
+  { act: "shake", wait: 1.3, caption: "shake", count: SHAKES_NEEDED, every: 0.16 },
+  { act: "seal", wait: 1.4, caption: "stamp when the needle is in the band" },
+  { act: "receipt", wait: 0, caption: "every step is graded, and tips fill the jar", hold: 3 },
   { act: "end", wait: 0.4 },
 ];
+
+/**
+ * The tip jar starts this full in the demo, so the demo's perfect drink tips
+ * it over and shows it paying out.
+ */
+export const DEMO_JAR_START = JAR_SIZE - pointsForDrink(100, DEMO_REGULAR, 1).coins;
 
 /** The topping the demo's jar steps end on. */
 export function demoJarEnd(start = DEMO_START_JAR, script = DEMO_SCRIPT) {
@@ -94,9 +113,14 @@ export function demoJarEnd(start = DEMO_START_JAR, script = DEMO_SCRIPT) {
   return TOPPINGS[index];
 }
 
-/** Scoops of ice the demo adds: whatever its order asks for. */
-export function demoIceScoops(order = DEMO_ORDER) {
-  return ICE_SCOOPS[order.ice];
+/** Cubes of ice the demo adds: whatever its order asks for. */
+export function demoIceCubes(order = DEMO_ORDER) {
+  return ICE_CUBES[order.ice];
+}
+
+/** Pumps of syrup the demo gives: whatever its order asks for. */
+export function demoSugarPumps(order = DEMO_ORDER) {
+  return sugarPumps(order.sugar);
 }
 
 /** Where the demo lets go of the tap. */
@@ -135,8 +159,12 @@ export function demoSeconds(script = DEMO_SCRIPT, order = DEMO_ORDER) {
   for (const step of script) {
     low += step.wait;
     high += step.wait;
-    if (step.act === "ice") {
-      const span = Math.max(0, demoIceScoops(order) - 1) * (step.every ?? 0);
+    if (step.act === "arrive") {
+      low += DEMO_WALK * 0.7;
+      high += DEMO_WALK;
+    } else if (step.act === "ice" || step.act === "sugar") {
+      const count = step.act === "ice" ? demoIceCubes(order) : demoSugarPumps(order);
+      const span = Math.max(0, count - 1) * (step.every ?? 0) + DEMO_ICE_SETTLE;
       low += span;
       high += span;
     } else if (step.act === "pour") {

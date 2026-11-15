@@ -1,7 +1,10 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from "svelte";
+  import { get } from "svelte/store";
 
+  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
   import {
+    finishMusic,
     setMusicPaused,
     setMusicPhase,
     sfxBlip,
@@ -13,19 +16,24 @@
     stopMusic,
   } from "$lib/sfx";
   import {
-    GROW_AFTER,
+    NORMAL,
     START_WIDTH,
+    drawnLeft,
     dropCup,
+    grownSpan,
+    perfectWindow,
     phaseForHeight,
+    rulesFor,
+    shareTower,
+    slideFor,
     sliderWidth,
     snapDrop,
-    speedForHeight,
     stepSlide,
     trackFor,
     traySpan,
-    widthAfterPerfect,
   } from "$lib/arcade/stack-engine.js";
-  import type { Span } from "$lib/arcade/stack-engine.js";
+  import type { DropKind, Rules, Span } from "$lib/arcade/stack-engine.js";
+  import { DEMO_SCRIPT, demoAim, demoDropsNow } from "$lib/arcade/stack-demo.js";
   import {
     DRINKS,
     INK,
@@ -43,9 +51,12 @@
     stepPopups,
     type Popup,
   } from "$lib/arcade/art";
-  import { firstVisit, readBest } from "$lib/arcade/scores";
+  import { demoIntro, firstVisit, readBest } from "$lib/arcade/scores";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
+  import DemoBar from "./DemoBar.svelte";
+  import DemoCard from "./DemoCard.svelte";
+  import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
   import ResultsSlip from "./ResultsSlip.svelte";
@@ -248,9 +259,33 @@
   let streak = 0;
   let bestStreak = 0;
   let perfects = 0;
+  /** Every drop this run, in order, for the share text. */
+  let drops: DropKind[] = [];
   let paused = false;
   let gameOver = false;
   let tipVisible = false;
+  /** The first-run tip waits for the first real run (never the demo). */
+  let tipChecked = false;
+
+  // Expert is read once when the game opens and kept; the demo always plays
+  // normal. `rules` is whichever the tower in front of you is using.
+  let expert = false;
+  let rules: Rules = NORMAL;
+  /** Seeds expert's sides and paces, fresh each run. */
+  let runSeed = 0;
+
+  // The demo: the game plays itself on these same rules, records nothing,
+  // and shuts out the player's drops. `asking` is the first-visit card.
+  let asking = false;
+  let demo = false;
+  let demoEnded = false;
+  let demoCaption = "";
+  let demoStep = 0;
+  /** Which pass over the tower the demo's cup is on, from 1. */
+  let demoPass = 1;
+  let demoAimAt = 0;
+  /** Play was pressed mid-demo: the cup falls and the sky comes home first. */
+  let leavingDemo = false;
   let liveMessage = "Cup stack starting";
   let localBest = 0;
   let previousBest = 0;
@@ -268,6 +303,8 @@
 
   let viewW = 0;
   let viewH = 0;
+  /** Screen pixels to a unit where the sliding cup is drawn: device pixels on a sharp screen. */
+  let drawPx = 6;
   let unit = 6;
   let cupH = 48;
   let groundY = 0;
@@ -276,7 +313,7 @@
 
   // tower[0] is the tray; every other entry is a cup.
   let tower: Layer[] = [];
-  let slider = { left: 0, direction: 1 as 1 | -1, width: START_WIDTH, drink: 0 };
+  let slider = { left: 0, direction: 1 as 1 | -1, width: START_WIDTH, drink: 0, speed: NORMAL.speed.start };
   /** The slider as drawn this frame, on the unit grid; reused to keep frames allocation-free. */
   const sliderShown = { left: 0, width: START_WIDTH, drink: 0 };
   let track = { min: 0, max: 0 };
@@ -1404,7 +1441,7 @@
    */
   function drawTable(c: CanvasRenderingContext2D, ground: number) {
     const u = unit;
-    const tray = traySpan();
+    const tray = traySpan(rules);
     const x0 = Math.round(screenX(tray.left));
     const width = tray.width * u;
     const mid = Math.round(screenX(0));
@@ -1438,7 +1475,9 @@
       PALETTES[layer.drink],
       HALO,
     );
-    const x = Math.round(screenX(layer.left)) - SPRITE_PAD;
+    // Cups sit on whole units; the sliding cup's left edge is on the drawn
+    // pixel grid (`drawnLeft`), half a CSS pixel on a sharp screen.
+    const x = Math.round(viewW / 2) - SPRITE_PAD + Math.round(layer.left * drawPx) / (drawPx / unit);
     if (squash <= 0) {
       ctx.drawImage(sprite, x, Math.round(top) - SPRITE_PAD);
       return;
@@ -1464,7 +1503,7 @@
    * backing, and the label on a chip, so both read from dusk to space.
    */
   function drawBestLine(c: CanvasRenderingContext2D) {
-    if (previousBest <= 0) return;
+    if (previousBest <= 0 || demo || demoEnded) return;
     const world = levelTop(previousBest - 1);
     const y = Math.round(groundY + (world - groundY) * zoom);
     if (y < playTop + 8 || y > viewH) return;
@@ -1696,7 +1735,7 @@
     // The slider glides; a drop then snaps toward the tower (`snapDrop`), so
     // it is never cut by more than was seen hanging over.
     if (playing) {
-      sliderShown.left = slider.left;
+      sliderShown.left = drawnLeft(slider.left, drawPx);
       sliderShown.width = slider.width;
       sliderShown.drink = slider.drink;
       drawCup(sliderShown, levelTop(tower.length - 1));
@@ -1711,16 +1750,32 @@
 
   function nextSlider() {
     const top = tower[tower.length - 1];
-    const width = sliderWidth(top);
+    const width = sliderWidth(top, rules);
     track = trackFor(top, halfScreen, width);
-    // Cups come in from alternating sides.
-    const fromLeft = tower.length % 2 === 1;
+    // Normal alternates sides; expert picks the side and the pace per cup.
+    const { fromLeft, speed } = slideFor(tower.length - 1, rules, runSeed);
     slider = {
       left: fromLeft ? track.min : track.max,
       direction: fromLeft ? 1 : -1,
       width,
       drink: tower.length % DRINKS.length,
+      speed,
     };
+    if (demo) {
+      const cup = DEMO_SCRIPT[demoStep];
+      demoPass = 1;
+      if (cup) {
+        demoAimAt = demoAim(cup, width, fromLeft);
+        if (cup.caption) demoCaption = cup.caption;
+      }
+    }
+  }
+
+  /** What a drop right now would come to, judged where the cup is drawn. */
+  function judge() {
+    const top = tower[tower.length - 1];
+    const window = perfectWindow(tower.length - 1, slider.speed, rules);
+    return dropCup(top, slider.left, slider.width, { window, px: drawPx });
   }
 
   function breakOff(cut: Span, snappedLeft: number, level: number, whole: boolean) {
@@ -1742,17 +1797,20 @@
     });
   }
 
-  function drop() {
-    if (!playing || paused || gameOver) return;
+  /** Drops the sliding cup. The demo's autopilot calls this too; the player's input is shut out of the demo. */
+  function drop(byDemo = false) {
+    if (!playing || paused || gameOver || demo !== byDemo) return;
     const now = performance.now();
-    if (now - lastDrop < 80) return;
+    if (!byDemo && now - lastDrop < 80) return;
     lastDrop = now;
     tipVisible = false;
 
     const top = tower[tower.length - 1];
     const level = tower.length - 1;
-    const result = dropCup(top, slider.left, slider.width);
-    const snapped = snapDrop(top, slider.left, slider.width);
+    const result = judge();
+    // The same snap dropCup made, from where the cup was drawn.
+    const snapped = snapDrop(top, drawnLeft(slider.left, drawPx), slider.width);
+    drops = [...drops, result.kind];
 
     if (result.kind === "miss" || !result.placed) {
       breakOff({ left: snapped, width: slider.width }, snapped, level, true);
@@ -1765,22 +1823,23 @@
       streak += 1;
       perfects += 1;
       bestStreak = Math.max(bestStreak, streak);
-      const grown = widthAfterPerfect(placed.width, streak);
-      if (grown > placed.width) {
-        // Grow back toward the tray's center line.
-        const growLeft = placed.left + placed.width / 2 > 0;
-        placed = { left: growLeft ? placed.left - 1 : placed.left, width: grown };
-      }
+      // Perfects in a row grow the cup back toward the tray's center line.
+      placed = grownSpan(placed, streak, rules);
       flashes.push({ level, left: placed.left, width: placed.width, age: 0 });
       addPopup(
         popups,
         screenX(placed.left + placed.width / 2),
         levelTop(level) - 14,
-        grown > result.placed.width ? `perfect ×${streak}, wider` : streak > 1 ? `perfect ×${streak}` : "perfect",
+        placed.width > result.placed.width ? `perfect ×${streak}, wider` : streak > 1 ? `perfect ×${streak}` : "perfect",
         "perfect",
       );
     } else {
       streak = 0;
+      if (result.kind === "close") {
+        // Snapped onto the centre whole, but it wasn't a perfect: say so,
+        // since it looks lined up.
+        addPopup(popups, screenX(placed.left + placed.width / 2), levelTop(level) - 14, "a hair off");
+      }
       if (result.cut) {
         breakOff(result.cut, snapped, level, false);
         sfxSlice();
@@ -1806,19 +1865,24 @@
     if (result.kind === "perfect" && !reduceMotion) {
       // From the third perfect in a row, the sparkles take the drink's colour.
       const cy = levelTop(level) + cupH / 2;
-      const color = streak >= GROW_AFTER ? DRINKS[slider.drink] : skyLumAt(cy) > 0.6 ? "#d9902f" : "#ffd166";
+      const color = streak >= rules.growAfter ? DRINKS[slider.drink] : skyLumAt(cy) > 0.6 ? "#d9902f" : "#ffd166";
       sparkleRing(x, cy, placed.width * unit, color);
     }
 
+    // In the demo the caption speaks; the live region stays quiet.
     if (stacked % 10 === 0) {
       sfxMilestone();
       addPopup(popups, x, levelTop(level) - 32, `${stacked} high`, "gold", 1);
-      liveMessage = `${stacked} cups high.`;
+      if (!demo) liveMessage = `${stacked} cups high.`;
     } else {
       sfxPlace(result.kind === "perfect", stacked);
-      if (result.kind === "perfect") liveMessage = `Perfect. ${stacked} cups.`;
+      if (demo) {
+        // Nothing to announce.
+      } else if (result.kind === "perfect") liveMessage = `Perfect. ${stacked} cups.`;
+      else if (result.kind === "close") liveMessage = `A hair off, so no perfect. ${stacked} cups.`;
     }
-    setMusicPhase(phaseForHeight(stacked));
+    setMusicPhase(phaseForHeight(stacked, rules));
+    if (demo) demoStep += 1;
     nextSlider();
   }
 
@@ -1826,6 +1890,17 @@
     playing = false;
     streak = 0;
     sfxTopple();
+    if (demo) {
+      // The demo's tower falls like any other; then the strip offers a turn.
+      timers.later(
+        () => {
+          finishMusic();
+          demoEnded = true;
+        },
+        reduceMotion ? 300 : 1300,
+      );
+      return;
+    }
     liveMessage = `The cup missed. ${stacked} cups high.`;
     // Let the last cup fall and the camera pull back before the slip.
     timers.later(() => void endGame(), reduceMotion ? 300 : 1300);
@@ -1834,7 +1909,7 @@
   /** The sky's moving parts. Reduced motion keeps the scene still at its altitude. */
   function stepScene(dt: number) {
     sceneClock += dt;
-    windFactor = 0.75 + (0.25 * speedForHeight(stacked)) / 15;
+    windFactor = 0.75 + (0.25 * slider.speed) / 15;
     if (reduceMotion) {
       flock.on = false;
       balloon.on = false;
@@ -1862,10 +1937,14 @@
       return;
     }
 
+    // The demo decides on the frame just drawn, as a player does.
+    if (playing && demo) autopilot();
     if (playing) {
       const top = tower[tower.length - 1];
       track = trackFor(top, halfScreen, slider.width);
-      const moved = stepSlide(slider.left, slider.direction, speedForHeight(stacked) * dt, track);
+      lastStep = slider.speed * dt;
+      const moved = stepSlide(slider.left, slider.direction, lastStep, track);
+      if (moved.direction !== slider.direction) demoPass += 1;
       slider.left = moved.position;
       slider.direction = moved.direction;
     }
@@ -1878,6 +1957,9 @@
       const towerHeight = tower.length * cupH + 40;
       const fit = Math.min(1, (groundY - playTop - 24) / towerHeight);
       zoom += (fit - zoom) * Math.min(1, dt * 3);
+    } else if (zoom !== 1) {
+      // A new tower after a fall: settle back in to full size.
+      zoom = zoom > 0.999 ? 1 : zoom + (1 - zoom) * Math.min(1, dt * 4);
     }
 
     for (const layer of tower) layer.land = Math.max(0, layer.land - dt);
@@ -1928,7 +2010,7 @@
   }
 
   async function endGame() {
-    if (gameOver) return;
+    if (gameOver || demo) return;
     gameOver = true;
     const result = concludeRun("stack", stacked);
     localBest = result.best;
@@ -1938,8 +2020,67 @@
     slip?.focus();
   }
 
-  function begin() {
-    tower = [{ ...traySpan(), drink: 0, land: 0 }];
+  // --- The demo's autopilot --------------------------------------------------
+
+  let lastStep = 0;
+
+  /** Drops when the script says to, through the same drop the player's input calls. */
+  function autopilot() {
+    const cup = DEMO_SCRIPT[demoStep];
+    if (!cup) return;
+    const top = tower[tower.length - 1];
+    const offset = slider.left - (top.left + (top.width - slider.width) / 2);
+    const now = { offset, aim: demoAimAt, step: lastStep, pass: demoPass, kind: judge().kind };
+    if (demoDropsNow(cup, now)) drop(true);
+  }
+
+  function watchDemo() {
+    asking = false;
+    timers.clear();
+    stopMusic();
+    begin(true);
+  }
+
+  /** A fresh real run, from the demo or its card. */
+  function playForReal() {
+    asking = false;
+    timers.clear();
+    stopMusic();
+    begin(false);
+    liveMessage = "New tower. Drop the first cup.";
+  }
+
+  /**
+   * Play, from the demo strip. Mid-demo the demo's cup drops away and the
+   * sky comes home as it does on a fall, then a real run starts; once the
+   * demo has fallen, it starts straight away.
+   */
+  function playFromDemo() {
+    if (!demo || !playing) {
+      playForReal();
+      return;
+    }
+    const top = tower[tower.length - 1];
+    const snapped = snapDrop(top, drawnLeft(slider.left, drawPx), slider.width);
+    breakOff({ left: snapped, width: slider.width }, snapped, tower.length - 1, true);
+    playing = false;
+    demo = false;
+    leavingDemo = true;
+    finishMusic();
+    timers.later(playForReal, reduceMotion ? 300 : 1300);
+  }
+
+  /** Starts a tower: a real run on this visit's mode, or the demo on normal. */
+  function begin(asDemo = false) {
+    demo = asDemo;
+    demoEnded = false;
+    leavingDemo = false;
+    demoStep = 0;
+    demoCaption = "";
+    rules = asDemo ? NORMAL : rulesFor(expert);
+    runSeed = Math.floor(Math.random() * 2 ** 31);
+    tower = [{ ...traySpan(rules), drink: 0, land: 0 }];
+    drops = [];
     stacked = 0;
     streak = 0;
     bestStreak = 0;
@@ -1949,13 +2090,17 @@
     popups = [];
     bitCount = 0;
     camera = 0;
-    zoom = 1;
+    // Zoom eases back in from a fall's pull-back while the new tower plays.
     playing = true;
     paused = false;
     gameOver = false;
     newBest = false;
     previousBest = readBest("stack");
     last = 0;
+    if (!asDemo && !tipChecked) {
+      tipChecked = true;
+      tipVisible = firstVisit("stack");
+    }
     // Back on the roof: nothing left crossing the sky from the last climb.
     flock.on = false;
     flock.wait = 4;
@@ -1972,10 +2117,7 @@
   }
 
   function restart() {
-    stopMusic();
-    timers.clear();
-    begin();
-    liveMessage = "New tower. Drop the first cup.";
+    playForReal();
   }
 
   // --- Sizing and lifecycle ------------------------------------------------
@@ -1985,6 +2127,9 @@
     viewH = window.innerHeight;
     ctx = fitCanvas(canvas, viewW, viewH);
     unit = viewW < 640 ? 4 : 5;
+    // On a sharp screen the sliding cup glides in half-pixel steps, and is
+    // judged on the same grid it is drawn on.
+    drawPx = unit * ((window.devicePixelRatio || 1) >= 2 ? 2 : 1);
     cupH = CUP_ROWS * unit;
     halfScreen = Math.floor(viewW / 2 / unit) - 1;
     playTop = hudRow ? hudRow.getBoundingClientRect().bottom : 80;
@@ -2023,12 +2168,19 @@
       s: STONE[3],
       B: STONE[0],
     });
+    expert = get(arcadeExpert);
     const unmountShell = mountShell({
       isOver: () => gameOver,
       isPaused: () => paused,
       pause: () => void pauseGame(),
       togglePause,
-      playScope: () => hudRow.closest(".boba-hud"),
+      // The demo strip and the first-visit card sit outside the HUD.
+      playScope: () =>
+        asking
+          ? document.querySelector(".boba-scrim")
+          : demo || demoEnded
+            ? hudRow.closest(".boba-arcade") ?? hudRow.closest(".boba-hud")
+            : hudRow.closest(".boba-hud"),
       onKey: (event) => {
         // A focused control keeps Space and Enter for itself.
         if (!DROP_KEYS.has(event.key) || isOnControl(event)) return;
@@ -2040,8 +2192,16 @@
       onReduceMotion: (reduce) => (reduceMotion = reduce),
     });
     sizeCanvas();
-    tipVisible = firstVisit("stack");
-    begin();
+    const intro = demoIntro("stack", takeDemoRequest("stack"));
+    if (intro === "demo") begin(true);
+    else if (intro === "none") begin(false);
+    else {
+      // First visit: the tray waits under the card until it is answered.
+      asking = true;
+      playing = false;
+      tower = [{ ...traySpan(rulesFor(expert)), drink: 0, land: 0 }];
+      rules = rulesFor(expert);
+    }
     raf = requestAnimationFrame(frame);
 
     return () => {
@@ -2072,6 +2232,10 @@
           </span>
         {/key}
       </span>
+      <!-- The demo plays normal, whatever the switch says. -->
+      {#if !demo && !demoEnded && !leavingDemo}
+        <ExpertTag />
+      {/if}
     </div>
 
     <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.6deg">
@@ -2090,6 +2254,18 @@
     </div>
   {/if}
 </header>
+
+{#if asking}
+  <DemoCard
+    deck="Watch it stack a few cups by itself, or go straight in."
+    on:watch={watchDemo}
+    on:play={playForReal}
+  />
+{/if}
+
+{#if demo || demoEnded}
+  <DemoBar caption={demoCaption} ended={demoEnded} placement="top" on:play={playFromDemo} on:again={watchDemo} />
+{/if}
 
 {#if paused && !gameOver}
   <PauseCard
@@ -2112,6 +2288,7 @@
     score={stacked}
     unit="cups"
     {newBest}
+    share={shareTower(drops)}
     stats={[
       { label: "cups stacked", value: stacked },
       { label: "perfect drops", value: perfects },

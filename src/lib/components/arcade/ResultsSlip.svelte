@@ -1,9 +1,10 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
 
-  import type { GameId } from "$lib/boba";
+  import { GAMES, type GameId } from "$lib/boba";
   import { LOOPS } from "$lib/arcade/art";
-  import { fetchBoard, submitScore, type BoardEntry } from "$lib/arcade/scores";
+  import { currentMode, fetchBoard, submitScore, type BoardEntry } from "$lib/arcade/scores";
+  import { shareText, shareRun } from "$lib/arcade/share";
   import { cleanName, MAX_NAME } from "$lib/profanity";
 
   export let game: GameId;
@@ -13,6 +14,27 @@
   export let unit = "points";
   export let newBest = false;
   export let stats: Array<{ label: string; value: string | number }> = [];
+  /**
+   * The run as a few short lines of emoji for the share text, the way a
+   * word game shares its grid: what happened, at a glance, without spoilers.
+   * Each game builds its own; empty shares the score alone.
+   */
+  export let share: string[] = [];
+
+  const mode = currentMode();
+  const expert = mode === "expert";
+  const gameName = GAMES.find((item) => item.id === game)?.name ?? game;
+
+  // "Copied" (or "Shared") stands in the button's label for a moment.
+  let shareState: "" | "copied" | "shared" | "failed" = "";
+  let shareTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async function shareScore() {
+    const text = shareText({ game: gameName, expert, score, unit, lines: share });
+    shareState = await shareRun(text);
+    if (shareTimer) clearTimeout(shareTimer);
+    shareTimer = setTimeout(() => (shareState = ""), 2200);
+  }
 
   const dispatch = createEventDispatcher<{ restart: null; menu: null; exit: null }>();
 
@@ -51,7 +73,7 @@
 
   onMount(async () => {
     playerName = readName();
-    const result = await fetchBoard(game);
+    const result = await fetchBoard(game, mode);
     boardAvailable = result.available;
     board = result.scores;
     boardLoading = false;
@@ -70,7 +92,7 @@
 
     nameError = "";
     submitting = true;
-    const result = await submitScore(game, checked.value, score);
+    const result = await submitScore(game, checked.value, score, mode);
     submitting = false;
     if (!result.ok) {
       nameError = result.reason;
@@ -133,7 +155,7 @@
     <div class="lower">
       {#if !boardLoading && boardAvailable && board.length > 0}
         <section class="board" aria-labelledby="boba-board-title">
-          <h3 id="boba-board-title" class="label">the regulars</h3>
+          <h3 id="boba-board-title" class="label">{expert ? "the expert regulars" : "the regulars"}</h3>
           <ol>
             {#each board.slice(0, 6) as entry, index}
               <li class="row" class:me={entry.me}>
@@ -177,9 +199,16 @@
       {/if}
     </div>
 
+    <p class="sr-only" aria-live="polite">
+      {shareState === "copied" ? "Score copied to share." : shareState === "failed" ? "Couldn’t copy the score." : ""}
+    </p>
+
     <div class="boba-actions">
       <button type="button" class="boba-btn" on:click={() => dispatch("restart")}>
         Play again
+      </button>
+      <button type="button" class="boba-btn secondary share" on:click={shareScore}>
+        {shareState === "copied" ? "Copied" : shareState === "shared" ? "Shared" : shareState === "failed" ? "Couldn’t copy" : "Share"}
       </button>
       <button type="button" class="boba-btn secondary" on:click={() => dispatch("menu")}>
         Menu
@@ -197,6 +226,11 @@
   .boba-over-card {
     width: min(100%, 36rem);
     container-type: inline-size;
+  }
+
+  /* Holds its width while the label swaps to "Copied". */
+  .share {
+    min-width: 6.5rem;
   }
 
   /* Score block on the left, the receipt beside it, centred against it. */

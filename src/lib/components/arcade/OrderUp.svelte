@@ -2,6 +2,7 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { flip } from "svelte/animate";
   import { cubicOut } from "svelte/easing";
+  import { get } from "svelte/store";
 
   import {
     setDemoPourStream,
@@ -11,11 +12,15 @@
     sfxBlip,
     sfxBrew,
     sfxBrewed,
+    sfxCoin,
+    sfxCombo,
     sfxCountdown,
     sfxDump,
     sfxIce,
+    sfxIceFull,
     sfxMilestone,
     sfxPlop,
+    sfxPump,
     sfxScoop,
     sfxScorch,
     sfxSeal,
@@ -24,6 +29,7 @@
     sfxSputter,
     sfxStart,
     sfxTicket,
+    sfxTipJar,
     sfxWalkOut,
     sfxWrong,
     startMusic,
@@ -31,30 +37,39 @@
   } from "$lib/sfx";
   import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import {
-    ACTIVE_PATIENCE_RATE,
     BREW_SECONDS,
     CRITIC,
-    CUP_MOUTH,
+    CROSS_AT,
     FILL_LINE,
+    ICE_CUBES,
     ICE_MAX,
+    JAR_SIZE,
     LIVES,
-    MAX_TICKETS,
     POUR_MAX,
-    SAMPLES_PER_SHIFT,
-    SEAL_BAND,
     SHAKES_NEEDED,
+    SHARE_FACES,
     SHIFT_SECONDS,
+    SUGAR_MAX,
     TANK_CAPACITY,
     TEAS,
     TOPPINGS,
+    activePatienceRate,
+    cheer,
+    comboFor,
+    comboProgress,
     criticDue,
     drawFromTank,
+    fillJar,
     gradeDrink,
     gradeWord,
+    iceGrade,
+    iceState,
+    jarPayout,
     judgeScoop,
     keepsStreak,
     ladleAt,
     makeOrder,
+    maxTickets,
     mostImpatient,
     nextArrivalIn,
     paceForElapsed,
@@ -63,22 +78,44 @@
     pickSpecial,
     pointsForDrink,
     pourGrade,
+    rulesFor,
     sampleBoost,
     sampleTarget,
+    samplesFor,
     scoopQueue,
     scoopResult,
     sealGrade,
     sealNeedle,
     sealResult,
+    servedMood,
     shakeGrade,
     stationsFor,
     stepPour,
+    sugarGrade,
+    sugarPumps,
+    sugarState,
     tankState,
     timeRemaining,
+    waitingMood,
   } from "$lib/arcade/orders-engine.js";
-  import type { Ice, Order, Phase, Quirk, Regular, Station, Tea, Topping } from "$lib/arcade/orders-engine.js";
+  import type {
+    Ice,
+    Order,
+    Phase,
+    Quirk,
+    Reaction,
+    Regular,
+    Station,
+    Tea,
+    Topping,
+    WaitMood,
+  } from "$lib/arcade/orders-engine.js";
+  import { Crowd, type CrowdState } from "$lib/arcade/orders-crowd";
+  import { FIGURE_W, JAR_W } from "$lib/arcade/orders-guests.js";
+  import { GLYPHS, GLYPH_ROWS, ICONS, wordWidth } from "$lib/arcade/orders-labels.js";
   import {
     DEMO_DROP_WITHIN,
+    DEMO_JAR_START,
     DEMO_ORDER,
     DEMO_PATIENCE,
     DEMO_PRESS_SECONDS,
@@ -88,8 +125,9 @@
     DEMO_SEAL_WITHIN,
     DEMO_START_JAR,
     DEMO_START_TAP,
-    demoIceScoops,
+    demoIceCubes,
     demoPourTarget,
+    demoSugarPumps,
     reachedTarget,
   } from "$lib/arcade/orders-demo.js";
   import type { DemoStep } from "$lib/arcade/orders-demo.js";
@@ -114,30 +152,36 @@
     type Particle,
     type Popup,
   } from "$lib/arcade/art";
-  import { firstVisit } from "$lib/arcade/scores";
+  import { demoIntro, firstVisit } from "$lib/arcade/scores";
+  import { emojiRows } from "$lib/arcade/share";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
+  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
   import Mark from "$lib/components/Mark.svelte";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
+  import DemoCard from "./DemoCard.svelte";
+  import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
   import Pearls from "./Pearls.svelte";
   import ResultsSlip from "./ResultsSlip.svelte";
 
-  // Order up: regulars queue on the line, each with a drink in mind. Take a
-  // ticket, then work the bench by hand: scoop the ice and pour to the line,
-  // pick each topping's jar and drop it from a swinging ladle, shake it, and
-  // stamp the seal while the sealer is hot. Around that, tanks run dry and
-  // brew, samples buy a guest time, the critic visits, and one tea is the
-  // special. Every rule, number and grade lives in orders-engine.js; this
-  // file steps it, draws it, and wires it to the arcade. The demo
-  // (orders-demo.js) plays one drink through the same functions.
+  // Order up: regulars walk up and hang a ticket on the rail, each with a
+  // drink in mind. Take a ticket, then work the bench by hand: drop in the
+  // ice cube by cube and pour to the line, pick each topping's jar and drop
+  // it from a swinging ladle, shake it, and stamp the seal while the sealer
+  // is hot. Around that, tanks run dry and brew, samples buy a guest time,
+  // the critic visits, and one tea is the special. Serving well climbs a
+  // combo, fills the tip jar, and cheers the line. Every rule, number and
+  // grade lives in orders-engine.js; the guests' art in orders-guests.js and
+  // their walk in orders-crowd.ts; this file steps it, draws the bench, and
+  // wires it to the arcade. The demo (orders-demo.js) plays one drink
+  // through the same functions.
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
   type Colors = ReturnType<typeof risoColors>;
-  type Mood = "happy" | "flat" | "cross";
   /** Where a scoop physically lands. */
   type ScoopOutcome = "clean" | "rim" | "miss";
   /** How a scoop is marked in the queue: a wrong jar is wrong wherever it lands. */
@@ -171,11 +215,11 @@
     matcha: "matcha",
     strawberry: "berry",
   };
-  const ICE_NAMES: Record<Ice, string> = { none: "no ice", light: "light ice", full: "full ice" };
-  /** Cube icons on the ticket. */
-  const ICE_ICONS: Record<Ice, number> = { none: 0, light: 1, full: 2 };
-  /** Each scoop from the bin puts this many cubes in the cup. */
-  const CUBES_PER_SCOOP = 2;
+  const ICE_NAMES: Record<Ice, string> = { none: "no ice", less: "less ice", regular: "regular ice", extra: "extra ice" };
+  /** On a phone's ticket the cubes carry the amount, so the words shorten. */
+  const ICE_SHORT: Record<Ice, string> = { none: "no ice", less: "less", regular: "regular", extra: "extra" };
+  const sugarName = (sugar: number) => `${sugar}% sugar`;
+  const TOPPING_SHORT: Record<Topping, string> = { pearls: "pearls", pudding: "pudding", jelly: "jelly", redbean: "bean" };
   const QUIRK_NAMES: Record<Quirk, string> = {
     hurry: "in a hurry",
     patient: "patient",
@@ -184,12 +228,21 @@
   };
 
   const PROMPTS: Record<Station, string> = {
+    ice: "add ice until the cup's marks are full",
+    sugar: "pump syrup until the bottle's marks are full",
     pour: "hold to pour, let go at the line",
     scoop: "pick the jar, drop when the ladle is over the cup",
     shake: "shake",
     seal: "stamp when the needle is in the band",
   };
-  const HAND_LABELS: Record<Station, string> = { pour: "Hold to pour", scoop: "Drop", shake: "Shake", seal: "Seal" };
+  const HAND_LABELS: Record<Station, string> = {
+    ice: "Add ice",
+    sugar: "Pump syrup",
+    pour: "Hold to pour",
+    scoop: "Drop",
+    shake: "Shake",
+    seal: "Seal",
+  };
   const SEAL_WORDS: Record<SealWord, string> = { sealed: "sealed", loose: "loose", scorched: "scorched" };
 
   // --- Timing ----------------------------------------------------------------------
@@ -202,8 +255,10 @@
   const AFTER_SHAKE = 0.25;
   /** The ladle dips into a jar and comes up loaded. */
   const DIP_SECONDS = 0.15;
-  /** A scoop of ice arcs from the bin into the cup. */
-  const ICE_ARC_SECONDS = 0.36;
+  /** A cube of ice arcs from the bin into the cup. */
+  const ICE_ARC_SECONDS = 0.28;
+  /** Once the last cube the ticket wants has landed, this beat, then the pour. */
+  const ICE_SETTLE = 0.12;
   /** From the stamp to the serve. */
   const SEAL_SECONDS = 0.7;
   /** Within the seal, from the stamp: the plate lands, the straw pops, the cup hops off. */
@@ -222,13 +277,33 @@
 
   // --- Pixel art ----------------------------------------------------------------
 
-  const TEA_URN = ["OOOOOOO", "OLLLLLO", ".OLLLO.", ".OLLLO.", "..OOO.."];
-  /** Each tea machine: a tank this many cells wide and tall, then a pipe and a nozzle. */
-  const TANK_W = 10;
-  const TANK_ROWS = 7;
-  const NOZZLE = ["OOOO", ".OO."];
-  /** Cells of open air between a nozzle and the rim: a short stream. */
-  const NOZZLE_GAP = 3;
+  /**
+   * The back bar: a wooden shelf on brackets along the wall, and standing on
+   * it the ice bin, a dispenser for each tea and the syrup bottle. Each
+   * dispenser is a glass tank (its tea showing) on a base whose tap reaches
+   * over the shelf's edge, so the stream falls in front of the shelf into the
+   * cup on the counter below. Heights in cells, measured from the cup.
+   */
+  /** A machine's width in cells: 10, or up to 12 where its column has room (so its label can say its name). */
+  let tankW = 10;
+  /** A machine's height above the shelf: tank, collar, base. */
+  const MACHINE_ROWS = 13;
+  /** The shelf plank's thickness. */
+  const SHELF_ROWS = 2;
+  /** The tap's tip sits this far above the cup's rim: a short, visible stream. */
+  const STREAM_ROWS = 7;
+  /** The tap reaches this far below the shelf's top. */
+  const TAP_DROP = 4;
+  const WOOD_TOP = "#c79a6b";
+  const WOOD_FACE = "#a77a52";
+  const WOOD_EDGE = "#5e3d2a";
+  const STEEL = "#d9d4cc";
+  const STEEL_DARK = "#a9a39a";
+  const GLASS = "#e3eff2";
+  const SYRUP = "#c98a2e";
+  /** The syrup bottle: a pump head, a neck, and a squat bottle of amber syrup. */
+  const PUMP_W = 8;
+  const PUMP_ROWS = 11;
   const SHAKER = [
     "......OO......",
     "....OOOOOO....",
@@ -249,6 +324,18 @@
     "..OOOO..",
   ];
   const ICE_CUBE = ["hpO", "ppp", "pps"];
+  const ICE_SLOT = "#d3e9f1";
+  /** The eight cells round a cube's slot, dotted in to mark where it goes. */
+  const ICE_RING: Array<[number, number]> = [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+    [0, 1],
+    [2, 1],
+    [0, 2],
+    [1, 2],
+    [2, 2],
+  ];
   const ICE_PALETTE = { h: "#ffffff", p: "#dceef4", s: "#b5d2dc", O: INK };
   /** The ice bin at the left end of the counter: lid propped open, cubes heaped inside. */
   const ICE_BIN = [
@@ -264,8 +351,6 @@
     "OBBBBBBBBO",
     "OOOOOOOOOO",
   ];
-  /** The ice button's icon: a scoop of cubes. */
-  const ICE_ICON = ["OOOOOOO", "OhpOphO", ".OpppO.", "..OOO.."];
   /** A small star for the critic and the day's special. */
   const STAR = ["..O..", "OOOOO", ".OOO.", ".O.O."];
   /** Light on any page, so dark pearls read against the night theme too. */
@@ -310,19 +395,26 @@
     const inset = row === 0 ? 0 : row === CUP_H - 1 ? 2 : wallInset(row);
     return ".".repeat(inset) + "O".repeat(CUP_W - 2 * inset) + ".".repeat(inset);
   });
-  /** Ice: where each cube rests on the bottom, and where it bobs at the top. */
+  /**
+   * Ice: where each cube rests on the bottom, in the order they drop, and
+   * where they bob along the top once the tea is in. The cup marks the slots
+   * the ticket wants before any go in.
+   */
   const ICE_REST: Array<[number, number]> = [
     [3, 14],
     [7, 14],
     [4, 11],
-    [7, 11],
-    [3, 8],
-    [8, 8],
+    [8, 11],
+    [2, 8],
+    [6, 8],
   ];
   /** Floating, by how many cubes are in: their columns along the surface. */
   const ICE_FLOAT: Record<number, number[]> = {
+    1: [5],
     2: [3, 7],
+    3: [2, 5, 8],
     4: [1, 4, 7, 10],
+    5: [1, 4, 7, 10, 5],
     6: [1, 4, 7, 10, 3, 8],
   };
   /** Where landed scoops settle, as [column, row] of each 5×3 sprite. */
@@ -334,102 +426,15 @@
     [3, 8],
     [6, 8],
   ];
-  /** The cup stands about this share of the bench's height. */
-  const CUP_SHARE = 0.45;
-  /** Cells the bench needs, top to bottom and across, before the grid shrinks. */
-  const ROWS_NEEDED = 34;
-  const COLS_NEEDED = 54;
+  /** Cells the bench needs, top to bottom (the back bar, the stream, the cup, the counter) and across. */
+  const ROWS_NEEDED = 46;
+  const COLS_NEEDED = 66;
   /** The ladle hangs from a pivot this many cells above it, out of view. */
   const LADLE_ARM = 60;
 
-  // Faces: eight cells square, seeded by name so a regular always looks the
-  // same, with an ink outline added around whatever is drawn.
-  const SKINS = ["#f3cfae", "#dca47c", "#b07850", "#7a4f35"];
-  const HAIRS = ["#2b1a12", "#5a3825", "#c98b3a", "#8f8f8f", "#b0442f"];
-  const HATS = ["#3f6fb0", "#2f7d5b", "#e85d4c", "#704a05"];
-  const SHIRTS = ["#6aa6e0", "#e76f8e", "#9fd17a", "#f4b942", "#b388e0"];
-  const FACE = ["........", "........", ".SSSSSS.", ".SESSES.", ".SSSSSS.", "", "", "..CCCC.."];
-  const MOUTHS: Record<Mood, [string, string]> = {
-    happy: [".SMSSMS.", "..SMMS.."],
-    flat: [".SMMMMS.", "..SSSS.."],
-    cross: [".SSMMSS.", "..MSSM.."],
-  };
-  const HAIRDOS = [
-    ["..HHHH..", ".HHHHHH.", ".H....H."],
-    ["...HH...", "..HHHH..", ".HHHHHH."],
-    ["..TTTT..", ".TTTTTTT", ".H....H."],
-  ];
-
-  function nameHash(name: string) {
-    let h = 2166136261;
-    for (let index = 0; index < name.length; index++) {
-      h ^= name.charCodeAt(index);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
-
-  const faceGrids = new Map<string, string[]>();
-  const facePalettes = new Map<string, Record<string, string>>();
-
-  /** The critic's reading glasses: a dark frame over pale lenses, across the eyes. */
-  const GLASSES: Record<number, string> = { 2: ".GGGGGG.", 3: "GLEGGELG" };
-
-  function faceGrid(name: string, mood: Mood, glasses = false) {
-    const key = `${name}|${mood}|${glasses}`;
-    const cached = faceGrids.get(key);
-    if (cached) return cached;
-    const hairdo = HAIRDOS[(nameHash(name) >>> 6) % HAIRDOS.length];
-    const rows = FACE.map((row, index) => {
-      let line = index === 5 ? MOUTHS[mood][0] : index === 6 ? MOUTHS[mood][1] : row;
-      const over = hairdo[index];
-      if (over) line = [...line].map((cell, column) => (over[column] !== "." ? over[column] : cell)).join("");
-      const frame = glasses ? GLASSES[index] : undefined;
-      if (frame) line = [...line].map((cell, column) => (frame[column] !== "." ? frame[column] : cell)).join("");
-      // A sweat drop beside the eye once they are about to give up.
-      if (mood === "cross" && index === 3) line = line.slice(0, 7) + "W";
-      return line;
-    });
-    // Pad by one cell and outline every empty cell that touches the drawing.
-    const padded = [".".repeat(10), ...rows.map((row) => `.${row}.`), ".".repeat(10)];
-    const filled = (row: number, column: number) => (padded[row]?.[column] ?? ".") !== ".";
-    const grid = padded.map((row, y) =>
-      [...row]
-        .map((cell, x) =>
-          cell === "." && (filled(y - 1, x) || filled(y + 1, x) || filled(y, x - 1) || filled(y, x + 1))
-            ? "O"
-            : cell,
-        )
-        .join(""),
-    );
-    faceGrids.set(key, grid);
-    return grid;
-  }
-
-  function facePalette(name: string) {
-    const cached = facePalettes.get(name);
-    if (cached) return cached;
-    const h = nameHash(name);
-    const palette = {
-      S: SKINS[h % SKINS.length],
-      E: INK,
-      M: INK,
-      H: HAIRS[(h >>> 3) % HAIRS.length],
-      T: HATS[(h >>> 9) % HATS.length],
-      C: SHIRTS[(h >>> 12) % SHIRTS.length],
-      W: "#7fc4e8",
-      G: INK,
-      L: "#cfe3ea",
-      O: "currentColor",
-    };
-    facePalettes.set(name, palette);
-    return palette;
-  }
-
-  const moodFor = (share: number): Mood => (share > 0.6 ? "happy" : share > 0.3 ? "flat" : "cross");
-  const MOOD_WORDS: Record<Mood, string> = {
-    happy: "happy to wait",
-    flat: "getting restless",
+  const MOOD_WORDS: Record<WaitMood, string> = {
+    calm: "happy to wait",
+    glance: "watching the clock",
     cross: "about to leave",
   };
 
@@ -442,6 +447,8 @@
     patience: number;
     left: number;
     tilt: number;
+    /** Their ticket is on the rail: until then they are walking up, and wait without losing patience. */
+    placed: boolean;
     /** Set just before the guest leaves, so the exit can differ. */
     outcome: "served" | "gone" | null;
   }
@@ -456,8 +463,10 @@
     station: Station;
     /** Between stations, or with the drink already judged: input waits. */
     busy: boolean;
-    /** Scoops of ice the player put in. */
+    /** Cubes of ice the player put in. */
     ice: number;
+    /** Pumps of syrup the player gave. */
+    sugar: number;
     tea: Tea | null;
     level: number;
     heldSeconds: number;
@@ -484,9 +493,21 @@
     burst: boolean;
   }
 
-  /** A scoop of ice on its way from the bin to the cup. */
+  /** A cube of ice on its way from the bin to the cup. */
   interface IceArc {
     age: number;
+  }
+
+  /** A ticket going up from a guest's hand (bench px) to their slot on the rail; `fx`/`fy` are where it is now, on screen. */
+  interface Flight {
+    id: number;
+    x0: number;
+    y0: number;
+    t: number;
+    fx: number;
+    fy: number;
+    scale: number;
+    turn: number;
   }
 
   interface Falling {
@@ -512,9 +533,10 @@
     sentBack: boolean;
     rows: Array<{ label: string; word: string }>;
     points: number;
-    /** Rubber stamps beside the points: the tip, the special, the critic. */
+    /** Rubber stamps beside the points: the tip, the special, the critic, the jar. */
     stamps: string[];
-    streak: number;
+    /** The combo multiplier this drink was paid at, when above 1. */
+    combo: number;
     perfect: boolean;
     /** Only a drink sent back carries a line: what went wrong. */
     line: string;
@@ -529,6 +551,11 @@
   }
 
   // --- State -----------------------------------------------------------------
+
+  /** Expert mode, read once as the game opens (the switch lives on the menu). The demo always plays normal. */
+  const expert = get(arcadeExpert);
+  const ticketCap = maxTickets(expert);
+  const sampleCap = samplesFor(expert);
 
   let score = 0;
   let lives = LIVES;
@@ -557,9 +584,15 @@
   /** Cup-shares left in each tea's tank, and when a brewing tank is done (0 when not brewing). */
   let tanks: number[] = TEAS.map(() => TANK_CAPACITY);
   let brewEnds: number[] = TEAS.map(() => 0);
-  let samplesLeft = SAMPLES_PER_SHIFT;
-  let criticSeen = false;
+  let samplesLeft = sampleCap;
+  let criticsSeen = 0;
   let special: Tea = "milk";
+  /** Coins in the tip jar, by the rules (the crowd shows them landing a beat later). */
+  let jar = 0;
+  let jarsCashed = 0;
+  /** How each guest left, in order, for the share. */
+  let history: Reaction[] = [];
+  let shareLines: string[] = [];
   /** The first time here: asked whether to watch the demo before the countdown. */
   let askFirst = false;
   let liveMessage = "Order up starting";
@@ -568,6 +601,7 @@
 
   let playScope: HTMLElement;
   let playfield: HTMLElement;
+  let syrupEl: HTMLButtonElement;
   let hud: HTMLElement;
   let hudHeight = 80;
   let benchArt: HTMLElement;
@@ -576,7 +610,6 @@
   let iceEl: HTMLButtonElement;
   let ctx: CanvasRenderingContext2D | null = null;
   let firstCard: HTMLElement;
-  let watchButton: HTMLButtonElement;
   let demoBar: HTMLElement;
   let skipButton: HTMLButtonElement;
   let endCard: HTMLElement;
@@ -586,7 +619,6 @@
   let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
   let reduceMotion = false;
   let small = false;
-  let facePx = 4;
 
   // The bench, in CSS px.
   let W = 0;
@@ -595,8 +627,14 @@
   let counterY = 0;
   let cupTop = 0;
   let spoutX: number[] = [];
-  /** The ice bin's centre, under the ice button. */
+  /** The ice bin's centre, under the ice button, and the syrup bottle's, under its button. */
   let binX = 0;
+  let pumpX = 0;
+  /** Where the back bar's buttons sit over its machines. */
+  let tapsTop = 0;
+  let tapsH = 0;
+  /** The guests' own pixel size: the bench's cell, or smaller where they stand close together. */
+  let guestPx = 4;
   let cupX = 0;
 
   // Game time: stops while paused, so every timer below holds with it.
@@ -621,17 +659,29 @@
   let joltDir = 1;
   let joltAge = 10;
   let flashAge = 10;
-  /** 0 with the nozzles tucked up under the tanks, 1 reaching for the cup. */
-  let tapReach = 1;
   let iceJitter = [0, 0, 0, 0, 0, 0];
   let lastShakeArrow: "left" | "right" | null = null;
   let iceArcs: IceArc[] = [];
+  /** Since the syrup pump was last pressed: the head dips and a squirt falls. */
+  let pumpAge = 10;
+  /** Tickets on their way from a guest's hand up to the rail. */
+  let flights: Flight[] = [];
   /** Tea is actually running this frame: held, and the tank not dry. */
   let streamOn = false;
   let tankSteamTimer = 0;
 
   /** Whatever is holding the pour open: keys, the hand, a tap, the bench. */
   const holds = new Set<string>();
+
+  /** The line of guests above the rail, and the tip jar at its end. */
+  const crowd = new Crowd({
+    hand: (id, x, y) => handTicket(id, x, y),
+    coin: (count) => sfxCoin(count),
+    full: () => {
+      sfxTipJar();
+      crowd.note(demoOn ? "jar full" : `jar +${jarPayout(1, LIVES).points}`);
+    },
+  });
 
   // --- The demo ---------------------------------------------------------------
   // It plays on the same bench and line as the shift. Opening it sets the
@@ -657,7 +707,8 @@
     iceArcs: IceArc[];
     cupX: number;
     wobble: number;
-    tapReach: number;
+    crowd: CrowdState;
+    flights: Flight[];
   }
 
   /** True from opening the demo until it is closed, end card included. */
@@ -695,9 +746,15 @@
   // --- Derived for the template ---------------------------------------------------
 
   // The hand and the ice follow the bench, demo included; the player's own
-  // input is shut out of the demo in the handlers instead.
-  $: handLive = !!making && !(making.station === "seal" && making.stampAt !== null);
-  $: handLabel = making ? HAND_LABELS[making.station] : "Pick a ticket";
+  // input is shut out of the demo in the handlers instead. With nothing on
+  // the bench the hand takes the next ticket: whoever is closest to leaving.
+  $: handLive = making ? !(making.station === "seal" && making.stampAt !== null) : guests.length > 0;
+  $: handLabel = making ? HAND_LABELS[making.station] : "Next ticket";
+  $: combo = comboProgress(streak, expert);
+  $: iceTarget = making ? ICE_CUBES[making.order.ice] : 0;
+  $: sugarCount = making?.sugar ?? 0;
+  $: sugarTarget = making ? sugarPumps(making.order.sugar) : 0;
+  $: syrupOpen = sugarAdjustable(making);
   $: steps = stepsFor(making);
   // In the demo the caption above the bench says it instead.
   $: prompt = demoOn ? "" : notice ? notice.text : making ? PROMPTS[making.station] : "";
@@ -717,20 +774,35 @@
     brewing = brewEnds.map((end) => (end > 0 ? clamp(1 - (end - clock) / BREW_SECONDS, 0, 1) : -1));
   }
 
+  /** The demo plays by normal rules; the shift by the mode it was opened in. */
+  function hard() {
+    return expert && !demoOn;
+  }
+
+  /** The stations before the tea: pressing a tap there moves straight on to the pour. */
+  const beforeTea = (station: Station) => station === "ice" || station === "sugar" || station === "pour";
+
   /** Can this tap pour into this cup right now? */
   function tapLive(index: number, cup: Cup | null = making) {
     return (
       !!cup &&
-      cup.station === "pour" &&
+      beforeTea(cup.station) &&
       !cup.busy &&
       (!cup.tea || cup.tea === TEAS[index]) &&
       brewEnds[index] === 0
     );
   }
 
-  /** Ice goes in at the pour, before any tea. */
+  /** Syrup goes in at its own station; it can't come back out. */
+  function sugarAdjustable(cup: Cup | null) {
+    return !!cup && cup.station === "sugar" && !cup.busy;
+  }
+
+  /** Ice goes in at its own station, and can still be changed at the pour until the tea goes in. */
   function iceAdjustable(cup: Cup | null) {
-    return !!cup && cup.station === "pour" && !cup.busy && !cup.tea && cup.level === 0 && holds.size === 0;
+    if (!cup || cup.busy) return false;
+    if (cup.station === "ice") return true;
+    return cup.station === "pour" && !cup.tea && cup.level === 0 && holds.size === 0;
   }
 
   /** Who a sample would go to: the guest closest to leaving (not the one being made), if they need one. */
@@ -750,15 +822,25 @@
   /** The stepper: a step is done once its grade is known, and the first undone is current. */
   function stepsFor(cup: Cup | null): Step[] {
     if (!cup) {
-      return ["pour", "scoop", "shake", "seal", "serve"].map((label): Step => ({ id: label, label, state: "todo", word: "" }));
+      return ["ice", "sugar", "pour", "scoop", "shake", "seal", "serve"].map((label): Step => ({ id: label, label, state: "todo", word: "" }));
     }
-    const list: Step[] = [{ id: "pour", label: "pour", state: "todo", word: cup.pourGrade === null ? "" : gradeWord(cup.pourGrade) }];
+    const list: Step[] = [];
+    const past = (station: Station) => cup.stations.indexOf(cup.station) > cup.stations.indexOf(station);
+    if (cup.stations.includes("ice")) {
+      const word = cup.station === "ice" ? "" : gradeWord(iceGrade(cup.ice, cup.order.ice, hard()));
+      list.push({ id: "ice", label: "ice", state: "todo", word });
+    }
+    if (cup.stations.includes("sugar")) {
+      const word = past("sugar") ? gradeWord(sugarGrade(cup.sugar, cup.order.sugar, hard())) : "";
+      list.push({ id: "sugar", label: "sugar", state: "todo", word });
+    }
+    list.push({ id: "pour", label: "pour", state: "todo", word: cup.pourGrade === null ? "" : gradeWord(cup.pourGrade) });
     if (cup.stations.includes("scoop")) {
       const done = cup.drops.length === cup.queue.length;
       list.push({ id: "scoop", label: "scoop", state: "todo", word: done ? gradeWord(scoopAverage(cup)) : "" });
     }
-    list.push({ id: "shake", label: "shake", state: "todo", word: cup.shakeSeconds === null ? "" : gradeWord(shakeGrade(cup.shakeSeconds)) });
-    list.push({ id: "seal", label: "seal", state: "todo", word: cup.sealValue === null ? "" : SEAL_WORDS[sealResult(cup.sealValue)] });
+    list.push({ id: "shake", label: "shake", state: "todo", word: cup.shakeSeconds === null ? "" : gradeWord(shakeGrade(cup.shakeSeconds, hard())) });
+    list.push({ id: "seal", label: "seal", state: "todo", word: cup.sealValue === null ? "" : SEAL_WORDS[sealResult(cup.sealValue, hard())] });
     list.push({ id: "serve", label: "serve", state: "todo", word: "" });
     let current = false;
     for (const step of list) {
@@ -772,14 +854,14 @@
   }
 
   function describeOrder(order: Order) {
-    const parts = [TEA_NAMES[order.tea], ICE_NAMES[order.ice]];
+    const parts = [TEA_NAMES[order.tea], sugarName(order.sugar), ICE_NAMES[order.ice]];
     for (const line of order.toppings) {
       parts.push(`${line.scoops} ${line.scoops === 1 ? "scoop" : "scoops"} of ${TOPPING_NAMES[line.kind]}`);
     }
     return parts.join(", ");
   }
 
-  function guestLabel(guest: Guest, mood: Mood, mine: boolean) {
+  function guestLabel(guest: Guest, mood: WaitMood, mine: boolean) {
     const quirk = guest.regular.quirk ? `, ${QUIRK_NAMES[guest.regular.quirk]}` : "";
     const state = mine ? "Their drink is on the bench." : `${MOOD_WORDS[mood][0].toUpperCase()}${MOOD_WORDS[mood].slice(1)}.`;
     const today = guest.order.tea === special ? ` ${TEA_NAMES[special]} is today's special.` : "";
@@ -828,31 +910,18 @@
   }
 
   // --- Guests on the line -----------------------------------------------------------
+  // Each guest walks up (the crowd draws that) and their ticket appears on
+  // the rail once it leaves their hand; patience only runs from then.
 
-  // Guests clip onto the rail as they arrive.
-  function arrive(node: Element, { guest }: { guest: Guest }) {
-    return {
-      duration: reduceMotion ? 0 : 380,
-      easing: cubicOut,
-      css: (t: number, u: number) =>
-        `transform: translateY(${-u * 26}px) rotate(${guest.tilt - u * 8}deg); opacity: ${t}`,
-    };
-  }
-
-  // Served guests hop for joy and float up off the rail; the ones who gave up
-  // (or were sent the wrong tea) drop away.
+  // A served guest's ticket lifts off the rail with them; a lost one drops away.
   function leave(node: Element, { guest }: { guest: Guest }) {
     const happy = guest.outcome === "served";
     return {
-      duration: reduceMotion ? 0 : happy ? 560 : 360,
+      duration: reduceMotion ? 0 : happy ? 300 : 360,
       css: (t: number, u: number) => {
-        if (!happy) {
-          const k = cubicOut(u);
-          return `transform: translateY(${k * 48}px) rotate(${k * 12}deg); opacity: ${t}`;
-        }
-        const hop = u < 0.3 ? -Math.sin((u / 0.3) * Math.PI) * 10 : 0;
-        const rise = u < 0.3 ? 0 : cubicOut((u - 0.3) / 0.7);
-        return `transform: translateY(${hop - rise * 30}px); opacity: ${u < 0.3 ? 1 : 1 - rise}`;
+        const k = cubicOut(u);
+        if (happy) return `transform: translateY(${-k * 18}px) rotate(${guest.tilt + k * 4}deg); opacity: ${t}`;
+        return `transform: translateY(${k * 48}px) rotate(${k * 12}deg); opacity: ${t}`;
       },
     };
   }
@@ -863,12 +932,12 @@
 
   function addGuest() {
     const exclude = [...guests.map((guest) => guest.regular.name), ...recent];
-    // Once a shift, the first guest through the door after CRITIC_AT is the critic.
-    const critic = criticDue(elapsed, criticSeen);
+    // The first guest through the door after the critic's hour is the critic (twice a shift in expert).
+    const critic = criticDue(elapsed, criticsSeen, expert);
     const regular = critic ? CRITIC : pickRegular(exclude);
-    if (critic) criticSeen = true;
-    const order = makeOrder(elapsed, regular);
-    const patience = patienceFor(order, regular, elapsed);
+    if (critic) criticsSeen += 1;
+    const order = makeOrder(elapsed, regular, Math.random, expert);
+    const patience = patienceFor(order, regular, elapsed, expert);
     const guest: Guest = {
       id: nextId++,
       regular,
@@ -876,10 +945,11 @@
       patience,
       left: patience,
       tilt: Math.round((Math.random() * 3 - 1.5) * 10) / 10,
+      placed: false,
       outcome: null,
     };
     guests = [...guests, guest];
-    sfxTicket();
+    crowd.arrive(guest.id, regular.name, guests.length - 1);
     if (critic) {
       note("the critic is here");
       liveMessage = `The critic is here, and their drink counts double: ${describeOrder(order)}.`;
@@ -888,13 +958,87 @@
     }
   }
 
-  function removeGuest(guest: Guest, outcome: "served" | "gone") {
-    guest.outcome = outcome;
-    guests = guests.filter((item) => item !== guest);
-    if (!demoOn) rememberName(guest.regular.name);
+  /** A guest holds their ticket out: it goes up to the rail (at once under Reduce Motion). */
+  function handTicket(id: number, x: number, y: number) {
+    if (reduceMotion) {
+      landTicket(id);
+      return;
+    }
+    flights = [...flights, { id, x0: x, y0: y, t: 0, fx: -999, fy: -999, scale: 0.6, turn: -10 }];
+    placeFlights();
   }
 
+  /** The ticket is clipped to the rail: the guest waits from now. */
+  function landTicket(id: number) {
+    if (flights.some((flight) => flight.id === id)) flights = flights.filter((flight) => flight.id !== id);
+    placeTicket(id);
+    crowd.hung(id);
+  }
+
+  const FLIGHT_SECONDS = 0.55;
+
+  function stepFlights(dt: number) {
+    if (!flights.length) return;
+    for (const flight of [...flights]) {
+      flight.t += dt / FLIGHT_SECONDS;
+      if (flight.t >= 1) landTicket(flight.id);
+    }
+    placeFlights();
+  }
+
+  /** Puts each ticket in the air on its arc from the hand to its clip on the rail. */
+  function placeFlights() {
+    if (!flights.length || !benchArt) return;
+    const art = benchArt.getBoundingClientRect();
+    for (const flight of flights) {
+      const slot = lineEl?.querySelector(`[data-guest="${flight.id}"]`)?.getBoundingClientRect();
+      const x0 = art.left + flight.x0;
+      const y0 = art.top + flight.y0;
+      const x1 = slot ? slot.left + slot.width / 2 : x0;
+      const y1 = slot ? slot.top : art.top;
+      // Straight up past the back bar between the machines (small, so it
+      // never crosses a sticker), then across to its clip on the rail.
+      const u = clamp(flight.t, 0, 1);
+      const above = art.top + tapsTop - 8;
+      if (u < 0.5) {
+        const k = u / 0.5;
+        flight.fx = x0;
+        flight.fy = lerp(y0, Math.min(y0, above) - 40, k * (2 - k));
+        flight.scale = 0.45;
+      } else {
+        const k = (u - 0.5) / 0.5;
+        const eased = 1 - (1 - k) * (1 - k);
+        flight.fx = lerp(x0, x1, eased);
+        flight.fy = lerp(Math.min(y0, above) - 40, y1, eased);
+        flight.scale = lerp(0.45, 1, eased);
+      }
+      flight.turn = lerp(-10, 0, u);
+    }
+    flights = flights;
+  }
+
+  /** The ticket has left the guest's hand and hangs on the rail. */
+  function placeTicket(id: number) {
+    const guest = guests.find((item) => item.id === id);
+    if (!guest || guest.placed) return;
+    guest.placed = true;
+    sfxTicket();
+    guests = guests;
+  }
+
+  /** Takes a guest off the line; the crowd walks them out wearing `reaction`. */
+  function removeGuest(guest: Guest, outcome: "served" | "gone", reaction: Reaction, coins = 0) {
+    guest.outcome = outcome;
+    guests = guests.filter((item) => item !== guest);
+    crowd.leave(guest.id, reaction, coins);
+    if (demoOn) return;
+    rememberName(guest.regular.name);
+    history = [...history, reaction];
+  }
+
+  /** Loses a pearl, and the combo with it. */
   function loseLife() {
+    if (comboFor(streak, expert) > 1) popBeside("combo lost", "miss", 1.1, 2);
     streak = 0;
     lives -= 1;
     missPulse += 1;
@@ -903,13 +1047,26 @@
 
   function walkOut(guest: Guest) {
     const mine = making?.guestId === guest.id;
-    removeGuest(guest, "gone");
+    removeGuest(guest, "gone", "storm");
     sfxWalkOut();
     if (mine) binCup();
     if (!reduceMotion) veilAge = 0;
     note(`${guest.regular.name} left`);
     liveMessage = `${guest.regular.name} left${mine ? " and their cup was binned" : ""}. You lose a pearl.`;
     loseLife();
+  }
+
+  /** A perfect drink cheers everyone still waiting: a little patience back, and a smile. */
+  function cheerLine() {
+    let cheered = 0;
+    for (const guest of guests) {
+      if (!guest.placed) continue;
+      guest.left = cheer(guest.left, guest.patience, hard());
+      crowd.react(guest.id, "content");
+      cheered += 1;
+    }
+    if (cheered) guests = guests;
+    return cheered;
   }
 
   // --- Taking a ticket, dumping it ---------------------------------------------------
@@ -923,17 +1080,21 @@
       return;
     }
     if (clock < takeLockUntil) return;
+    // Taken straight from their hand: it goes on the rail now.
+    if (!guest.placed) landTicket(guest.id);
     receipt = null;
     notice = null;
+    const stations = stationsFor(guest.order);
     making = {
       guestId: guest.id,
       name: guest.regular.name,
       regular: guest.regular,
       order: guest.order,
-      stations: stationsFor(guest.order),
-      station: "pour",
+      stations,
+      station: stations[0],
       busy: false,
       ice: 0,
+      sugar: 0,
       tea: null,
       level: 0,
       heldSeconds: 0,
@@ -962,7 +1123,19 @@
     wobble = 0;
     sfxBlip();
     guests = guests;
-    liveMessage = `Making ${guest.regular.name}'s ${describeOrder(guest.order)}. At the pour, under the ${TEA_NAMES[TEAS[tapIndex]]} tap.`;
+    const first =
+      stations[0] === "ice"
+        ? `Add ${cubes(ICE_CUBES[guest.order.ice])} of ice.`
+        : stations[0] === "sugar"
+          ? `Pump the syrup ${pumps(sugarPumps(guest.order.sugar))}.`
+          : `At the pour, under the ${TEA_NAMES[TEAS[tapIndex]]} tap.`;
+    liveMessage = `Making ${guest.regular.name}'s ${describeOrder(guest.order)}. ${first}`;
+  }
+
+  /** The hand with an empty bench: the ticket of whoever is closest to leaving. */
+  function takeNext() {
+    const index = mostImpatient(guests);
+    if (index >= 0) take(index);
   }
 
   /** Throws the cup away, and everything it was waiting on. */
@@ -986,8 +1159,26 @@
   }
 
   // --- Ice --------------------------------------------------------------------------
+  // One press, one cube. The cup marks a slot for each cube the ticket asks
+  // for and the ticket shows the same cubes, filling as they go in; at the
+  // ice station the last one moves the cup on to the pour by itself. More
+  // can still go in at the pour before the tea (too much), and pressing a
+  // tap early leaves it short.
 
-  /** One scoop from the bin, before any tea goes in. */
+  function cubes(count: number) {
+    return `${count} ${count === 1 ? "cube" : "cubes"}`;
+  }
+
+  function pumps(count: number) {
+    return `${count === 1 ? "once" : count === 2 ? "twice" : `${count} times`}`;
+  }
+
+  /** The station after this one. */
+  function nextStation(cup: Cup): Station {
+    return cup.stations[cup.stations.indexOf(cup.station) + 1] ?? "pour";
+  }
+
+  /** One cube from the bin. */
   function addIce() {
     const cup = making;
     if (!cup || !benchLive() || !iceAdjustable(cup)) return false;
@@ -998,21 +1189,73 @@
     cup.ice += 1;
     if (!reduceMotion) iceArcs.push({ age: 0 });
     sfxIce(cup.ice);
-    liveMessage = `${cup.ice} ${cup.ice === 1 ? "scoop" : "scoops"} of ice in the cup.`;
+    const target = ICE_CUBES[cup.order.ice];
+    liveMessage = `${cup.ice} of ${cubes(target)} of ice.`;
+    if (cup.station === "ice" && cup.ice >= target) {
+      // Right on: once the cube lands, a ding, and on to the pour.
+      cup.busy = true;
+      after((reduceMotion ? 0 : ICE_ARC_SECONDS) + ICE_SETTLE, () => {
+        sfxIceFull();
+        enterStation(nextStation(cup));
+      });
+    } else if (cup.ice > target) {
+      popBeside("too much ice", "miss", 0.9, 12);
+      note("too much ice");
+      liveMessage = `Too much ice: ${cup.ice}, the ticket says ${target}. Press down to take one out.`;
+    }
     refresh();
     return true;
   }
 
-  /** One scoop back out, while there is still no tea on it. */
+  /** One cube back out, while there is still no tea on it. */
   function removeIce() {
     const cup = making;
     if (!cup || !benchLive() || !iceAdjustable(cup) || cup.ice === 0) return;
     cup.ice -= 1;
-    // A scoop still in the air is the one that comes back.
+    // A cube still in the air is the one that comes back.
     if (iceArcs.length) iceArcs.pop();
     sfxIce(0);
-    liveMessage = `${cup.ice} ${cup.ice === 1 ? "scoop" : "scoops"} of ice in the cup.`;
+    liveMessage = `${cup.ice} of ${cubes(ICE_CUBES[cup.order.ice])} of ice.`;
     refresh();
+  }
+
+  /** One pump of syrup into the cup under the bottle. */
+  function pumpSyrup() {
+    const cup = making;
+    if (!cup || !benchLive() || !sugarAdjustable(cup)) return false;
+    if (cup.sugar >= SUGAR_MAX) return false;
+    cup.sugar += 1;
+    pumpAge = 0;
+    sfxPump(cup.sugar);
+    const target = sugarPumps(cup.order.sugar);
+    liveMessage = `${cup.sugar} of ${target} ${target === 1 ? "pump" : "pumps"} of syrup.`;
+    if (cup.sugar >= target) {
+      // Right on: a ding, and on to the pour.
+      cup.busy = true;
+      after(ICE_SETTLE + 0.1, () => {
+        sfxIceFull();
+        enterStation(nextStation(cup));
+      });
+    }
+    refresh();
+    return true;
+  }
+
+  /**
+   * A tap pressed before the tea: straight on to the pour, short on ice or
+   * syrup if they weren't all in.
+   */
+  function leaveEarly() {
+    const cup = making;
+    if (!cup || cup.busy || (cup.station !== "ice" && cup.station !== "sugar")) return;
+    const short: string[] = [];
+    if (cup.stations.includes("ice") && iceState(cup.ice, cup.order.ice) === "short") short.push("ice");
+    if (cup.stations.includes("sugar") && sugarState(cup.sugar, cup.order.sugar) === "short") short.push("sugar");
+    if (short.length) {
+      popBeside(`short on ${short.join(" and ")}`, "miss", 0.9, 12);
+      liveMessage = `Short on ${short.join(" and ")}.`;
+    }
+    enterStation("pour");
   }
 
   // --- The pour --------------------------------------------------------------------
@@ -1025,7 +1268,7 @@
 
   function selectTap(index: number) {
     const cup = making;
-    if (!cup || cup.station !== "pour" || cup.busy || holds.size) return false;
+    if (!cup || !beforeTea(cup.station) || cup.busy || holds.size) return false;
     if (cup.tea && cup.tea !== TEAS[index]) {
       note(`this cup is ${TEA_NAMES[cup.tea]}, dump to switch`);
       return false;
@@ -1086,7 +1329,7 @@
     streamOn = false;
     setPourStream(0);
     cup.busy = true;
-    cup.pourGrade = pourGrade(cup.level, cup.order.ice);
+    cup.pourGrade = pourGrade(cup.level, cup.order.ice, hard());
     const word = gradeWord(cup.pourGrade);
     popBeside(word, popupKind(cup.pourGrade), 1.1, 5);
     liveMessage = `Pour ${word}.`;
@@ -1107,10 +1350,14 @@
     streamOn = false;
     setPourStream(0);
     lastShakeArrow = null;
-    if (next === "scoop") {
+    if (next === "sugar") {
+      liveMessage = `Syrup: pump ${pumps(sugarPumps(cup.order.sugar))} for ${sugarName(cup.order.sugar)}.`;
+    } else if (next === "pour") {
+      liveMessage = `Pour: hold the ${TEA_NAMES[cup.order.tea]} tap and let go at the line.`;
+    } else if (next === "scoop") {
       cup.scoopStart = clock;
       // The demo swings at the opening pace, whenever it is opened.
-      cup.swing = paceForElapsed(demoOn ? 0 : elapsed).swing;
+      cup.swing = paceForElapsed(demoOn ? 0 : elapsed, hard()).swing;
       cup.loadedAt = 0;
       dipJar(cup);
       const count = cup.queue.length;
@@ -1129,8 +1376,8 @@
 
   // --- The ladle ----------------------------------------------------------------------
 
-  /** The ladle's swing radius: the cup's mouth edge sits at exactly CUP_MOUTH. */
-  const ladleRadius = () => ((CUP_W / 2) * cell) / CUP_MOUTH;
+  /** The ladle's swing radius: the cup's mouth edge sits at exactly the mode's cup mouth. */
+  const ladleRadius = () => ((CUP_W / 2) * cell) / rulesFor(hard()).cupMouth;
 
   function ladleNow(cup: Cup) {
     const x = ladleAt(clock - cup.scoopStart, cup.swing, Math.PI / 2);
@@ -1173,8 +1420,8 @@
     const kind = cup.chosen;
     const ladle = ladleNow(cup);
     // A wrong jar still falls where the ladle was; it just counts for nothing.
-    const landed = scoopResult(ladle.x);
-    const judged = judgeScoop(wanted, kind, ladle.x);
+    const landed = scoopResult(ladle.x, hard());
+    const judged = judgeScoop(wanted, kind, ladle.x, hard());
     cup.drops.push(judged.grade);
     cup.results.push(judged.result);
     sfxScoop(landed, index);
@@ -1222,7 +1469,7 @@
       flashAge = 0;
       cup.shakeSeconds = clock - cup.shakeStart;
       cup.busy = true;
-      const grade = shakeGrade(cup.shakeSeconds);
+      const grade = shakeGrade(cup.shakeSeconds, hard());
       const word = gradeWord(grade);
       popBeside(word, popupKind(grade), 1.1, 5);
       liveMessage = `Shake ${word}.`;
@@ -1237,12 +1484,12 @@
   function stamp() {
     const cup = making;
     if (!cup || cup.station !== "seal" || cup.busy || cup.stampAt !== null || !benchLive()) return;
-    const value = sealNeedle(clock - cup.sealStart);
+    const value = sealNeedle(clock - cup.sealStart, hard());
     cup.sealValue = value;
     cup.stampAt = clock;
     cup.busy = true;
-    const result = sealResult(value);
-    const grade = sealGrade(value);
+    const result = sealResult(value, hard());
+    const grade = sealGrade(value, hard());
     popBeside(SEAL_WORDS[result], result === "sealed" ? "perfect" : grade >= 55 ? "plain" : "miss", 1.1, 5);
     liveMessage = `Seal ${SEAL_WORDS[result]}.`;
     refresh();
@@ -1250,9 +1497,15 @@
 
   /** The hand: whatever the station needs from one press. */
   function act(source: string) {
+    if (!benchLive()) return;
     const cup = making;
-    if (!cup || !benchLive()) return;
-    if (cup.station === "pour") startHold(source);
+    if (!cup) {
+      takeNext();
+      return;
+    }
+    if (cup.station === "ice") addIce();
+    else if (cup.station === "sugar") pumpSyrup();
+    else if (cup.station === "pour") startHold(source);
     else if (cup.station === "scoop") drop();
     else if (cup.station === "shake") shake();
     else stamp();
@@ -1301,7 +1554,7 @@
     }
     guest.left = sampleBoost(guest.left, guest.patience);
     samplesLeft -= 1;
-    sfxPlop(SAMPLES_PER_SHIFT - samplesLeft);
+    sfxPlop(sampleCap - samplesLeft);
     guests = guests;
     note(`sample for ${guest.regular.name}`);
     liveMessage = `A free sample for ${guest.regular.name}; they will wait longer. ${samplesLeft} ${samplesLeft === 1 ? "sample" : "samples"} left.`;
@@ -1317,13 +1570,15 @@
       order: cup.order,
       tea: cup.tea,
       iceCount: cup.ice,
+      sugarCount: cup.sugar,
       level: cup.level,
       drops: cup.drops,
       shakeSeconds: cup.shakeSeconds ?? 99,
       sealValue: cup.sealValue ?? 0,
       patienceFraction: clamp(guest.left / guest.patience, 0, 1),
+      expert: hard(),
     });
-    return { guest, tea: cup.tea, result };
+    return { guest, tea: cup.tea, result, patienceFraction: clamp(guest.left / guest.patience, 0, 1) };
   }
 
   function serveCup() {
@@ -1337,14 +1592,14 @@
       guests = guests;
       return;
     }
-    const { guest, tea, result } = judged;
+    const { guest, tea, result, patienceFraction } = judged;
     const name = guest.regular.name;
     // The demo's receipt stays until its end card; the script decides how long.
     const until = clock + (demoOn ? 99 : RECEIPT_SECONDS);
 
     if (!result.accepted) {
       sfxWrong();
-      removeGuest(guest, "gone");
+      removeGuest(guest, "gone", "sentBack");
       const line = `${name} ordered ${TEA_NAMES[cup.order.tea]}, not ${TEA_NAMES[tea]}`;
       receipt = {
         id: ++receiptId,
@@ -1353,7 +1608,7 @@
         rows: [],
         points: 0,
         stamps: [],
-        streak: 0,
+        combo: 0,
         perfect: false,
         line,
         until,
@@ -1366,8 +1621,12 @@
     }
 
     const nextStreak = keepsStreak(result.total) ? streak + 1 : 0;
-    const pay = pointsForDrink(result.total, guest.regular, nextStreak, cup.order.tea === special);
+    const pay = pointsForDrink(result.total, guest.regular, nextStreak, cup.order.tea === special, hard());
     const perfect = result.total >= PERFECT;
+    const reaction = servedMood(result.total, patienceFraction);
+    const before = comboFor(streak, expert);
+    let jarPaid = 0;
+    let pearlBack = false;
     // The demo shows what a drink earns but never banks it.
     if (!demoOn) {
       streak = nextStreak;
@@ -1376,16 +1635,39 @@
       served += 1;
       gradeTotal += result.total;
       if (perfect) perfects += 1;
+      // Tips into the jar; a full jar pays out and buys back a lost pearl.
+      const filled = fillJar(jar, pay.coins);
+      jar = filled.jar;
+      if (filled.payouts) {
+        const paid = jarPayout(filled.payouts, lives);
+        jarPaid = paid.points;
+        pearlBack = paid.lives > lives;
+        score += paid.points;
+        lives = paid.lives;
+        jarsCashed += filled.payouts;
+      }
     }
     sfxServe(pay.tip > 0);
     // The fanfare comes in just after the serve chime.
     if (perfect) timers.later(() => sfxMilestone(), 220);
     // The room answers too: the lamps flare for a moment, up out of the way.
     if (perfect && !reduceMotion) flareAge = 0;
-    removeGuest(guest, "served");
+    removeGuest(guest, "served", reaction, pay.coins);
+    const cheered = perfect ? cheerLine() : 0;
+    if (!demoOn) {
+      if (pay.multiplier > before) {
+        // The combo steps up: a louder chord each step, and the lamps answer.
+        timers.later(() => sfxCombo(pay.multiplier), perfect ? 520 : 200);
+        popBeside(`×${pay.multiplier} combo`, "perfect", 1.4, 2);
+        if (!reduceMotion) flareAge = 0;
+      } else if (!keepsStreak(result.total) && before > 1) {
+        popBeside("combo lost", "miss", 1.1, 2);
+      }
+    }
 
     const rows = [
       { label: "ice", word: gradeWord(result.ice) },
+      { label: "sugar", word: gradeWord(result.sugar) },
       { label: "pour", word: gradeWord(result.pour) },
     ];
     if (result.scoop !== null) rows.push({ label: "scoops", word: gradeWord(result.scoop) });
@@ -1400,6 +1682,8 @@
       pay.specialBonus > 0 ? `special +${pay.specialBonus}` : "",
       critic ? "critic ×2" : "",
       pay.criticBonus > 0 ? `critic bonus +${pay.criticBonus}` : "",
+      jarPaid > 0 ? `tip jar +${jarPaid}` : "",
+      pearlBack ? "pearl back" : "",
     ].filter(Boolean);
     receipt = {
       id: ++receiptId,
@@ -1408,7 +1692,7 @@
       rows,
       points: pay.points,
       stamps,
-      streak: pay.streakBonus > 0 ? nextStreak : 0,
+      combo: pay.multiplier > 1 ? pay.multiplier : 0,
       perfect,
       line: "",
       until,
@@ -1418,9 +1702,13 @@
       pay.specialBonus > 0 ? `${pay.specialBonus} for today's special` : "",
       critic ? "double for the critic" : "",
       pay.criticBonus > 0 ? `a critic's bonus of ${pay.criticBonus}` : "",
-      pay.streakBonus > 0 ? `a ${nextStreak} drink streak` : "",
+      pay.multiplier > 1 ? `a ×${pay.multiplier} combo` : "",
     ].filter(Boolean);
-    liveMessage = `Served ${name}, ${perfect ? "perfect, " : ""}graded ${result.total} of 100: ${pay.points} points${extras.length ? ` with ${extras.join(" and ")}` : ""}.`;
+    const tail = [
+      jarPaid > 0 ? ` The tip jar filled and paid ${jarPaid}${pearlBack ? ", and bought back a pearl" : ""}.` : "",
+      cheered ? " The line cheers up." : "",
+    ].join("");
+    liveMessage = `Served ${name}, ${perfect ? "perfect, " : ""}graded ${result.total} of 100: ${pay.points} points${extras.length ? ` with ${extras.join(" and ")}` : ""}.${tail}`;
   }
 
   // --- Drawing ----------------------------------------------------------------------
@@ -1436,11 +1724,21 @@
 
   const cupLeftAt = (cx: number) => Math.round(cx - (CUP_W / 2) * cell);
 
-  /** Where the nozzles end: a few cells above the rim when out, tucked under the tanks when in. */
-  function nozzleBottom() {
-    const tucked = (TANK_ROWS + 1 + NOZZLE.length) * cell;
-    const out = Math.max(tucked, cupTop - NOZZLE_GAP * cell);
-    return Math.round(lerp(tucked, out, tapReach));
+  /** Where the taps end: STREAM_ROWS above the cup's rim. */
+  const nozzleBottom = () => Math.round(cupTop - STREAM_ROWS * cell);
+  /** The top of the back-bar shelf, where the machines stand. */
+  const shelfTop = () => nozzleBottom() - TAP_DROP * cell;
+  /** The shelf's underside. */
+  const shelfBottom = () => shelfTop() + SHELF_ROWS * cell;
+  /** Where the cup goes for the scoop, the shake and the seal: between the middle two machines. */
+  const workX = () => W / 2;
+  /** The syrup bottle's tube, which the cup goes under for the syrup. */
+  const pumpTipX = () => Math.round(pumpX - (PUMP_W / 2 + 1.5) * cell);
+  /** Where the cup stands at its station. */
+  function stationX(cup: Cup) {
+    if (cup.station === "sugar") return pumpTipX();
+    if (cup.station === "ice" || cup.station === "pour") return spoutX[tapIndex] ?? workX();
+    return workX();
   }
 
   /**
@@ -1464,63 +1762,285 @@
   }
 
   /**
-   * The tea machines: a tank hanging from the top of the bench under each tap
-   * button, a window showing its tea, and a pipe down to a nozzle just above
-   * the rim. The pipes tuck up out of the ladle's way once the pour is done.
+   * The back bar: the shelf and its brackets, then everything standing on it.
+   * Machines that can't be used right now are faded, the way the buttons
+   * over them are.
    */
-  function drawDispensers(g: CanvasRenderingContext2D, colors: Colors) {
+  function drawBackBar(g: CanvasRenderingContext2D, colors: Colors) {
     const c = cell;
-    const line = Math.max(2, Math.round(c / 3));
-    const tankTop = c;
-    const tankBottom = (TANK_ROWS + 1) * c;
-    const tip = nozzleBottom();
-    const pipeBottom = tip - NOZZLE.length * c;
+    const top = shelfTop();
+    // Brackets under the shelf, into the wall: at the ends and under each machine.
+    const brackets = [c * 2, W - c * 3, ...spoutX];
+    if (pumpX) brackets.push(pumpX);
+    for (const x of brackets) {
+      const bx = Math.round(x - c / 2);
+      g.fillStyle = WOOD_EDGE;
+      for (let row = 0; row < 3; row++) g.fillRect(bx - (2 - row) * c, top + (SHELF_ROWS + row) * c, (3 - row) * c, c);
+    }
+    // The plank: a light top edge, a face, a dark lip.
+    g.fillStyle = WOOD_TOP;
+    g.fillRect(0, top, W, c);
+    g.fillStyle = WOOD_FACE;
+    g.fillRect(0, top + c, W, (SHELF_ROWS - 1) * c);
+    g.fillStyle = WOOD_EDGE;
+    g.fillRect(0, top + SHELF_ROWS * c - Math.max(2, Math.round(c / 3)), W, Math.max(2, Math.round(c / 3)));
+
+    drawIceBin(g);
+    drawPump(g, colors);
     const flowingAt = streamOn ? tapIndex : -1;
+    const wordsFit = teaWordsFit();
     TEAS.forEach((tea, index) => {
       const x = spoutX[index];
       if (x === undefined) return;
-      const left = Math.round(x - (TANK_W / 2) * c);
-      const width = TANK_W * c;
       g.save();
       g.globalAlpha = (!making && brewEnds[index] === 0) || tapLive(index) ? 1 : 0.55;
-      // A paper halo, so the machine reads against whatever the room shows.
-      g.fillStyle = HALO;
-      g.fillRect(Math.round(x - c) - 2, 0, 2 * c + 4, tankTop);
-      g.fillRect(left - 2, tankTop - 2, width + 4, tankBottom - tankTop + 4);
-      if (pipeBottom > tankBottom) g.fillRect(Math.round(x - c) - 2, tankBottom, 2 * c + 4, pipeBottom - tankBottom);
-      drawHalo(g, NOZZLE, x - 2 * c, pipeBottom, c, HALO);
-      g.fillStyle = colors.ink;
-      g.fillRect(Math.round(x - c), 0, 2 * c, tankTop);
-      g.fillStyle = colors.paper;
-      g.fillRect(left, tankTop, width, tankBottom - tankTop);
-      // The window: the tea left in the tank, sloshing while this tap runs.
-      const wx = left + 2 * c;
-      const wy = tankTop + 2 * c;
-      const ww = width - 4 * c;
-      const wh = tankBottom - tankTop - 4 * c;
-      const share = clamp(tanks[index] / TANK_CAPACITY, 0, 1);
-      if (share > 0) {
-        g.fillStyle = TEA_COLORS[tea];
-        for (let column = 0; column < TANK_W - 4; column++) {
-          const slosh = index === flowingAt && !reduceMotion ? Math.sin(clock * 14 + column * 1.3) * 0.45 * c : 0;
-          const top = Math.min(wy + wh - 1, wy + (1 - share) * wh + slosh);
-          g.fillRect(wx + column * c, top, c, wy + wh - top);
-        }
-      }
-      g.strokeStyle = colors.ink;
-      g.lineWidth = line;
-      g.strokeRect(wx, wy, ww, wh);
-      g.strokeRect(left + line / 2, tankTop + line / 2, width - line, tankBottom - tankTop - line);
-      if (pipeBottom > tankBottom) {
-        g.fillStyle = colors.ink;
-        g.fillRect(Math.round(x - c), tankBottom, 2 * c, pipeBottom - tankBottom);
-        g.fillStyle = colors.paper;
-        g.fillRect(Math.round(x - c) + line, tankBottom, 2 * c - 2 * line, pipeBottom - tankBottom);
-      }
-      drawSprite(g, NOZZLE, x - 2 * c, pipeBottom, c, { O: colors.ink });
+      drawDispenser(g, colors, x, tea, clamp(tanks[index] / TANK_CAPACITY, 0, 1), index === flowingAt, brewEnds[index] > 0);
+      // Its label on the glass, clear of the tap below; the tea shows above and below it.
+      const left = Math.round(x - (tankW / 2) * cell);
+      const tankTop = shelfTop() - MACHINE_ROWS * cell + 2 * cell;
+      const rows = Math.max(2, Math.ceil(((GLYPH_ROWS + 4) * labelUnit()) / cell));
+      const label = TEA_LABELS[tea];
+      drawJarLabel(g, label.word, label.icon, wordsFit, left + cell, tankW - 2, tankTop + Math.floor((6 - rows) / 2) * cell, left + 2 * cell);
       g.restore();
     });
   }
+
+  /** Each tea's label: a short printed word, and a flavour mark for a jar too narrow for it. */
+  const TEA_LABELS: Record<Tea, { word: string; icon: keyof typeof ICONS }> = {
+    milk: { word: "milk", icon: "milk" },
+    taro: { word: "taro", icon: "taro" },
+    matcha: { word: "matcha", icon: "leaf" },
+    strawberry: { word: "berry", icon: "berry" },
+  };
+  const LABEL_PAPER = "#ede0c6";
+  const LABEL_SHADE = "#d4c3a3";
+  const LABEL_LIGHT = "#f8f0e0";
+  const LABEL_EDGE = "#b9a587";
+  const LABEL_INK = "#54443a";
+
+  /** The print unit on a label: a quarter of a cell, at least 2px, so the lettering stays on a pixel grid. */
+  const labelUnit = () => Math.max(2, Math.round(cell / 4));
+
+  /** Whether every tea's word fits its jar; if one doesn't, they all show their mark, so the row reads alike. */
+  function teaWordsFit() {
+    const room = (tankW - 2) * cell - 4 * labelUnit();
+    return TEAS.every((tea) => wordWidth(TEA_LABELS[tea].word) * labelUnit() <= room);
+  }
+
+  /**
+   * A paper label on a jar, drawn on the jar's own cells: a warm off-white
+   * a shade under the HUD's paper, darker toward each side where the jar
+   * curves away and lighter where the glass catches the light, a faint edge
+   * top and bottom, the top right corner lifting off the glass, and the word
+   * printed small in soft ink (or the flavour's mark, when `useWord` is off).
+   * `jarLeft` and `jarCols` are the glass's first cell and its width in cells;
+   * `top` is the label's first row; `highlightX` is the glass's shine.
+   */
+  function drawJarLabel(
+    g: CanvasRenderingContext2D,
+    word: string,
+    icon: keyof typeof ICONS,
+    useWord: boolean,
+    jarLeft: number,
+    jarCols: number,
+    top: number,
+    highlightX = -1,
+  ) {
+    const c = cell;
+    const u = labelUnit();
+    const content = useWord ? wordWidth(word) * u : 5 * u;
+    const cols = Math.min(jarCols, Math.max(3, Math.ceil((content + 4 * u) / c)));
+    const rows = Math.max(2, Math.ceil(((GLYPH_ROWS + 4) * u) / c));
+    const left = Math.round(jarLeft + Math.floor((jarCols - cols) / 2) * c);
+    const y0 = Math.round(top);
+    const width = cols * c;
+    const height = rows * c;
+    // The paper, all but the lifted corner.
+    g.fillStyle = LABEL_PAPER;
+    g.fillRect(left, y0, width - u, u);
+    g.fillRect(left, y0 + u, width, height - u);
+    // The jar's curve: a shaded column at each side, dithered into the paper.
+    g.fillStyle = LABEL_SHADE;
+    for (let y = y0; y < y0 + height; y += u) {
+      const row = (y - y0) / u;
+      g.fillRect(left, y, u, u);
+      if (row > 0) g.fillRect(left + width - u, y, u, u);
+      if (row % 2 === 0) {
+        g.fillRect(left + u, y, u, u);
+        if (row > 0) g.fillRect(left + width - 2 * u, y, u, u);
+      }
+    }
+    // Where the glass shines, the paper does too.
+    if (highlightX >= left + 2 * u && highlightX < left + width - 3 * u) {
+      g.fillStyle = LABEL_LIGHT;
+      g.fillRect(highlightX, y0 + u, u, height - 2 * u);
+    }
+    // A faint edge along the top and bottom (the sides are the shading).
+    g.fillStyle = LABEL_EDGE;
+    g.fillRect(left + u, y0, width - 3 * u, Math.max(1, Math.round(u / 2)));
+    g.fillRect(left, y0 + height - Math.max(1, Math.round(u / 2)), width, Math.max(1, Math.round(u / 2)));
+    // The lifted corner: its underside, a shade darker, folded down.
+    g.fillStyle = LABEL_SHADE;
+    g.fillRect(left + width - 2 * u, y0 + u, u, u);
+    // The print, on the label's own unit grid, centred.
+    const x = left + Math.round((width - content) / (2 * u)) * u;
+    const y = y0 + Math.round((height - GLYPH_ROWS * u) / (2 * u)) * u;
+    if (useWord) {
+      g.fillStyle = LABEL_INK;
+      let pen = x;
+      for (const letter of word) {
+        const glyph = GLYPHS[letter];
+        if (!glyph) {
+          pen += 4 * u;
+          continue;
+        }
+        glyph.forEach((line, row) => {
+          [...line].forEach((cell, column) => {
+            if (cell === "#") g.fillRect(pen + column * u, y + row * u, u, u);
+          });
+        });
+        pen += (glyph[0].length + 1) * u;
+      }
+    } else {
+      drawSprite(g, ICONS[icon].grid, x, y, u, ICONS[icon].palette);
+    }
+  }
+
+  /** One tea machine standing on the shelf at `x`, its tank `share` full. */
+  function drawDispenser(
+    g: CanvasRenderingContext2D,
+    colors: Colors,
+    x: number,
+    tea: Tea,
+    share: number,
+    flowing: boolean,
+    brewing: boolean,
+  ) {
+    const c = cell;
+    const line = Math.max(2, Math.round(c / 3));
+    const left = Math.round(x - (tankW / 2) * c);
+    const base = shelfTop();
+    const top = base - MACHINE_ROWS * c;
+    const tankTop = top + 2 * c;
+    const tankBottom = top + 8 * c;
+    // The lid and its knob. Nothing is drawn behind the machine: its own ink
+    // outlines part it from the wall.
+    g.fillStyle = colors.ink;
+    g.fillRect(Math.round(x - c), top, 2 * c, c);
+    g.fillRect(left + 2 * c, top + c, (tankW - 4) * c, c);
+    // The glass tank, with the tea in it; it sloshes while this tap runs.
+    g.fillStyle = GLASS;
+    g.fillRect(left + c, tankTop, (tankW - 2) * c, tankBottom - tankTop);
+    if (share > 0) {
+      g.fillStyle = TEA_COLORS[tea];
+      const height = tankBottom - tankTop - c;
+      for (let column = 1; column < tankW - 1; column++) {
+        const slosh = flowing && !reduceMotion ? Math.sin(clock * 14 + column * 1.3) * 0.45 * c : 0;
+        const surface = Math.min(tankBottom - 1, tankBottom - share * height + slosh);
+        g.fillRect(left + column * c, surface, c, tankBottom - surface);
+      }
+    }
+    // A highlight down the glass, then its outline.
+    g.fillStyle = "rgba(255, 255, 255, 0.7)";
+    g.fillRect(left + 2 * c, tankTop + c, Math.max(2, Math.round(c / 2)), tankBottom - tankTop - 2 * c);
+    g.strokeStyle = colors.ink;
+    g.lineWidth = line;
+    g.strokeRect(left + c + line / 2, tankTop + line / 2, (tankW - 2) * c - line, tankBottom - tankTop - line);
+    // A collar in the tea's colour, so each machine reads as its tea.
+    g.fillStyle = colors.ink;
+    g.fillRect(left, tankBottom, tankW * c, c);
+    g.fillStyle = TEA_COLORS[tea];
+    g.fillRect(left + line, tankBottom + line, tankW * c - 2 * line, c - 2 * line);
+    // The base: steel, on two feet.
+    g.fillStyle = STEEL;
+    g.fillRect(left, tankBottom + c, tankW * c, base - tankBottom - 2 * c);
+    g.strokeStyle = colors.ink;
+    g.strokeRect(left + line / 2, tankBottom + c, tankW * c - line, base - tankBottom - 2 * c);
+    g.fillStyle = colors.ink;
+    g.fillRect(left + c, base - c, 2 * c, c);
+    g.fillRect(left + (tankW - 3) * c, base - c, 2 * c, c);
+    // The tap under the base: a body with a lever to one side, and a spout
+    // down over the shelf's edge.
+    const tip = nozzleBottom();
+    g.fillStyle = colors.ink;
+    g.fillRect(Math.round(x + c), base - 2 * c, c, c);
+    g.fillRect(Math.round(x - c), base - 2 * c, 2 * c, tip - base + 2 * c);
+    g.fillStyle = STEEL_DARK;
+    g.fillRect(Math.round(x - c) + line, base - 2 * c + line, 2 * c - 2 * line, tip - base + 2 * c - 2 * line);
+    if (brewing && !reduceMotion) {
+      // Brewing: the lid lifts a little with the steam.
+      g.fillStyle = colors.ink;
+      g.fillRect(left + 2 * c, top + Math.round(Math.sin(clock * 20) * 0.5) * 2, (tankW - 4) * c, Math.max(2, line));
+    }
+  }
+
+  /**
+   * The syrup bottle at the shelf's right end: a pump head that dips with
+   * each pump, a tube down over the shelf's edge, and a label marked with the
+   * pumps the drink wants, filling as they go in.
+   */
+  function drawPump(g: CanvasRenderingContext2D, colors: Colors) {
+    if (!pumpX) return;
+    const c = cell;
+    const line = Math.max(2, Math.round(c / 3));
+    const base = shelfTop();
+    const left = Math.round(pumpX - (PUMP_W / 2) * c);
+    const live = !!making && sugarAdjustable(making);
+    const press = !reduceMotion && pumpAge < 0.16 ? Math.round(Math.sin((pumpAge / 0.16) * Math.PI) * 2) * c : 0;
+    g.save();
+    g.globalAlpha = !making || live ? 1 : 0.55;
+    const top = base - PUMP_ROWS * c;
+    // The bottle.
+    g.fillStyle = SYRUP;
+    g.fillRect(left, top + 4 * c, PUMP_W * c, base - top - 4 * c);
+    g.fillStyle = GLASS;
+    g.fillRect(left, top + 4 * c, PUMP_W * c, c);
+    g.strokeStyle = colors.ink;
+    g.lineWidth = line;
+    g.strokeRect(left + line / 2, top + 4 * c + line / 2, PUMP_W * c - line, base - top - 4 * c - line);
+    // The neck, and the pump head on its stem.
+    g.fillStyle = colors.ink;
+    g.fillRect(left + 3 * c, top + 3 * c, 2 * c, c);
+    g.fillRect(Math.round(pumpX - c / 2), top + c + press, c, 2 * c - press);
+    g.fillRect(left + 2 * c, top + press, 4 * c, c);
+    // The tube from the head, out and down over the shelf's edge.
+    const tip = nozzleBottom();
+    g.fillRect(left + 2 * c, top + press, c, c);
+    g.fillRect(left - c, top + press, 3 * c, c);
+    g.fillRect(left - 2 * c, top + press, c, tip - top - press);
+    // The label: a ring for each pump the drink wants, filled as each goes in.
+    const target = making ? sugarPumps(making.order.sugar) : 0;
+    const given = making?.sugar ?? 0;
+    // Its label low on the bottle, and above it the pumps the drink wants.
+    const pumpWord = wordWidth("syrup") * labelUnit() + 4 * labelUnit() <= PUMP_W * c;
+    drawJarLabel(g, "syrup", "syrup", pumpWord, left, PUMP_W, top + 7 * c, left + c);
+    const labelTop = top + 4.5 * c;
+    if (making && (target || given)) {
+      const marks = Math.max(target, given);
+      const size = Math.max(2, Math.round(c * 0.8));
+      const gap = ((PUMP_W - 2) * c - marks * size) / (marks + 1);
+      for (let index = 0; index < marks; index++) {
+        const mx = Math.round(left + c + gap + index * (size + gap));
+        const my = Math.round(labelTop + 1.5 * c - size / 2);
+        g.fillStyle = index >= target ? colors.slab : "#fbe08a";
+        if (index < given) {
+          g.fillRect(mx, my, size, size);
+          g.strokeStyle = colors.ink;
+          g.lineWidth = 1;
+          g.strokeRect(mx + 0.5, my + 0.5, size - 1, size - 1);
+        } else {
+          g.strokeStyle = colors.ink;
+          g.lineWidth = 1;
+          g.strokeRect(mx + 0.5, my + 0.5, size - 1, size - 1);
+        }
+      }
+    }
+    g.restore();
+  }
+
+  /** The tip jar stands at the counter's left end. */
+  const tipJarLeft = () => cell;
+  const tipJarRight = () => tipJarLeft() + JAR_W * guestPx;
 
   /** While it's quiet: a stack of clean cups, a napkin holder and a jar of straws. */
   function drawIdleProps(g: CanvasRenderingContext2D, colors: Colors) {
@@ -1532,8 +2052,8 @@
         p: colors.paper,
       });
     }
-    // Seeded spots, so they sit in the same places every visit, clear of the ice bin.
-    const napkinX = Math.round(Math.max((0.05 + hash(5) * 0.05) * W, binRight() + 2 * cell));
+    // Seeded spots, so they sit in the same places every visit, clear of the tip jar.
+    const napkinX = Math.round(Math.max((0.05 + hash(5) * 0.05) * W, tipJarRight() + 2 * cell));
     const strawX = napkinX + (NAPKINS[0].length + 2 + Math.round(hash(9) * 3)) * cell;
     drawHalo(g, NAPKINS, napkinX, counterY - NAPKINS.length * cell, cell, HALO);
     drawHalo(g, STRAW_JAR, strawX, counterY - STRAW_JAR.length * cell, cell, HALO);
@@ -1545,30 +2065,33 @@
     });
   }
 
-  /** The ice bin's left edge, standing on the counter under the ice button. */
+  /** The ice bin's left edge, standing on the shelf under the ice button. */
   const binLeft = () => Math.round(Math.max(cell, binX - (ICE_BIN[0].length / 2) * cell));
-  const binRight = () => binLeft() + ICE_BIN[0].length * cell;
   const BIN_PALETTE = { O: INK, L: LID, h: "#ffffff", p: "#dceef4", s: "#b5d2dc", B: "#8fb8c9" };
 
-  /** The ice bin, lid propped open. Out of the way while the jars are on the counter. */
+  /** The ice bin on the shelf, lid propped open. */
   function drawIceBin(g: CanvasRenderingContext2D) {
-    if (making?.station === "scoop") return;
-    const top = counterY - ICE_BIN.length * cell;
+    const top = shelfTop() - ICE_BIN.length * cell;
     const fade = !making || iceAdjustable(making);
     g.save();
     g.globalAlpha = fade ? 1 : 0.55;
     drawHalo(g, ICE_BIN, binLeft(), top, cell, HALO);
     drawSprite(g, ICE_BIN, binLeft(), top, cell, BIN_PALETTE);
+    const binWord = wordWidth("ice") * labelUnit() + 4 * labelUnit() <= (ICE_BIN[0].length - 2) * cell;
+    drawJarLabel(g, "ice", "ice", binWord, binLeft() + cell, ICE_BIN[0].length - 2, top + 7 * cell);
     g.restore();
   }
 
-  /** Where a scoop of ice is on its arc from the bin's mouth to the cup's, at 0–1. */
+  /**
+   * Where a cube of ice is on its way from the bin to the cup, at 0–1: out
+   * of the bin's front, below the shelf, so it never crosses the machines.
+   */
   function iceArcAt(u: number) {
-    const fromX = binLeft() + 6 * cell;
-    const fromY = counterY - 8 * cell;
+    const fromX = binLeft() + (ICE_BIN[0].length / 2) * cell;
+    const fromY = shelfBottom() + cell;
     const toX = cupX;
     const toY = cupTop + 2 * cell;
-    const peak = Math.min(fromY, toY) - 6 * cell;
+    const peak = fromY;
     const x = lerp(fromX, toX, u);
     const y = (1 - u) * (1 - u) * fromY + 2 * (1 - u) * u * peak + u * u * toY;
     return { x, y };
@@ -1578,13 +2101,19 @@
     for (const arc of iceArcs) {
       const u = clamp(arc.age / ICE_ARC_SECONDS, 0, 1);
       const { x, y } = iceArcAt(u);
-      for (let cube = 0; cube < CUBES_PER_SCOOP; cube++) {
-        const cx = x + (cube - 0.5) * 3.5 * cell;
-        const cy = y + cube * cell;
-        drawHalo(g, ICE_CUBE, cx - 1.5 * cell, cy, cell, HALO);
-        drawSprite(g, ICE_CUBE, cx - 1.5 * cell, cy, cell, ICE_PALETTE);
-      }
+      drawHalo(g, ICE_CUBE, x - 1.5 * cell, y, cell, HALO);
+      drawSprite(g, ICE_CUBE, x - 1.5 * cell, y, cell, ICE_PALETTE);
     }
+  }
+
+  /** A squirt of syrup from the bottle's tube, just after a pump. */
+  function drawSyrup(g: CanvasRenderingContext2D) {
+    if (pumpAge > 0.2 || !making || making.station !== "sugar") return;
+    const x = pumpTipX();
+    const top = nozzleBottom();
+    const bottom = top + (cupTop + 15 * cell - top) * clamp(pumpAge / 0.12, 0, 1);
+    g.fillStyle = SYRUP;
+    g.fillRect(Math.round(x - cell / 2), top, Math.max(2, Math.round(cell / 2) * 2 - 2), Math.max(0, bottom - top));
   }
 
   /** Pearls are dark; on the night theme they take the ink colour instead. */
@@ -1629,6 +2158,13 @@
       }
     }
 
+    // Syrup sits on the bottom until the tea goes in and takes it up.
+    if (!cup.tea && cup.sugar > 0) {
+      const rows = Math.min(cup.sugar, SUGAR_MAX) * 0.5;
+      g.fillStyle = SYRUP;
+      g.fillRect(left + 3 * c, base - rows * c, 8 * c, rows * c);
+    }
+
     // Scoops that landed, settled on the bottom.
     cup.pile.forEach((kind, index) => {
       const [column, row] = PILE_SLOTS[index % PILE_SLOTS.length];
@@ -1642,14 +2178,37 @@
       g.fillRect(left + 9 * c, top + c, c, 12 * c);
     }
 
-    // Ice the player scooped in rests on the bottom and bobs up with the tea;
-    // a scoop still in the air isn't in the cup yet.
-    const cubes = Math.max(0, cup.ice - iceArcs.length) * CUBES_PER_SCOOP;
-    const floats = ICE_FLOAT[cup.ice * CUBES_PER_SCOOP] ?? ICE_FLOAT[6];
-    for (let index = 0; index < cubes; index++) {
+    // Before the tea, the cup marks a slot for each cube the ticket wants:
+    // a dotted square on the bottom, filled as each cube lands. A cube past
+    // the ticket's count lands ringed in accent.
+    const landed = Math.max(0, cup.ice - iceArcs.length);
+    const target = ICE_CUBES[cup.order.ice];
+    const marking = (cup.station === "ice" || cup.station === "pour") && !cup.tea;
+    if (marking) {
+      const dot = Math.max(2, Math.round(c * 0.6));
+      for (let index = landed; index < Math.min(target, ICE_REST.length); index++) {
+        const [column, row] = ICE_REST[index];
+        // A faint ice-blue slot, ringed in dots.
+        g.fillStyle = ICE_SLOT;
+        g.fillRect(left + column * c, top + row * c, 3 * c, 3 * c);
+        g.fillStyle = colors.ink;
+        for (const [dx, dy] of ICE_RING) {
+          g.fillRect(
+            Math.round(left + (column + dx + 0.5) * c - dot / 2),
+            Math.round(top + (row + dy + 0.5) * c - dot / 2),
+            dot,
+            dot,
+          );
+        }
+      }
+    }
+    // Ice the player dropped in rests on the bottom and bobs up with the tea;
+    // a cube still in the air isn't in the cup yet.
+    const floats = ICE_FLOAT[clamp(cup.ice, 1, 6)];
+    for (let index = 0; index < Math.min(landed, ICE_REST.length); index++) {
       const [restColumn, restRow] = ICE_REST[index];
       const restTop = top + restRow * c;
-      // The third scoop's cubes float a cell lower, under the first four.
+      // The last two float a cell lower, under the first four.
       const sink = index >= 4 ? c : 0;
       const y = Math.max(top - c + sink, Math.min(restTop, surface - c + sink));
       const lift = clamp((restTop - y) / (2 * c), 0, 1);
@@ -1658,11 +2217,17 @@
       let column = Math.round(lerp(restColumn, floats[index], lift));
       column = clamp(column, inset + 1, 12 - inset - 2);
       const jitter = reduceMotion ? 0 : iceJitter[index] * c * Math.exp(-joltAge * 14);
-      drawSprite(g, ICE_CUBE, left + column * c + jitter, y, c, ICE_PALETTE);
+      const x = left + column * c + jitter;
+      drawSprite(g, ICE_CUBE, x, y, c, ICE_PALETTE);
+      if (marking && index >= target) {
+        g.strokeStyle = colors.slab;
+        g.lineWidth = Math.max(2, Math.round(c / 3));
+        g.strokeRect(Math.round(x) - 1, Math.round(y) - 1, 3 * c + 2, 3 * c + 2);
+      }
     }
 
-    // At the pour: a dashed line where the tea should stop.
-    if (cup.station === "pour") {
+    // At the ice and the pour: a dashed line where the tea should stop.
+    if (cup.station === "pour" || cup.station === "ice") {
       const lineY = base - FILL_LINE[cup.order.ice] * INSIDE_ROWS * c;
       const row = clamp(Math.floor((lineY - top) / c), 1, INSIDE_ROWS);
       const inset = wallInset(row);
@@ -1712,7 +2277,7 @@
     }
     if (cup.sealed && cup.sealValue !== null) {
       // Clean, crooked (loose), or browned (scorched).
-      const result = sealResult(cup.sealValue);
+      const result = sealResult(cup.sealValue, hard());
       const film = result === "scorched" ? SCORCHED : LID;
       const palette = { O: colors.ink, L: film };
       if (result === "loose") {
@@ -1778,7 +2343,11 @@
     g.save();
     g.lineCap = "round";
     g.beginPath();
-    g.moveTo(W / 2, ladle.pivotY);
+    // A short handle up toward the pivot, as if held from above.
+    const dx = W / 2 - ladle.bx;
+    const dy = ladle.pivotY - (ladle.by - 2 * cell);
+    const reach = (9 * cell) / Math.hypot(dx, dy);
+    g.moveTo(ladle.bx + dx * reach, ladle.by - 2 * cell + dy * reach);
     g.lineTo(ladle.bx, ladle.by - 2 * cell);
     g.strokeStyle = HALO;
     g.lineWidth = arm + 4;
@@ -1813,10 +2382,13 @@
 
   /** Where each topping jar stands: two either side of the cup. */
   function jarCentres() {
-    const room = W / 2 - (CUP_W / 2 + 2) * cell;
-    const far = room * 0.3;
-    const near = room * 0.72;
-    return [far, near, W - near, W - far];
+    const half = (JAR_COLS / 2) * cell;
+    const nearGap = (CUP_W / 2 + 2) * cell + half;
+    const leftFar = tipJarRight() + 2 * cell + half;
+    const leftNear = Math.max(leftFar + 2 * half + cell, workX() - nearGap);
+    const rightNear = workX() + nearGap;
+    const rightFar = Math.max(rightNear + 2 * half + cell, W - cell - half);
+    return [leftFar, leftNear, rightNear, rightFar];
   }
 
   /** Which jar, if any, a point on the bench lands on: generous, for a thumb. */
@@ -1863,15 +2435,8 @@
     const iconH = 2 * px;
     const gap = Math.max(5, cell);
     const mark = Math.max(5, Math.round(cell * 0.9));
-    const x0 = Math.round(1.5 * cell);
-    const y = Math.round((TANK_ROWS + 4) * cell);
-    // A small paper chip under the queue, so it reads over the room.
-    const chipW = cup.queue.length * (iconW + gap) - gap + 2 * gap;
-    g.fillStyle = BENCH.paper;
-    g.fillRect(x0 - gap, y - gap, chipW, iconH + 2 * mark + gap);
-    g.strokeStyle = "#c8c8c8";
-    g.lineWidth = 1;
-    g.strokeRect(x0 - gap + 0.5, y - gap + 0.5, chipW - 1, iconH + 2 * mark + gap - 1);
+    const x0 = Math.round(cupX + (CUP_W / 2 + 3) * cell);
+    const y = Math.round(nozzleBottom() + 2 * cell);
     cup.queue.forEach((kind, index) => {
       const x = x0 + index * (iconW + gap);
       const result = cup.results[index];
@@ -1935,15 +2500,13 @@
     const gap = Math.max(2, Math.round(cell / 2));
     const total = SHAKES_NEEDED * size + (SHAKES_NEEDED - 1) * gap;
     const y = Math.round(cupTop - (SHAKER.length + 2.5) * cell);
-    g.fillStyle = HALO;
-    g.fillRect(Math.round(cupX - total / 2) - gap, y - gap, total + 2 * gap, size + 2 * gap);
     for (let index = 0; index < SHAKES_NEEDED; index++) {
       const x = Math.round(cupX - total / 2 + index * (size + gap));
       if (index < cup.shakes) {
         g.fillStyle = colors.ink;
         g.fillRect(x, y, size, size);
       } else {
-        g.strokeStyle = colors.muted;
+        g.strokeStyle = colors.ink;
         g.lineWidth = 1;
         g.strokeRect(x + 0.5, y + 0.5, size - 1, size - 1);
       }
@@ -1981,6 +2544,7 @@
   function drawPress(g: CanvasRenderingContext2D, colors: Colors, cup: Cup) {
     const landed = cupTop - cell;
     const hover = cupTop - 4 * cell;
+    const mount = shelfBottom();
     let bottom: number;
     if (cup.stampAt === null) {
       bottom = hover;
@@ -1990,21 +2554,19 @@
         if (t > PRESS_LIFTS) return;
         bottom = landed;
       } else {
-        if (t > PRESS_GONE) return;
         if (t < PRESS_LANDS) bottom = lerp(hover, landed, cubicOut(t / PRESS_LANDS) ** 2);
         else if (t < PRESS_LIFTS) bottom = landed;
-        else bottom = lerp(landed, -cell, (t - PRESS_LIFTS) / (PRESS_GONE - PRESS_LIFTS));
+        else bottom = lerp(landed, hover, clamp((t - PRESS_LIFTS) / (PRESS_GONE - PRESS_LIFTS), 0, 1));
       }
     }
     const left = Math.round(cupX - (CUP_W / 2 + 2) * cell);
     const width = (CUP_W + 4) * cell;
     const height = Math.round(1.5 * cell);
     const plateTop = Math.round(bottom - height);
-    g.fillStyle = HALO;
-    g.fillRect(Math.round(cupX - cell) - 2, 0, 2 * cell + 4, Math.max(0, plateTop));
-    g.fillRect(left - 2, plateTop - 2, width + 4, height + 4);
+    // The rod comes down from a mount under the shelf.
     g.fillStyle = colors.ink;
-    g.fillRect(Math.round(cupX - cell), 0, 2 * cell, Math.max(0, plateTop));
+    g.fillRect(Math.round(cupX - 2 * cell), mount, 4 * cell, cell);
+    g.fillRect(Math.round(cupX - cell), mount, 2 * cell, Math.max(0, plateTop - mount));
     g.fillStyle = colors.paper;
     g.fillRect(left, plateTop, width, height);
     g.strokeStyle = colors.ink;
@@ -2021,18 +2583,20 @@
   function drawSealGauge(g: CanvasRenderingContext2D, colors: Colors, cup: Cup) {
     const c = cell;
     if (cup.stampAt !== null && clock - cup.stampAt > HOP_START) return;
-    const value = cup.sealValue ?? sealNeedle(clock - cup.sealStart);
+    const value = cup.sealValue ?? sealNeedle(clock - cup.sealStart, hard());
+    const band = rulesFor(hard()).sealBand;
     const width = GAUGE_COLS * c;
     const height = GAUGE_ROWS * c;
     const left = Math.round(cupX + (CUP_W / 2 + 4) * c);
     const top = Math.round(cupTop + c);
     const yAt = (v: number) => Math.round(top + (1 - v) * height);
-    const bandTop = yAt(SEAL_BAND[1]);
-    const bandBottom = yAt(SEAL_BAND[0]);
+    const bandTop = yAt(band[1]);
+    const bandBottom = yAt(band[0]);
     const tick = Math.max(2, Math.round(c / 3));
-    // A paper halo round the gauge, its ticks and its needle.
-    g.fillStyle = HALO;
-    g.fillRect(left - 2 * c - 2, top - c - 2, width + 5 * c + 4, height + 2 * c + 4);
+    // The dial on its stand on the counter; nothing behind it.
+    g.fillStyle = colors.ink;
+    g.fillRect(Math.round(left + width / 2 - c / 2), top + height, c, counterY - top - height);
+    g.fillRect(left, counterY - c, width, c);
     g.fillStyle = colors.paper;
     g.fillRect(left, top, width, height);
     g.fillStyle = GAUGE_HOT;
@@ -2076,7 +2640,7 @@
       if (end <= 0 || x === undefined) return;
       // Off whichever side of the tank, from about its shoulder.
       const side = Math.random() < 0.5 ? -1 : 1;
-      addParticle(particles, x + side * (TANK_W / 2 + 0.5) * cell, 3 * cell, "#fdf8f3", 14, -60);
+      addParticle(particles, x + side * (tankW / 2 - 1) * cell, shelfTop() - MACHINE_ROWS * cell, "#fdf8f3", 14, -60);
     });
   }
 
@@ -2093,9 +2657,11 @@
     }
     if (cup.station === "seal" && cup.stampAt !== null && !reduceMotion) {
       const u = clamp((clock - cup.stampAt - HOP_START) / (SEAL_SECONDS - HOP_START), 0, 1);
-      // A hop off the counter toward the line, fading as it goes.
-      dy = -(Math.sin(u * Math.PI) * 3 * c + u * u * 10 * c);
-      alpha = 1 - u * u;
+      // A hop along the counter to the guest it's for, fading into their hands.
+      const to = crowd.xOf(cup.guestId);
+      if (to !== null) dx = (to - cupX) * cubicOut(u);
+      dy = -Math.sin(u * Math.PI) * 4 * c;
+      alpha = 1 - u * u * u;
     }
 
     if (cup.station === "scoop") {
@@ -2132,13 +2698,17 @@
     // The bench draws in fixed colours: it sits on the room, not on the page.
     const colors = BENCH;
     g.clearRect(0, 0, W, H);
+    // The wall's back bar, the guests across the counter (cut off at its
+    // edge), then everything standing on the counter in front of them.
+    drawBackBar(g, colors);
+    crowd.drawBack(g);
     if (!making) drawIdleProps(g, colors);
-    drawIceBin(g);
-    drawDispensers(g, colors);
     if (making) drawMaking(g, colors, making);
     drawIceArcs(g);
+    drawSyrup(g);
     for (const item of falling) drawTopping(g, item.kind, item.x, item.y, item.angle, item.alpha);
     drawParticles(g, particles);
+    crowd.drawFront(g, popupFont);
     drawNotes(g);
   }
 
@@ -2239,14 +2809,11 @@
 
   function stepEffects(dt: number) {
     const cup = making;
-    const target = !cup ? cupX : cup.station === "pour" ? (spoutX[tapIndex] ?? W / 2) : W / 2;
+    const target = !cup ? cupX : stationX(cup);
     cupX = reduceMotion ? target : cupX + (target - cupX) * (1 - Math.exp(-dt * 24));
     if (Math.abs(target - cupX) < 0.3) cupX = target;
 
-    // The nozzles reach down for the pour (and while the counter is idle),
-    // and tuck up for everything else.
-    const reach = !cup || cup.station === "pour" ? 1 : 0;
-    tapReach = reduceMotion ? reach : tapReach + (reach - tapReach) * (1 - Math.exp(-dt * 12));
+    pumpAge += dt;
 
     const flowing = streamOn && pouring(cup);
     wobble = flowing ? 1 : wobble * Math.exp(-dt * 3);
@@ -2260,7 +2827,7 @@
       const landed = iceArcs.filter((arc) => arc.age >= ICE_ARC_SECONDS).length;
       if (landed) {
         iceArcs = iceArcs.filter((arc) => arc.age < ICE_ARC_SECONDS);
-        if (cup) splash(cupX, cupTop + 2 * cell, "#dceef4", 3 * landed);
+        if (cup) splash(cupX, cupTop + 2 * cell, "#dceef4", 2 * landed);
       }
     }
     stepTankSteam(dt);
@@ -2817,9 +3384,14 @@
     tanks = TEAS.map(() => TANK_CAPACITY);
     brewEnds = TEAS.map(() => 0);
     brewing = TEAS.map(() => -1);
-    samplesLeft = SAMPLES_PER_SHIFT;
-    criticSeen = false;
+    samplesLeft = sampleCap;
+    criticsSeen = 0;
     special = pickSpecial();
+    jar = 0;
+    jarsCashed = 0;
+    history = [];
+    shareLines = [];
+    crowd.reset(0);
   }
 
   function beginShift() {
@@ -2886,7 +3458,7 @@
       if (!cup.sealed && t >= PRESS_LANDS) {
         cup.sealed = true;
         sfxSeal();
-        if (cup.sealValue !== null && sealResult(cup.sealValue) === "scorched") {
+        if (cup.sealValue !== null && sealResult(cup.sealValue, hard()) === "scorched") {
           sfxScorch();
           smokePuff();
         }
@@ -2939,6 +3511,7 @@
         refreshTanks();
       }
       stepEffects(dt);
+      stepCrowd(dt);
       stepRoom(dt);
       drawRoom();
       draw();
@@ -2968,7 +3541,7 @@
       return;
     }
 
-    const pace = paceForElapsed(elapsed);
+    const pace = paceForElapsed(elapsed, expert);
     if (pace.phase !== phase) {
       phase = pace.phase;
       setMusicPhase(phase);
@@ -2979,18 +3552,20 @@
     // A full line means they wait at the door.
     arrivalTimer = Math.min(arrivalTimer + dt, pace.arrivalEvery);
     arrivalIn = Math.min(arrivalIn - dt, nextArrivalIn(pace, guests.length, arrivalTimer));
-    if (arrivalIn <= 0 && guests.length < MAX_TICKETS) {
+    if (arrivalIn <= 0 && guests.length < ticketCap) {
       arrivalTimer = 0;
       arrivalIn = Infinity;
       addGuest();
     }
 
-    // Patience: slower for the guest who can see their drink being made, and
-    // frozen once it is stamped.
+    // Patience: from when the ticket is hung, slower for the guest who can
+    // see their drink being made, and frozen once it is stamped.
+    const activeRate = activePatienceRate(expert);
     for (const guest of [...guests]) {
+      if (!guest.placed) continue;
       const mine = making?.guestId === guest.id;
       if (mine && making?.stampAt !== null) continue;
-      guest.left -= dt * (mine ? ACTIVE_PATIENCE_RATE : 1);
+      guest.left -= dt * (mine ? activeRate : 1);
       if (guest.left <= 0) {
         walkOut(guest);
         if (gameOver) return;
@@ -3011,10 +3586,40 @@
     if (notice && clock >= notice.until) notice = null;
 
     stepEffects(dt);
+    stepCrowd(dt);
     stepRoom(dt);
     drawRoom();
     draw();
     raf = requestAnimationFrame(frame);
+  }
+
+  // --- The line of guests ---------------------------------------------------------
+
+  /** Tells the crowd who waits where, and how patient they are, then steps it and the tickets in the air. */
+  function stepCrowd(dt: number) {
+    crowd.sync(guests.map((guest) => ({ id: guest.id, share: guest.placed ? clamp(guest.left / guest.patience, 0, 1) : 1 })));
+    crowd.step(dt);
+    stepFlights(dt);
+  }
+
+  /**
+   * Where the guests stand across the counter: between the back bar's
+   * columns, skipping the middle one where the cup does its work, so a face
+   * is never right behind the cup. Their pixels shrink if the spots are close.
+   */
+  function layoutCrowd() {
+    const columns = [binX, ...spoutX, pumpX].filter((x) => x > 0).sort((a, b) => a - b);
+    const gaps: number[] = [];
+    for (let index = 1; index < columns.length; index++) gaps.push((columns[index - 1] + columns[index]) / 2);
+    let middle = 0;
+    gaps.forEach((gap, index) => {
+      if (Math.abs(gap - workX()) < Math.abs(gaps[middle] - workX())) middle = index;
+    });
+    const spots = gaps.filter((_, index) => index !== middle).slice(0, ticketCap);
+    let tightest = W;
+    for (let index = 1; index < spots.length; index++) tightest = Math.min(tightest, spots[index] - spots[index - 1]);
+    guestPx = Math.max(2, Math.min(cell, Math.floor(tightest / (FIGURE_W - 1))));
+    crowd.layout(W, H, guestPx, counterY, spots, tipJarLeft());
   }
 
   // --- The demo, in motion -------------------------------------------------------------
@@ -3038,7 +3643,8 @@
       iceArcs,
       cupX,
       wobble,
-      tapReach,
+      crowd: crowd.snapshot(),
+      flights,
     };
   }
 
@@ -3060,7 +3666,8 @@
     iceArcs = saved.iceArcs;
     cupX = saved.cupX;
     wobble = saved.wobble;
-    tapReach = saved.tapReach;
+    crowd.restore(saved.crowd);
+    flights = saved.flights;
     refreshTanks();
   }
 
@@ -3086,7 +3693,9 @@
     iceArcs = [];
     cupX = spoutX[tapIndex] ?? W / 2;
     wobble = 0;
-    tapReach = 1;
+    // A jar one good tip from full, so the demo's drink shows it paying out.
+    crowd.reset(DEMO_JAR_START);
+    flights = [];
     demoTask = null;
     demoCaption = "";
     enterDemoStep(0);
@@ -3155,11 +3764,9 @@
     focusPlayfield();
   }
 
-  async function askAboutDemo() {
+  function askAboutDemo() {
     askFirst = true;
-    liveMessage = "First shift? Watch one drink being made first.";
-    await tick();
-    watchButton?.focus();
+    liveMessage = "First time here? Watch one drink being made, or open the counter.";
   }
 
   function answerFirst(watch: boolean) {
@@ -3184,18 +3791,18 @@
 
   function addDemoGuest() {
     const order = { ...DEMO_ORDER, toppings: DEMO_ORDER.toppings.map((line) => ({ ...line })) };
-    guests = [
-      {
-        id: demoGuestId--,
-        regular: DEMO_REGULAR,
-        order,
-        patience: DEMO_PATIENCE,
-        left: DEMO_PATIENCE,
-        tilt: -0.8,
-        outcome: null,
-      },
-    ];
-    sfxTicket();
+    const guest: Guest = {
+      id: demoGuestId--,
+      regular: DEMO_REGULAR,
+      order,
+      patience: DEMO_PATIENCE,
+      left: DEMO_PATIENCE,
+      tilt: -0.8,
+      placed: false,
+      outcome: null,
+    };
+    guests = [guest];
+    crowd.arrive(guest.id, DEMO_REGULAR.name, 0);
     liveMessage = `${DEMO_REGULAR.name} is waiting: ${describeOrder(order)}.`;
   }
 
@@ -3241,11 +3848,17 @@
    */
   function demoAction(step: DemoStep): (dt: number) => boolean {
     switch (step.act) {
-      case "arrive":
+      case "arrive": {
+        // The guest walks up; the step is done once their ticket is on the rail.
+        let added = false;
         return () => {
-          addDemoGuest();
-          return true;
+          if (!added) {
+            addDemoGuest();
+            added = true;
+          }
+          return guests[0]?.placed ?? true;
         };
+      }
       case "take":
         return () => {
           pressFor("ticket-0");
@@ -3253,16 +3866,33 @@
           return true;
         };
       case "ice": {
-        let left = demoIceScoops(making?.order ?? DEMO_ORDER);
+        // The hand, once per cube: the same press a player makes.
+        let left = demoIceCubes(making?.order ?? DEMO_ORDER);
         let timer = 0;
         return (dt) => {
           if (left <= 0 || !making) return true;
           timer -= dt;
           if (timer > 0) return false;
-          pressFor("ice");
+          pressFor("hand");
           addIce();
           left -= 1;
-          timer = step.every ?? 0.5;
+          timer = step.every ?? 0.45;
+          return left <= 0;
+        };
+      }
+      case "sugar": {
+        // The hand, once per pump.
+        let left = demoSugarPumps(making?.order ?? DEMO_ORDER);
+        let timer = 0;
+        return (dt) => {
+          if (left <= 0 || !making) return true;
+          if (making.station !== "sugar") return false;
+          timer -= dt;
+          if (timer > 0) return false;
+          pressFor("hand");
+          pumpSyrup();
+          left -= 1;
+          timer = step.every ?? 0.45;
           return left <= 0;
         };
       }
@@ -3333,7 +3963,7 @@
           const cup = making;
           if (!cup) return true;
           if (cup.station !== "seal" || cup.busy) return false;
-          const value = sealNeedle(clock - cup.sealStart);
+          const value = sealNeedle(clock - cup.sealStart, hard());
           const hit = Number.isFinite(previous) && reachedTarget(previous, value, DEMO_SEAL_AIM, DEMO_SEAL_WITHIN);
           previous = value;
           if (!hit) return false;
@@ -3393,7 +4023,7 @@
       event.preventDefault();
       if (event.repeat || !making) return;
       const direction = key === "ArrowLeft" ? "left" : "right";
-      if (making.station === "pour") moveTap(direction === "left" ? -1 : 1);
+      if (beforeTea(making.station)) moveTap(direction === "left" ? -1 : 1);
       else if (making.station === "scoop") moveJar(direction === "left" ? -1 : 1);
       else if (making.station === "shake" && direction !== lastShakeArrow) {
         // Arrows shake only when they alternate, like a wrist going back and forth.
@@ -3404,7 +4034,13 @@
     }
     if (key === "ArrowUp" || key === "ArrowDown") {
       event.preventDefault();
-      if (event.repeat || making?.station !== "pour") return;
+      if (event.repeat || !making) return;
+      if (making.station === "sugar") {
+        if (key === "ArrowUp") pumpSyrup();
+        else note("syrup can't come back out");
+        return;
+      }
+      if (making.station !== "pour" && making.station !== "ice") return;
       if (key === "ArrowUp") addIce();
       else removeIce();
       return;
@@ -3426,7 +4062,7 @@
       return;
     }
     const number = Number(key);
-    if (Number.isInteger(number) && number >= 1 && number <= MAX_TICKETS) {
+    if (Number.isInteger(number) && number >= 1 && number <= ticketCap) {
       event.preventDefault();
       if (!event.repeat) take(number - 1);
     }
@@ -3451,6 +4087,7 @@
     if (!isPrimary(event)) return;
     event.preventDefault();
     if (demoOn || !tapLive(index) || !selectTap(index)) return;
+    leaveEarly();
     capture(event);
     startHold("tap");
   }
@@ -3463,6 +4100,7 @@
       return;
     }
     if (demoOn || event.repeat || !tapLive(index) || !selectTap(index)) return;
+    leaveEarly();
     startHold("tap-key");
   }
 
@@ -3470,18 +4108,18 @@
   function handDown(event: PointerEvent, source: string) {
     if (!isPrimary(event)) return;
     event.preventDefault();
-    if (demoOn || !making) return;
+    if (demoOn) return;
     capture(event);
     act(source);
   }
 
-  /** The bench: a jar marks that jar at the scoop; anywhere else is the hand. */
+  /** The bench: a jar marks that jar at the scoop; anywhere else is the hand (an empty bench takes the next ticket). */
   function benchDown(event: PointerEvent) {
     if (!isPrimary(event)) return;
     event.preventDefault();
     const cup = making;
-    if (demoOn || !cup) return;
-    if (cup.station === "scoop" && !cup.busy) {
+    if (demoOn || (!cup && !running)) return;
+    if (cup && cup.station === "scoop" && !cup.busy) {
       const box = canvas.getBoundingClientRect();
       const jar = jarAt(event.clientX - box.left, event.clientY - box.top);
       if (jar >= 0) {
@@ -3574,6 +4212,11 @@
     const result = concludeRun("orders", score, reason);
     localBest = result.best;
     newBest = result.newBest;
+    // One face per guest, the way they left, then a jar for each one filled.
+    shareLines = [
+      ...emojiRows(history.map((reaction) => SHARE_FACES[reaction]), 10, 3),
+      ...(jarsCashed ? ["🫙".repeat(Math.min(jarsCashed, 10))] : []),
+    ];
     liveMessage =
       reason === "time" ? `Shift complete. Final score ${score}.` : `Kitchen closed. Final score ${score}.`;
     await tick();
@@ -3612,7 +4255,6 @@
     arrivalIn = Infinity;
     takeLockUntil = 0;
     recent = [];
-    tapReach = 1;
     resetShiftExtras();
     resetRoom();
     beats = [];
@@ -3636,10 +4278,9 @@
     W = Math.max(1, Math.round(rect.width));
     H = Math.max(1, Math.round(rect.height));
     ctx = fitCanvas(canvas, W, H);
-    // Whole-pixel cells, sized so the cup stands about CUP_SHARE of the bench;
-    // everything judged from the cup is measured in the same cells.
-    cell = Math.round((H * CUP_SHARE) / CUP_H);
-    cell = Math.max(2, Math.min(cell, Math.floor(H / ROWS_NEEDED), Math.floor(W / COLS_NEEDED)));
+    // Whole-pixel cells, sized so the back bar, the stream and the cup all
+    // fit; everything judged from the cup is measured in the same cells.
+    cell = Math.max(2, Math.min(Math.floor(H / ROWS_NEEDED), Math.floor(W / COLS_NEEDED)));
     counterY = H - 3 * cell;
     cupTop = counterY - CUP_H * cell;
     spoutX = TEAS.map((_, index) => {
@@ -3648,14 +4289,22 @@
       const box = tap.getBoundingClientRect();
       return box.left + box.width / 2 - rect.left;
     });
-    if (iceEl) {
-      const box = iceEl.getBoundingClientRect();
-      binX = box.left + box.width / 2 - rect.left;
-    } else {
-      binX = (0.5 / (TEAS.length + 1)) * W;
-    }
+    const centre = (el: HTMLElement | undefined, fallback: number) => {
+      if (!el) return fallback;
+      const box = el.getBoundingClientRect();
+      return box.left + box.width / 2 - rect.left;
+    };
+    binX = centre(iceEl, (0.5 / (TEAS.length + 2)) * W);
+    pumpX = centre(syrupEl, ((TEAS.length + 1.5) / (TEAS.length + 2)) * W);
+    // As wide as the column allows, within reason, so the labels fit their words.
+    const column = tapEls[0]?.getBoundingClientRect().width ?? W / (TEAS.length + 2);
+    tankW = clamp(Math.floor(column / cell) - 1, 9, 12);
+    // The buttons sit over the machines, from their lids to the shelf.
+    tapsTop = Math.max(0, shelfTop() - MACHINE_ROWS * cell);
+    tapsH = shelfBottom() - tapsTop;
+    layoutCrowd();
     // Re-seat the cup where it belongs on the new layout, without a slide.
-    if (making) cupX = making.station === "pour" ? spoutX[tapIndex] : W / 2;
+    if (making) cupX = stationX(making);
     // The room lines up with the bench, the taps and the line, so it follows.
     layoutRoom();
     drawRoom();
@@ -3670,18 +4319,20 @@
   onMount(() => {
     popupFont = arcadeFont();
     special = pickSpecial();
-    // The first time here, ask about the demo before the countdown starts.
-    if (firstVisit("orders")) void askAboutDemo();
-    else sfxCountdown(COUNTDOWN_SECONDS);
+    // The menu's demo button opens straight on the demo; the first time on
+    // this device asks; otherwise straight to the countdown. Order up asked
+    // its own first-shift question before the shared one existed, so anyone
+    // who has played it before (its first-visit cookie) is never asked again.
+    const requested = takeDemoRequest("orders");
+    const fresh = firstVisit("orders");
+    const intro = demoIntro("orders", requested);
 
     const smallQuery = window.matchMedia("(max-width: 640px)");
     const onSmall = () => {
       small = smallQuery.matches;
-      facePx = small ? 3 : 4;
       void tick().then(measure);
     };
     small = smallQuery.matches;
-    facePx = small ? 3 : 4;
     smallQuery.addEventListener("change", onSmall);
 
     const unmountShell = mountShell({
@@ -3693,7 +4344,10 @@
       onResize: measure,
       // The demo row and the HUD's second row change where the counter starts.
       observe: hud,
-      onReduceMotion: (reduce) => (reduceMotion = reduce),
+      onReduceMotion: (reduce) => {
+        reduceMotion = reduce;
+        crowd.reduceMotion = reduce;
+      },
     });
     // The bench's own box changes with the column (a guest card growing a
     // line, the window resizing), and the canvas follows it.
@@ -3702,6 +4356,7 @@
     benchObserver.observe(lineEl);
     benchObserver.observe(columnEl);
 
+
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     // Held keys never outlive the window's focus.
@@ -3709,6 +4364,9 @@
 
 
     measure();
+    if (intro === "demo") void openDemo();
+    else if (intro === "ask" && fresh) askAboutDemo();
+    else sfxCountdown(COUNTDOWN_SECONDS);
     raf = requestAnimationFrame(frame);
 
     return () => {
@@ -3748,11 +4406,18 @@
         <span class="boba-big">{String(score).padStart(3, "0")}</span>
         <span class="boba-stack">
           <span class="boba-meta">points</span>
-          {#key streak}
-            <span class="boba-combo" class:active={streak > 1}>
-              {streak > 1 ? `×${streak} streak` : "no streak yet"}
+          <!-- The combo: its multiplier once it climbs, and pips filling toward the next step. -->
+          {#key combo.multiplier}
+            <span class="boba-combo ou-combo" class:active={combo.multiplier > 1}>
+              {combo.multiplier > 1 ? `×${combo.multiplier} combo` : "combo"}
+              {#if combo.span}
+                <span class="ou-pips" aria-hidden="true">
+                  {#each Array(combo.span) as _, pip}<span class="ou-pip" class:is-used={pip >= combo.filled}></span>{/each}
+                </span>
+              {/if}
             </span>
           {/key}
+          <ExpertTag />
         </span>
       </div>
 
@@ -3808,28 +4473,32 @@
 
   <div class="ou-counter boba-ui" style={`--hud-h: ${hudHeight}px`}>
     <div bind:this={columnEl} class="ou-column">
-      <!-- The line: regulars clip onto a rail as they arrive. The demo swaps
-           in its own line without the shift's guests playing their exits. -->
-      <section class="ou-line" aria-label="Customers">
+      <!-- The rail: each guest's ticket comes up from the counter and is
+           clipped here. The demo swaps in its own line without the shift's
+           guests playing their exits. -->
+      <section class="ou-line" aria-label="Customers" style={`--cap: ${ticketCap}`}>
         <span class="ou-wire" aria-hidden="true"></span>
-        <ol bind:this={lineEl} class="ou-guests">
+        <ol bind:this={lineEl} class="ou-guests" class:is-four={ticketCap > 3}>
           {#key demoOn}
             {#each guests as guest, index (guest.id)}
               {@const share = Math.max(0, guest.left / guest.patience)}
-              {@const mood = moodFor(share)}
+              {@const mood = waitingMood(share)}
               {@const mine = making?.guestId === guest.id}
               {@const critic = guest.regular.quirk === "critic"}
+              {@const wanted = ICE_CUBES[guest.order.ice]}
+              {@const pumpsWanted = sugarPumps(guest.order.sugar)}
               <li
                 class="ou-slot"
-                in:arrive={{ guest }}
+                data-guest={guest.id}
                 out:leave={{ guest }}
                 animate:flip={{ duration: reduceMotion ? 0 : 260 }}
               >
                 <button
                   type="button"
                   class="ou-guest boba-riso is-small"
-                  class:has-slab={share < 0.3}
+                  class:has-slab={guest.placed && share <= CROSS_AT}
                   class:is-making={mine}
+                  class:is-hanging={!guest.placed}
                   class:is-demo-press={demoPress === `ticket-${index}`}
                   style={`--tilt: ${guest.tilt}deg`}
                   aria-pressed={mine}
@@ -3840,9 +4509,6 @@
                 >
                   <span class="ou-clip" aria-hidden="true"></span>
                   <span class="ou-head">
-                    <span class="ou-face">
-                      <PixelIcon grid={faceGrid(guest.regular.name, mood, critic)} palette={facePalette(guest.regular.name)} px={facePx} />
-                    </span>
                     <span class="ou-who">
                       <span class="ou-name">{guest.regular.name}</span>
                       <span class="ou-tag">{guest.regular.tag}</span>
@@ -3866,27 +4532,60 @@
                   <span class="ou-order">
                     <span class="ou-item">
                       <span class="ou-icon"><span class="ou-swatch" style={`--swatch: ${TEA_COLORS[guest.order.tea]}`}></span></span>
-                      {TEA_NAMES[guest.order.tea]}
+                      <span class="ou-long">{TEA_NAMES[guest.order.tea]}</span>
+                      <span class="ou-short">{TEA_SHORT[guest.order.tea]}</span>
                       {#if guest.order.tea === special}
                         <span class="ou-star" aria-hidden="true"><PixelIcon grid={STAR} palette={{ O: "currentColor" }} px={2} /></span>
                       {/if}
                     </span>
+                    <!-- The sugar: a drop per pump wanted, filling as they go in. -->
                     <span class="ou-item">
-                      <span class="ou-icon">
-                        {#each Array(ICE_ICONS[guest.order.ice]) as _}<span class="ou-cube"></span>{/each}
+                      <span class="ou-icon ou-ice-cubes">
+                        {#if pumpsWanted || (mine && sugarCount)}
+                          {#each Array(Math.max(pumpsWanted, mine ? sugarCount : 0)) as _, drop}
+                            <span
+                              class="ou-drop"
+                              class:is-empty={mine && drop >= sugarCount}
+                              class:is-over={mine && drop >= pumpsWanted}
+                            ></span>
+                          {/each}
+                        {:else}
+                          <span class="ou-drop is-none"></span>
+                        {/if}
                       </span>
-                      {ICE_NAMES[guest.order.ice]}
+                      <span class="ou-long">{sugarName(guest.order.sugar)}</span>
+                      <span class="ou-short">{guest.order.sugar}%</span>
+                    </span>
+                    <!-- The ice: one cube per cube wanted. On the drink being made
+                         they fill as cubes go in, and any extra shows in accent. -->
+                    <span class="ou-item">
+                      <span class="ou-icon ou-ice-cubes">
+                        {#if wanted || (mine && iceCount)}
+                          {#each Array(Math.max(wanted, mine ? iceCount : 0)) as _, cube}
+                            <span
+                              class="ou-cube"
+                              class:is-empty={mine && cube >= iceCount}
+                              class:is-over={mine && cube >= wanted}
+                            ></span>
+                          {/each}
+                        {:else}
+                          <span class="ou-cube is-none"></span>
+                        {/if}
+                      </span>
+                      <span class="ou-long">{ICE_NAMES[guest.order.ice]}</span>
+                      <span class="ou-short">{ICE_SHORT[guest.order.ice]}</span>
                     </span>
                     {#each guest.order.toppings as line}
                       <span class="ou-item">
                         <span class="ou-icon">
-                          <PixelIcon grid={TOPPING_ART[line.kind].grid} palette={toppingIconPalette(line.kind)} px={3} />
+                          <PixelIcon grid={TOPPING_ART[line.kind].grid} palette={toppingIconPalette(line.kind)} px={small && ticketCap > 3 ? 2 : 3} />
                         </span>
-                        {TOPPING_NAMES[line.kind]} ×{line.scoops}
+                        <span class="ou-long">{TOPPING_NAMES[line.kind]} ×{line.scoops}</span>
+                        <span class="ou-short">{TOPPING_SHORT[line.kind]} ×{line.scoops}</span>
                       </span>
                     {/each}
                   </span>
-                  <span class="ou-patience" class:is-low={share < 0.3} style={`--left: ${share}`}></span>
+                  <span class="ou-patience" class:is-low={share <= CROSS_AT} style={`--left: ${share}`}></span>
                 </button>
               </li>
             {/each}
@@ -3897,109 +4596,105 @@
         {/if}
       </section>
 
-      <!-- The ice bin and the taps: scoop ice in first, then hold a tap to pour. -->
-      <div bind:this={tapsEl} class="ou-taps" role="group" aria-label="Ice and taps">
-        <div class="ou-tap-slot">
-          <button
-            bind:this={iceEl}
-            type="button"
-            class="ou-tap ou-ice"
-            class:is-demo-press={demoPress === "ice"}
-            aria-label={`Add a scoop of ice, ${iceCount} of ${ICE_MAX} in the cup`}
-            aria-keyshortcuts="ArrowUp"
-            disabled={!iceOpen}
-            on:mousedown={keepFocus}
-            on:click={() => !demoOn && addIce()}
-          >
-            <PixelIcon grid={ICE_ICON} palette={{ O: "currentColor", h: "#ffffff", p: "#dceef4" }} px={3} />
-            <span class="ou-tap-name">
-              ice
-              <span class="ou-cubes" aria-hidden="true">
-                {#each Array(ICE_MAX) as _, cube}<span class="ou-cube" class:is-empty={cube >= iceCount}></span>{/each}
-              </span>
-            </span>
-          </button>
-          {#if iceOpen && iceCount > 0}
-            <button
-              type="button"
-              class="boba-btn secondary ou-chip"
-              aria-label="Take a scoop of ice out"
-              aria-keyshortcuts="ArrowDown"
-              disabled={demoOn}
-              on:mousedown={keepFocus}
-              on:click={removeIce}
-            >
-              Less
-            </button>
-          {/if}
-        </div>
-        {#each TEAS as tea, index}
-          {@const brewNow = brewing[index]}
-          {@const tank = tankStates[index]}
-          <div class="ou-tap-slot">
-            <button
-              bind:this={tapEls[index]}
-              type="button"
-              class="ou-tap"
-              class:is-low={brewNow < 0 && tank !== "ok"}
-              class:is-demo-press={demoPress === `tap-${index}`}
-              aria-pressed={!!making && tapIndex === index}
-              aria-label={tapLabel(index, special, brewing, tankStates)}
-              disabled={!tapLive(index, making)}
-              on:mousedown={keepFocus}
-              on:pointerdown={(event) => tapDown(event, index)}
-              on:pointerup={() => endHold("tap", true)}
-              on:pointercancel={() => endHold("tap", false)}
-              on:lostpointercapture={() => endHold("tap", false)}
-              on:keydown={(event) => tapKey(event, index, true)}
-              on:keyup={(event) => tapKey(event, index, false)}
-              on:blur={() => endHold("tap-key", false)}
-              on:contextmenu={(event) => event.preventDefault()}
-            >
-              <!-- State never adds a row: a corner star, a dashed edge, a
-                   bar along the foot, or the label itself. -->
-              {#if tea === special}
-                <span class="ou-tap-star" aria-hidden="true"><PixelIcon grid={STAR} palette={{ O: "currentColor" }} px={2} /></span>
-                <span class="sr-only">special</span>
-              {/if}
-              <PixelIcon grid={TEA_URN} palette={{ O: "currentColor", L: TEA_COLORS[tea] }} px={3} />
-              <span class="ou-tap-name">
-                {#if brewNow >= 0}
-                  brewing
-                {:else if tank === "empty"}
-                  empty
-                {:else}
-                  <span class="ou-long">{TEA_NAMES[tea]}</span>
-                  <span class="ou-short" aria-hidden="true">{TEA_SHORT[tea]}</span>
-                {/if}
-              </span>
-              {#if brewNow >= 0}
-                <span class="ou-brew-bar" style={`--done: ${brewNow}`} aria-hidden="true"></span>
-              {/if}
-            </button>
-            {#if brewNow < 0 && tank !== "ok"}
-              <button
-                type="button"
-                class="boba-btn secondary ou-chip"
-                aria-label={`Brew ${TEA_NAMES[tea]}`}
-                disabled={!running || demoOn}
-                on:mousedown={keepFocus}
-                on:click={() => brew(index)}
-              >
-                Brew
-              </button>
-            {/if}
-          </div>
-        {/each}
-      </div>
-
       <!-- The bench: the cup and everything that happens to it. -->
       <div class="ou-bench">
         {#if demoOn}
           <!-- The live region reads each caption, so this copy is hidden. -->
           <p class="ou-caption" aria-hidden="true">{demoCaption}</p>
         {/if}
-        <div bind:this={benchArt} class="ou-bench-art">
+        <div bind:this={benchArt} class="ou-bench-art" style={`--taps-top: ${tapsTop}px; --taps-h: ${tapsH}px`}>
+          <!-- The back bar's controls, laid over its machines: the ice bin,
+               a tap for each tea (hold to pour), and the syrup bottle. Each
+               button is its machine; the sticker on the glass is its label. -->
+          <div bind:this={tapsEl} class="ou-taps" role="group" aria-label="Ice, taps and syrup">
+            <div class="ou-tap-slot">
+              <button
+                bind:this={iceEl}
+                type="button"
+                class="ou-tap ou-ice"
+                class:is-demo-press={demoPress === "ice"}
+                aria-label={making && iceTarget
+                  ? `Add a cube of ice, ${iceCount} of ${iceTarget} in the cup`
+                  : `Add a cube of ice, ${iceCount} in the cup`}
+                aria-keyshortcuts="ArrowUp"
+                disabled={!iceOpen}
+                on:mousedown={keepFocus}
+                on:click={() => !demoOn && addIce()}
+              ></button>
+              {#if iceOpen && iceCount > 0}
+                <button
+                  type="button"
+                  class="boba-btn secondary ou-chip"
+                  aria-label="Take a cube of ice out"
+                  aria-keyshortcuts="ArrowDown"
+                  disabled={demoOn}
+                  on:mousedown={keepFocus}
+                  on:click={removeIce}
+                >
+                  Less
+                </button>
+              {/if}
+            </div>
+            {#each TEAS as tea, index}
+              {@const brewNow = brewing[index]}
+              {@const tank = tankStates[index]}
+              <div class="ou-tap-slot">
+                <button
+                  bind:this={tapEls[index]}
+                  type="button"
+                  class="ou-tap"
+                  class:is-demo-press={demoPress === `tap-${index}`}
+                  aria-pressed={!!making && tapIndex === index}
+                  aria-label={tapLabel(index, special, brewing, tankStates)}
+                  disabled={!tapLive(index, making)}
+                  on:mousedown={keepFocus}
+                  on:pointerdown={(event) => tapDown(event, index)}
+                  on:pointerup={() => endHold("tap", true)}
+                  on:pointercancel={() => endHold("tap", false)}
+                  on:lostpointercapture={() => endHold("tap", false)}
+                  on:keydown={(event) => tapKey(event, index, true)}
+                  on:keyup={(event) => tapKey(event, index, false)}
+                  on:blur={() => endHold("tap-key", false)}
+                  on:contextmenu={(event) => event.preventDefault()}
+                >
+                  <!-- Today's special: a star by the lid. Brewing: a bar
+                       filling along the foot. -->
+                  {#if tea === special}
+                    <span class="ou-tap-star" aria-hidden="true"><PixelIcon grid={STAR} palette={{ O: "currentColor" }} px={2} /></span>
+                  {/if}
+                  {#if brewNow >= 0}
+                    <span class="ou-brew-bar" style={`--done: ${brewNow}`} aria-hidden="true"></span>
+                  {/if}
+                </button>
+                {#if brewNow < 0 && tank !== "ok"}
+                  <button
+                    type="button"
+                    class="boba-btn secondary ou-chip"
+                    aria-label={`Brew ${TEA_NAMES[tea]}`}
+                    disabled={!running || demoOn}
+                    on:mousedown={keepFocus}
+                    on:click={() => brew(index)}
+                  >
+                    Brew
+                  </button>
+                {/if}
+              </div>
+            {/each}
+            <div class="ou-tap-slot">
+              <button
+                bind:this={syrupEl}
+                type="button"
+                class="ou-tap ou-syrup"
+                class:is-demo-press={demoPress === "syrup"}
+                aria-label={making && sugarTarget
+                  ? `Pump the syrup, ${sugarCount} of ${sugarTarget} pumps in`
+                  : "Pump the syrup"}
+                disabled={!syrupOpen}
+                on:mousedown={keepFocus}
+                on:click={() => !demoOn && pumpSyrup()}
+              ></button>
+            </div>
+          </div>
           <canvas
             bind:this={canvas}
             class="ou-canvas"
@@ -4010,9 +4705,6 @@
             on:lostpointercapture={() => endHold("bench", false)}
             on:contextmenu={(event) => event.preventDefault()}
           ></canvas>
-          {#if running && !demoOn && !making && !receipt}
-            <p class="ou-idle" aria-hidden="true">pick a ticket</p>
-          {/if}
           <!-- The live region carries the same news, so this copy is hidden. -->
           {#if receipt}
             {#key receipt.id}
@@ -4033,8 +4725,8 @@
                         {/each}
                       </span>
                     {/if}
-                    {#if receipt.streak > 0}
-                      <span class="ou-receipt-streak">×{receipt.streak} streak</span>
+                    {#if receipt.combo > 0}
+                      <span class="ou-receipt-streak">×{receipt.combo} combo</span>
                     {/if}
                   {/if}
                   {#if receipt.line}<p class="ou-receipt-line">{receipt.line}</p>{/if}
@@ -4092,6 +4784,21 @@
           on:contextmenu={(event) => event.preventDefault()}
         >
           {handLabel}
+          {#if making?.station === "ice"}
+            <!-- The cubes the ticket wants, filling as each goes in. -->
+            <span class="ou-cubes is-hand" aria-hidden="true">
+              {#each Array(Math.max(iceTarget, iceCount)) as _, cube}
+                <span class="ou-cube" class:is-empty={cube >= iceCount} class:is-over={cube >= iceTarget}></span>
+              {/each}
+            </span>
+          {:else if making?.station === "sugar"}
+            <!-- The pumps the ticket wants, filling as each goes in. -->
+            <span class="ou-cubes is-hand" aria-hidden="true">
+              {#each Array(Math.max(sugarTarget, sugarCount)) as _, drop}
+                <span class="ou-drop" class:is-empty={drop >= sugarCount} class:is-over={drop >= sugarTarget}></span>
+              {/each}
+            </span>
+          {/if}
           {#if handLive && !demoOn}<kbd aria-hidden="true">Space</kbd>{/if}
         </button>
         <button
@@ -4115,7 +4822,7 @@
         >
           Sample
           <span class="ou-pips" aria-hidden="true">
-            {#each Array(SAMPLES_PER_SHIFT) as _, pip}<span class="ou-pip" class:is-used={pip >= samplesLeft}></span>{/each}
+            {#each Array(sampleCap) as _, pip}<span class="ou-pip" class:is-used={pip >= samplesLeft}></span>{/each}
           </span>
           <kbd aria-hidden="true">S</kbd>
         </button>
@@ -4124,22 +4831,30 @@
   </div>
 </div>
 
+<!-- Tickets on their way from a guest's hand up to the rail. -->
+<div class="ou-flights boba-ui" aria-hidden="true">
+  {#each flights as flight (flight.id)}
+    <span
+      class="ou-flight boba-riso is-small"
+      style={`transform: translate(${flight.fx}px, ${flight.fy}px) translate(-50%, 0) rotate(${flight.turn}deg) scale(${flight.scale})`}
+    >
+      <span class="ou-flight-lines"></span>
+    </span>
+  {/each}
+</div>
+
 {#if (countdown > 0 || goVisible) && !askFirst && !demoOn}
   <Countdown value={countdown} caption="the counter opens in" goCaption="orders up" />
 {/if}
 
 {#if askFirst}
-  <div class="boba-scrim boba-ui" role="dialog" aria-modal="true" aria-labelledby="ou-first-title">
-    <div bind:this={firstCard} class="boba-card boba-riso" tabindex="-1">
-      <h2 id="ou-first-title" class="boba-title">first shift?</h2>
-      <p class="boba-deck">Watch one drink being made first.</p>
-      <div class="boba-actions is-start">
-        <button bind:this={watchButton} type="button" class="boba-btn" on:click={() => answerFirst(true)}>
-          Watch demo
-        </button>
-        <button type="button" class="boba-btn secondary" on:click={() => answerFirst(false)}>Skip</button>
-      </div>
-    </div>
+  <!-- The shared first-time card; the wrapper is only for the focus trap. -->
+  <div bind:this={firstCard} class="ou-first">
+    <DemoCard
+      deck="Watch one drink made start to finish, or open the counter."
+      on:watch={() => answerFirst(true)}
+      on:play={() => answerFirst(false)}
+    />
   </div>
 {/if}
 
@@ -4181,10 +4896,11 @@
     stats={[
       { label: "drinks served", value: served },
       { label: "average grade", value: served ? averageGrade : "–" },
-      { label: "perfect drinks", value: perfects },
-      { label: "best streak", value: `×${bestStreak}` },
+      { label: "longest streak", value: bestStreak },
+      { label: "tip jars filled", value: jarsCashed },
       { label: "personal best", value: localBest },
     ]}
+    share={shareLines}
     on:restart={restart}
     on:menu={toMenu}
     on:exit={exit}
@@ -4311,6 +5027,8 @@
 
   /* --- The line --- */
 
+  /* The rail, and the tickets clipped to it. The rail and the clips belong
+     to the room, which keeps its colours in both themes. */
   .ou-line {
     position: relative;
     flex: none;
@@ -4320,13 +5038,16 @@
   .ou-wire {
     position: absolute;
     inset: var(--space-1) 0 auto;
+    z-index: 1;
     height: 2px;
-    background: var(--b-line);
+    background: #2b2320;
   }
 
   .ou-guests {
+    position: relative;
+    z-index: 2;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--cap, 3), minmax(0, 1fr));
     align-items: start;
     gap: var(--space-4);
     min-height: 9.5rem;
@@ -4354,12 +5075,22 @@
     touch-action: manipulation;
     transform: rotate(var(--tilt));
     transform-origin: 50% 0;
-    transition: transform var(--motion-base) var(--ease-emphasized);
+    transition:
+      transform var(--motion-base) var(--ease-emphasized),
+      opacity var(--motion-fast) var(--ease-standard);
   }
 
   /* The cup on the bench is theirs: the ticket lifts off the rail. */
   .ou-guest.is-making {
     transform: translateY(-3px) rotate(var(--tilt));
+  }
+
+  /* Still on its way up from the guest's hand: once it reaches the rail it
+     unfolds down from its clip. */
+  .ou-guest.is-hanging {
+    opacity: 0;
+    pointer-events: none;
+    transform: rotate(var(--tilt)) scaleY(0.15);
   }
 
   .ou-clip {
@@ -4368,7 +5099,7 @@
     left: 50%;
     width: 1.25rem;
     height: 0.75rem;
-    background: var(--b-line);
+    background: #2b2320;
     border-radius: 2px 2px 0 0;
     transform: translateX(-50%);
   }
@@ -4378,13 +5109,6 @@
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
-  }
-
-  .ou-face {
-    display: grid;
-    flex: none;
-    place-items: center;
-    color: var(--b-line);
   }
 
   .ou-who {
@@ -4465,6 +5189,7 @@
     align-items: center;
     gap: var(--space-1-5);
     min-width: 0;
+    overflow: hidden;
     white-space: nowrap;
   }
 
@@ -4487,10 +5212,34 @@
   }
 
   .ou-cube {
-    width: 0.375rem;
-    height: 0.375rem;
-    background: #dceef4;
+    flex: none;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    background: #8ec9e0;
     border: 1px solid var(--b-line);
+  }
+
+  /* A cube still to go in: an empty dotted slot, like the cup's marks. */
+  .ou-cube.is-empty {
+    background: transparent;
+    border: 1px dotted var(--b-muted);
+  }
+
+  /* One more than the ticket asked for. */
+  .ou-cube.is-over {
+    background: var(--b-accent);
+    border-style: solid;
+  }
+
+  /* No ice: a cube struck through. */
+  .ou-cube.is-none {
+    background: linear-gradient(to top right, transparent 42%, var(--b-line) 42% 62%, transparent 62%);
+  }
+
+  .ou-icon.ou-ice-cubes {
+    justify-content: flex-start;
+    width: auto;
+    min-width: 0.875rem;
   }
 
   /* Patience is a pencil line that shortens, turning accent near the end
@@ -4511,6 +5260,7 @@
 
   .ou-quiet {
     position: absolute;
+    z-index: 2;
     top: var(--space-8);
     left: 50%;
     margin: 0;
@@ -4526,106 +5276,63 @@
     text-align: center;
   }
 
-  /* --- The taps --- */
+  /* --- The back bar's buttons ---
+     Laid over the machines the bench draws: each button is its machine, and
+     its face is the machine's label plate. */
 
   .ou-taps {
+    position: absolute;
+    z-index: 2;
+    top: var(--taps-top);
+    right: 0;
+    left: 0;
     display: grid;
-    flex: none;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: var(--space-3);
+    height: var(--taps-h);
   }
 
-  /* A tap and, when its tank wants it, a Brew chip overlapping its foot.
-     The chip is positioned, so the row's height never moves. */
+  /* A machine and, when its tank wants it, a Brew chip at the shelf. */
   .ou-tap-slot {
     position: relative;
     display: grid;
     min-width: 0;
   }
 
-  /* One constant height at every width: the icon and the label, nothing
-     else in the flow. State lives in a corner, the edge, or the foot. */
   .ou-tap {
     position: relative;
-    display: grid;
-    overflow: hidden;
-    justify-items: center;
-    align-content: center;
-    gap: var(--space-1);
-    height: 3.5rem;
-    padding: var(--space-1) var(--space-1);
+    display: block;
+    padding: 0;
     color: var(--b-strong);
-    background: var(--b-paper);
-    border: 1px solid var(--b-rule);
+    background: none;
+    border: 0;
     border-radius: var(--radius-control);
     cursor: pointer;
     font: inherit;
-    font-size: 0.75rem;
     line-height: 1.25;
     touch-action: none;
     -webkit-touch-callout: none;
-    transition:
-      border-color var(--motion-fast) var(--ease-standard),
-      opacity var(--motion-fast) var(--ease-standard),
-      transform var(--motion-base) var(--ease-emphasized);
   }
 
-  .ou-tap:hover:not(:disabled) {
-    border-color: var(--b-muted);
-  }
-
-  .ou-tap:active:not(:disabled) {
-    transform: translateY(1px);
-  }
-
-  /* The cup is under this one: paper and an ink edge. */
-  .ou-tap[aria-pressed="true"] {
-    background: var(--b-paper);
-    border-color: var(--b-line);
-    box-shadow: inset 0 0 0 1px var(--b-line);
-  }
-
-  /* Not live: the button stays opaque over the room, its label goes muted
-     (still above 4.5:1 on the paper), the urn fades, and a dashed edge says
-     so without colour. */
+  /* The buttons draw nothing of their own: the machine under each is the
+     button, its sticker the label. Focus still shows its ring. */
   .ou-tap:disabled {
-    color: var(--b-muted);
     cursor: default;
-    border-style: dashed;
   }
 
-  .ou-tap:disabled :global(.pixel-icon) {
-    opacity: 0.55;
-  }
-
-  /* A low or empty tank: a heavier dashed accent edge (the chip and the
-     machine's window say it too, so colour never says it alone). */
-  .ou-tap.is-low,
-  .ou-tap.is-low:hover:not(:disabled) {
-    border: 2px dashed var(--b-accent);
-  }
-
-  .ou-tap-name {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
+  /* Short names only on a phone. */
   .ou-short {
     display: none;
   }
 
-  /* Today's special: a small star in the top corner. */
+  /* Today's special: a small star just over its machine's lid. */
   .ou-tap-star {
     position: absolute;
-    top: 3px;
-    right: 4px;
+    top: 0;
+    left: 50%;
     display: inline-flex;
-    color: var(--b-accent);
+    color: #c9462f;
+    transform: translate(-50%, -110%);
   }
 
   /* Brew and Less: a compact chip straddling the button's bottom edge. */
@@ -4666,8 +5373,91 @@
     gap: 2px;
   }
 
-  .ou-cube.is-empty {
-    visibility: hidden;
+  /* A pump of syrup: a drop, filled as it goes in. */
+  .ou-drop {
+    flex: none;
+    width: 0.375rem;
+    height: 0.4375rem;
+    background: #c98a2e;
+    border: 1px solid var(--b-line);
+    border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+  }
+
+  .ou-drop.is-empty {
+    background: transparent;
+    border: 1px dotted var(--b-muted);
+  }
+
+  .ou-drop.is-over {
+    background: var(--b-accent);
+    border-style: solid;
+  }
+
+  .ou-drop.is-none {
+    background: linear-gradient(to top right, transparent 42%, var(--b-line) 42% 62%, transparent 62%);
+  }
+
+  .ou-cubes.is-hand .ou-drop {
+    width: 0.5rem;
+    height: 0.5625rem;
+    border-color: currentColor;
+  }
+
+  /* Tickets in the air between a guest's hand and the rail. */
+  .ou-flights {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--layer-overlay) + 2);
+    pointer-events: none;
+  }
+
+  .ou-flight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2.5rem;
+    height: 3rem;
+    transform-origin: 50% 0;
+  }
+
+  .ou-flight-lines {
+    position: absolute;
+    inset: 0.65rem 0.45rem auto;
+    height: 1rem;
+    background: repeating-linear-gradient(var(--b-line) 0 1.5px, transparent 1.5px 5px);
+    opacity: 0.55;
+  }
+
+  /* On the hand at the ice: a little larger, on the ink face. */
+  .ou-cubes.is-hand {
+    gap: 3px;
+    margin-left: var(--space-1);
+  }
+
+  .ou-cubes.is-hand .ou-cube {
+    width: 0.5625rem;
+    height: 0.5625rem;
+    border-color: currentColor;
+  }
+
+  .ou-cubes.is-hand .ou-cube.is-empty {
+    border-style: dotted;
+  }
+
+  /* The score ticket's combo: the word, then its pips. */
+  .ou-combo {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .ou-combo .ou-pip {
+    width: 0.375rem;
+    height: 0.375rem;
+  }
+
+  .ou-first {
+    display: contents;
   }
 
   .ou-star {
@@ -4706,23 +5496,14 @@
     -webkit-touch-callout: none;
   }
 
-  .ou-idle {
-    z-index: 1;
-    grid-area: 1 / 1;
-    margin: 0 0 var(--space-8);
-    padding: var(--space-0-5) var(--space-2);
-    color: var(--b-strong);
-    background: var(--b-paper);
-    border-radius: var(--radius-control);
-    font-size: 0.9375rem;
-    pointer-events: none;
-  }
-
+  /* Up on the wall, clear of the counter, so the guest's face as they take
+     the drink is never under it. */
   .ou-receipt {
     position: relative;
-    z-index: 2;
+    z-index: 3;
     display: flex;
     grid-area: 1 / 1;
+    align-self: start;
     align-items: start;
     gap: var(--space-5);
     width: min(100%, 25rem);
@@ -5068,6 +5849,32 @@
       gap: var(--space-1);
     }
 
+    .ou-order .ou-cube {
+      width: 0.3125rem;
+      height: 0.3125rem;
+    }
+
+    .ou-ice-cubes {
+      gap: 1px;
+    }
+
+    /* Four to a row (expert): tighter tickets and smaller print. */
+    .ou-guests.is-four {
+      gap: var(--space-1);
+    }
+
+    .is-four .ou-guest {
+      padding-inline: var(--space-1);
+    }
+
+    .is-four .ou-order {
+      font-size: 0.625rem;
+    }
+
+    .is-four .ou-item {
+      gap: 3px;
+    }
+
     .ou-patience {
       margin-top: 0;
     }
@@ -5078,10 +5885,9 @@
 
     .ou-taps {
       gap: var(--space-1-5);
-      margin-bottom: var(--space-1);
     }
 
-    /* Five across: the icon over a short label. */
+    /* Six across: short labels. */
     .ou-long {
       display: none;
     }
@@ -5090,15 +5896,6 @@
       display: inline;
     }
 
-    .ou-tap {
-      gap: var(--space-0-5);
-      height: 3rem;
-      padding: var(--space-1) 2px;
-    }
-
-    .ou-tap-name {
-      font-size: 0.6875rem;
-    }
 
     .ou-chip {
       padding-inline: var(--space-1-5);

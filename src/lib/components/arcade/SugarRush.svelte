@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from "svelte";
+  import { get } from "svelte/store";
 
   import {
     setMusicPaused,
@@ -9,14 +10,18 @@
     sfxCountdown,
     sfxRunBounce,
     sfxRunBump,
+    sfxRunCreak,
+    sfxRunCupLost,
     sfxRunDeliver,
     sfxRunFall,
     sfxRunJump,
     sfxRunLand,
     sfxRunPearl,
     sfxRunSlide,
+    sfxRunShatter,
     sfxRunSmash,
     sfxRunSpill,
+    sfxRunZap,
     sfxRushEnd,
     sfxRushStart,
     sfxStart,
@@ -25,20 +30,38 @@
   } from "$lib/sfx";
   import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import {
+    BARREL_H,
+    BARREL_W,
+    DRONE_H,
+    DRONE_W,
+    ENDINGS,
+    HIT_GRACE,
+    MAX_SPARES,
     RESPAWN_GRACE,
     RUSH_TIME,
+    STEAM_PIPE,
     STEP,
     SUGAR_FULL,
+    SWING_H,
+    SWING_LOW,
+    SWING_W,
     breakdown,
     cableY,
     comboMultiplier,
     createRng,
+    isLethal,
     newRun,
     pigeonPosition,
+    plumeBox,
     respawnPoint,
+    shareLines,
     speedAt,
+    steamPhase,
     step as stepRun,
+    swingBox,
+    swingReach,
   } from "$lib/arcade/runner-engine.js";
+  import { botInput, createBot } from "$lib/arcade/runner-bot.js";
   import {
     DRINKS,
     INK,
@@ -56,27 +79,33 @@
     clearSpriteCache,
     fitCanvas,
   } from "$lib/arcade/art";
-  import { firstVisit } from "$lib/arcade/scores";
+  import { demoIntro, firstVisit } from "$lib/arcade/scores";
+  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
+  import DemoBar from "./DemoBar.svelte";
+  import DemoCard from "./DemoCard.svelte";
+  import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
   import ResultsSlip from "./ResultsSlip.svelte";
 
   // Sugar rush: a delivery cup of milk tea on legs runs the rooftops from dusk
-  // into the night. The tea in the cup is its health and its pay. Every rule
-  // lives in runner-engine.js; this file steps it at 120 Hz, paints the city
-  // around it, and answers each event with a sound and a mark.
+  // into the night, faster and faster. Spare cups are its lives and the tea
+  // is its pay. Every rule lives in runner-engine.js; this file steps it at
+  // 120 Hz, paints the city around it, and answers each event with a sound
+  // and a mark. The demo drives the same run with the reference bot in
+  // runner-bot.js, through the same keys a player has.
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
   type RunState = ReturnType<typeof newRun>;
   type Roof = RunState["chunks"][number]["roofs"][number];
   type Held = { jump: boolean; down: boolean; rush: boolean };
-  type Mode = "countdown" | "running" | "over";
-  type TeachKind = "slide" | "glide" | "rush";
+  type Mode = "intro" | "countdown" | "running" | "over";
+  type TeachKind = "slide" | "glide" | "rush" | "lethal";
 
   // --- Scale and timing ------------------------------------------------------
 
@@ -96,6 +125,14 @@
   /** The foreground hedge's top, in world y: a fall disappears behind it. */
   const HEDGE_TOP = 3;
   const OVER_SECONDS = 1.4;
+  /** A revived runner blinks on and off in windows this long. */
+  const BLINK = 0.08;
+  /** The demo's seed: a calm opening with a gap, a slide, a drop, crates and deliveries. */
+  const DEMO_SEED = 25;
+  /** The demo's script runs this long, then offers to play. */
+  const DEMO_SECONDS = 28;
+  /** A demo caption stays up at least this long before the next replaces it. */
+  const DEMO_CAPTION_SECONDS = 2.3;
   const TEACH_SECONDS = 2.4;
   const MAX_BITS = 420;
 
@@ -134,6 +171,9 @@
   const FEATHERS = ["#e3e6ec", "#9aa0ad"];
   const SPARKS = ["#fff3c4", "#ffd166"];
   const PLANKS = ["#c08a52", "#8a5a3c"];
+  /** Lethal things are striped in this and ink, and spark. */
+  const HAZARD = "#ffd23f";
+  const GLASS_SHARDS = ["#cfe8ef", "#9fc6d6", "#fdf8f3"];
 
   const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
   const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
@@ -144,12 +184,27 @@
     slide: "slide under it",
     glide: "hold jump to glide",
     rush: "rush",
+    lethal: "hazard stripes end the run",
   };
   const TEACH_KEYS: Record<TeachKind, string> = {
     slide: "boba_teach_runner_slide",
     glide: "boba_teach_runner_glide",
     rush: "boba_teach_runner_rush",
+    lethal: "boba_teach_runner_lethal",
   };
+  /** What the demo says the first time the bot does each thing. */
+  const DEMO_LINES = {
+    start: "the cup runs by itself and keeps speeding up",
+    jump: "tap jump to hop, hold it to go higher",
+    glide: "holding jump on the way down glides",
+    slide: "press down to slide under anything red and cream underneath",
+    slam: "press down in the air to slam, which breaks crates",
+    delivery: "cross a coaster to hand the tea over",
+    hit: "anything you run into costs a spare cup",
+    rush: "pearls fill the sugar for a rush that smashes through",
+    lethal: "hazard stripes end the run, spare cups or not",
+  } as const;
+  type DemoLine = keyof typeof DEMO_LINES;
 
   // --- Small helpers -----------------------------------------------------------
 
@@ -192,6 +247,8 @@
   const RUSH_PAL = { O: ACCENT, S: STRAW_PINK, l: "#fff3da", T: "#e0b07c", e: "#fff6ea", b: PEARL, C: "#fff3da", k: ACCENT, g: "#fff3da" };
   const GHOST_PAL = { O: STRAW_PINK, S: STRAW_PINK, l: STRAW_PINK, T: STRAW_PINK, e: STRAW_PINK, b: STRAW_PINK, C: STRAW_PINK, k: STRAW_PINK, g: STRAW_PINK };
   const TEA_CELLS = 7;
+  /** A spare cup's slot as it blinks: the whole cup in the ticket's accent. */
+  const FLASH_PAL: Record<string, string> = Object.fromEntries([..."OSlcwR"].map((ch) => [ch, "currentColor"]));
 
   const HEADS: Record<string, string[]> = {
     straw: ["..SSS....", "....S...."],
@@ -270,6 +327,11 @@
   /** One palette for every object grid; letters keep their meaning throughout. */
   const ITEM_PAL: Record<string, string> = {
     O: INK,
+    Y: HAZARD,
+    n: "#2a1f3d",
+    N: "#ff5fa2",
+    i: "#5ff0e6",
+    e: "#9fd0e0",
     t: "#efe6d6",
     a: "#aab6c2",
     A: "#7e8b99",
@@ -497,6 +559,136 @@
     return joined(g);
   }
 
+  // Lethal things are striped in hazard yellow and ink on the side that
+  // kills: the top of what lies on the roof, the underside of what hangs.
+
+  /** A live wire down on the roof between two striped stubs, sagging, taped. */
+  function wireGrid(width: number) {
+    const g = blank(width, 3);
+    for (let y = 0; y < 3; y++) {
+      rect(g, 0, y, 2, 1, y % 2 ? "O" : "Y");
+      rect(g, width - 2, y, 2, 1, y % 2 ? "O" : "Y");
+    }
+    for (let x = 2; x < width - 2; x++) {
+      const f = (x - 1.5) / Math.max(1, width - 3);
+      const y = Math.min(2, Math.round(Math.sin(f * Math.PI) * 1.6));
+      dot(g, x, y, (x + 3) % 9 === 0 ? "Y" : "O");
+    }
+    return joined(g);
+  }
+
+  /**
+   * A skylight: a raised frame striped along its top over two rows of
+   * glass, and the pane let into the roof below it.
+   */
+  function skylightGrid(width: number) {
+    const g = blank(width, 4);
+    for (let x = 0; x < width; x++) dot(g, x, 0, Math.floor(x / 2) % 2 ? "O" : "Y");
+    rect(g, 0, 1, width, 3, "O");
+    rect(g, 1, 1, width - 2, 1, "e");
+    rect(g, 1, 2, width - 2, 1, "u");
+    rect(g, 1, 3, width - 2, 1, "e");
+    for (let x = 6; x < width - 2; x += 7) rect(g, x, 1, 1, 3, "O");
+    for (let x = 2; x < width - 2; x += 7) {
+      dot(g, x, 1, "c");
+      dot(g, x + 1, 2, "c");
+    }
+    return joined(g);
+  }
+
+  /**
+   * A shorting neon sign on legs: a dark face with a cup in pink tube and
+   * cyan lettering, and hazard stripes under it. `dim` is a flicker frame.
+   */
+  function neonGrid(width: number, height: number, seed: number, dim: boolean) {
+    const g = blank(width, height);
+    const board = height - 6;
+    const posts = width > 52 ? [Math.floor(width * 0.18), Math.floor(width / 2) - 1, Math.floor(width * 0.82) - 2] : [Math.floor(width * 0.22), Math.floor(width * 0.78) - 2];
+    for (const x of posts) {
+      rect(g, x, board, 2, 6, "p");
+      rect(g, x + 1, board, 1, 6, "P");
+    }
+    rect(g, 0, 0, width, board, "O");
+    rect(g, 1, 1, width - 2, board - 5, "n");
+    rect(g, 1, board - 4, width - 2, 1, "O");
+    for (let x = 1; x < width - 1; x++) rect(g, x, board - 3, 1, 2, Math.floor((x - 1) / 2) % 2 ? "O" : "Y");
+    const tube = dim ? "v" : "N";
+    const glow = dim ? "v" : "i";
+    // A cup in outline, its straw, and two pearls.
+    const cx = 4;
+    const cy = Math.max(6, Math.floor((board - 5 - 16) / 2) + 2);
+    for (let y = 0; y < 13; y++) {
+      const inset = Math.floor(y / 5);
+      dot(g, cx + inset, cy + 3 + y, tube);
+      dot(g, cx + 11 - inset, cy + 3 + y, tube);
+    }
+    rect(g, cx, cy + 2, 12, 1, tube);
+    rect(g, cx + 2, cy + 15, 8, 1, tube);
+    rect(g, cx + 7, cy - 2, 1, 4, tube);
+    rect(g, cx + 7, cy - 2, 3, 1, tube);
+    dot(g, cx + 4, cy + 11, glow);
+    dot(g, cx + 7, cy + 12, glow);
+    // Lettering, one stroke broken where the tube has gone.
+    const textX = cx + 16;
+    const room = width - 3 - textX;
+    if (room >= 8) {
+      const random = createRng(seed + 5);
+      for (let row = 0; row < 3; row++) {
+        const w = Math.max(5, Math.floor(room * (0.5 + random() * 0.45)));
+        const y = cy + 2 + row * 5;
+        rect(g, textX, y, w, 1, glow);
+        rect(g, textX, y + 2, Math.max(3, w - 2), 1, glow);
+        if (row === 1) rect(g, textX + Math.floor(w / 2), y, 2, 1, "n");
+      }
+    }
+    return joined(g);
+  }
+
+  /** A steam pipe: a short metal stack with a cream cap, banded. */
+  const PIPE_GRID = ["OttttO", "OaaaAO", "OgggAO", "OaaaAO"];
+
+  /** A barrel rolling at the runner: a cream rim on top, hoops that turn as it rolls. */
+  function barrelGrid(frame: number) {
+    const g = blank(8, 7);
+    rect(g, 1, 0, 6, 7, "O");
+    rect(g, 0, 1, 8, 5, "O");
+    rect(g, 1, 1, 6, 1, "t");
+    rect(g, 1, 2, 6, 4, "w");
+    rect(g, 1, 4, 6, 1, "W");
+    for (const hoop of [(1 + frame) % 6, (4 + frame) % 6]) rect(g, 1 + hoop, 2, 1, 4, "g");
+    return joined(g);
+  }
+  const BARREL_FRAMES = [0, 1, 2, 3, 4, 5].map(barrelGrid);
+
+  /** A rival's delivery drone: rotors, a body with one eye, red and cream underneath. */
+  const DRONE_FRAMES = [
+    ["aaa...aaa", ".O.....O.", "OOOOOOOOO", "OaaaiaaaO", "RRccRRccR"],
+    [".a.....a.", ".O.....O.", "OOOOOOOOO", "OaaaiaaaO", "RRccRRccR"],
+  ];
+
+  /** A shop sign hung from a gantry: an ink frame, a cup, red and cream underneath. */
+  const SWING_SIGN = [
+    "OOOOOOOOOOOOO",
+    "OqqqqqqqqqqqO",
+    "OqqSqqOOOOqqO",
+    "OqOTOqqqqqqqO",
+    "OqOTOqOOOqqqO",
+    "RRccRRccRRccR",
+    "OOOOOOOOOOOOO",
+  ];
+
+  /** Rotten boards over a gap; once stood on, they crack. */
+  function boardsGrid(width: number, cracked: boolean) {
+    const g = blank(width, 2);
+    for (let x = 0; x < width; x++) {
+      const seam = x % 9 === 8;
+      dot(g, x, 0, seam ? "." : "k");
+      dot(g, x, 1, seam ? "." : x % 9 === 0 ? "W" : "w");
+      if (cracked && !seam && hash2(x, 17) < 0.18) dot(g, x, hash2(x, 3) < 0.5 ? 0 : 1, "O");
+    }
+    return joined(g);
+  }
+
   const PEARL_GRID = [".bb.", "bhbb", "bbbb", ".bb."];
   /** The spare's glow: two stepped discs of light around the cup, three cells out. */
   const SPARE_GLOW = [5.2, 6.4].map((radius) => {
@@ -664,7 +856,7 @@
   let goVisible = false;
   let teach: TeachKind | null = null;
   let teachAge = 0;
-  const taught: Record<TeachKind, boolean> = { slide: false, glide: false, rush: false };
+  const taught: Record<TeachKind, boolean> = { slide: false, glide: false, rush: false, lethal: false };
 
   // HUD readouts, refreshed about ten times a second.
   let score = 0;
@@ -674,12 +866,42 @@
   let rushReady = false;
   let rushing = false;
   let teaShown = 1;
-  /** The spare slot: held, popped in (counts pickups), or emptying after a save. */
-  let spareHeld = false;
-  let sparePop = 0;
-  let spareLeaving = false;
+  /**
+   * The spare cups held, and each slot's blink: a cup lost flickers out in
+   * the accent and settles empty; a cup won back flickers in and pops. Each
+   * slot keeps a count so a blink restarts if it changes again.
+   */
+  let spareCount = 0;
+  type SlotChange = "out" | "in" | null;
+  let slotChange: SlotChange[] = [];
+  let slotRestarts: number[] = [];
+  let shownSpares: number | null = null;
   let hudClock = 0;
   let finalStats = breakdown(state);
+  let finalShare: string[] = [];
+
+  /** Expert mode, read once when the game opens; the switch lives on the menu. */
+  const expert = get(arcadeExpert);
+
+  // --- The demo -----------------------------------------------------------
+  // The bot plays a normal run on a fixed seed through the same keys a
+  // player has, while a strip says what each move is the first time it
+  // happens. It records nothing and shuts out the player's game keys.
+
+  /** The first visit asks whether to watch the demo before the countdown. */
+  let askDemo = false;
+  let demoOn = false;
+  let demoEnded = false;
+  let demoCaption = "";
+  let demoClock = 0;
+  let demoShownAt = -10;
+  let demoQueue: DemoLine[] = [];
+  const demoSaid = new Set<DemoLine>();
+  let bot = createBot();
+  /** The keys the bot held last step, for the touch pads to show. */
+  let demoHeld: Held = { jump: false, down: false, rush: false };
+  let demoCard: DemoCard;
+  let demoBar: DemoBar;
 
   let canvas: HTMLCanvasElement;
   let playScope: HTMLElement;
@@ -729,12 +951,19 @@
   let slosh = 0;
   let sloshV = 0;
   let lastVy = 0;
-  let respawnAt = -10;
+  /** A runner brought back by a spare cup blinks on and off over this stretch of the clock. */
+  let blinkFrom = -10;
+  let blinkUntil = -10;
   let fallAt = -10;
   /** A spare cup is bringing the runner back; it sounds when the runner reappears. */
   let saving = false;
-  /** How the run ended: a fall drops out of sight, a dry cup stands there empty. */
-  let overCause: "fall" | "dry" | null = null;
+  /**
+   * How the run ended, as the engine names it: a fall or the railway drops
+   * out of sight, a skylight is crashed through, a live wire or neon sign
+   * leaves the runner scorched, anything else leaves it standing.
+   */
+  let overCause: string | null = null;
+  let overAtX = 0;
   let handoffAt = -10;
   let rushFlashAt = -10;
   let lastPearlSound = -1;
@@ -1107,7 +1336,7 @@
     if (reduceMotion || mode !== "running") return;
     if (balloon.on) {
       // It hangs in the far sky, so the city slides past it slowly.
-      balloon.x -= speedAt(state.runner.x) * stripS * 0.06 * dt - 4 * dt;
+      balloon.x -= speedAt(state.runner.x, state.expert) * stripS * 0.06 * dt - 4 * dt;
       if (balloon.x < -BALLOON[0].length * SC - 8) balloon.on = false;
       return;
     }
@@ -1480,7 +1709,7 @@
 
   /** mixHex toward night, cached per colour step so the draw loop never builds strings. */
   const nightMixes: Array<{ step: number; color: string }> = [];
-  const NIGHT_TARGETS = [WALL_NIGHT, WALL_NIGHT, "#141526", "#5a5470", HEDGE[1]];
+  const NIGHT_TARGETS = [WALL_NIGHT, WALL_NIGHT, "#141526", "#5a5470", HEDGE[1], WALL_NIGHT];
   function mixHexCached(color: string, slot: number, n: number) {
     const step = Math.round(n * SKY_STEPS);
     let entry = nightMixes[slot];
@@ -1544,6 +1773,25 @@
         grid = billboardGrid(w, h, seed);
         break;
       }
+      case "neon": {
+        const h = Math.round((item.y1 - (item.y0 - 11)) / CELL);
+        const seed = Math.abs(item.x0) % 7;
+        key = `sr-neon-${w}-${h}-${seed}-${v}`;
+        grid = neonGrid(w, h, seed, v === 1);
+        break;
+      }
+      case "wire":
+        key = `sr-wire-${w}`;
+        grid = wireGrid(w);
+        break;
+      case "skylight":
+        key = `sr-skylight-${w}`;
+        grid = skylightGrid(w);
+        break;
+      case "boards":
+        key = `sr-boards-${w}-${v}`;
+        grid = boardsGrid(w, v === 1);
+        break;
       case "awning":
         key = `sr-awning-${w}-${v}`;
         grid = awningGrid(w, v === 3);
@@ -1640,6 +1888,18 @@
       }
     }
 
+    // The railway: hazard stripes down both walls and a signal between them.
+    for (const chunk of state.chunks) {
+      if (chunk.x1 < left || chunk.x0 > right) continue;
+      for (const gap of chunk.gaps) if (gap.assist === "rail" && gap.x1 > left && gap.x0 < right) drawRailGap(chunk, gap);
+    }
+
+    // Gantries behind the signs that swing from them.
+    for (const chunk of state.chunks) {
+      if (chunk.x1 < left || chunk.x0 > right) continue;
+      for (const item of chunk.items) if (item.type === "swing" && !item.broken) drawGantry(item);
+    }
+
     // Poles, cables and the ropes of scaffold planks, behind what stands on the roofs.
     for (const chunk of state.chunks) {
       if (chunk.x1 < left || chunk.x0 > right + 200) continue;
@@ -1682,6 +1942,64 @@
           case "ledge": {
             const art = artFor(item, 0);
             blit(art.key, art.grid, ITEM_PAL, item.x0, item.y);
+            break;
+          }
+          case "wire":
+          case "skylight": {
+            const art = artFor(item, 0);
+            blit(art.key, art.grid, ITEM_PAL, item.x0, item.y1);
+            if (item.type === "wire") drawWireSparks(item);
+            break;
+          }
+          case "neon": {
+            // It buzzes: now and then the tubes drop out for a frame or two.
+            const flicker = !reduceMotion && ihash(Math.floor(clock / BLINK) * 31 + Math.round(item.x0)) < 0.12;
+            const art = artFor(item, flicker ? 1 : 0);
+            blit(art.key, art.grid, ITEM_PAL, item.x0, item.y1);
+            drawNeonSparks(item);
+            break;
+          }
+          case "steam": {
+            if (item.broken) break;
+            if (item.hit) ctx.globalAlpha = 0.45;
+            blit("sr-pipe", PIPE_GRID, ITEM_PAL, item.x0, item.y1);
+            ctx.globalAlpha = 1;
+            drawPlume(item);
+            break;
+          }
+          case "barrel": {
+            if (item.state === "broken" || item.state === "fell") break;
+            if (item.state === "hit") ctx.globalAlpha = 0.45;
+            // The hoops turn a step for every few units it rolls.
+            const frame = reduceMotion ? 0 : ((Math.floor(-item.x / 3) % 6) + 6) % 6;
+            blit(`sr-barrel-${frame}`, BARREL_FRAMES[frame], ITEM_PAL, item.x - BARREL_W / 2, item.y + BARREL_H);
+            ctx.globalAlpha = 1;
+            break;
+          }
+          case "drone": {
+            if (item.state === "broken") break;
+            if (item.state === "hit") ctx.globalAlpha = 0.45;
+            const frame = reduceMotion ? 0 : Math.floor(clock * 30) % 2;
+            blit(`sr-drone-${frame}`, DRONE_FRAMES[frame], ITEM_PAL, item.x - DRONE_W / 2, item.y + DRONE_H);
+            ctx.globalAlpha = 1;
+            break;
+          }
+          case "swing": {
+            if (item.broken) break;
+            const box = swingBox(item, state.time);
+            drawSwingArms(item, box);
+            if (item.hit) ctx.globalAlpha = 0.45;
+            blit("sr-swing", SWING_SIGN, ITEM_PAL, box.x0, box.y1);
+            ctx.globalAlpha = 1;
+            break;
+          }
+          case "boards": {
+            if (item.gone) break;
+            const cracked = item.at >= 0;
+            const art = artFor(item, cracked ? 1 : 0);
+            // Once stood on they shudder until they go.
+            const shudder = cracked && !reduceMotion ? (Math.floor(clock * 30) % 2 ? 0.5 : -0.5) : 0;
+            blit(art.key, art.grid, ITEM_PAL, item.x0, item.y + shudder);
             break;
           }
           case "coaster": {
@@ -1809,6 +2127,137 @@
     }
   }
 
+  /** Fills a world-space box in screen cells. */
+  function worldRect(x0: number, y0: number, x1: number, y1: number, color: string) {
+    if (!ctx) return;
+    const left = Math.round(sx(x0));
+    const top = Math.round(sy(y1));
+    ctx.fillStyle = color;
+    ctx.fillRect(left, top, Math.max(1, Math.round(sx(x1)) - left), Math.max(1, Math.round(sy(y0)) - top));
+  }
+
+  /**
+   * A gap with the railway below and no ledge: hazard stripes down both
+   * walls and over both copings, and a signal standing in the cutting.
+   */
+  function drawRailGap(chunk: RunState["chunks"][number], gap: { x0: number; x1: number }) {
+    if (!ctx) return;
+    const near = chunk.roofs.find((roof) => roof.x1 === gap.x0);
+    const far = chunk.roofs.find((roof) => roof.x0 === gap.x1);
+    const band = 4 * CELL;
+    for (const [roof, x0] of [
+      [near, gap.x0 - band],
+      [far, gap.x1],
+    ] as const) {
+      if (!roof) continue;
+      for (let y = 0; y < roof.top + CELL; y += band) {
+        worldRect(x0, y, x0 + band, Math.min(roof.top + CELL, y + band), Math.floor(y / band) % 2 ? INK : HAZARD);
+      }
+      // The coping's last stretch striped across.
+      const edge = roof === near ? gap.x0 - 7 * CELL : gap.x1;
+      for (let x = 0; x < 7; x++) worldRect(edge + x * CELL, roof.top - CELL, edge + (x + 1) * CELL, roof.top, x % 2 ? INK : HAZARD);
+    }
+    // A signal on a pole, rising out of the cutting, its lamp blinking red.
+    const mid = (gap.x0 + gap.x1) / 2;
+    const top = Math.max(26, Math.min(near?.top ?? 60, far?.top ?? 60) - 14);
+    worldRect(mid - CELL / 2, 0, mid + CELL / 2, top, "#3b3540");
+    worldRect(mid - 2 * CELL, top, mid + 2 * CELL, top + 6 * CELL, INK);
+    const lit = reduceMotion || Math.floor(clock * 2.5) % 2 === 0;
+    worldRect(mid - CELL, top + 3 * CELL, mid + CELL, top + 5 * CELL, lit ? ACCENT : "#5a2a2a");
+    worldRect(mid - CELL, top + CELL, mid + CELL, top + 2 * CELL, "#5a5470");
+  }
+
+  /** The posts and beam a swinging sign hangs from, behind the running line. */
+  function drawGantry(sign: any) {
+    if (!ctx) return;
+    const span = swingReach(sign);
+    const beam = sign.y + SWING_LOW + SWING_H + sign.len;
+    const far = mixHexCached("#4a3f5c", 5, night);
+    for (const x of [span.x0 - 6, span.x1 + 4]) worldRect(x, sign.y, x + CELL, beam + CELL, far);
+    worldRect(span.x0 - 8, beam, span.x1 + 8, beam + CELL, far);
+  }
+
+  /** Two arms from the beam down to the sign, so it stays upright as it swings. */
+  function drawSwingArms(sign: any, box: { x0: number; x1: number; y1: number }) {
+    if (!ctx) return;
+    const beam = sign.y + SWING_LOW + SWING_H + sign.len;
+    const shift = (box.x0 + box.x1) / 2 - sign.x;
+    ctx.fillStyle = INK;
+    const w = Math.max(2, Math.round(S * 0.9));
+    for (const offset of [-SWING_W / 2 + 4, SWING_W / 2 - 4]) {
+      const steps = 10;
+      for (let k = 0; k < steps; k++) {
+        const t = k / steps;
+        const x = sign.x + offset + shift * t;
+        const y = beam - (beam - box.y1) * t;
+        ctx.fillRect(Math.round(sx(x)) - w / 2, Math.round(sy(y)), w, Math.ceil(((beam - box.y1) / steps) * S) + 1);
+      }
+    }
+  }
+
+  /** A live wire spits sparks: a few cells along it, reseeded every blink. */
+  function drawWireSparks(wire: any) {
+    if (!ctx) return;
+    const tick = reduceMotion ? 0 : Math.floor(clock / BLINK);
+    const span = wire.x1 - wire.x0 - 8 * CELL;
+    for (let k = 0; k < 3; k++) {
+      const roll = ihash(tick * 13 + k * 7 + Math.round(wire.x0));
+      if (!reduceMotion && roll < 0.3) continue;
+      const x = wire.x0 + 4 * CELL + roll * span;
+      const y = wire.y0 + 2 * CELL + ihash(tick + k * 3) * 3 * CELL;
+      worldRect(x, y, x + CELL, y + CELL, k === 0 ? CREAM : HAZARD);
+      if (roll > 0.8) worldRect(x - CELL, y + CELL, x, y + 2 * CELL, HAZARD);
+    }
+  }
+
+  /** Sparks drip from a neon sign's underside. */
+  function drawNeonSparks(sign: any) {
+    if (!ctx) return;
+    const tick = reduceMotion ? 0 : Math.floor(clock / BLINK);
+    for (let k = 0; k < 2; k++) {
+      const roll = ihash(tick * 17 + k * 5 + Math.round(sign.x0));
+      if (!reduceMotion && roll < 0.35) continue;
+      const x = sign.x0 + 4 + roll * (sign.x1 - sign.x0 - 8);
+      const fall = reduceMotion ? 2 : (clock * 40 + k * 3) % 6;
+      worldRect(x, sign.y0 - CELL - fall, x + CELL, sign.y0 - fall, k ? HAZARD : CREAM);
+    }
+  }
+
+  /**
+   * A pipe's plume while it blows, filling exactly the box that is judged;
+   * a few puffs while it hisses, as a warning.
+   */
+  function drawPlume(pipe: any) {
+    if (!ctx) return;
+    const phase = steamPhase(pipe, state.time);
+    if (phase.state === "off") return;
+    const box = plumeBox(pipe);
+    const t = reduceMotion ? 0 : clock;
+    ctx.fillStyle = STEAM;
+    if (phase.state === "hiss") {
+      for (let k = 0; k < 3; k++) {
+        const rise = ((t * 40 + k * 5) % 10) + phase.f * 6;
+        ctx.globalAlpha = 0.7;
+        worldRect(box.x0 + 3 + k * 4, box.y0 + rise, box.x0 + 3 + k * 4 + CELL, box.y0 + rise + CELL, STEAM);
+      }
+      ctx.globalAlpha = 1;
+      return;
+    }
+    const height = box.y1 - box.y0;
+    for (let column = 0; column < 4; column++) {
+      const x = box.x0 + 1 + column * ((box.x1 - box.x0 - 2) / 4);
+      for (let k = 0; k < 10; k++) {
+        const room = height - 2.4 * CELL;
+        const rise = (t * 140 + (k / 10) * room + column * 13) % room;
+        const f = rise / room;
+        const size = CELL * (1.2 + f * 1.2);
+        ctx.globalAlpha = quarters(1 - f * 0.6) * 0.85;
+        worldRect(x, box.y0 + rise, x + size, box.y0 + rise + size, STEAM);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   // --- The runner -----------------------------------------------------------------------------
 
   interface Ghost {
@@ -1882,16 +2331,24 @@
     ctx.drawImage(sprite, Math.round(left), Math.round(top), Math.round(sprite.width * pk), Math.round(sprite.height * pk));
   }
 
+  /** Scorched by a live wire or a neon sign: an ink silhouette, the straw still pink. */
+  const SCORCHED_PAL = { O: INK, S: STRAW_PINK, l: INK, T: INK, e: "#3b3540", b: INK, C: INK, k: INK, g: INK };
+  const ZAP_PAL = { O: HAZARD, S: CREAM, l: CREAM, T: HAZARD, e: CREAM, b: HAZARD, C: CREAM, k: HAZARD, g: CREAM };
+  const VANISHED = new Set(["fall", "rail", "skylight"]);
+
   function drawRunner() {
-    // A fall has dropped out of sight behind the hedge; a dry cup stands there, empty.
-    if (!ctx || (state.status !== "running" && !(state.status === "over" && overCause === "dry"))) return;
+    // A fall, the railway, or a skylight drops it out of sight; anything
+    // else leaves it standing where the run ended.
+    if (!ctx || state.status === "respawning" || (state.status === "over" && VANISHED.has(overCause ?? ""))) return;
     choosePose();
     const r = state.runner;
-    const since = clock - respawnAt;
+    // Brought back by a spare cup: a hard on and off blink while the grace lasts.
+    if (!reduceMotion && clock < blinkUntil && Math.floor((clock - blinkFrom) / BLINK) % 2 === 1) return;
     let alpha = 1;
-    if (since < RESPAWN_GRACE) {
-      if (reduceMotion) alpha = 0.55;
-      else if (Math.floor(since * 10) % 2 === 1) alpha = 0.25;
+    if (state.status === "over" && (overCause === "wire" || overCause === "neon")) {
+      const zapped = !reduceMotion && clock - overAt < 0.5 && Math.floor((clock - overAt) / 0.06) % 2 === 0;
+      drawSpriteAt(`${pose.key}-${zapped ? "zap" : "burnt"}`, pose.grid, zapped ? ZAP_PAL : SCORCHED_PAL, r.x, r.y, pose.lift, pose.anchor, true);
+      return;
     }
     // Afterimages in a rush.
     if (state.rush > 0 && !reduceMotion) {
@@ -2416,7 +2873,7 @@
   function updateCamera(dt: number, snapNow = false) {
     if (!viewW) return;
     const r = state.runner;
-    const speed = speedAt(r.x) * (state.rush > 0 ? 1.2 : 1);
+    const speed = speedAt(r.x, state.expert) * (state.rush > 0 ? 1.2 : 1);
     const target = scaleFor(speed);
     S = snapNow ? target : S + (target - S) * (1 - Math.exp(-dt * 1.6));
 
@@ -2465,6 +2922,29 @@
     if (!reduceMotion) shake = Math.max(shake, amount);
   }
 
+  /** Live-region words for a lethal end. */
+  const ENDING_LIVE: Record<string, string> = {
+    wire: "Ran into a live wire.",
+    neon: "Ran into a shorting neon sign.",
+    skylight: "Crashed through a skylight.",
+    rail: "Fell onto the railway.",
+  };
+  const CUP_LOST_LIVE: Record<string, string> = { hit: "Ran into", fall: "A spare cup caught the fall", dry: "A spare cup refilled the tea" };
+
+  /** "No spare cups left", "One spare cup left", and so on. */
+  function spareWords(count: number) {
+    if (count <= 0) return "No spare cups left";
+    return `${count === 1 ? "One spare cup" : `${count} spare cups`} ${count >= MAX_SPARES ? "held, the most there is" : "left"}`;
+  }
+
+  /** Glass from a broken skylight, falling. */
+  function shards(x: number, y: number, count: number) {
+    for (let k = 0; k < count; k++) {
+      if (reduceMotion) still(B_PLANK, x + (k - count / 2) * 3, y + 2, 1, GLASS_SHARDS[k % 3], 0.4);
+      else spawn(B_PLANK, x + (Math.random() - 0.5) * 20, y + Math.random() * 6, (Math.random() - 0.5) * 140, 60 + Math.random() * 160, 1.1, 0.8, GLASS_SHARDS[k % 3]);
+    }
+  }
+
   function onEvents(events: Array<{ type: string; [key: string]: any }>) {
     for (let index = 0; index < events.length; index++) {
       const ev = events[index];
@@ -2473,14 +2953,20 @@
           sfxRunJump();
           dustBurst(ev.x, ev.y, 4, 0.7);
           if (tipVisible) tipVisible = false;
+          demoSay("jump");
           break;
         case "slide":
           sfxRunSlide();
           dustBurst(ev.x + 6, ev.y, 3, 0.6);
           if (teach === "slide") teach = null;
+          demoSay("slide");
           break;
         case "glide":
           if (teach === "glide") teach = null;
+          demoSay("glide");
+          break;
+        case "slam":
+          demoSay("slam");
           break;
         case "land": {
           const hard = ev.slam || ev.impact > 600;
@@ -2519,9 +3005,37 @@
           displayTea = Math.min(displayTea, state.tea);
           refillAt = -10;
           break;
-        case "bump":
+        case "hit":
+          // What was run into is ghosted by the engine; the cup is spent below.
           sfxRunBump();
           kick(0.5);
+          if (ev.what === "pigeon") feathers(ev.x, ev.y + 16, 10);
+          else dustBurst(ev.x + 6, ev.y + 8, 6, 1);
+          demoSay("hit");
+          break;
+        case "lethal":
+          setRunGlide(0);
+          overAtX = ev.x;
+          if (ev.what === "skylight") {
+            sfxRunShatter();
+            shards(ev.x, ev.y, 14);
+            kick(0.7);
+          } else if (ev.what === "rail") {
+            sfxRunFall();
+          } else {
+            sfxRunZap();
+            sparks(ev.x, ev.y + 10, 16);
+            sparks(ev.x, ev.y + 4, 10);
+            kick(0.8);
+          }
+          liveMessage = `${ENDING_LIVE[ev.what] ?? "That was lethal."}`;
+          break;
+        case "creak":
+          sfxRunCreak();
+          dustBurst(ev.x, ev.y, 3, 0.4);
+          break;
+        case "crumble":
+          planks((ev.x0 + ev.x1) / 2, ev.y, 8);
           break;
         case "smash":
           sfxRunSmash();
@@ -2561,12 +3075,14 @@
           liveMessage = "Sugar rush.";
           if (teach === "rush") teach = null;
           dustBurst(ev.x, ev.y, 10, 1.4);
+          demoSay("rush");
           break;
         case "rushEnd":
           sfxRushEnd();
           break;
         case "delivery":
           delivered(ev);
+          demoSay("delivery");
           break;
         case "miss": {
           const coaster = findCoaster(ev.x, ev.y);
@@ -2595,53 +3111,60 @@
           setRunGlide(0);
           fallAt = clock;
           kick(0.3);
-          liveMessage = ev.spare ? "Fell off the roofs. The spare cup saved the run." : "Fell off the roofs.";
+          liveMessage = "Fell off the roofs.";
           break;
         case "dry":
           sfxRunSpill(1);
           setRunGlide(0);
-          fallAt = clock;
           addNote(ev.x, ev.y + 34, "dry", NOTE_DIM, 1.2);
           displayTea = 0;
           refillAt = -10;
-          liveMessage = ev.spare ? "The cup ran dry. The spare cup saved the run." : "The cup ran dry.";
+          liveMessage = "The cup ran dry.";
           break;
         case "spare":
           sfxRunDeliver(true);
           if (reduceMotion) still(B_POP, ev.x, ev.y, 1.5, NOTE_GOLD, 0.2);
           else spawn(B_POP, ev.x, ev.y, 0, 0, 0.32, 1.5, NOTE_GOLD);
-          spareHeld = true;
-          sparePop += 1;
-          liveMessage = "Picked up a spare cup.";
+          followSpares(state.spare);
+          liveMessage = `Picked up a spare cup. ${spareWords(ev.held)}.`;
           break;
         case "spareBonus":
           sfxRunDeliver(true);
           if (reduceMotion) still(B_POP, ev.x, ev.y, 1.5, NOTE_GOLD, 0.2);
           else spawn(B_POP, ev.x, ev.y, 0, 0, 0.32, 1.5, NOTE_GOLD);
           addNote(ev.x, ev.y + 20, `+${ev.points}`, NOTE_GOLD, 1.1);
-          liveMessage = `A second spare cup, for ${ev.points} points.`;
+          liveMessage = `A golden cup, for ${ev.points} points.`;
           break;
         case "spareUsed":
-          // The slot empties with a beat now; the save sounds as the runner reappears.
-          saving = true;
-          spareHeld = false;
-          spareLeaving = true;
-          timers.later(() => (spareLeaving = false), reduceMotion ? 150 : 520);
+          // The slot blinks out now; a fall's save sounds as the runner reappears.
+          followSpares(state.spare);
+          if (ev.cause === "fall") {
+            saving = true;
+          } else {
+            // A hit or a dry cup carries on: it blinks through its grace.
+            blinkFrom = clock;
+            blinkUntil = clock + HIT_GRACE;
+            sfxRunCupLost();
+            refillFrom = displayTea;
+            refillAt = ev.cause === "dry" ? clock : refillAt;
+          }
+          addNote(ev.x, ev.y + 34, "−1 cup", NOTE_DIM, 1);
+          liveMessage = `${CUP_LOST_LIVE[ev.cause] ?? "Lost"}${ev.cause === "hit" ? ` ${ENDINGS[ev.what as keyof typeof ENDINGS] ?? "something"}` : ""}. ${spareWords(ev.left)}.`;
           break;
         case "respawn":
-          respawnAt = clock;
+          blinkFrom = clock;
+          blinkUntil = clock + RESPAWN_GRACE;
           anchorY = state.runner.y;
-          refillFrom = displayTea;
-          refillAt = clock;
           if (saving) {
             saving = false;
-            sfxRushStart();
+            sfxRunCupLost();
           }
           break;
         case "over":
           setRunGlide(0);
           overAt = clock;
           overCause = ev.cause;
+          followSpares(state.spare);
           mode = "over";
           break;
         case "phase":
@@ -2701,7 +3224,7 @@
   // --- Teaching, once per device ------------------------------------------------------------
 
   function readTaught() {
-    for (const kind of ["slide", "glide", "rush"] as TeachKind[]) {
+    for (const kind of ["slide", "glide", "rush", "lethal"] as TeachKind[]) {
       try {
         taught[kind] = window.localStorage.getItem(TEACH_KEYS[kind]) === "1";
       } catch {
@@ -2723,11 +3246,15 @@
 
   /** The first time each move is about to matter, one caption says so. */
   function checkTeach() {
-    if (teach || tipVisible || state.status !== "running") return;
+    if (demoOn || teach || tipVisible || state.status !== "running") return;
     const r = state.runner;
     const reach = r.vx * 1.3;
     if (!taught.rush && state.sugar >= SUGAR_FULL && state.rush === 0) {
       showTeach("rush");
+      return;
+    }
+    if (!taught.lethal && lethalAhead(reach)) {
+      showTeach("lethal");
       return;
     }
     if (taught.slide && taught.glide) return;
@@ -2752,6 +3279,77 @@
     }
   }
 
+  /** Whether something lethal (or the railway) is coming up within `reach`. */
+  function lethalAhead(reach: number) {
+    const r = state.runner;
+    for (const chunk of state.chunks) {
+      if (chunk.x1 < r.x || chunk.x0 > r.x + reach) continue;
+      for (const item of chunk.items) if (isLethal(item) && "x0" in item && item.x0 > r.x && item.x0 - r.x < reach) return true;
+      for (const gap of chunk.gaps) if (gap.assist === "rail" && gap.x0 > r.x && gap.x0 - r.x < reach) return true;
+    }
+    return false;
+  }
+
+  // --- The demo ----------------------------------------------------------------------------
+
+  /** Queues what the demo says about something, the first time it happens. */
+  function demoSay(line: DemoLine) {
+    if (!demoOn || demoEnded || demoSaid.has(line)) return;
+    demoSaid.add(line);
+    demoQueue = [...demoQueue, line];
+  }
+
+  function stepDemo(dt: number) {
+    if (!demoOn || demoEnded) return;
+    demoClock += dt;
+    const r = state.runner;
+    // Things to run into, and things that end it, get a word as they come up.
+    if (!demoSaid.has("hit")) {
+      for (const chunk of state.chunks) {
+        for (const item of chunk.items) {
+          if ((item.type === "ac" || item.type === "tank" || item.type === "crate" || item.type === "barrel") && "x0" in item && item.x0 > r.x && item.x0 - r.x < r.vx * 0.7) demoSay("hit");
+        }
+      }
+    }
+    if (lethalAhead(r.vx * 1.2)) demoSay("lethal");
+    if (demoQueue.length && clock - demoShownAt >= DEMO_CAPTION_SECONDS) {
+      demoCaption = DEMO_LINES[demoQueue[0]];
+      demoQueue = demoQueue.slice(1);
+      demoShownAt = clock;
+    }
+    if (demoClock >= DEMO_SECONDS && clock - demoShownAt >= DEMO_CAPTION_SECONDS) {
+      demoEnded = true;
+      liveMessage = "The demo is over.";
+    }
+  }
+
+  /** Plays the demo from the top: a normal run on the demo's seed, driven by the bot. */
+  function startDemo() {
+    stopMusic();
+    timers.clear();
+    releaseAll();
+    setRunGlide(0);
+    paused = false;
+    gameOver = false;
+    askDemo = false;
+    newShift(true);
+    countdown = 0;
+    goVisible = false;
+    mode = "running";
+    setMusicPhase(state.phase);
+    startMusic();
+    demoSay("start");
+    liveMessage = "The demo is playing.";
+  }
+
+  /** Out of the card or the demo into a real run, from the countdown. */
+  function playForReal() {
+    askDemo = false;
+    restart();
+    tipVisible = firstVisit("runner");
+    void tick().then(focusPlayfield);
+  }
+
   // --- Running -------------------------------------------------------------------------------
 
   function controls() {
@@ -2764,11 +3362,16 @@
   function run(dt: number) {
     accumulator += dt;
     const held = controls();
+    let shown: Held | null = null;
     while (accumulator >= STEP && state.status !== "over") {
       accumulator -= STEP;
-      const events = stepRun(state, held, STEP);
+      // The demo plays through the same keys, held by the bot.
+      const keys = demoOn ? botInput(bot, state) : held;
+      if (demoOn) shown = { jump: !!keys.jump, down: !!keys.down, rush: !!keys.rush };
+      const events = stepRun(state, keys, STEP);
       if (events.length) onEvents(events);
     }
+    if (shown && (shown.jump !== demoHeld.jump || shown.down !== demoHeld.down || shown.rush !== demoHeld.rush)) demoHeld = shown;
     if (state.status === "over") accumulator = 0;
   }
 
@@ -2837,7 +3440,31 @@
     rushReady = !rushing && state.sugar >= SUGAR_FULL;
     sugarPips = rushing ? Math.ceil((state.rush / RUSH_TIME) * 10) : Math.floor((state.sugar / SUGAR_FULL) * 10);
     teaShown = displayTea;
-    spareHeld = state.spare > 0;
+    followSpares(state.spare);
+  }
+
+  /** Follows the spare cups held, marking the slots that change so they blink. */
+  function followSpares(now: number) {
+    if (shownSpares === null || now === shownSpares) {
+      shownSpares = now;
+      spareCount = now;
+      return;
+    }
+    const kind: SlotChange = now < shownSpares ? "out" : "in";
+    for (let index = Math.min(now, shownSpares); index < Math.max(now, shownSpares); index++) {
+      slotChange[index] = kind;
+      slotRestarts[index] = (slotRestarts[index] ?? 0) + 1;
+    }
+    slotChange = slotChange;
+    slotRestarts = slotRestarts;
+    shownSpares = now;
+    spareCount = now;
+  }
+
+  function settleSlot(index: number, event: AnimationEvent) {
+    if (!event.animationName.includes("slot-blink")) return;
+    slotChange[index] = null;
+    slotChange = slotChange;
   }
 
   function frame(timestamp: number) {
@@ -2870,8 +3497,11 @@
       run(dt);
       checkTeach();
     } else if (mode === "over" && !gameOver && clock - overAt >= OVER_SECONDS) {
-      void endGame();
+      // A demo that ends early just says so; it never records anything.
+      if (demoOn) demoEnded = true;
+      else void endGame();
     }
+    stepDemo(dt);
     stepScene(dt);
     updateCamera(dt);
     hudClock += dt;
@@ -2899,7 +3529,8 @@
       return;
     }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (gameOver || paused) return;
+    // The demo and its question shut out the game's own keys.
+    if (gameOver || paused || demoOn || askDemo) return;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
     const control = KEY_CONTROLS[key];
@@ -2920,7 +3551,7 @@
   }
 
   function holdPad(control: keyof Held, down: boolean) {
-    if (down && (paused || gameOver)) return;
+    if (down && (paused || gameOver || demoOn || askDemo)) return;
     if (touchHeld[control] === down) return;
     touchHeld = { ...touchHeld, [control]: down };
   }
@@ -2947,7 +3578,7 @@
   // --- Pause, restart, and finish --------------------------------------------------------
 
   async function pauseGame() {
-    if (gameOver || paused) return;
+    if (gameOver || paused || askDemo) return;
     paused = true;
     releaseAll();
     setRunGlide(0);
@@ -2992,6 +3623,7 @@
     setRunGlide(0);
     syncHud();
     finalStats = breakdown(state);
+    finalShare = shareLines(state);
     const result = concludeRun("runner", state.score);
     localBest = result.best;
     newBest = result.newBest;
@@ -3011,8 +3643,18 @@
     if (document.activeElement instanceof HTMLButtonElement && playScope?.contains(document.activeElement)) focusPlayfield();
   }
 
-  function newShift() {
-    state = newRun(Math.floor(Math.random() * 2 ** 31));
+  /** A fresh run: a real one in the mode the menu set, or the demo's. */
+  function newShift(demo = false) {
+    demoOn = demo;
+    demoEnded = false;
+    demoCaption = "";
+    demoClock = 0;
+    demoShownAt = -10;
+    demoQueue = [];
+    demoSaid.clear();
+    demoHeld = { jump: false, down: false, rush: false };
+    bot = createBot();
+    state = demo ? newRun(DEMO_SEED) : newRun(Math.floor(Math.random() * 2 ** 31), { expert });
     mode = "countdown";
     accumulator = 0;
     countdown = COUNTDOWN_SECONDS;
@@ -3022,12 +3664,12 @@
     teach = null;
     displayTea = 1;
     refillAt = -10;
-    respawnAt = -10;
+    blinkFrom = -10;
+    blinkUntil = -10;
     fallAt = -10;
     saving = false;
     overCause = null;
-    spareLeaving = false;
-    sparePop = 0;
+    finalShare = [];
     handoffAt = -10;
     slosh = 0;
     sloshV = 0;
@@ -3144,13 +3786,23 @@
     window.addEventListener("blur", releaseAll);
     document.addEventListener("visibilitychange", onVisible);
 
+    // On the demo (the menu asked), asking about it (a first visit), or straight in.
+    const intro = demoIntro("runner", takeDemoRequest("runner"));
     newShift();
     tick().then(() => {
       if (!active) return;
       sizeCanvas();
-      tipVisible = firstVisit("runner");
-      sfxCountdown(COUNTDOWN_SECONDS);
-      liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+      if (intro === "demo") {
+        startDemo();
+      } else if (intro === "ask") {
+        askDemo = true;
+        mode = "intro";
+        liveMessage = "First time here? Watch the demo, or play.";
+      } else {
+        tipVisible = firstVisit("runner");
+        sfxCountdown(COUNTDOWN_SECONDS);
+        liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+      }
       raf = requestAnimationFrame(frame);
     });
 
@@ -3171,6 +3823,9 @@
   });
 
   $: deliveries = finalStats.deliveries;
+  $: endingWords = finalStats.ending ? (ENDINGS[finalStats.ending as keyof typeof ENDINGS] ?? "the end") : "the end";
+  /** The pads show the bot's keys while the demo plays. */
+  $: padsShown = demoOn ? demoHeld : touchHeld;
 </script>
 
 <div class="boba-stage sr-stage" aria-hidden="true"></div>
@@ -3188,6 +3843,9 @@
         </span>
         <span class="boba-stack sr-score">
           <span class="boba-big">{String(score).padStart(5, "0")}</span>
+          {#if !demoOn}
+            <ExpertTag />
+          {/if}
           {#if combo > 1}
             {#key combo}
               <span class="boba-combo active">pearls ×{combo}</span>
@@ -3199,6 +3857,7 @@
       <div
         class="boba-ticket boba-ticket-center boba-riso sr-middle"
         class:has-slab={rushReady}
+        class:is-demo={demoOn}
         style="--tilt: 0.8deg"
       >
         <span class="sr-readout">
@@ -3233,36 +3892,49 @@
           <CupTimer fraction={teaShown} rush={teaShown < 0.25} />
           <span class="boba-meta sr-tea-label">tea</span>
         </span>
-        <span class="boba-stack sr-spare" role="img" aria-label={spareHeld ? "spare cup" : "no spare cup"}>
-          {#key sparePop}
-            <span
-              class="sr-spare-slot"
-              class:is-held={spareHeld}
-              class:is-new={spareHeld && sparePop > 0}
-              class:is-leaving={spareLeaving}
-              aria-hidden="true"
-            >
-              {#if spareHeld || spareLeaving}
-                <PixelIcon grid={SPARE_CUP} palette={SPARE_ICON_PAL} px={3} />
-              {:else}
-                <svg viewBox="0 0 21 24" focusable="false">
-                  <path d="M3.5 4.5 H16.5 L19.5 7.5 V10.5 H17.5 L15.5 22.5 H5.5 L3.5 10.5 H1.5 V7.5 Z" />
-                </svg>
-              {/if}
-            </span>
-          {/key}
-          <span class="boba-meta sr-tea-label" aria-hidden="true">spare</span>
+        <!-- The spare cups are the lives: a cup per slot held, a dashed
+             outline per slot empty. A cup lost blinks out in the accent; a
+             cup won back blinks in and pops. -->
+        <span
+          class="boba-stack sr-spare"
+          role="img"
+          aria-label={`${spareCount} of ${MAX_SPARES} spare cups`}
+        >
+          <span class="sr-slots" aria-hidden="true">
+            {#each Array(MAX_SPARES) as _, index}
+              {#key slotRestarts[index] ?? 0}
+                <span
+                  class="sr-slot"
+                  class:is-held={index < spareCount}
+                  class:out={slotChange[index] === "out"}
+                  class:in={slotChange[index] === "in"}
+                  on:animationend={(event) => settleSlot(index, event)}
+                >
+                  <svg class="sr-slot-ring" viewBox="0 0 21 24" focusable="false">
+                    <path d="M3.5 4.5 H16.5 L19.5 7.5 V10.5 H17.5 L15.5 22.5 H5.5 L3.5 10.5 H1.5 V7.5 Z" />
+                  </svg>
+                  <span class="sr-slot-cup">
+                    <PixelIcon grid={SPARE_CUP} palette={SPARE_ICON_PAL} px={3} />
+                  </span>
+                  <span class="sr-slot-flash">
+                    <PixelIcon grid={SPARE_CUP} palette={FLASH_PAL} px={3} />
+                  </span>
+                </span>
+              {/key}
+            {/each}
+          </span>
+          <span class="boba-meta sr-tea-label">spare</span>
         </span>
         <HudButtons {paused} on:pause={togglePause} />
       </div>
     </div>
 
-    {#if tipVisible && !paused}
+    {#if tipVisible && !paused && !demoOn}
       <div class="boba-tip" role="note" aria-label="How to play">
         <span>jump the gaps and deliver the tea</span>
         <span class="boba-keys"><kbd>Space</kbd></span>
       </div>
-    {:else if teach && !paused}
+    {:else if teach && !paused && !demoOn}
       {#key teach}
         <p class="boba-tip sr-teach" role="note">
           <span>{TEACH_TEXT[teach]}</span>
@@ -3282,7 +3954,7 @@
         <button
           type="button"
           class="sr-pad boba-riso is-small"
-          class:is-down={touchHeld.down}
+          class:is-down={padsShown.down}
           style="--tilt: -1.2deg"
           on:pointerdown={(event) => padDown(event, "down")}
           on:pointerup={() => holdPad("down", false)}
@@ -3303,7 +3975,7 @@
           <button
             type="button"
             class="sr-pad sr-rush boba-riso is-small"
-            class:is-down={touchHeld.rush}
+            class:is-down={padsShown.rush}
             class:is-hidden={!rushReady}
             tabindex={rushReady ? 0 : -1}
             aria-hidden={!rushReady}
@@ -3325,7 +3997,7 @@
           <button
             type="button"
             class="sr-pad sr-jump boba-riso is-small"
-            class:is-down={touchHeld.jump}
+            class:is-down={padsShown.jump}
             style="--tilt: -0.9deg"
             on:pointerdown={(event) => padDown(event, "jump")}
             on:pointerup={() => holdPad("jump", false)}
@@ -3348,8 +4020,28 @@
   {/if}
 </div>
 
-{#if countdown > 0 || goVisible}
+{#if !askDemo && !demoOn && (countdown > 0 || goVisible)}
   <Countdown value={countdown} caption="out for delivery" goCaption="run" />
+{/if}
+
+{#if askDemo}
+  <DemoCard
+    bind:this={demoCard}
+    deck="Watch the courier run a stretch on its own, or go straight in."
+    on:watch={startDemo}
+    on:play={playForReal}
+  />
+{/if}
+
+{#if demoOn && !paused}
+  <DemoBar
+    bind:this={demoBar}
+    caption={demoCaption}
+    ended={demoEnded}
+    placement={touchUI ? "top" : "bottom"}
+    on:play={playForReal}
+    on:again={startDemo}
+  />
 {/if}
 
 {#if paused && !gameOver}
@@ -3369,7 +4061,7 @@
     title="clocked out"
     deck={deliveries === 0
       ? "The tea never arrived."
-      : `${deliveries} ${deliveries === 1 ? "delivery" : "deliveries"} before the run ended.`}
+      : `${deliveries} ${deliveries === 1 ? "delivery" : "deliveries"} before ${endingWords}.`}
     score={finalStats.score}
     unit="points"
     {newBest}
@@ -3380,6 +4072,7 @@
       { label: "distance", value: `${finalStats.distance} m` },
       { label: "personal best", value: localBest },
     ]}
+    share={finalShare}
     on:restart={restart}
     on:menu={toMenu}
     on:exit={exit}
@@ -3486,22 +4179,31 @@
     gap: 0;
   }
 
-  /* --- The spare slot: a to-go cup when held, its dashed outline when not --- */
+  /* --- The spare slots: a to-go cup when held, its dashed outline when not --- */
 
   .sr-spare {
     justify-items: center;
     gap: 0;
   }
 
-  .sr-spare-slot {
+  .sr-slots {
+    display: inline-flex;
+    gap: var(--space-1);
+  }
+
+  .sr-slot {
     display: grid;
-    place-items: center;
     width: 21px;
     height: 24px;
     color: var(--b-line);
   }
 
-  .sr-spare-slot svg {
+  .sr-slot > * {
+    grid-area: 1 / 1;
+    place-self: center;
+  }
+
+  .sr-slot-ring {
     width: 21px;
     height: 24px;
     overflow: visible;
@@ -3513,26 +4215,126 @@
     filter: url(#boba-rough-fine);
   }
 
-  .sr-spare-slot.is-new {
-    animation: boba-pop var(--motion-slow) var(--ease-standard);
+  .sr-slot-cup,
+  .sr-slot-flash {
+    line-height: 0;
   }
 
-  /* Spent on a save: a beat, then it is gone and the outline is left. */
-  .sr-spare-slot.is-leaving {
-    animation: sr-spare-out 0.52s var(--ease-standard) forwards;
+  .sr-slot-flash {
+    color: var(--b-accent);
+    visibility: hidden;
   }
 
-  @keyframes sr-spare-out {
-    30% {
-      transform: translateY(-3px) rotate(-6deg) scale(1.15);
+  .sr-slot.is-held .sr-slot-ring,
+  .sr-slot:not(.is-held) .sr-slot-cup {
+    visibility: hidden;
+  }
+
+  /* Lost: four hard blinks between an accent cup and the outline. */
+  .sr-slot.out .sr-slot-flash {
+    animation: slot-blink-flash-out 960ms steps(1, end) both;
+  }
+
+  .sr-slot.out .sr-slot-ring {
+    animation: slot-blink-ring-out 960ms steps(1, end) both;
+  }
+
+  @keyframes slot-blink-flash-out {
+    0%,
+    25%,
+    50% {
+      visibility: visible;
     }
-    60% {
-      opacity: 1;
-      transform: translateX(2px) rotate(4deg);
+    12.5%,
+    37.5%,
+    62.5%,
+    100% {
+      visibility: hidden;
+    }
+  }
+
+  @keyframes slot-blink-ring-out {
+    0%,
+    25%,
+    50% {
+      visibility: hidden;
+    }
+    12.5%,
+    37.5%,
+    62.5%,
+    100% {
+      visibility: visible;
+    }
+  }
+
+  /* Won back: the outline blinks into an accent cup, then the cup lands with a pop. */
+  .sr-slot.in {
+    animation: slot-pop 840ms var(--ease-emphasized) both;
+  }
+
+  .sr-slot.in .sr-slot-ring {
+    animation: slot-blink-ring-in 840ms steps(1, end) both;
+  }
+
+  .sr-slot.in .sr-slot-flash {
+    animation: slot-blink-flash-in 840ms steps(1, end) both;
+  }
+
+  .sr-slot.in .sr-slot-cup {
+    animation: slot-blink-cup-in 840ms steps(1, end) both;
+  }
+
+  @keyframes slot-blink-ring-in {
+    0%,
+    25%,
+    50% {
+      visibility: visible;
+    }
+    12.5%,
+    37.5%,
+    62.5%,
+    75%,
+    100% {
+      visibility: hidden;
+    }
+  }
+
+  @keyframes slot-blink-flash-in {
+    0%,
+    25%,
+    50%,
+    75%,
+    100% {
+      visibility: hidden;
+    }
+    12.5%,
+    37.5%,
+    62.5% {
+      visibility: visible;
+    }
+  }
+
+  @keyframes slot-blink-cup-in {
+    0%,
+    62.5% {
+      visibility: hidden;
+    }
+    75%,
+    100% {
+      visibility: visible;
+    }
+  }
+
+  @keyframes slot-pop {
+    0%,
+    62% {
+      transform: scale(1);
+    }
+    78% {
+      transform: scale(1.35);
     }
     100% {
-      opacity: 0;
-      transform: translateY(4px) scale(0.7);
+      transform: scale(1);
     }
   }
 
@@ -3657,8 +4459,9 @@
 
   @media (prefers-reduced-motion: reduce) {
     .sr-sugar.is-ready .sr-pips,
-    .sr-spare-slot.is-new,
-    .sr-spare-slot.is-leaving {
+    .sr-slot.in,
+    .sr-slot.in > *,
+    .sr-slot.out > * {
       animation: none;
     }
 
@@ -3670,6 +4473,11 @@
   @media (max-width: 640px) {
     .sr-middle {
       gap: var(--space-3);
+    }
+
+    /* On a phone the demo's strip takes the middle ticket's row. */
+    .sr-middle.is-demo {
+      visibility: hidden;
     }
 
     .sr-tea-label {

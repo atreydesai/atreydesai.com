@@ -20,7 +20,7 @@ import {
   pumpShape,
   stepBeat,
 } from "../src/lib/music/notation.ts";
-import { bandSizes, climbingPlaylist, shuffledPlaylist } from "../src/lib/music/playlist.ts";
+import { bandSizes, climbingPlaylist, rememberOpener, shuffledPlaylist } from "../src/lib/music/playlist.ts";
 
 const PHASES = ["opening", "steady", "rush"];
 const DRUMS = ["kick", "snare", "rim", "hat", "open", "shaker"];
@@ -309,6 +309,50 @@ test("a shuffled playlist is every song once, avoiding the last opener", () => {
   const openers = new Set();
   for (let seed = 1; seed <= 200; seed++) openers.add(shuffledPlaylist(10, null, seeded(seed))[0]);
   assert.equal(openers.size, 10);
+});
+
+test("a shuffled playlist opens on none of the recent openers while it can", () => {
+  for (let seed = 1; seed <= 300; seed++) {
+    const count = 2 + (seed % 11);
+    const avoid = Array.from({ length: Math.min(count - 1, 6) }, (_, index) => (seed + index * 5) % count);
+    const list = shuffledPlaylist(count, avoid, seeded(seed));
+    assert.equal(new Set(list).size, count);
+    assert.ok(!avoid.includes(list[0]), `seed ${seed}: opened on ${list[0]}, avoiding ${avoid}`);
+  }
+  // Every song to avoid: it still never repeats the very last opener.
+  for (let seed = 1; seed <= 50; seed++) {
+    const list = shuffledPlaylist(4, [2, 0, 1, 3], seeded(seed));
+    assert.notEqual(list[0], 2);
+  }
+  // Half the songbook avoided: every one of the other half gets to open.
+  const openers = new Set();
+  for (let seed = 1; seed <= 300; seed++) openers.add(shuffledPlaylist(12, [0, 1, 2, 3, 4, 5], seeded(seed))[0]);
+  assert.deepEqual([...openers].sort((a, b) => a - b), [6, 7, 8, 9, 10, 11]);
+});
+
+test("recent openers are newest first, each once, capped", () => {
+  assert.deepEqual(rememberOpener([], 3, 6), [3]);
+  assert.deepEqual(rememberOpener([3, 1], 4, 6), [4, 3, 1]);
+  assert.deepEqual(rememberOpener([4, 3, 1], 1, 6), [1, 4, 3]);
+  assert.deepEqual(rememberOpener([5, 4, 3, 2, 1, 0], 9, 6), [9, 5, 4, 3, 2, 1]);
+});
+
+test("a climbing playlist opens on a slow song that didn't just open", () => {
+  const tempos = SONGS.map((song) => song.bpm);
+  const slowest = tempos
+    .map((bpm, index) => ({ bpm, index }))
+    .sort((a, b) => a.bpm - b.bpm || a.index - b.index)
+    .slice(0, 3)
+    .map((entry) => entry.index);
+  for (let seed = 1; seed <= 100; seed++) {
+    const avoid = [slowest[seed % 3], slowest[(seed + 1) % 3]];
+    const list = climbingPlaylist(tempos, 4, seeded(seed), avoid);
+    assert.equal(list[0], slowest[(seed + 2) % 3]);
+  }
+  // With the whole band to avoid it still draws from the band.
+  for (let seed = 1; seed <= 20; seed++) {
+    assert.ok(slowest.includes(climbingPlaylist(tempos, 4, seeded(seed), slowest)[0]));
+  }
 });
 
 test("a climbing playlist draws one song from each tempo band, slowest first", () => {

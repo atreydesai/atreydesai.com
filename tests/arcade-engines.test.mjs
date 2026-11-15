@@ -116,12 +116,17 @@ test("a stab goes to the closest waiting cup, and late cups are missed", () => {
 
 test("a close drop is perfect and keeps the full width", () => {
   const top = { left: -7, width: START_WIDTH };
-  for (const left of [-6.4, -5.6, -8.5]) {
+  // The first cup's window is 0.45 units (30 ms at the opening slide).
+  for (const left of [-7, -6.6, -7.45]) {
     const result = dropCup(top, left);
     assert.equal(result.kind, "perfect", `left ${left}`);
     assert.deepEqual(result.placed, top);
     assert.equal(result.cut, null);
   }
+  // What used to be perfect (up to 1.5 units off) now lands whole but isn't,
+  // or is cut.
+  assert.equal(dropCup(top, -6.4).kind, "close");
+  assert.equal(dropCup(top, -5.6).kind, "cut");
   assert.equal(dropCup(top, -5.4).kind, "cut");
 });
 
@@ -146,6 +151,7 @@ test("a cup anywhere on the wider tray lands whole, with nothing cut", () => {
     kind: "clean",
     placed: { left: tray.left, width: START_WIDTH },
     cut: null,
+    offset: -TRAY_MARGIN,
   });
   const right = tray.left + tray.width - START_WIDTH;
   assert.deepEqual(dropCup(tray, right, START_WIDTH).placed, { left: right, width: START_WIDTH });
@@ -154,11 +160,14 @@ test("a cup anywhere on the wider tray lands whole, with nothing cut", () => {
 test("on the tray, perfect means centred", () => {
   const tray = traySpan();
   const centre = -START_WIDTH / 2;
-  for (const left of [centre, centre + 1.4, centre - 1.5]) {
+  for (const left of [centre, centre + 0.4, centre - 0.45]) {
     const result = dropCup(tray, left, START_WIDTH);
     assert.equal(result.kind, "perfect", `left ${left}`);
     assert.deepEqual(result.placed, { left: centre, width: START_WIDTH });
   }
+  // Snapped onto the centre from a little further off: whole, not perfect.
+  assert.equal(dropCup(tray, centre + 0.8, START_WIDTH).kind, "close");
+  assert.equal(dropCup(tray, centre + 1.4, START_WIDTH).kind, "clean");
   const off = dropCup(tray, centre + 2, START_WIDTH);
   assert.equal(off.kind, "clean");
   assert.deepEqual(off.placed, { left: centre + 2, width: START_WIDTH });

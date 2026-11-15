@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   AFTER_HOURS,
   EVENTS,
+  EXPERT_PLAN,
+  EXPERT_SLACK,
   FLOOR,
   IN_PIPE,
   MAX_FRAME,
@@ -31,6 +33,7 @@ import {
   describeRoom,
   drawStrokes,
   emptyProgress,
+  expertRoom,
   extendStroke,
   frameSteps,
   judgeCup,
@@ -48,6 +51,7 @@ import {
   remix,
   removeStroke,
   roomAt,
+  shareLines,
   simplify,
   simulate,
   snapToStraws,
@@ -415,6 +419,75 @@ test("a conveyor slides its cup back and forth, then stops after the pour", () =
   assert.equal(xs.at(-1), xs.at(-2), "stopped");
 });
 
+test("a kettle on a rail waits where it is, then slides while it pours, whenever the pour begins", () => {
+  const rail = { range: 50, period: 2, phase: 0 };
+  const room = bareRoom({ plan: 10, kettles: [{ x: 120, y: 60, vx: 0, vy: 40, count: 40, rate: 20, rail }] });
+  const sweep = (pourAt) => {
+    const world = createWorld(room);
+    /** @type {number[]} */
+    const xs = [];
+    let started = -1;
+    run(world, pourAt + 2, (w) => {
+      if (w.time >= pourAt && w.status === "waiting") pourNow(w);
+      if (started < 0 && w.kettles[0].started) started = w.time;
+      if (started >= 0) xs.push(w.kettles[0].x);
+    });
+    return { xs, world };
+  };
+  const early = sweep(1);
+  const late = sweep(4);
+  assert.equal(createWorld(room).kettles[0].x, 120, "waits at the rail's middle (phase 0)");
+  // Half a period in: out to one end and back; the same path for any pour time.
+  assert.ok(Math.max(...early.xs) > 168 && Math.max(...early.xs) <= 170 + 1e-9);
+  for (let k = 0; k < 200; k++) assert.ok(Math.abs(early.xs[k] - late.xs[k]) < 1e-6);
+  // The stream is spread along the rail, not dropped in one place.
+  const world = early.world;
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < world.count; i++) {
+    min = Math.min(min, world.p.x[i]);
+    max = Math.max(max, world.p.x[i]);
+  }
+  assert.ok(max - min > 60, `spread ${min.toFixed(0)} to ${max.toFixed(0)}`);
+  // The whole run of the spout is kept clear of straws.
+  assert.equal(beginStroke(createWorld(room), 165, 62), false);
+  assert.ok(beginStroke(createWorld(room), 120, 90));
+  // It stops where it is once it is empty.
+  run(early.world, 1);
+  assert.equal(early.world.kettles[0].left, 0);
+  const after = early.world.kettles[0].x;
+  run(early.world, 1);
+  assert.equal(early.world.kettles[0].x, after);
+});
+
+test("a sieve holds pearls and lets tea and milk straight through", () => {
+  const world = createWorld(
+    bareRoom({
+      kettles: [
+        { x: 60, y: 60, vx: 0, vy: 40, count: 20, rate: 20, delay: 0 },
+        { x: 70, y: 60, vx: 0, vy: 40, count: 10, rate: 20, delay: 0, kind: "milk" },
+      ],
+      hopper: { x: 64, y: 40, count: 3, interval: 0.2 },
+      sieves: [{ x1: 10, y1: 150, x2: 130, y2: 150 }],
+    }),
+  );
+  let landed = 0;
+  run(world, 3, (w) => {
+    for (let i = 0; i < w.count; i++) {
+      // Nothing that crosses the mesh's span is a pearl.
+      if (w.p.kind[i] === PEARL && w.p.x[i] > 14 && w.p.x[i] < 126) assert.ok(w.p.y[i] < 150, "a pearl stays on the mesh");
+    }
+  });
+  let dropsBelow = 0;
+  for (let i = 0; i < world.count; i++) {
+    if (world.p.kind[i] === PEARL && world.p.y[i] < 150) landed++;
+    else if (world.p.kind[i] !== PEARL && world.p.y[i] > 250) dropsBelow++;
+  }
+  assert.ok(landed >= 2, "the pearls are held (one may roll off an end)");
+  // All but a drop or two that came to rest on the pearls themselves.
+  assert.ok(dropsBelow >= 28, `${dropsBelow} of 30 fell through`);
+});
+
 test("kettles wait out the planning time, and pour now ends it early, keeping the stagger", () => {
   const room = bareRoom({
     plan: 20,
@@ -651,14 +724,16 @@ test("400 droplets step 120 times well inside 50ms", () => {
 
 // --- Rooms --------------------------------------------------------------------------------------
 
-test("eighteen rooms in six pages of three, each with a name, a hint and a budget", () => {
-  assert.equal(ROOMS.length, 18);
-  assert.equal(new Set(ROOMS.map((room) => room.id)).size, 18);
-  for (let page = 1; page <= 6; page++) assert.equal(ROOMS.filter((room) => room.page === page).length, 3);
+test("forty-eight rooms in sixteen pages of three, each with a name, a hint and a budget", () => {
+  assert.equal(ROOMS.length, 48);
+  assert.equal(new Set(ROOMS.map((room) => room.id)).size, 48);
+  assert.equal(new Set(ROOMS.map((room) => room.name)).size, 48, "no two rooms share a name");
+  for (let page = 1; page <= 16; page++) assert.equal(ROOMS.filter((room) => room.page === page).length, 3);
   ROOMS.forEach((room, i) => {
     assert.equal(room.page, Math.floor(i / 3) + 1);
     assert.equal(room.name, room.name.toLowerCase());
     assert.ok(room.hint.length > 10 && !room.hint.includes("!"));
+    assert.ok(room.hint === room.hint.toLowerCase() && !room.hint.includes("·"));
     assert.ok(room.straw > 0);
   });
 });
@@ -713,6 +788,116 @@ test("remixes squeeze harder as difficulty grows", () => {
   }
 });
 
+// --- Expert -------------------------------------------------------------------------------------
+
+/** A pen's pace: the expert route drawn one straw at a time, as a player would. */
+const PEN_SECONDS = 1.5;
+
+/**
+ * Plays a room with its route drawn one straw every PEN_SECONDS from the
+ * moment it opens, pouring when the route says. Returns the verdict.
+ * @param {import("../src/lib/arcade/spill-engine.js").Room} room
+ */
+function playAtPenPace(room) {
+  const route = room.solution.strokes;
+  const world = createWorld(room);
+  const pourAt = room.solution.pourAt;
+  let drawn = 0;
+  for (let n = 0; n < 60 / STEP && !world.result; n++) {
+    while (drawn < route.length && world.time >= drawn * PEN_SECONDS) assert.equal(drawStrokes(world, [route[drawn++]]), 1, "drawn in full");
+    if (pourAt !== undefined && world.status === "waiting" && world.time >= pourAt) pourNow(world);
+    step(world);
+  }
+  assert.equal(drawn, route.length);
+  return world.result;
+}
+
+for (const [index, room] of ROOMS.entries()) {
+  test(`room ${index + 1}, ${room.name}, expert: drawn at a pen's pace, the route still clears on far less`, () => {
+    const expert = expertRoom(room);
+    const route = expert.solution.strokes;
+    const length = route.reduce((sum, line) => sum + polylineLength(line), 0);
+    // Just enough straw for the route, hardly any time, a fuller order.
+    assert.ok(expert.straw <= room.straw && expert.straw <= Math.ceil(length * EXPERT_SLACK));
+    assert.ok(length > expert.straw * 0.95, "the route needs nearly all of it");
+    assert.equal(expert.plan, EXPERT_PLAN);
+    assert.ok(route.length * PEN_SECONDS <= EXPERT_PLAN, "time to draw the route before the pour");
+    expert.cups.forEach((cup, c) => {
+      assert.ok(cup.order.need >= room.cups[c].order.need);
+      if (cup.order.milk !== undefined) assert.ok((cup.order.tol ?? 0.1) < (room.cups[c].order.tol ?? 0.1));
+    });
+
+    // One straw every PEN_SECONDS from the moment the room opens.
+    const result = playAtPenPace(expert);
+    assert.equal(result?.cleared, true, `${result?.cups.map((cup) => cup.count)}`);
+    // And without its straws it fails, as the room always does.
+    assert.equal(simulate(expert, []).result.cleared, false);
+  });
+
+  test(`room ${index + 1}, ${room.name}, expert after hours: its remix, mirrored and not, clears on the route's straw at a pen's pace`, () => {
+    // As it comes round in the first lap of expert after hours, at that lap's difficulty.
+    const seen = new Set();
+    for (let seed = 1; seed <= 24 && seen.size < 2; seed++) {
+      const remixed = roomAt(AFTER_HOURS + index, seed, true);
+      if (seen.has(remixed.remix?.mirrored)) continue;
+      seen.add(remixed.remix?.mirrored);
+      const route = remixed.solution.strokes.reduce((sum, line) => sum + polylineLength(line), 0);
+      assert.equal(remixed.straw, Math.ceil(route), "just the route's straw");
+      assert.ok(remixed.straw <= expertRoom(room).straw && remixed.plan === EXPERT_PLAN);
+      const result = playAtPenPace(remixed);
+      assert.equal(result?.cleared, true, `mirrored ${remixed.remix?.mirrored}: ${result?.cups.map((cup) => cup.count)}`);
+    }
+    assert.equal(seen.size, 2, "saw both a mirrored and an unmirrored remix");
+  });
+}
+
+test("expert is its own harder take: less straw overall, stricter stars, and remixes keep the route's straw", () => {
+  let normal = 0;
+  let expert = 0;
+  for (const room of ROOMS) {
+    normal += room.straw;
+    expert += expertRoom(room).straw;
+  }
+  assert.ok(expert < normal * 0.9, `${expert} of ${normal}`);
+  const room = ROOMS[2];
+  const hard = expertRoom(room);
+  assert.equal(expertRoom(hard), hard, "already expert");
+  assert.ok((hard.keep ?? [0, 0])[1] > 0.75 && (hard.keep ?? [0, 0])[0] > 0.55);
+  assert.equal(roomAt(2, 1, true).straw, hard.straw);
+  assert.equal(roomAt(2).straw, room.straw);
+  const remixed = roomAt(AFTER_HOURS + 2, 5, true);
+  assert.equal(remixed.remix?.of, room.id);
+  const route = remixed.solution.strokes.reduce((sum, line) => sum + polylineLength(line), 0);
+  assert.ok(remixed.straw >= route, "never cut below the route");
+  // Expert remixes pour the room's own droplets, and squeeze the order and
+  // the belt only from the second lap on.
+  const belt = ROOMS[6];
+  for (let seed = 1; seed < 40; seed++) {
+    const first = remix(expertRoom(belt), 3, seed);
+    assert.deepEqual(first.cups[0].order, expertRoom(belt).cups[0].order);
+    assert.equal(first.cups[0].conveyor?.period, belt.cups[0].conveyor?.period);
+    assert.equal(first.seed, remix(expertRoom(belt), 1, seed + 1).seed);
+  }
+  let squeezed = 0;
+  for (let seed = 1; seed < 40; seed++) {
+    const later = remix(expertRoom(belt), 6, seed);
+    if (later.cups[0].order.need > expertRoom(belt).cups[0].order.need || (later.cups[0].conveyor?.period ?? 0) < (belt.cups[0].conveyor?.period ?? 0)) squeezed++;
+  }
+  assert.ok(squeezed > 0, "later laps squeeze expert too");
+});
+
+test("the share text is a square per room, a page of three to a group, four pages to a line", () => {
+  let progress = emptyProgress();
+  assert.deepEqual(shareLines(progress), Array(4).fill(Array(4).fill("⬜⬜⬜").join(" ")));
+  progress = recordRoomResult(progress, 0, cleared(3, 310));
+  progress = recordRoomResult(progress, 1, cleared(2, 210));
+  progress = recordRoomResult(progress, 2, cleared(1, 110));
+  const lines = shareLines(progress);
+  assert.equal(lines.length, 4);
+  assert.ok(lines[0].startsWith("🟩🟨🟧 ⬜⬜⬜"));
+  for (const line of lines) assert.equal([...line.replaceAll(" ", "")].length, 12);
+});
+
 test("mirroring flips everything left to right", () => {
   const room = ROOMS[17];
   const m = mirrorRoom(room);
@@ -725,17 +910,26 @@ test("mirroring flips everything left to right", () => {
   const fans = mirrorRoom(ROOMS[3]);
   assert.equal(fans.fans?.[0].fx, -(ROOMS[3].fans?.[0].fx ?? 0));
   assert.equal((fans.fans?.[0].x ?? 0) + (fans.fans?.[0].w ?? 0), WIDTH - (ROOMS[3].fans?.[0].x ?? 0));
+  const railed = ROOMS.find((room) => room.kettles.some((k) => k.rail));
+  assert.ok(railed);
+  assert.equal(mirrorRoom(railed).kettles[0].rail?.range, -(railed.kettles[0].rail?.range ?? 0));
+  const sieved = ROOMS.find((room) => room.sieves?.length);
+  assert.ok(sieved?.sieves);
+  assert.deepEqual(mirrorRoom(sieved).sieves?.[0], { ...sieved.sieves[0], x1: WIDTH - sieved.sieves[0].x1, x2: WIDTH - sieved.sieves[0].x2 });
 });
 
 test("after the authored rooms, after hours carries on with remixes", () => {
   assert.equal(AFTER_HOURS, ROOMS.length);
   assert.equal(roomAt(0), ROOMS[0]);
-  assert.equal(roomAt(17), ROOMS[17]);
+  assert.equal(roomAt(47), ROOMS[47]);
   const next = roomAt(AFTER_HOURS, 3);
   assert.equal(next.remix?.of, ROOMS[0].id);
   assert.equal(next.remix?.difficulty, 1);
-  assert.equal(roomAt(18 + 6 * 3, 3).remix?.difficulty, 4);
-  assert.deepEqual(roomAt(25, 3), roomAt(25, 3));
+  // A step harder every sixteen remixes: three steps a lap of the rooms.
+  assert.equal(roomAt(AFTER_HOURS + 15, 3).remix?.difficulty, 1);
+  assert.equal(roomAt(AFTER_HOURS + 16 * 3, 3).remix?.difficulty, 4);
+  assert.equal(roomAt(AFTER_HOURS + ROOMS.length, 3).remix?.of, ROOMS[0].id, "a lap visits every room");
+  assert.deepEqual(roomAt(60, 3), roomAt(60, 3));
 });
 
 // --- Progress ---------------------------------------------------------------------------------------
@@ -777,8 +971,8 @@ test("the total is the sum of best points, and the summary counts rooms, stars a
   progress = recordRoomResult(progress, 1, cleared(2, 250));
   progress = recordRoomResult(progress, 2, cleared(3, 312));
   assert.equal(progressTotal(progress), 902);
-  assert.equal(MAX_STARS, 54);
-  assert.deepEqual(progressSummary(progress), { rooms: 18, cleared: 3, stars: 8, maxStars: 54, threeStar: 2, total: 902 });
+  assert.equal(MAX_STARS, 144);
+  assert.deepEqual(progressSummary(progress), { rooms: 48, cleared: 3, stars: 8, maxStars: 144, threeStar: 2, total: 902 });
   assert.equal(progressTotal(emptyProgress()), 0);
 });
 
@@ -803,11 +997,27 @@ test("stored progress is checked field by field, so junk or an old shape never b
   assert.equal(cleaned.stars.length, ROOMS.length);
   assert.equal(cleaned.afterHours, false);
   // A migrated reach (rooms before it cleared with one star) may run past the authored rooms.
-  const migrated = cleanProgress({ stars: Array(25).fill(1), points: Array(25).fill(100) });
+  const migrated = cleanProgress({ stars: Array(64).fill(1), points: Array(64).fill(100) });
   assert.equal(migrated.stars.length, ROOMS.length);
   assert.equal(migrated.afterHours, true, "the last room cleared means after hours is open");
-  assert.equal(progressTotal(migrated), 1800);
+  assert.equal(progressTotal(migrated), 4800);
   assert.deepEqual(cleanProgress(JSON.parse(JSON.stringify(migrated))), migrated, "round-trips through JSON");
+});
+
+test("a save from the eighteen-room shop keeps its rooms, and the new ones open in order before after hours", () => {
+  const old = {
+    stars: [3, 2, 3, 1, 3, 3, 2, 2, 3, 3, 3, 1, 2, 3, 3, 2, 3, 3],
+    points: [340, 250, 312, 140, 330, 310, 260, 240, 300, 314, 311, 150, 230, 312, 313, 240, 312, 330],
+    afterHours: true,
+  };
+  const progress = cleanProgress(old);
+  assert.deepEqual(progress.stars.slice(0, 18), old.stars);
+  assert.deepEqual(progress.points.slice(0, 18), old.points);
+  assert.equal(progressTotal(progress), old.points.reduce((sum, points) => sum + points, 0));
+  assert.deepEqual(unlockedRooms(progress).slice(16, 21), [true, true, true, false, false], "room 19 is next; 20 waits for it");
+  assert.equal(nextRoom(progress), 18);
+  assert.equal(progress.afterHours, false, "after hours now opens with room 48");
+  assert.equal(progressSummary(progress).cleared, 18);
 });
 
 test("a room's points add straw left over and an early pour, scaled by the planning time given back", () => {
@@ -827,6 +1037,9 @@ test("a room's points add straw left over and an early pour, scaled by the plann
 test("every room plans for a while, longer as the game goes on", () => {
   for (const room of ROOMS) assert.ok((room.plan ?? 20) >= 10 && (room.plan ?? 20) <= 30);
   assert.ok((ROOMS[0].plan ?? 20) < (ROOMS[17].plan ?? 20));
+  assert.ok((ROOMS[17].plan ?? 20) <= (ROOMS.at(-1)?.plan ?? 20));
+  // Later pages plan at least as long as the first page's rooms.
+  for (const room of ROOMS.slice(18)) assert.ok((room.plan ?? 20) >= 20, room.name);
   assert.equal(createWorld({ ...ROOMS[3], plan: undefined }).plan, 20);
 });
 
@@ -860,5 +1073,9 @@ test("rooms describe themselves for screen readers", () => {
   assert.match(text, /hopper/);
   assert.match(text, /300 units of straw, and 30 seconds to plan/);
   assert.match(describeRoom(ROOMS[6]), /sliding back and forth/);
+  const railed = ROOMS.find((room) => room.kettles.some((k) => k.rail));
+  assert.match(describeRoom(/** @type {any} */ (railed)), /on a rail/);
+  const sieved = ROOMS.find((room) => room.sieves?.length);
+  assert.match(describeRoom(/** @type {any} */ (sieved)), /sieve .* holds pearls/);
   for (const room of ROOMS) assert.ok(!describeRoom(room).includes("undefined"));
 });

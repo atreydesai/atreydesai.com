@@ -51,9 +51,18 @@ export function concludeRun(game: GameId, score: number, reason: "hearts" | "tim
   return recordScore(game, score);
 }
 
-/** True when a key press belongs to a focused button or field, not the game. */
+/**
+ * True when a key press belongs to a focused button or field, not the game.
+ * The HUD's pause and mute buttons are the exception for Space: focus lands
+ * on pause after a resume, and Space is every game's main action, so there
+ * it goes to the game (HudButtons keeps it from pressing the button). Enter
+ * still presses them.
+ */
 export function isOnControl(event: KeyboardEvent) {
-  return event.target instanceof HTMLElement && !!event.target.closest("button, input");
+  if (!(event.target instanceof HTMLElement)) return false;
+  const control = event.target.closest("button, input");
+  if (!control) return false;
+  return !(event.key === " " && control.closest(".boba-hud-buttons"));
 }
 
 interface ShellOptions {

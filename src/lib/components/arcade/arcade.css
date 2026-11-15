@@ -456,6 +456,29 @@ body.boba-active .custom-cursor {
   margin-top: var(--space-6);
 }
 
+/* Pause says each thing once, so its three buttons sit on one line: the card
+   is wide enough for them with their key chips, and on a phone (no chips)
+   the labels keep their width and the padding gives way first. */
+.boba-pause-card {
+  width: min(100%, 27rem);
+}
+
+.boba-pause-card .boba-actions {
+  flex-wrap: nowrap;
+}
+
+.boba-pause-card .boba-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .boba-pause-card .boba-btn {
+    padding-inline: var(--space-3);
+  }
+}
+
 /* Buttons are hand-cut paper labels. The shape lives on the pseudo-elements,
    so the filter roughens the paper and never the label: the face (paper and
    a rough ink outline) on ::after, the primary's accent slab on ::before.

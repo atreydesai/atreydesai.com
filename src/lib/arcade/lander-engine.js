@@ -27,6 +27,52 @@ export const FEATHER_BONUS = 25;
 /** Site 1's tank; the HUD gauge is fuel / MAX_FUEL. */
 export const MAX_FUEL = 620;
 export const START_LIVES = 3;
+/**
+ * Touchdown limits: fastest safe descent and sideways drift, and the most
+ * tilt a landing forgives.
+ * @typedef {{ vy: number, vx: number, tilt: number }} Limits
+ */
+/** @type {Readonly<Limits>} */
+export const SAFE = { vy: SAFE_VY, vx: SAFE_VX, tilt: SAFE_TILT };
+
+/**
+ * Expert is a lot harder, from the first site: wind already blowing at site
+ * 1 and rising faster, with a stronger gust and a quick flutter on top;
+ * coasters a quarter narrower; a smaller cup with a lower floor; a stricter
+ * touchdown; and two landers instead of three. The wind tops out where
+ * normal's does, because past it even a careful autopilot can't hold still
+ * over the narrowest coaster. The floor is about a fifth more than that
+ * autopilot burns reaching the furthest coaster from the start (about 355),
+ * and a test holds it to landing everywhere with 15% of the cup to spare.
+ */
+export const EXPERT = {
+  lives: 2,
+  /** @type {Readonly<Limits>} */
+  safe: { vy: 12, vx: 7, tilt: 0.15 },
+  /** Coasters are this share of normal width, never under padMin. */
+  padScale: 0.75,
+  padMin: 27,
+  /** Site 1's tank, then this much less a site, down to the floor. */
+  fuel: 560,
+  fuelStep: 30,
+  fuelFloor: 430,
+  /** Wind at site 1, then this much more a site, up to the cap. */
+  wind: 3,
+  windStep: 0.7,
+  windCap: 6.5,
+  /** The slow gust's swing, and a quicker flutter on top of it. */
+  gust: 0.45,
+  flutter: 0.2,
+};
+
+/**
+ * Landers a run starts with.
+ * @param {boolean} [expert]
+ */
+export function livesFor(expert = false) {
+  return expert ? EXPERT.lives : START_LIVES;
+}
+
 /** Feet sit at local x = ±FOOT_SPAN. */
 export const FOOT_SPAN = 11;
 /** Feet sit at local y = -FOOT_DROP, so a landed ship rests at pad.y + FOOT_DROP. */
@@ -92,9 +138,10 @@ const PLUME_THROTTLE = 0.08;
  * @typedef {{
  *   n: number, name: string, terrain: Terrain, seed: number,
  *   points: Array<[number, number]>, pads: Pad[], features: Feature[],
- *   wind: number, fuel: number
+ *   wind: number, fuel: number, expert: boolean, safe: Limits
  * }} Site
  */
+/** @typedef {{ expert?: boolean }} SiteOptions */
 /** @typedef {"flying" | "landed" | "crashed"} ShipState */
 /**
  * @typedef {{
@@ -230,7 +277,8 @@ export function terrainFor(n, seed) {
 
 /**
  * Points multiplier for landing at site n: ×1 at site 1, a quarter more for
- * each site after it, up to ×3 from site 9.
+ * each site after it, up to ×3 from site 9. It is applied to every landing's
+ * points but never shown: the player sees the points it pays, not the factor.
  * @param {number} n
  */
 export function siteMultiplier(n) {
@@ -633,9 +681,11 @@ const PAD_WIDTH = { 2: 74, 3: 52, 5: 38 };
  * @param {number} n
  * @param {number} seed the run's seed; each site derives its own from it
  * @param {Terrain} [terrain] to build a given kind of ground instead of the route's
+ * @param {SiteOptions} [options] expert builds the expert run's site
  * @returns {Site}
  */
-export function makeSite(n, seed, terrain) {
+export function makeSite(n, seed, terrain, options = {}) {
+  const expert = !!options.expert;
   const plan = route(n, seed);
   const kind = terrain ?? plan[n - 1];
   const visits = plan.slice(0, n - 1).filter((t) => t === kind).length;
@@ -649,7 +699,9 @@ export function makeSite(n, seed, terrain) {
   const pads = multipliers.map((multiplier, i) => ({
     cx: slot * (i + 0.5) + (random() - 0.5) * slot * 0.36,
     y: 0,
-    width: Math.max(29, PAD_WIDTH[multiplier] * shrink),
+    width: expert
+      ? Math.max(EXPERT.padMin, PAD_WIDTH[multiplier] * shrink * EXPERT.padScale)
+      : Math.max(29, PAD_WIDTH[multiplier] * shrink),
     multiplier,
   }));
 
@@ -704,7 +756,6 @@ export function makeSite(n, seed, terrain) {
   points = points.filter((p, index) => index === 0 || p[0] - points[index - 1][0] > 0.05);
 
   const direction = random() < 0.5 ? -1 : 1;
-  const wind = n < 2 ? 0 : direction * Math.min(6.5, 1.4 + 0.9 * (n - 2));
   const names = SITE_NAMES[kind];
   return {
     n,
@@ -714,9 +765,41 @@ export function makeSite(n, seed, terrain) {
     points,
     pads,
     features: profile.features,
-    wind,
-    fuel: Math.max(270, 620 - 50 * (n - 1)),
+    // `|| 0` so a calm site's wind is 0, never -0.
+    wind: direction * windFor(n, expert) || 0,
+    fuel: fuelFor(n, expert),
+    expert,
+    safe: expert ? EXPERT.safe : SAFE,
   };
+}
+
+/**
+ * The mean wind's strength at site n. A normal run's first site is calm and
+ * the wind rises from the second; an expert run's is already blowing.
+ * @param {number} n
+ * @param {boolean} [expert]
+ */
+export function windFor(n, expert = false) {
+  if (expert) return Math.min(EXPERT.windCap, EXPERT.wind + EXPERT.windStep * (n - 1));
+  return n < 2 ? 0 : Math.min(6.5, 1.4 + 0.9 * (n - 2));
+}
+
+/** The leanest tank a late site gets. */
+export const FUEL_FLOOR = 450;
+
+/**
+ * A site's tank. It shrinks 30 a site from site 1's full cup to a floor of
+ * 450, which is about a third more than a careful autopilot burns reaching the
+ * furthest coaster from the start against the strongest wind (about 350), so
+ * every coaster can be flown to by a player who isn't perfect. Later sites
+ * stay harder through narrow coasters and wind, not an empty cup. Expert
+ * starts on a smaller cup and goes down to a lower floor (see EXPERT).
+ * @param {number} n
+ * @param {boolean} [expert]
+ */
+export function fuelFor(n, expert = false) {
+  if (expert) return Math.max(EXPERT.fuelFloor, EXPERT.fuel - EXPERT.fuelStep * (n - 1));
+  return Math.max(FUEL_FLOOR, MAX_FUEL - 30 * (n - 1));
 }
 
 /**
@@ -786,7 +869,9 @@ export function padUnder(site, leftX, rightX) {
  * @param {number} time seconds since the site began
  */
 export function windAt(site, time) {
-  return site.wind ? site.wind * (1 + 0.35 * Math.sin(time * 0.7)) : 0;
+  if (!site.wind) return 0;
+  if (!site.expert) return site.wind * (1 + 0.35 * Math.sin(time * 0.7));
+  return site.wind * (1 + EXPERT.gust * Math.sin(time * 0.7) + EXPERT.flutter * Math.sin(time * 2.3 + 0.8));
 }
 
 /**
@@ -825,14 +910,15 @@ export function newShip(site, viewHeight) {
  * @param {Pick<Ship, "vx" | "vy" | "angle">} ship
  * @param {Pad | null} pad
  * @param {boolean} bodyHit whether anything but the feet touched
+ * @param {Limits} [safe] the site's limits; normal's by default
  * @returns {CrashReason | null} null for a good landing
  */
-export function judgeTouchdown(ship, pad, bodyHit) {
-  if (ship.vy < -SAFE_VY * 1.8 || Math.abs(ship.vx) > SAFE_VX * 2.2) return "fast";
+export function judgeTouchdown(ship, pad, bodyHit, safe = SAFE) {
+  if (ship.vy < -safe.vy * 1.8 || Math.abs(ship.vx) > safe.vx * 2.2) return "fast";
   if (!pad) return "off";
-  if (bodyHit || Math.abs(ship.angle) > SAFE_TILT) return "tilt";
-  if (ship.vy < -SAFE_VY) return "hard";
-  if (Math.abs(ship.vx) > SAFE_VX) return "drift";
+  if (bodyHit || Math.abs(ship.angle) > safe.tilt) return "tilt";
+  if (ship.vy < -safe.vy) return "hard";
+  if (Math.abs(ship.vx) > safe.vx) return "drift";
   return null;
 }
 
@@ -903,7 +989,7 @@ export function stepShip(ship, controls, site, time, h, ceiling = Infinity) {
       ship.x - FOOT_SPAN * cos - FOOT_DROP * sin,
       ship.x + FOOT_SPAN * cos - FOOT_DROP * sin,
     );
-    const reason = judgeTouchdown(ship, pad, bodyHit);
+    const reason = judgeTouchdown(ship, pad, bodyHit, site.safe ?? SAFE);
     if (reason || !pad) {
       ship.state = "crashed";
       ship.throttle = 0;
@@ -968,4 +1054,149 @@ export function clearance(ship, site) {
 export function zoomForClearance(c) {
   const t = clamp((c - 175) / (46 - 175), 0, 1);
   return t * t * (3 - 2 * t);
+}
+
+// --- The autopilot --------------------------------------------------------------
+
+/**
+ * An autopilot flying toward one coaster: where it is going, what it last
+ * measured of the ground ahead, and whether it has started down.
+ * @typedef {{ pad: Pad, target: number, clear: number, descending: boolean, steps: number }} Pilot
+ */
+
+/**
+ * Sets an autopilot on a coaster from where the ship is now. It goes the
+ * short way round the moon, or with `way` set, that way (+1 east, -1 west).
+ * @param {Pad} pad
+ * @param {Pick<Ship, "x">} ship
+ * @param {number} [way]
+ * @returns {Pilot}
+ */
+export function createPilot(pad, ship, way = 0) {
+  let target = pad.cx - ship.x - Math.round((pad.cx - ship.x) / PERIOD) * PERIOD;
+  if (way && Math.sign(target) !== way) target += way * PERIOD;
+  return { pad, target: target + ship.x, clear: 0, descending: false, steps: 0 };
+}
+
+/**
+ * The autopilot's keys for one fixed step, the same three a player has. It
+ * glides toward the coaster above the ground ahead, settles over it, comes
+ * down braking late, and stands upright just before its low foot lands,
+ * inside the site's own touchdown limits. Thrust is pulsed against the
+ * engine's own throttle lag. Call once per step, before stepShip.
+ * @param {Pilot} pilot mutated: its view of the ground and its phase
+ * @param {Ship} ship
+ * @param {Site} site
+ * @param {number} time seconds since the site began, for the wind
+ * @returns {Controls}
+ */
+export function pilotControls(pilot, ship, site, time) {
+  const { pad, target } = pilot;
+  const safe = site.safe ?? SAFE;
+  // How slowly it touches down, how hard it brakes coming down, and how
+  // upright it stands to land, all inside the site's limits.
+  const touch = Math.min(9, safe.vy - 4);
+  const brake = (12 * safe.vy) / SAFE_VY;
+  const upright = safe.tilt - 0.03;
+  // How far off the coaster's centre it lets the wind push it before it
+  // stops coming down: less on a coaster with little room around the feet.
+  const room = (pad.width + 3) / 2 - FOOT_SPAN;
+  const drift = Math.min(4, room - 1);
+  const dx = target - ship.x;
+  if (pilot.steps++ % 12 === 0) {
+    const reach = Math.sign(dx) * Math.min(Math.abs(dx) + 30, 220);
+    pilot.clear = highestGround(site, ship.x - Math.sign(dx) * 30, ship.x + reach) + FOOT_DROP + 26;
+  }
+  const height = ship.y - FOOT_DROP - pad.y;
+  const vxWant = Math.sign(dx) * Math.min(75, Math.sqrt(16 * Math.abs(dx)), 1.2 * Math.abs(dx));
+  if (!pilot.descending && Math.abs(dx) < 2.5 && Math.abs(ship.vx) < 1.5) pilot.descending = true;
+  let vyWant;
+  let holding = false;
+  if (pilot.descending) {
+    // Hold still if the wind has pushed the ship off the coaster.
+    holding = Math.abs(dx) > drift && height > 10;
+    vyWant = holding ? 0 : height < 8 ? -touch : -Math.min(45, Math.sqrt(brake * (height - 8)) + touch);
+  } else {
+    const want = Math.max(pilot.clear, pad.y + FOOT_DROP + 10 + 0.35 * Math.abs(dx));
+    vyWant = want > ship.y ? Math.min(14, (want - ship.y) * 0.8) : -Math.min(45, Math.sqrt(12 * (ship.y - want)));
+  }
+  const ax = (vxWant - ship.vx) * 1.2 - windAt(site, time);
+  const ay = Math.max(0, (vyWant - ship.vy) * 2 + GRAVITY);
+
+  // High up it may lean far over to brake; low down it leans into the
+  // wind, then stands up before the lower foot lands.
+  const roomy = ship.y - groundAt(site, ship.x) > 70;
+  const soon = height / Math.max(3, -ship.vy);
+  const low = ship.y - pad.y - FOOT_DROP * Math.cos(ship.angle) - FOOT_SPAN * Math.abs(Math.sin(ship.angle));
+  const standUp = Math.max(0, Math.abs(ship.angle) - upright) / 2.2 + 0.1;
+  let limit = roomy ? 1.3 : 1;
+  if (pilot.descending && !holding) {
+    if (soon < 0.55 || low / Math.max(2, -ship.vy) < standUp + 0.15) limit = upright;
+    else limit = soon < 1 ? 0.45 : Math.min(limit, 0.75);
+  }
+  const angleWant = clamp(Math.atan2(ax, Math.max(ay, 2)), -limit, limit);
+  const sin = Math.sin(ship.angle);
+  const sideways = Math.abs(sin) > 0.05 && Math.sign(sin) === Math.sign(ax) ? ax / sin : 0;
+  const along = ax * sin + ay * Math.cos(ship.angle);
+  const throttleWant = clamp(Math.max(along, roomy || limit < 0.2 ? 0 : sideways) / THRUST, 0, 1);
+  const lead = ship.angle + ship.spin * 0.1;
+  return {
+    left: lead > angleWant + 0.015,
+    right: lead < angleWant - 0.015,
+    thrust: ship.throttle < throttleWant,
+  };
+}
+
+// --- The demo -------------------------------------------------------------------
+
+/** The run seed whose calm first site the demo flies. */
+export const DEMO_SEED = 2;
+/** Seconds the demo stays on its landing before it is over. */
+export const DEMO_HOLD = 3;
+
+/**
+ * The demo's flight: a normal run's first site (calm, the gentlest ground)
+ * and its ×5 coaster, far enough off that the autopilot shows every step.
+ * @returns {{ site: Site, pad: Pad }}
+ */
+export function demoFlight() {
+  const site = makeSite(1, DEMO_SEED);
+  const pad = site.pads.find((p) => p.multiplier === 5 && p.cx > 330 && p.cx < 720) ?? site.pads[1];
+  return { site, pad };
+}
+
+/** One line for each part of the demo, said while it happens. */
+export const DEMO_CAPTIONS = {
+  burn: "Hold burn to slow the fall.",
+  fuel: "The tea in the cup is the fuel.",
+  steer: "Tilt to line up over a coaster.",
+  descend: "Come down slow and level.",
+  landed: "The tea left over is the score.",
+};
+
+/**
+ * Which part of the demo the flight is in.
+ * @param {Pilot} pilot
+ * @param {Pick<Ship, "state">} ship
+ * @param {number} time seconds since the flight began
+ * @returns {keyof typeof DEMO_CAPTIONS}
+ */
+export function demoStage(pilot, ship, time) {
+  if (ship.state === "landed") return "landed";
+  if (pilot.descending) return "descend";
+  if (time < 3.5) return "burn";
+  if (time < 7.5) return "fuel";
+  return "steer";
+}
+
+// --- Sharing ------------------------------------------------------------------
+
+/**
+ * One emoji for an attempt in a shared run: the coaster's multiplier as a
+ * keycap for a landing, a burst for a crash.
+ * @param {Touchdown} touchdown
+ */
+export function attemptEmoji(touchdown) {
+  if (touchdown.kind === "crash") return "💥";
+  return `${touchdown.pad.multiplier}️⃣`;
 }

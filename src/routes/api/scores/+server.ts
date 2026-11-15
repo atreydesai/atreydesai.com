@@ -8,24 +8,37 @@ import type { RequestHandler } from './$types';
 export const prerender = false;
 export const trailingSlash = 'ignore';
 
-// One board per arcade game. Catch keeps its v2 file: v2 scores use the
-// timed/combo/golden rules and are intentionally kept separate from the
-// original endless-mode board. A request without a game means catch, so
-// older clients keep working.
+// One board per arcade game and mode. Catch's v2 file held its timed rules;
+// catch is endless from v3, so it starts a fresh board, and sugar rush and cup
+// stack did the same at v2 when they got much harder. Expert mode has its own board for every
+// game. A request without a game means catch, and one without a mode means
+// normal, so older clients keep working.
 const BOARDS = {
-	catch: 'boba/v2-leaderboard.json',
+	catch: 'boba/catch-v3-leaderboard.json',
 	stab: 'boba/stab-v1-leaderboard.json',
 	orders: 'boba/orders-v2-leaderboard.json',
-	stack: 'boba/stack-v1-leaderboard.json',
+	stack: 'boba/stack-v2-leaderboard.json',
 	lander: 'boba/lander-v1-leaderboard.json',
-	runner: 'boba/runner-v1-leaderboard.json',
+	runner: 'boba/runner-v2-leaderboard.json',
 	spill: 'boba/spill-v1-leaderboard.json',
 } as const;
 
-function boardPath(game: unknown): string | null {
-	if (game === null || game === undefined || game === '') return BOARDS.catch;
-	if (typeof game !== 'string' || !Object.hasOwn(BOARDS, game)) return null;
-	return BOARDS[game as keyof typeof BOARDS];
+const EXPERT_BOARDS: Record<keyof typeof BOARDS, string> = {
+	catch: 'boba/catch-v3-expert-leaderboard.json',
+	stab: 'boba/stab-v1-expert-leaderboard.json',
+	orders: 'boba/orders-v2-expert-leaderboard.json',
+	stack: 'boba/stack-v2-expert-leaderboard.json',
+	lander: 'boba/lander-v1-expert-leaderboard.json',
+	runner: 'boba/runner-v2-expert-leaderboard.json',
+	spill: 'boba/spill-v1-expert-leaderboard.json',
+};
+
+function boardPath(game: unknown, mode: unknown): string | null {
+	if (mode !== null && mode !== undefined && mode !== '' && mode !== 'normal' && mode !== 'expert') return null;
+	const key = game === null || game === undefined || game === '' ? 'catch' : game;
+	if (typeof key !== 'string' || !Object.hasOwn(BOARDS, key)) return null;
+	const id = key as keyof typeof BOARDS;
+	return mode === 'expert' ? EXPERT_BOARDS[id] : BOARDS[id];
 }
 
 const MAX_ENTRIES = 50; // keep the blob small
@@ -154,7 +167,7 @@ function rateLimited(ip: string, now: number): boolean {
 }
 
 export const GET: RequestHandler = async ({ url }) => {
-	const path = boardPath(url.searchParams.get('game'));
+	const path = boardPath(url.searchParams.get('game'), url.searchParams.get('mode'));
 	if (!path) return json({ available: false, scores: [] }, { status: 400 });
 	if (!token) return json({ available: false, scores: [] });
 	const board = await readBoard(path);
@@ -187,14 +200,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		return json({ ok: false, reason: 'too many submissions, slow down' }, { status: 429 });
 	}
 
-	let body: { name?: unknown; score?: unknown; game?: unknown };
+	let body: { name?: unknown; score?: unknown; game?: unknown; mode?: unknown };
 	try {
 		body = await request.json();
 	} catch {
 		return json({ ok: false, reason: 'bad request' }, { status: 400 });
 	}
 
-	const path = boardPath(body.game);
+	const path = boardPath(body.game, body.mode);
 	if (!path) return json({ ok: false, reason: 'unknown game' }, { status: 400 });
 
 	// Validate score: a non-negative integer within a sane ceiling.

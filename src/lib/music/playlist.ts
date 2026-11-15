@@ -1,14 +1,21 @@
 // Which songs a run plays, and in what order. Pure: give it a `random` and
 // the same draw comes back, so all of it runs under `node --test`.
 
+/** `avoid` as a list, whether it came as one song, several, or none. */
+function avoidList(avoid: number | null | readonly number[]): readonly number[] {
+  if (avoid === null) return [];
+  return typeof avoid === "number" ? [avoid] : avoid;
+}
+
 /**
  * Every song once, in a fresh order (a Fisher–Yates shuffle of
- * `0..count-1`). When it would open on `avoidFirst`, the opener trades
- * places with another song, so two runs in a row never start the same way.
+ * `0..count-1`). It never opens on a song in `avoidFirst` (the songs that
+ * opened the last few runs) while any other song could open instead: the
+ * opener trades places with a song drawn from the rest.
  */
 export function shuffledPlaylist(
   count: number,
-  avoidFirst: number | null,
+  avoidFirst: number | null | readonly number[],
   random: () => number = Math.random,
 ): number[] {
   const list = Array.from({ length: Math.max(0, count) }, (_, index) => index);
@@ -16,11 +23,27 @@ export function shuffledPlaylist(
     const pick = Math.floor(random() * (index + 1)) % (index + 1);
     [list[index], list[pick]] = [list[pick], list[index]];
   }
-  if (list.length > 1 && list[0] === avoidFirst) {
-    const swap = 1 + (Math.floor(random() * (list.length - 1)) % (list.length - 1));
-    [list[0], list[swap]] = [list[swap], list[0]];
+  const avoid = avoidList(avoidFirst);
+  if (list.length > 1 && avoid.includes(list[0])) {
+    const fresh = list.map((_, index) => index).filter((index) => index > 0 && !avoid.includes(list[index]));
+    // Every song is one to avoid: then only the very last opener is.
+    const pool = fresh.length
+      ? fresh
+      : list.map((_, index) => index).filter((index) => index > 0 && list[index] !== avoid[0]);
+    if (pool.length) {
+      const swap = pool[Math.floor(random() * pool.length) % pool.length];
+      [list[0], list[swap]] = [list[swap], list[0]];
+    }
   }
   return list;
+}
+
+/**
+ * The openers to steer clear of next time: `opener` first, then the
+ * earlier ones, each once, at most `keep` of them.
+ */
+export function rememberOpener(recent: readonly number[], opener: number, keep: number): number[] {
+  return [opener, ...recent.filter((song) => song !== opener)].slice(0, Math.max(0, keep));
 }
 
 /**
@@ -44,12 +67,14 @@ export function bandSizes(count: number, picks: number): number[] {
  * `picks` songs whose tempo climbs: rank the songs by tempo (ties by
  * index), split the ranking into `picks` contiguous bands, draw one song
  * from each, and return them slowest first. More picks than songs plays
- * every song, slowest first.
+ * every song, slowest first. The opener is drawn from the slowest band's
+ * songs that aren't in `avoidFirst`, while there are any.
  */
 export function climbingPlaylist(
   tempos: number[],
   picks = 4,
   random: () => number = Math.random,
+  avoidFirst: readonly number[] = [],
 ): number[] {
   const ranked = tempos
     .map((bpm, index) => ({ bpm, index }))
@@ -58,7 +83,10 @@ export function climbingPlaylist(
   const chosen: number[] = [];
   let from = 0;
   for (const size of bandSizes(ranked.length, picks)) {
-    chosen.push(ranked[from + (Math.floor(random() * size) % size)]);
+    const band = ranked.slice(from, from + size);
+    const fresh = chosen.length === 0 ? band.filter((song) => !avoidFirst.includes(song)) : [];
+    const pool = fresh.length ? fresh : band;
+    chosen.push(pool[Math.floor(random() * pool.length) % pool.length]);
     from += size;
   }
   return chosen;

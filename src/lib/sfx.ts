@@ -5,7 +5,7 @@
 // from a short look-ahead timer.
 
 import { createMusicEngine, type MusicEngine } from "./music/engine";
-import { climbingPlaylist, shuffledPlaylist } from "./music/playlist";
+import { climbingPlaylist, rememberOpener, shuffledPlaylist } from "./music/playlist";
 import { SONGS, type MusicPhase } from "./music/songs";
 
 const MASTER_LEVEL = 0.48;
@@ -55,8 +55,37 @@ let clockHeld = false;
 let currentRoot = 60;
 let currentScale = [0, 2, 4, 7, 9];
 
-/** The song that opened the last shuffled run, so the next one opens on another. */
-let lastOpener: number | null = null;
+// The songs that opened the last few runs, newest first, kept on this device
+// so a fresh visit doesn't open on the same song as the last one either.
+// Half the songbook: the next run always opens on one of the other half.
+const RECENT_KEY = "boba_recent_openers_v1";
+const RECENT_KEEP = Math.floor(SONGS.length / 2);
+let recentOpeners: number[] | null = null;
+
+function recent(): number[] {
+  if (recentOpeners) return recentOpeners;
+  recentOpeners = [];
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(RECENT_KEY) ?? "[]");
+    if (Array.isArray(stored)) {
+      recentOpeners = stored
+        .filter((song): song is number => Number.isInteger(song) && song >= 0 && song < SONGS.length)
+        .slice(0, RECENT_KEEP);
+    }
+  } catch {
+    // Storage may be unavailable; the run still avoids this visit's openers.
+  }
+  return recentOpeners;
+}
+
+function noteOpener(opener: number) {
+  recentOpeners = rememberOpener(recent(), opener, RECENT_KEEP);
+  try {
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(recentOpeners));
+  } catch {
+    // As above.
+  }
+}
 
 let songListener: ((name: string) => void) | null = null;
 
@@ -297,7 +326,12 @@ export function songTempos(order?: number[]) {
 
 /** A fresh four for straw stab: one from each tempo band, slowest first. */
 export function stabPlaylist(): number[] {
-  return climbingPlaylist(SONGS.map((song) => song.bpm));
+  return climbingPlaylist(
+    SONGS.map((song) => song.bpm),
+    4,
+    Math.random,
+    typeof window === "undefined" ? [] : recent(),
+  );
 }
 
 /**
@@ -355,7 +389,8 @@ export function setMusicPhase(phase: MusicPhase) {
 /**
  * Starts the soundtrack. With an `order`, plays those songs eight bars each
  * (the rhythm form); without one, every song in a fresh shuffle, whole
- * songs each, never opening on the song that opened the last such run.
+ * songs each, never opening on a song that opened one of the last six runs
+ * (on this device, across visits).
  * Returns the audio time of the first downbeat, or null when there is no
  * audio to start.
  */
@@ -373,11 +408,11 @@ export function startMusic(order?: number[]): number | null {
     opener = given[0];
     musicEngine.start(given, firstDownbeat);
   } else {
-    const shuffled = shuffledPlaylist(SONGS.length, lastOpener);
+    const shuffled = shuffledPlaylist(SONGS.length, recent());
     opener = shuffled[0];
-    lastOpener = opener;
     musicEngine.start(shuffled, firstDownbeat, "listening");
   }
+  noteOpener(opener);
   // Keyed to the opening song now; the first bar, scheduled below, keeps
   // the effects on each song as it comes on.
   currentRoot = SONGS[opener].sfxRoot;
@@ -1395,4 +1430,101 @@ export function sfxRoomFail() {
   const start = c.currentTime;
   note(midiFrequency(scaleMidi(1, 2)), start, 0.13, "triangle", 0.12);
   note(midiFrequency(scaleMidi(1, 0)), start + 0.15, 0.26, "triangle", 0.11);
+}
+
+/** Order up: a tip coin drops into the jar, each a little higher than the last. */
+export function sfxCoin(step = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  const lift = Math.min(Math.max(Math.floor(step), 0), 11) * 40;
+  note(2_100 + lift, start, 0.04, "triangle", 0.07);
+  note(3_150 + lift, start + 0.03, 0.06, "sine", 0.05);
+}
+
+/** Order up: the tip jar fills and pays out, a bright climbing run. */
+export function sfxTipJar() {
+  const c = audioContext();
+  if (!c) return;
+  duckMusic(0.5, 0.35);
+  const start = c.currentTime;
+  [0, 2, 4, 5].forEach((step, index) => {
+    note(midiFrequency(scaleMidi(2, step)), start + index * 0.07, index === 3 ? 0.26 : 0.09, "triangle", 0.15);
+  });
+  effectNoise(start + 0.26, 0.2, 0.05, "highpass", 6_000);
+}
+
+/** Order up: the combo steps up; a higher step climbs further. */
+export function sfxCombo(level = 2) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  const top = Math.min(Math.max(Math.floor(level), 2), 4);
+  for (let index = 0; index < top; index++) {
+    note(midiFrequency(scaleMidi(2, index * 2 + top - 2)), start + index * 0.06, 0.08, "square", 0.09);
+  }
+}
+
+/** Order up: the ice is right, a soft high ding. */
+export function sfxIceFull() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  note(midiFrequency(scaleMidi(3, 4)), start, 0.12, "sine", 0.08);
+  note(midiFrequency(scaleMidi(3, 7)), start + 0.05, 0.16, "sine", 0.06);
+}
+
+/** Sugar rush: a live wire or a shorting sign, a crackle and a falling buzz. */
+export function sfxRunZap() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  duckMusic(0.6, 0.25);
+  for (let index = 0; index < 4; index++) {
+    effectNoise(start + index * 0.045, 0.035, 0.12, "highpass", 3_500 + index * 600);
+  }
+  dropAt(start, 240, 60, 0.45, "square", 0.07);
+}
+
+/** Sugar rush: a skylight gives way, glass and a drop. */
+export function sfxRunShatter() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  duckMusic(0.6, 0.25);
+  effectNoise(start, 0.32, 0.14, "highpass", 5_000, 1_800);
+  [3, 5, 2].forEach((step, index) => {
+    note(midiFrequency(scaleMidi(3, step)), start + 0.02 + index * 0.05, 0.06, "triangle", 0.08);
+  });
+  dropAt(start + 0.12, midiFrequency(scaleMidi(2, 0)), 110, 0.5, "triangle", 0.14);
+}
+
+/** Sugar rush: rotten boards take the weight, a dry creak. */
+export function sfxRunCreak() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  effectNoise(start, 0.16, 0.06, "bandpass", 420, 260);
+  dropAt(start, 150, 120, 0.14, "sawtooth", 0.035);
+}
+
+/** Sugar rush: a spare cup spent, a knock and a short falling pair. */
+export function sfxRunCupLost() {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  duckMusic(0.3, 0.45);
+  effectNoise(start, 0.05, 0.08, "lowpass", 600);
+  note(midiFrequency(scaleMidi(2, 2)), start + 0.04, 0.09, "triangle", 0.13);
+  note(midiFrequency(scaleMidi(1, 4)), start + 0.14, 0.18, "triangle", 0.12);
+}
+
+/** Order up: a pump of syrup, a soft squelch a little higher each pump. */
+export function sfxPump(step = 0) {
+  const c = audioContext();
+  if (!c) return;
+  const start = c.currentTime;
+  const lift = Math.min(Math.max(Math.floor(step), 0), 6) * 50;
+  effectNoise(start, 0.06, 0.06, "lowpass", 900 + lift, 300);
+  note(320 + lift, start + 0.02, 0.07, "sine", 0.09);
 }

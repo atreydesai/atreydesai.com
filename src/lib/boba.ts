@@ -83,6 +83,51 @@ function gameInfo(id: GameId) {
 /** Which arcade screen is open, or null when the arcade is closed. */
 export const arcadeScreen = writable<ArcadeScreen | null>(null);
 
+// Expert mode: one switch on the menu for every game. A game reads it when
+// it opens and keeps it for as long as it is open (the switch lives only on
+// the menu), and expert runs keep their own bests and their own boards. The
+// choice is remembered on this device.
+const EXPERT_KEY = "boba_expert_v1";
+
+function readExpert() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(EXPERT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Expert mode is on. Games read it with `get(arcadeExpert)` when they open. */
+export const arcadeExpert = writable<boolean>(readExpert());
+
+export function setExpert(on: boolean) {
+  arcadeExpert.set(on);
+  try {
+    window.localStorage.setItem(EXPERT_KEY, on ? "1" : "0");
+  } catch {
+    // Storage can be off; the switch still holds for this visit.
+  }
+}
+
+// A demo asked for from the menu. The game takes it once, when it opens, and
+// plays its demo before the first run instead of going straight in.
+let demoAsked: GameId | null = null;
+
+/** Opens `id` on its demo. */
+export function openDemo(id: GameId) {
+  demoAsked = id;
+  arcadeScreen.set(id);
+  track("arcade_demo", { game: id });
+}
+
+/** True once if the menu asked for `id`'s demo; clears the request. */
+export function takeDemoRequest(id: GameId) {
+  const asked = demoAsked === id;
+  demoAsked = null;
+  return asked;
+}
+
 // Catch needs both enough room for readable trajectories and a precise
 // mouse-like pointer; the other games play by tap or key.
 export const BOBA_DESKTOP_QUERY =

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from "svelte";
+  import { get } from "svelte/store";
 
   import {
     setMusicPaused,
@@ -17,24 +18,28 @@
   } from "$lib/sfx";
   import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
   import {
+    DEMO_CAPTIONS,
+    DEMO_HOLD,
     GRAVITY,
     MAX_FUEL,
     PERIOD,
-    SAFE_VX,
-    SAFE_VY,
-    START_LIVES,
     altitudeOf,
+    attemptEmoji,
     clearance,
+    createPilot,
     createRng,
+    demoFlight,
+    demoStage,
     groundAt,
+    livesFor,
     makeSite,
     newShip,
-    siteMultiplier,
+    pilotControls,
     stepShip,
     windAt,
     zoomForClearance,
   } from "$lib/arcade/lander-engine.js";
-  import type { CrashReason, Pad, Ship, Site, Terrain, Touchdown } from "$lib/arcade/lander-engine.js";
+  import type { CrashReason, Pad, Pilot, Ship, Site, Terrain, Touchdown } from "$lib/arcade/lander-engine.js";
   import {
     INK,
     LID,
@@ -52,11 +57,17 @@
     stepPopups,
     type Popup,
   } from "$lib/arcade/art";
-  import { firstVisit } from "$lib/arcade/scores";
+  import { demoIntro, firstVisit } from "$lib/arcade/scores";
+  import { emojiRows } from "$lib/arcade/share";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
+  import { REVIVE_BLINK_SECONDS, blinkShows } from "$lib/arcade/blink";
+  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
   import PixelIcon from "$lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
+  import DemoBar from "./DemoBar.svelte";
+  import DemoCard from "./DemoCard.svelte";
+  import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
   import Pearls from "./Pearls.svelte";
@@ -65,7 +76,8 @@
   // Tea minus: a lunar lander painted as a pixel-print night. The cup's tea is
   // its fuel, so every burn empties it a little; whatever is left on touchdown
   // is the score. All rules and physics live in lander-engine.js; this file
-  // only steps it, draws it, and wires it to the arcade.
+  // only steps it, draws it, and wires it to the arcade. The demo flies the
+  // engine's own autopilot on the same rules, pressing the same three keys.
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
@@ -359,8 +371,14 @@
 
   // --- State -----------------------------------------------------------------
 
+  /** Expert mode, read once when the game opens; the switch lives on the menu. */
+  const expert = get(arcadeExpert);
+  const startLives = livesFor(expert);
+
   let score = 0;
-  let lives = START_LIVES;
+  let lives = startLives;
+  /** Seconds the fresh lander has left to flicker after a crash cost one. */
+  let landerBlink = 0;
   let livesPulse = 0;
   let landings = 0;
   let feathers = 0;
@@ -377,12 +395,23 @@
   let caption: Caption | null = null;
   let captionAge = 0;
   let captionCount = 0;
+  /** Each attempt of the run as one emoji, for the shared result. */
+  let attempts: string[] = [];
+
+  // The demo: asked about on a first visit, flown by the engine's autopilot.
+  /** The first-visit card is up, holding the countdown. */
+  let askDemo = false;
+  let demoOn = false;
+  let demoEnded = false;
+  let demoCaption = "";
+  let pilot: Pilot | null = null;
+  /** The autopilot's keys, shown on the touch pads while it flies. */
+  let demoHeld: Held = { left: false, right: false, thrust: false };
+  let demoBar: DemoBar | undefined;
 
   // HUD readouts, refreshed about ten times a second rather than every frame.
   let siteN = 1;
   let siteName = "";
-  /** The site's points multiplier, as the ticket prints it. */
-  let siteMultLabel = "1";
   let readAltitude = 0;
   let readDrift = 0;
   let readDriftSign = 0;
@@ -424,7 +453,7 @@
   let S = 1;
 
   let seedBase = 0;
-  let site: Site = makeSite(1, 7919);
+  let site: Site = makeSite(1, 7919, undefined, { expert });
   let look: Look = LOOKS[site.terrain];
   let plan: SkyPlan = planSky(site);
   let ship: Ship = newShip(site, 400);
@@ -1787,7 +1816,9 @@
     return Math.min(flameLen, Math.max(0.5, flameReach / CELL));
   }
 
-  const thrustHeld = () => keys.thrust || touchHeld.thrust;
+  // The demo's autopilot pulses its burn key against the throttle's lag, so
+  // its flame follows the throttle itself rather than the key.
+  const thrustHeld = () => keys.thrust || touchHeld.thrust || (pilot !== null && ship.throttle > 0.12);
 
   /** Flame length, ignition and cut-off, embers and smoke, once a frame. */
   function stepFire(dt: number) {
@@ -2143,7 +2174,7 @@
   }
 
   function drawLander() {
-    if (!ctx || ship.state === "crashed") return;
+    if (!ctx || ship.state === "crashed" || !blinkShows(landerBlink)) return;
     const { px, k } = spriteScale();
     const level = fuelLevel(ship.fuel);
     const sprite = cachedSprite(`tea-minus-${level}`, LANDER_GRIDS[level], px, LANDER_PALETTE, HALO);
@@ -2311,28 +2342,30 @@
     captionAge = 0;
   }
 
+  // Later sites pay more (the engine's site multiplier), but only the points
+  // a landing earns are ever shown, never the factor behind them.
   function showIntro() {
     showCaption("intro", "", siteIntro);
-    const pays = site.n > 1 ? ` Landings pay ${siteMultLabel} times.` : "";
-    liveMessage = `Site ${site.n}, ${site.name}.${pays} ${siteIntro}`;
+    liveMessage = `Site ${site.n}, ${site.name}. ${siteIntro}`;
   }
 
-  /** ×1, ×1.25, ×1.5 … as the ticket prints them. */
-  const multLabel = (value: number) => String(Math.round(value * 100) / 100);
-
-  function enterSite(n: number) {
-    site = makeSite(n, seedBase);
+  /** Paints a site and points the HUD at it. */
+  function useSite(next: Site) {
+    site = next;
     siteSeed = site.seed;
     look = LOOKS[site.terrain];
     plan = planSky(site);
     SUN = sunFor(plan);
     STARS = makeStars(plan.seed);
-    siteN = n;
+    siteN = site.n;
     siteName = site.name;
-    siteMultLabel = multLabel(siteMultiplier(n));
-    siteIntro = introFor(n);
     ghosts = [];
     buildScene();
+  }
+
+  function enterSite(n: number) {
+    useSite(makeSite(n, seedBase, undefined, { expert }));
+    siteIntro = introFor(n);
   }
 
   /** A fresh ship at the top of the sky, and a clean sheet around it. */
@@ -2366,6 +2399,8 @@
   }
 
   function nextAttempt() {
+    // A crash with landers left: the next one flickers in, a life spent.
+    const revived = mode === "crashed";
     if (mode === "landed") {
       enterSite(site.n + 1);
       setMusicPhase(phaseFor(site.n));
@@ -2374,11 +2409,13 @@
       ghosts = [...ghosts, path].slice(-2);
     }
     resetAttempt();
+    landerBlink = revived ? REVIVE_BLINK_SECONDS : 0;
     startFlight();
   }
 
   /** A click, tap, or game key moves on once the result has had a moment. */
   function trySkip() {
+    if (demoOn || askDemo) return;
     if ((mode === "landed" || (mode === "crashed" && lives > 0)) && modeTime >= SKIP_AFTER && !paused) {
       nextAttempt();
     }
@@ -2456,28 +2493,35 @@
       });
     });
 
-    const line = LANDINGS[landingTurn++ % LANDINGS.length];
-    showCaption("result", "", line);
-    liveMessage = `${line} ${result.points} points${result.feather ? ", a feather landing" : ""}.`;
+    // In the demo the strip says what this means instead.
+    if (!demoOn) {
+      const line = LANDINGS[landingTurn++ % LANDINGS.length];
+      showCaption("result", "", line);
+      liveMessage = `${line} ${result.points} points${result.feather ? ", a feather landing" : ""}.`;
+    }
     syncHud();
   }
 
   function crash(reason: CrashReason) {
     setThruster(0);
     sfxCrashLanding();
-    lives -= 1;
-    livesPulse += 1;
+    if (!demoOn) {
+      lives -= 1;
+      livesPulse += 1;
+    }
     path.points.push(ship.x, ship.y);
     path.crashed = true;
     mode = "crashed";
     modeTime = 0;
     breakCup();
 
-    const list = CRASHES[reason];
-    const line = list[crashTurns[reason]++ % list.length];
-    const left = lives > 0 ? `${lives} ${lives === 1 ? "lander" : "landers"} left` : "no landers left";
-    showCaption("result", "", line);
-    liveMessage = `${line} ${left[0].toUpperCase()}${left.slice(1)}.`;
+    if (!demoOn) {
+      const list = CRASHES[reason];
+      const line = list[crashTurns[reason]++ % list.length];
+      const left = lives > 0 ? `${lives} ${lives === 1 ? "lander" : "landers"} left` : "no landers left";
+      showCaption("result", "", line);
+      liveMessage = `${line} ${left[0].toUpperCase()}${left.slice(1)}.`;
+    }
     syncHud();
   }
 
@@ -2630,10 +2674,13 @@
     const held = controls();
     while (accumulator >= STEP) {
       accumulator -= STEP;
-      const result = stepShip(ship, held, site, flightTime, STEP, ceiling);
+      // The demo's autopilot decides every step, as the tests fly it.
+      const input = pilot ? pilotControls(pilot, ship, site, flightTime) : held;
+      const result = stepShip(ship, input, site, flightTime, STEP, ceiling);
       flightTime += STEP;
       if (result) {
         accumulator = 0;
+        if (!demoOn) attempts = [...attempts, attemptEmoji(result)];
         if (result.kind === "land") land(result);
         else crash(result.reason);
         return;
@@ -2643,6 +2690,7 @@
     }
 
     setThruster(ship.throttle);
+    if (pilot) showDemoKeys();
 
     if (ship.fuel <= 0 && !emptyNoted) {
       emptyNoted = true;
@@ -2653,7 +2701,7 @@
     // Alarms: a falling tone that quickens as the ground nears, else the
     // slower low-tea note.
     const altitude = altitudeOf(ship, site);
-    if (altitude < DANGER_ALTITUDE && ship.vy < -SAFE_VY) {
+    if (altitude < DANGER_ALTITUDE && ship.vy < -site.safe.vy) {
       const gap = 0.16 + (altitude / DANGER_ALTITUDE) * 0.4;
       if (flightTime - lastBeep > gap) {
         lastBeep = flightTime;
@@ -2683,8 +2731,9 @@
     readWind = Math.abs(wind);
     readWindSign = Math.abs(wind) < 0.5 ? 0 : Math.sign(wind);
     const low = ship.state === "flying" && altitude < DANGER_ALTITUDE;
-    tooFast = low && ship.vy < -SAFE_VY;
-    drifting = low && Math.abs(ship.vx) > SAFE_VX;
+    // Unsafe by this site's limits, which are stricter on expert.
+    tooFast = low && ship.vy < -site.safe.vy;
+    drifting = low && Math.abs(ship.vx) > site.safe.vx;
     fuelFraction = ship.fuel / MAX_FUEL;
   }
 
@@ -2705,7 +2754,10 @@
     stepMeteor(dt);
 
     if (mode === "countdown") {
-      const step = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
+      // The first-visit card holds the countdown until it is answered.
+      const step = askDemo
+        ? { elapsed: countdownElapsed, count: countdown, beep: false, done: false }
+        : stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
       countdownElapsed = step.elapsed;
       if (step.beep) {
         countdown = step.count;
@@ -2714,8 +2766,16 @@
       if (step.done) beginMission();
     } else {
       modeTime += dt;
+      landerBlink = Math.max(0, landerBlink - dt);
       if (mode === "flying") fly(dt);
-      if (mode === "landed" || (mode === "crashed" && lives > 0)) {
+      if (demoOn) {
+        // The demo never moves on: it holds on its landing, then is over.
+        if (pilot && !demoEnded) {
+          const line = DEMO_CAPTIONS[demoStage(pilot, ship, flightTime)];
+          if (line !== demoCaption) demoCaption = line;
+        }
+        if (mode !== "flying" && modeTime >= DEMO_HOLD && !demoEnded) void endDemo();
+      } else if (mode === "landed" || (mode === "crashed" && lives > 0)) {
         if (modeTime >= RESULT_SECONDS) nextAttempt();
       } else if (mode === "crashed" && modeTime >= GAME_OVER_SECONDS) {
         void endGame();
@@ -2762,6 +2822,12 @@
     // A focused control keeps Space and Enter for itself.
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
     const control = KEY_CONTROLS[key];
+    // The demo flies itself, and the first-visit card waits for an answer:
+    // the game's own keys do nothing, and never scroll the page.
+    if (demoOn || askDemo) {
+      if (control) event.preventDefault();
+      return;
+    }
     if (key === "Enter") {
       if (!event.repeat) trySkip();
       return;
@@ -2788,7 +2854,7 @@
   }
 
   function holdPad(control: keyof Held, down: boolean) {
-    if (down && (paused || gameOver)) return;
+    if (down && (paused || gameOver || demoOn || askDemo)) return;
     if (touchHeld[control] === down) return;
     touchHeld = { ...touchHeld, [control]: down };
     if (down) {
@@ -2825,7 +2891,8 @@
   // --- Pause, restart, and finish -----------------------------------------
 
   async function pauseGame() {
-    if (gameOver || paused) return;
+    // Nothing runs behind the first-visit card, so there is nothing to pause.
+    if (gameOver || paused || askDemo) return;
     paused = true;
     releaseAll();
     setThruster(0);
@@ -2841,8 +2908,9 @@
     last = 0;
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = "Game resumed";
-    focusPlayfield();
+    liveMessage = demoOn ? "Demo resumed" : "Game resumed";
+    if (demoOn) demoBar?.focus();
+    else focusPlayfield();
   }
 
   /**
@@ -2900,7 +2968,7 @@
     }
   }
 
-  /** A new mission: fresh seeds, three landers, site 1, and the countdown. */
+  /** A new mission: fresh seeds, a full set of landers, site 1, and the countdown. */
   function newMission() {
     seedBase = Math.floor(Math.random() * 1_000_000);
     landingTurn = Math.floor(Math.random() * LANDINGS.length);
@@ -2913,11 +2981,13 @@
     };
     laterTurn = Math.floor(Math.random() * INTRO_LATER.length);
     score = 0;
-    lives = START_LIVES;
+    lives = startLives;
+    landerBlink = 0;
     livesPulse = 0;
     landings = 0;
     feathers = 0;
     bestLanding = 0;
+    attempts = [];
     newBest = false;
     popups = [];
     pendingPopups = [];
@@ -2941,6 +3011,111 @@
     newMission();
     sfxCountdown(COUNTDOWN_SECONDS);
     liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+  }
+
+  // --- The demo ----------------------------------------------------------------
+
+  /** The share text's lines: one emoji per attempt, then any feather landings. */
+  function shareRows() {
+    const rows = emojiRows(attempts, 8, 3);
+    if (rows.length) rows[0] = `🌕 ${rows[0]}`;
+    if (feathers > 0) rows.push("🪶".repeat(Math.min(feathers, 8)));
+    return rows;
+  }
+
+  /**
+   * The touch pads light with what the autopilot is doing. Its keys flicker
+   * step to step, so they read from the ship's eased spin and throttle.
+   */
+  function showDemoKeys() {
+    const left = ship.spin < -0.5;
+    const right = ship.spin > 0.5;
+    const thrust = ship.throttle > 0.12;
+    if (left === demoHeld.left && right === demoHeld.right && thrust === demoHeld.thrust) return;
+    demoHeld = { left, right, thrust };
+  }
+
+  /**
+   * The demo: a normal first site, flown to its ×5 coaster by the engine's
+   * autopilot. It scores nothing that is kept and the player's game keys do
+   * nothing; pause and Escape still work.
+   */
+  function startDemo() {
+    askDemo = false;
+    timers.clear();
+    releaseAll();
+    stopMusic();
+    paused = false;
+    gameOver = false;
+    demoOn = true;
+    demoEnded = false;
+    const flight = demoFlight();
+    score = 0;
+    lives = startLives;
+    landerBlink = 0;
+    landings = 0;
+    feathers = 0;
+    bestLanding = 0;
+    attempts = [];
+    popups = [];
+    pendingPopups = [];
+    caption = null;
+    tipVisible = false;
+    countdown = 0;
+    goVisible = false;
+    useSite(flight.site);
+    resetAttempt();
+    pilot = createPilot(flight.pad, ship);
+    demoHeld = { left: false, right: false, thrust: false };
+    demoCaption = DEMO_CAPTIONS[demoStage(pilot, ship, 0)];
+    mode = "flying";
+    modeTime = 0;
+    last = 0;
+    setMusicPhase("opening");
+    startMusic();
+    liveMessage = "Demo. The cup flies itself to a coaster.";
+  }
+
+  async function endDemo() {
+    demoEnded = true;
+    pilot = null;
+    demoHeld = { left: false, right: false, thrust: false };
+    setThruster(0);
+    liveMessage = "Demo over. Your turn.";
+    await tick();
+    demoBar?.focus();
+  }
+
+  function stopDemo() {
+    demoOn = false;
+    demoEnded = false;
+    pilot = null;
+    demoCaption = "";
+    demoHeld = { left: false, right: false, thrust: false };
+  }
+
+  /** The first real run: the countdown, and the first-run tip once per device. */
+  function firstRun() {
+    tipVisible = firstVisit("lander");
+    sfxCountdown(COUNTDOWN_SECONDS);
+    liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+  }
+
+  /** From the demo (or the card offering it) into a fresh real run. */
+  function playFromDemo() {
+    askDemo = false;
+    if (demoOn) {
+      stopDemo();
+      stopMusic();
+      timers.clear();
+      releaseAll();
+      setThruster(0);
+      paused = false;
+      gameOver = false;
+      newMission();
+    }
+    firstRun();
+    focusPlayfield();
   }
 
   // --- Sizing and lifecycle ------------------------------------------------
@@ -3017,13 +3192,16 @@
     // Held keys never outlive the window's focus.
     window.addEventListener("blur", releaseAll);
 
+    // Asked for from the menu, the demo plays now; on a first visit, a card
+    // offers it before the countdown; otherwise straight to the countdown.
+    const intro = demoIntro("lander", takeDemoRequest("lander"));
     newMission();
+    askDemo = intro === "ask";
     tick().then(() => {
       if (!active) return;
       sizeCanvas();
-      tipVisible = firstVisit("lander");
-      sfxCountdown(COUNTDOWN_SECONDS);
-      liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+      if (intro === "demo") startDemo();
+      else if (intro === "none") firstRun();
       raf = requestAnimationFrame(frame);
     });
 
@@ -3041,6 +3219,9 @@
       unmountShell();
     };
   });
+
+  /** The touch pads show the autopilot's keys during the demo, the player's otherwise. */
+  $: padsHeld = demoOn ? demoHeld : touchHeld;
 
   const arrowX = (sign: number) => (sign > 0 ? "→" : sign < 0 ? "←" : "·");
   const wordX = (sign: number) => (sign > 0 ? "right" : sign < 0 ? "left" : "none");
@@ -3072,7 +3253,7 @@
         <span class="boba-stack">
           <span class="boba-meta tm-site">
             <span>site {pad2(siteN, 2)}</span>
-            <span class="tm-mult"><span class="sr-only">points </span>×{siteMultLabel}</span>
+            <ExpertTag />
           </span>
           <span class="boba-phase tm-site-name">{siteName}</span>
         </span>
@@ -3097,7 +3278,7 @@
             <span aria-hidden="true">{arrowY(readDescentSign)}</span><span class="sr-only">{wordY(readDescentSign)}</span>
           </span>
         </span>
-        {#if siteN >= 2}
+        {#if site.wind}
           <span class="tm-readout">
             <span class="boba-meta">wind</span>
             <span class="tm-value">
@@ -3113,7 +3294,7 @@
           <CupTimer fraction={fuelFraction} rush={fuelFraction * MAX_FUEL < LOW_FUEL} />
           <span class="boba-meta tm-tea-label">tea</span>
         </span>
-        <Pearls left={lives} total={START_LIVES} pulse={livesPulse} />
+        <Pearls left={lives} total={startLives} pulse={livesPulse} />
         <HudButtons {paused} on:pause={togglePause} />
       </div>
     </div>
@@ -3142,7 +3323,7 @@
         <button
           type="button"
           class="tm-pad boba-riso is-small"
-          class:is-down={touchHeld.left}
+          class:is-down={padsHeld.left}
           style="--tilt: -1.4deg"
           aria-label="Tilt left"
           on:pointerdown={(event) => padDown(event, "left")}
@@ -3162,7 +3343,7 @@
         <button
           type="button"
           class="tm-pad boba-riso is-small"
-          class:is-down={touchHeld.right}
+          class:is-down={padsHeld.right}
           style="--tilt: 1.2deg"
           aria-label="Tilt right"
           on:pointerdown={(event) => padDown(event, "right")}
@@ -3183,7 +3364,7 @@
       <button
         type="button"
         class="tm-pad tm-burn boba-riso is-small"
-        class:is-down={touchHeld.thrust}
+        class:is-down={padsHeld.thrust}
         style="--tilt: -0.9deg"
         aria-label="Burn"
         on:pointerdown={(event) => padDown(event, "thrust")}
@@ -3202,9 +3383,33 @@
       </button>
     </div>
   {/if}
+
+  <!-- Inside the play scope, so Tab cycles through their buttons. -->
+  {#if askDemo}
+    <DemoCard
+      deck="Watch the cup fly itself down to a coaster, or go straight in."
+      on:watch={startDemo}
+      on:play={playFromDemo}
+    />
+  {/if}
+
+  {#if demoOn}
+    <!-- On touch the strip goes to the top, clear of the hold buttons, and
+         just under the tickets, which take two rows on a phone. -->
+    <div class="tm-demo" style="--tm-demo-top: {Math.round(playTop + 8)}px">
+      <DemoBar
+        bind:this={demoBar}
+        caption={demoCaption}
+        ended={demoEnded}
+        placement={touchUI ? "top" : "bottom"}
+        on:play={playFromDemo}
+        on:again={startDemo}
+      />
+    </div>
+  {/if}
 </div>
 
-{#if countdown > 0 || goVisible}
+{#if !askDemo && !demoOn && (countdown > 0 || goVisible)}
   <Countdown value={countdown} caption="tea minus" goCaption="go for landing" />
 {/if}
 
@@ -3229,6 +3434,7 @@
     {score}
     unit="points"
     {newBest}
+    share={shareRows()}
     stats={[
       { label: "landings", value: landings },
       { label: "furthest site", value: siteN },
@@ -3261,19 +3467,12 @@
     content: none;
   }
 
-  /* The site's points multiplier stands apart from its number, a small
-     figure of its own. */
+  /* The site number, and beside it the expert mark on an expert run. */
   .tm-site {
     display: flex;
     align-items: baseline;
     gap: var(--space-2);
     white-space: nowrap;
-  }
-
-  .tm-mult {
-    color: var(--b-strong);
-    font-variant-numeric: lining-nums tabular-nums;
-    font-weight: 500;
   }
 
   .tm-site-name {
@@ -3357,6 +3556,12 @@
     font-weight: 400;
     line-height: 1.4;
     text-wrap: balance;
+  }
+
+  /* The demo strip, placed at the top on touch, starts under the tickets
+     rather than at a fixed height, so it never covers the telemetry. */
+  .tm-demo :global(.demo.is-top) {
+    top: var(--tm-demo-top, 5.5rem);
   }
 
   /* --- Touch controls: tilt pair bottom left, burn bottom right --- */
@@ -3469,7 +3674,7 @@
       display: none;
     }
 
-    /* The multiplier takes the site name's place, under the site number. */
+    /* The expert mark takes the site name's place, under the site number. */
     .tm-site {
       flex-direction: column;
       align-items: flex-start;

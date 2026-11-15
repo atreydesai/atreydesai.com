@@ -32,6 +32,20 @@ import {
   terrainFor,
   windAt,
   zoomForClearance,
+  FUEL_FLOOR,
+  fuelFor,
+  EXPERT,
+  SAFE,
+  createPilot,
+  livesFor,
+  pilotControls,
+  windFor,
+  START_LIVES,
+  DEMO_CAPTIONS,
+  DEMO_HOLD,
+  attemptEmoji,
+  demoFlight,
+  demoStage,
 } from "../src/lib/arcade/lander-engine.js";
 
 const H = 1 / 120;
@@ -53,80 +67,32 @@ function highShip(site) {
 }
 
 /** Every terrain at a spread of site numbers, across many runs. */
-function* everySite(seeds = MANY, sites = [1, 2, 4, 7, 11, 16]) {
+function* everySite(seeds = MANY, sites = [1, 2, 4, 7, 11, 16], options = {}) {
   for (const terrain of TERRAINS) {
     for (const seed of seeds) {
-      for (const n of sites) yield makeSite(n, seed, terrain);
+      for (const n of sites) yield makeSite(n, seed, terrain, options);
     }
   }
 }
 
-const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+/** Expert sites, a spread of them, for the ground's own properties. */
+const EXPERT_SITES = () => everySite(MANY.slice(0, 16), [1, 3, 6, 12], { expert: true });
 
 /**
- * A simple autopilot, flying with the same three keys a player has. It
- * glides toward the coaster above the ground ahead, settles over it, comes
- * down braking late, and stands upright just before its low foot lands.
- * Thrust is pulsed against the engine's own throttle lag. It goes the short
- * way round the moon, or with `way` set, that way (+1 east, -1 west).
+ * Flies the engine's autopilot from the start toward one coaster, with the
+ * same three keys a player has. It goes the short way round the moon, or
+ * with `way` set, that way (+1 east, -1 west).
  */
 function autopilot(site, pad, viewHeight, startX, way = 0) {
   const ship = newShip(site, viewHeight);
   if (startX !== undefined) ship.x = startX;
-  let target = pad.cx - ship.x - Math.round((pad.cx - ship.x) / PERIOD) * PERIOD;
-  if (way && Math.sign(target) !== way) target += way * PERIOD;
-  target += ship.x;
-  let clear = 0;
-  let descending = false;
+  const pilot = createPilot(pad, ship, way);
   for (let step = 0; step < 120 * 120; step++) {
     const time = step * H;
-    const dx = target - ship.x;
-    if (step % 12 === 0) {
-      const reach = Math.sign(dx) * Math.min(Math.abs(dx) + 30, 220);
-      clear = highestGround(site, ship.x - Math.sign(dx) * 30, ship.x + reach) + FOOT_DROP + 26;
-    }
-    const height = ship.y - FOOT_DROP - pad.y;
-    const vxWant = Math.sign(dx) * Math.min(75, Math.sqrt(16 * Math.abs(dx)), 1.2 * Math.abs(dx));
-    if (!descending && Math.abs(dx) < 2.5 && Math.abs(ship.vx) < 1.5) descending = true;
-    let vyWant;
-    let holding = false;
-    if (descending) {
-      // Hold still if the wind has pushed the ship off the coaster.
-      holding = Math.abs(dx) > 4 && height > 10;
-      vyWant = holding ? 0 : height < 8 ? -9 : -Math.min(45, Math.sqrt(12 * (height - 8)) + 9);
-    } else {
-      const want = Math.max(clear, pad.y + FOOT_DROP + 10 + 0.35 * Math.abs(dx));
-      vyWant = want > ship.y ? Math.min(14, (want - ship.y) * 0.8) : -Math.min(45, Math.sqrt(12 * (ship.y - want)));
-    }
-    const ax = (vxWant - ship.vx) * 1.2 - windAt(site, time);
-    const ay = Math.max(0, (vyWant - ship.vy) * 2 + GRAVITY);
-
-    // High up it may lean far over to brake; low down it leans into the
-    // wind, then stands up before the lower foot lands.
-    const roomy = ship.y - groundAt(site, ship.x) > 70;
-    const soon = height / Math.max(3, -ship.vy);
-    const low = ship.y - pad.y - FOOT_DROP * Math.cos(ship.angle) - FOOT_SPAN * Math.abs(Math.sin(ship.angle));
-    const standUp = Math.max(0, Math.abs(ship.angle) - 0.17) / 2.2 + 0.1;
-    let limit = roomy ? 1.3 : 1;
-    if (descending && !holding) {
-      if (soon < 0.55 || low / Math.max(2, -ship.vy) < standUp + 0.15) limit = 0.17;
-      else limit = soon < 1 ? 0.45 : Math.min(limit, 0.75);
-    }
-    const angleWant = clamp(Math.atan2(ax, Math.max(ay, 2)), -limit, limit);
-    const sin = Math.sin(ship.angle);
-    const sideways = Math.abs(sin) > 0.05 && Math.sign(sin) === Math.sign(ax) ? ax / sin : 0;
-    const along = ax * sin + ay * Math.cos(ship.angle);
-    const throttleWant = clamp(Math.max(along, roomy || limit < 0.2 ? 0 : sideways) / THRUST, 0, 1);
-    const lead = ship.angle + ship.spin * 0.1;
-    const controls = {
-      left: lead > angleWant + 0.015,
-      right: lead < angleWant - 0.015,
-      thrust: ship.throttle < throttleWant,
-    };
-    const result = stepShip(ship, controls, site, time, H);
-    if (result) return { result, ship };
+    const result = stepShip(ship, pilotControls(pilot, ship, site, time), site, time, H);
+    if (result) return { result, ship, seconds: time + H };
   }
-  return { result: null, ship };
+  return { result: null, ship, seconds: Infinity };
 }
 
 // --- The route ----------------------------------------------------------------
@@ -189,7 +155,7 @@ test("sites are named for their terrain, taking the next name on a revisit", () 
 // --- Every site's ground --------------------------------------------------
 
 test("every site has four flat, separate coasters inside the period", () => {
-  for (const site of everySite()) {
+  for (const site of [...everySite(), ...EXPERT_SITES()]) {
     assert.equal(site.pads.length, 4);
     const multipliers = site.pads.map((pad) => pad.multiplier).sort((a, b) => a - b);
     assert.deepEqual(multipliers, site.n <= 3 ? [2, 2, 3, 5] : [2, 3, 5, 5]);
@@ -214,7 +180,7 @@ test("every coaster can be reached straight down: nothing beside it stands above
   const reach = half + 7;
   const lip = 0.5;
   assert.ok(reach <= PAD_APRON);
-  for (const site of everySite()) {
+  for (const site of [...everySite(), ...EXPERT_SITES()]) {
     for (const pad of site.pads) {
       for (let x = pad.cx - pad.width / 2 - reach; x <= pad.cx + pad.width / 2 + reach; x += 0.5) {
         const ground = groundAt(site, x);
@@ -229,7 +195,7 @@ test("every coaster can be reached straight down: nothing beside it stands above
 
 test("every start clears the highest ground with room to spare", () => {
   const lowest = startAltitude(0);
-  for (const site of everySite()) {
+  for (const site of [...everySite(), ...EXPERT_SITES()]) {
     const highest = Math.max(...site.points.map(([, y]) => y));
     assert.ok(highest + FOOT_DROP + 30 <= lowest, `${site.terrain}: ground at ${highest.toFixed(1)}`);
     assert.ok(Math.min(...site.points.map(([, y]) => y)) > 0);
@@ -323,9 +289,10 @@ test("coasters narrow and tanks shrink as sites go on, down to their floors", ()
   assert.equal(widest(makeSite(20, 7), 5), 29);
 
   assert.equal(makeSite(1, 7).fuel, MAX_FUEL);
-  assert.equal(makeSite(2, 7).fuel, 570);
+  assert.equal(makeSite(2, 7).fuel, 590);
   assert.ok(makeSite(6, 7).fuel < makeSite(5, 7).fuel);
-  assert.equal(makeSite(20, 7).fuel, 270);
+  assert.equal(makeSite(20, 7).fuel, FUEL_FLOOR);
+  for (let n = 1; n < 30; n++) assert.equal(makeSite(n, 7).fuel, fuelFor(n));
 });
 
 test("site 1 is calm and later sites blow, capped at 6.5", () => {
@@ -341,6 +308,64 @@ test("site 1 is calm and later sites blow, capped at 6.5", () => {
   }
   const windy = makeSite(4, 7);
   assert.ok(Math.abs(windAt(windy, 2.2)) !== Math.abs(windy.wind));
+});
+
+test("expert is a lot harder: narrower coasters, a smaller cup, wind from the start, stricter touchdowns, two landers", () => {
+  assert.equal(livesFor(false), START_LIVES);
+  assert.equal(livesFor(true), 2);
+  for (const seed of SEEDS) {
+    for (let n = 1; n <= 20; n++) {
+      const normal = makeSite(n, seed);
+      const expert = makeSite(n, seed, undefined, { expert: true });
+      // The same ground plan, only harder to fly.
+      assert.equal(expert.terrain, normal.terrain);
+      assert.equal(expert.expert, true);
+      assert.equal(normal.expert, false);
+      assert.deepEqual(normal.safe, SAFE);
+      assert.deepEqual(expert.safe, EXPERT.safe);
+      expert.pads.forEach((pad, i) => {
+        assert.equal(pad.multiplier, normal.pads[i].multiplier);
+        assert.ok(pad.width < normal.pads[i].width);
+        assert.ok(pad.width >= EXPERT.padMin);
+      });
+      assert.ok(expert.fuel < normal.fuel);
+      assert.equal(expert.fuel, fuelFor(n, true));
+      // Wind from the very first site, never weaker than normal's, same cap.
+      assert.ok(Math.abs(expert.wind) >= 3 && Math.abs(expert.wind) >= Math.abs(normal.wind));
+      assert.ok(Math.abs(expert.wind) <= 6.5);
+      assert.equal(Math.abs(expert.wind), windFor(n, true));
+    }
+  }
+  assert.equal(fuelFor(1, true), EXPERT.fuel);
+  assert.equal(fuelFor(30, true), EXPERT.fuelFloor);
+  assert.ok(EXPERT.fuelFloor < FUEL_FLOOR);
+  assert.equal(windFor(1, true), 3);
+  assert.equal(windFor(1), 0);
+  assert.equal(windFor(20, true), 6.5);
+
+  // Its gusts swing wider, and flutter on top.
+  const swing = (site) => {
+    const values = Array.from({ length: 2000 }, (_, i) => windAt(site, i * 0.01));
+    return (Math.max(...values) - Math.min(...values)) / Math.abs(site.wind);
+  };
+  assert.ok(swing(makeSite(9, 7, undefined, { expert: true })) > swing(makeSite(9, 7)) * 1.4);
+
+  // A touchdown normal forgives, expert doesn't.
+  const pad = { cx: 0, y: 50, width: 60, multiplier: 2 };
+  assert.equal(judgeTouchdown({ vx: 0, vy: -14, angle: 0 }, pad, false), null);
+  assert.equal(judgeTouchdown({ vx: 0, vy: -14, angle: 0 }, pad, false, EXPERT.safe), "hard");
+  assert.equal(judgeTouchdown({ vx: 8, vy: -3, angle: 0 }, pad, false, EXPERT.safe), "drift");
+  assert.equal(judgeTouchdown({ vx: 0, vy: -3, angle: 0.18 }, pad, false), null);
+  assert.equal(judgeTouchdown({ vx: 0, vy: -3, angle: 0.18 }, pad, false, EXPERT.safe), "tilt");
+  assert.equal(judgeTouchdown({ vx: 0, vy: -23, angle: 0 }, pad, false, EXPERT.safe), "fast");
+
+  // And the ship flying an expert site is judged by it.
+  const site = makeSite(1, 7, undefined, { expert: true });
+  const target = site.pads[0];
+  const ship = { ...newShip(site, 600), x: target.cx, y: target.y + FOOT_DROP + 1, vx: 0, vy: -14 };
+  let result = null;
+  for (let step = 0; step < 600 && !result; step++) result = stepShip(ship, IDLE, site, step * H, H);
+  assert.deepEqual(result, { kind: "crash", reason: "hard" });
 });
 
 test("ships start high in the view, within limits", () => {
@@ -510,23 +535,97 @@ test("an autopilot lands on every coaster of every terrain from the start, on th
   }
 });
 
-test("on the leanest tanks and strongest winds, every coaster can still be landed from its own quarter", () => {
-  // From site 7 the tank is too small to cross the whole moon against the
-  // entry drift, so the ship starts upwind of each coaster instead.
+test("on the leanest tanks and strongest winds, every coaster can still be reached from the start", () => {
+  // Late sites have the floor tank and the strongest wind. The autopilot
+  // must reach every coaster from where the ship really enters, going
+  // whichever way round is cheaper, and land with a fifth of the cup to
+  // spare, room for a player who flies less tidily than it does.
   for (const view of [200, 450]) {
-    for (const site of everySite(SEEDS, [7, 9, 12])) {
+    for (const site of everySite(SEEDS, [7, 9, 12, 16])) {
       for (const pad of site.pads) {
-        const { result, ship } = autopilot(site, pad, view, pad.cx - 150);
-        assert.ok(result, `${site.terrain} n${site.n} ×${pad.multiplier}: still flying`);
-        assert.equal(
-          result.kind === "land" ? result.pad : result.reason,
-          pad,
-          `${site.terrain} n${site.n} seed ${site.seed} ×${pad.multiplier} at ${pad.cx.toFixed(0)}, view ${view}`,
-        );
-        assert.ok(ship.fuel > 0);
+        let best = null;
+        for (const way of [0, 1, -1]) {
+          const flight = autopilot(site, pad, view, undefined, way);
+          if (flight.result?.kind === "land" && flight.result.pad === pad && (!best || flight.ship.fuel > best.ship.fuel)) best = flight;
+        }
+        const where = `${site.terrain} n${site.n} seed ${site.seed} ×${pad.multiplier} at ${pad.cx.toFixed(0)}, view ${view}`;
+        assert.ok(best, `${where}: never landed`);
+        assert.ok(best.ship.fuel >= 0.2 * site.fuel, `${where}: landed with ${best.ship.fuel.toFixed(0)} of ${site.fuel}`);
       }
     }
   }
+});
+
+test("on expert, every coaster can still be reached from the start with 15% of the cup to spare", () => {
+  // Expert's wind, narrow coasters and strict touchdowns cost the autopilot
+  // more tea and leave it less room; its floor tank still has to carry it to
+  // every coaster from where the ship enters, whichever way round is cheaper.
+  for (const view of [200, 450]) {
+    for (const site of everySite(SEEDS, [1, 3, 6, 9, 16], { expert: true })) {
+      for (const pad of site.pads) {
+        let best = null;
+        for (const way of [0, 1, -1]) {
+          const flight = autopilot(site, pad, view, undefined, way);
+          if (flight.result?.kind === "land" && flight.result.pad === pad && (!best || flight.ship.fuel > best.ship.fuel)) best = flight;
+          if (best && way === 0 && best.ship.fuel >= 0.15 * site.fuel) break;
+        }
+        const where = `expert ${site.terrain} n${site.n} seed ${site.seed} ×${pad.multiplier} at ${pad.cx.toFixed(0)}, view ${view}`;
+        assert.ok(best, `${where}: never landed`);
+        assert.ok(best.ship.fuel >= 0.15 * site.fuel, `${where}: landed with ${best.ship.fuel.toFixed(0)} of ${site.fuel}`);
+      }
+    }
+  }
+});
+
+// --- The demo -----------------------------------------------------------------------
+
+test("the demo flies a calm first site to its ×5 coaster, on the real rules, from any view", () => {
+  const { site, pad } = demoFlight();
+  assert.equal(site.n, 1);
+  assert.equal(site.expert, false);
+  assert.equal(site.wind, 0);
+  assert.equal(pad.multiplier, 5);
+  assert.ok(site.pads.includes(pad));
+  const order = ["burn", "fuel", "steer", "descend", "landed"];
+  for (const view of [160, 200, 260, 330, 450, 600, 800]) {
+    const ship = newShip(site, view);
+    const pilot = createPilot(pad, ship);
+    let result = null;
+    let time = 0;
+    /** @type {string[]} */
+    const seen = [];
+    /** @type {number[]} when each stage began */
+    const began = [];
+    for (let step = 0; step < 120 * 40 && !result; step++) {
+      time = step * H;
+      const stage = demoStage(pilot, ship, time);
+      if (seen[seen.length - 1] !== stage) {
+        seen.push(stage);
+        began.push(time);
+      }
+      result = stepShip(ship, pilotControls(pilot, ship, site, time), site, time, H);
+    }
+    seen.push(demoStage(pilot, ship, time));
+    began.push(time);
+    assert.equal(result?.kind, "land", `view ${view}`);
+    assert.equal(result.pad, pad);
+    // Long enough to say each line, short enough to watch: 15 to 30 s with
+    // the hold on the landing.
+    assert.ok(time + DEMO_HOLD >= 15 && time + DEMO_HOLD <= 30, `view ${view}: ${time.toFixed(1)} s`);
+    // Every caption shows, in order, each long enough to read.
+    assert.deepEqual(seen, order, `view ${view}`);
+    for (let i = 0; i < began.length - 1; i++) {
+      assert.ok(began[i + 1] - began[i] >= 2, `view ${view}: "${seen[i]}" for ${(began[i + 1] - began[i]).toFixed(1)} s`);
+    }
+    for (const stage of order) assert.ok(DEMO_CAPTIONS[stage].length > 0);
+  }
+});
+
+test("a shared run marks each landing by its coaster and each crash with a burst", () => {
+  const pad = { cx: 0, y: 50, width: 60, multiplier: 5 };
+  assert.equal(attemptEmoji({ kind: "land", pad, points: 900, feather: false }), "5\uFE0F\u20E3");
+  assert.equal(attemptEmoji({ kind: "land", pad: { ...pad, multiplier: 2 }, points: 300, feather: true }), "2\uFE0F\u20E3");
+  assert.equal(attemptEmoji({ kind: "crash", reason: "tilt" }), "💥");
 });
 
 test("a landed or crashed ship no longer moves", () => {

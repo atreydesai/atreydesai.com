@@ -1,7 +1,12 @@
 # Boba arcade style guide
 
 The pixel boba on the homepage opens a menu of seven small games; the Konami
-code drops straight into the first. This guide is the contract for how those
+code drops straight into the first. The arcade is signposted quietly, so a
+reader who came for the research is never asked anything: a pencilled
+`arcade` note under the homepage photo points at the boba, the boba gives one
+small wiggle a few seconds into a visit (once a session, never under Reduce
+Motion), and the footer on every page carries an `arcade` link with a small
+pixel cup beside the music player. This guide is the contract for how those
 games look, read, move, and sound. It sits beside the
 [website style guide](style-guide.md), which still governs everything the
 arcade inherits: the palette, focus, contrast, target size, reduced motion,
@@ -32,7 +37,7 @@ Three rules hold everywhere:
 | ---------- | ------------------------------- | ---------------------------------------------------- | ------------ |
 | boba catch | Catch cups thrown by links      | Mouse                                                | Desktop only |
 | straw stab | Stab each cup on the beat       | Tap, click, Space                                    | Everywhere   |
-| order up   | Pour, scoop, shake, and serve   | Hold, tap, click, Space                              | Everywhere   |
+| order up   | Ice, syrup, pour, scoop, serve  | Hold, tap, click, Space                              | Everywhere   |
 | cup stack  | Drop cups onto a tower          | Tap, click, Space                                    | Everywhere   |
 | tea minus  | Land a cup of tea on a moon     | Arrows or `WASD`, Space; three hold buttons on touch | Everywhere   |
 | sugar rush | Run the rooftops and deliver    | Space, `↓`, `X`; three buttons on touch              | Everywhere   |
@@ -164,7 +169,18 @@ row). A paper wash fades the site header behind them.
 
 - The score ticket is the one with a slab.
 - Timers are a drawn cup whose tea drains. Where a game has lives, they are
-  three tapioca pearls, and a dropped one becomes a dashed ring.
+  tapioca pearls, and a dropped one becomes a dashed ring.
+- **A life changing hands blinks.** A lost pearl flickers hard between an
+  accent pearl and the ring before it settles; a pearl won back flickers in
+  and lands with a small pop. The player's own sprite (the basket, the straw
+  in hand, the next lander, the runner) flickers on and off for 1.2 s at the
+  same moment (`src/lib/arcade/blink.ts`), so the loss or the revive is seen
+  on the thing being played. Under Reduce Motion neither flickers.
+- `<ExpertTag />` sits in the score ticket and says `expert` during an expert
+  run, so the player always knows which board the score goes to.
+- Space on the HUD's pause and mute buttons belongs to the game: focus lands
+  on pause after a resume, and Space is every game's main action. Enter
+  still presses them.
 - The song's name waves on a small flag that hugs its text, capped at
   `12rem`, so there is never a gap between it and the buttons beside it.
 - Numbers that change use tabular figures and update at most about ten times
@@ -176,9 +192,20 @@ row). A paper wash fades the site header behind them.
 ## Dialogs
 
 - **Menu.** A menu board: each game's name with its best score where the
-  price would be, and its shortcut key.
+  price would be, its shortcut key, and a quiet italic `demo` beside it. A
+  `normal | expert` switch sits by the title (key `E`); the prices follow
+  it. The menu's primary button opens the leaderboards (key `L`).
+- **Leaderboards.** The menu card turns over to every game's board at once:
+  the top five of each, for the mode the switch is on, the leader in the
+  accent, with a `play` link into each game. A board nobody has signed shows
+  only its name. Back or Escape returns to the menu.
 - **Pause says each thing once.** A title, one sentence, and three buttons
-  that carry their own key chips. Nothing else.
+  that carry their own key chips, on one line. Nothing else.
+- **Share.** The results slip's secondary `Share` button copies the run as a
+  few short lines a player can paste to a friend, the way a word game shares
+  its grid: the game and mode, the score, the game's own emoji lines, and the
+  site. A phone opens the share sheet instead. The label says `Copied` for a
+  moment; nothing else changes.
 - **Results.** The slip's top is two columns: title, deck, and the circled
   score with its unit on the left, with any `new best` stamp pressed across
   the top of the circle; the run's stats as a single receipt column on the
@@ -215,9 +242,12 @@ site's motion tokens. Under Reduce Motion, read live:
 Everything is synthesized; there are no audio files. The songs and the synth
 that plays them live in `src/lib/music/`, and effects in `src/lib/sfx.ts`,
 which also re-exports the music controls so games import from one place.
-There are twelve songs, each in its own style. Each run shuffles them and never opens on
-the song that opened the last one; straw stab draws four, one from each
-tempo band, slowest first, so its difficulty still climbs. Effects are
+There are twelve songs, each in its own style. Each run shuffles them and
+never opens on a song that opened any of the last six runs; those openers
+are remembered on the device, so a fresh visit doesn't open the same way
+either. Straw stab draws four, one from each tempo band, slowest first, so
+its difficulty still climbs, and its opener skips the slow songs that opened
+recently. Effects are
 short and gentle and sit under the music's key where they can. Mute silences everything, and nothing throws when audio is locked.
 Straw stab draws its belt against the audio clock (`audioClock()`), so cups
 land on what is heard; pausing suspends the audio context so the music
@@ -240,60 +270,166 @@ exclamation marks, no “Oops”.
 - Live-region messages are plain sentences that say what happened and what it
   cost or earned.
 
+## Every game
+
+- **Expert mode.** One switch on the menu for all seven games
+  (`arcadeExpert` in `src/lib/boba.ts`, remembered on the device). A game
+  reads it once when it opens and passes it to its engine, where the expert
+  rules live and are tested. Expert is a lot harder, not a small tweak, and
+  stays fair: where a game proves something is reachable (coasters, gaps,
+  rooms), the proof covers expert too. Expert runs keep their own bests and
+  their own boards; `scores.ts` and `/api/scores` take the mode from the
+  switch.
+- **A demo first.** Each game can play itself for 15 to 30 seconds on its
+  real rules: an autopilot pressing the same inputs a player would, never
+  scoring, always on normal rules. The first time a game opens on a device a
+  card asks whether to watch it (`DemoCard`); the menu's `demo` opens it any
+  time (`openDemo`). While it plays, `DemoBar` carries the word demo, one
+  caption at a time, and `Play`; at the end, `Watch again`. The strip is a
+  riso sheet with no box behind it. The first-run tip waits for the first
+  real run.
+- **Share.** Each game builds its own emoji lines for the results slip's
+  `share` prop (`emojiRows` in `src/lib/arcade/share.ts` wraps a sequence):
+  at most four short lines that say how the run went without explaining it.
+- **New rules, new board.** When a game's scoring changes enough that old
+  scores can't be matched (catch going endless, sugar rush and cup stack
+  getting much harder), its best cookie and its board move to a new version;
+  the old board is kept, not shown.
+
 ## Game by game
 
 ### Boba catch
 
 Cups fly out of the page's own links and you catch them in a basket, on the
-page itself. It needs a mouse. Its end ticket carries the pearls, the song
-flag, and the HUD buttons.
+page itself. It needs a mouse.
+
+- **No clock: the shift lasts until the last pearl drops.** Each miss costs
+  one of three pearls. Everything climbs with time on shift: throws come
+  faster and closer together, fall harder, and fly wider, and a link glows
+  for less time before it throws. After the opening, links throw in pairs
+  and threes, high lobs that hang and drift, and low flicks. Normal reaches
+  its top pace at three and a half minutes and stays there. The music's
+  opening, steady, and rush follow the same climb.
+- **Brutal, never impossible.** Each throw is planned so a quick hand can
+  get the basket from every other landing to this one. A link with nowhere
+  fair to throw holds its cup a moment, and lets it go rather than throw
+  unfairly. A test plays four minutes at the top pace with a basket that
+  moves exactly as fast as the rule assumes, and it misses nothing.
+- **Golden cups** are every tenth throw and worth three points. While a pearl
+  is down, three golden cups in a row with no miss between win it back,
+  never past three.
+- **Expert** starts where normal is at a minute and three quarters and
+  climbs faster to a harder top pace, with a basket a third narrower
+  (caught exactly where it is drawn), a tighter perfect, less warning, and no
+  pearls coming back.
+- **The tickets.** The middle ticket counts time on shift up, with the
+  pace's name under it. The end ticket carries the pearls, the song flag,
+  and the HUD buttons.
+- **The demo** moves the basket itself, a little late and a little off
+  centre like a hand, lets one cup fall to show a pearl dropping, and jumps
+  to rush hour for its last stretch. Its strip sits under the tickets, clear
+  of the basket, and no link behind it throws.
+- **The share** is one square per fifteen seconds on shift (a clean stretch,
+  a golden cup, a pearl won back, or a pearl dropped), then the time on
+  shift.
 
 ### Straw stab
 
 A conveyor belt carries cups past a straw; stab each on the beat.
 
-- **A night-market stall, and the song runs the clock.** The scene is a
-  painted pixel dusk, the same in both themes. The engine's tier is the time
-  of day: tier 0 is golden dusk with a half-set sun, the top tier is full
-  night. The dithered sky, the stars, and the windows in two scrolling
-  skylines all follow it, each change eased in over a bar.
-- **Lantern strings play along.** A running light steps one lantern along
-  each string per beat, and every lantern swells on the downbeat. A perfect
-  stab flashes a string in that drink's colour; a miss dims them all for a
-  moment. Tiers add a string, then another, then bunting, then windows that
-  blink on the beat, and at the top fireworks on each downbeat.
+- **A stab is judged when it happened.** Song time is the heard audio time
+  (`audioClock()`) less the first downbeat, and the page clock maps onto it
+  by one steady offset. A key or tap is timed by its event's own timestamp,
+  not by when the page got round to it; each frame is drawn for the moment
+  it reaches the screen, a frame after its timestamp; so a cup is seen on
+  the notch when its beat is heard, and a stab made then is judged dead on.
+  A cup is only called missed a moment after its window closes, so a stab
+  that was in time but handled late still finds it.
+- **The nearest cup still waiting takes the stab**, the earlier on a tie.
+  Perfect is within `50ms`, good `100ms`, a graze `150ms`; anything further
+  hits the belt. Off the notch, a second note says `early` or `late`.
+- **Space always stabs during a run,** even on a focused pause or mute
+  button, which lets go of focus; the letter keys stab everywhere. Enter
+  still presses a focused button.
+- **Expert** narrows the windows to `30`, `60`, and `90ms`, plays with two
+  pearls, opens two tiers up and climbs a tier every song into a syncopated
+  tier of its own, and pushes about a third of bars half a beat off the
+  beat. Its scene opens at twilight.
+- **A demo** plays itself on the same rules for about twenty seconds: a
+  good, a graze, and a let-go cup in turn, each while its caption is up.
+- **The share** is a row per song, a square per bar, coloured by the worst
+  stab in it.
+- **A night-market stall, kept in the background.** The scene is a painted
+  pixel dusk, the same in both themes, printed with most of its saturation
+  and some of its light taken out. The engine's tier is the time of day:
+  tier 0 is dusk with a small sun setting over the play lane, the top tier
+  is full night. The dithered sky, dim stars, and windows that come on in
+  two slowly scrolling skylines all follow it, each change eased in over a
+  bar. Nothing blinks.
+- **A dark lane.** A flat dark band, dithered along its top edge, runs
+  behind the cups from above the straw down to the belt, so whatever the
+  market has there sits under it.
+- **Lantern strings, above the lane.** A running light brightens one
+  lantern's core along each string per bar; lanterns never change size. A
+  perfect stab tints a string in that drink's colour; a miss dims them all
+  for a moment. Tiers add a string, then another, then still bunting, and
+  at the top a small firework every other bar, bursting high and clear of
+  the straw's column.
 - **The stall.** The belt is a cream face between ink lips on a dark housing
   whose rollers turn at the belt's real speed, over a wooden counter.
 - **Restraint.** Cups, belt, straw, and judgement text stay the most legible
-  things on screen: nothing bright or animated sits behind the cup at the
-  stab point, and popups are cream on a dark backing.
-- The stab point is a small accent notch on the belt, not a ring.
+  things on screen, and popups are cream on a dark backing.
+- The stab point is a small accent notch on the belt, not a ring, centred
+  exactly where a cup's centre is at its beat.
 
 ### Order up
 
-Customers queue tickets on a rail. You take one ticket at a time through the
-stations: hold to pour the tea to the ice line, drop each topping from a
-swinging ladle, shake, and the drink is sealed, graded, and served.
+Guests walk up to the counter and hand over a ticket, which goes up and is
+clipped to the rail. You take one ticket at a time through the stations: drop
+in the ice, pump the syrup, hold a tap to pour the tea to the ice line, drop
+each topping from a swinging ladle, shake, and the drink is sealed, graded,
+and handed over.
 
+- **Tickets read like a boba shop's:** the tea, the sugar as 0 to 100% in
+  quarters, the ice as no, less, regular or extra, and any toppings. Sugar
+  and ice each show a mark per pump or cube, and the same marks appear on
+  the cup or bottle and on the hand, filling as they go in; the station moves
+  on by itself when they're full. Pressing a tap early leaves a drink short;
+  extra ice at the pour, or the wrong count, is graded down.
 - **Each station is a small physical act with its own grade** out of 100, and
-  the receipt mixes those with how long the customer waited.
-- **More to a drink than tea and toppings.** Orders also set the ice, the
-  jar to pull from, and a timed seal; tea has to be brewed, samples can be
-  handed out, a critic turns up, and each shift has a daily special.
+  the receipt mixes those with how long the guest waited.
+- **Guests stand across the counter,** cut off at the waist by its edge,
+  between the back bar's columns and never where the cup does its work. Each
+  of the cast of about forty has a written look (hair, glasses, a cap, a
+  phone, a hood). Their faces follow their patience (calm, eyes on the clock,
+  cross) and their drink as they take it (starry for perfect, surprised by a
+  good one served fast, content, unmoved, unimpressed), and a cross guest
+  storms out. Under Reduce Motion nobody walks; the faces still change.
+- **Serving well pays three ways:** good drinks in a row climb a combo that
+  multiplies each drink (×2 from the third, ×3 from the sixth); tips fly into
+  a tip jar on the counter, which pays a bonus and buys back a lost pearl
+  when full; and a perfect drink cheers everyone waiting, buying them
+  patience.
+- **The back bar is real:** a wooden shelf on brackets, with the ice bin, a
+  dispenser per tea (a glass tank with its tea showing, on a steel base whose
+  tap reaches over the shelf's edge) and the syrup bottle standing on it.
+  Each machine is its own button. Its name is a printed paper label on the
+  glass, drawn on the jar's cells with a lifted corner; a jar too narrow for
+  its word shows the flavour's mark instead. Nothing has a box behind it, and
+  nothing that moves crosses a label.
+- **More around the drink:** tea has to be brewed, samples can be handed
+  out, a critic turns up, and each shift has a daily special.
+- **Expert** puts four tickets on the rail, sends guests faster with less
+  patience and bigger orders, tightens every grading window, swings the ladle
+  and the sealer faster, gives two samples, and sends the critic twice.
 - **A demo first.** A first-time visitor is offered a short demo before the
-  shift starts.
-- **A written cast.** Customers come from a set list of about forty regulars
-  with their own quirks, not from the leaderboard.
-- **The shop, kept quiet.** Behind the whole play area is one flat wall
-  tone with nothing on it and nothing moving, so tickets, taps, and the cup
-  always read first. The room lives only in the side walls, mixed toward the
-  wall colour: a menu board, a few large jars, a clock whose hand shows the
-  shift's time left, and a small window where the day turns to night. The
-  wall itself barely darkens over the shift. A phone shows a plain wall.
-  A perfect drink briefly brightens the lamps; a lost guest briefly dims
-  the edges.
-- Order slips and station panels carry no slab at rest; a customer about to
-  walk out earns one.
+  shift starts; the menu's demo button opens it directly.
+- **The shop, kept quiet.** The wall behind the play area is one flat tone;
+  the room lives in the side walls, mixed toward the wall colour: a menu
+  board, a few large jars, a clock whose hand shows the shift's time left,
+  and a small window where the day turns to night. A perfect drink briefly
+  brightens the lamps; a lost guest briefly dims the edges.
+- Order slips carry no slab at rest; a guest about to walk out earns one.
 
 ### Cup stack
 
@@ -307,14 +443,36 @@ A cup slides over the tower; drop it, and what overhangs is sliced off.
   coaster on it. Sky colour is a function of altitude.
 - **It moves with the game.** Clouds and birds drift faster as the slide
   speeds up. A perfect drop sends out a ring of sparkle cells, in the drink's
-  colour from the third in a row. When the tower falls, the sky sweeps back
-  down to the rooftop.
+  colour once the streak is growing the cup. When the tower falls, the sky
+  sweeps back down to the rooftop.
 - **Never cut more than you saw.** The tray is judged at the width it is
-  drawn. The sliding cup glides smoothly, and a drop snaps to the pixel grid
-  toward the tower, never away from it, so an edge that looks supported is
-  never cut.
-- A drop within `1.5` units of centre is perfect; three perfect drops in a
-  row start growing the cup back.
+  drawn. The sliding cup glides on the screen's pixel grid (half CSS pixels
+  on a sharp screen), and a drop is judged exactly where it was last drawn.
+  It then snaps to the unit grid toward the tower, never away from it, so an
+  edge that looks supported is never cut.
+- **Perfect is earned.** The perfect window is a time either side of centre,
+  turned into distance at the slide's speed: `30` ms at the first cup,
+  tightening to `14` ms by 24 cups (about half a unit throughout, as the
+  slide speeds up). It is never narrower than one frame of the slide at
+  60 fps plus half a pixel, so no pass can skip over it. A drop just outside
+  it still snaps onto the centre whole, so the game says “a hair off”: it
+  looks lined up, but it isn't a perfect and it ends the streak.
+- **Regrowth.** The third perfect in a row grows the cup back a unit, and
+  so does every perfect after it, never past a fresh cup.
+- **Expert** is a narrower cup (`10` units, on a narrower tray), a slide
+  half again as fast from the start that speeds up sooner (`22` to `44`
+  units a second by 22 cups), each cup from a random side at its own pace
+  (±20%), the narrowest perfect window allowed (about `14` to `11` ms), and
+  slower regrowth: the fourth perfect in a row, then every second one. The
+  music rushes sooner.
+- **The demo** plays fourteen scripted cups on the real rules, in normal
+  mode, through the same drop the player's input calls: perfects, trims, a
+  regrowth, a near miss, then a miss and the fall. Its strip sits at the
+  top, clear of the tower. Pressing Play mid-demo drops its cup and brings
+  the sky home as a fall does, then a real run starts.
+- **Sharing** draws the run as a little tower: a square per drop, ten to a
+  row, newest row on top, ending on the cup that fell (gold perfect, white
+  whole, orange trimmed, red fell).
 - A dashed line marks the personal best's height, ink over pale sky and
   cream over dark. Anything drifting behind the top cups fades back.
 
@@ -342,10 +500,34 @@ level in the cup on screen and in the HUD's cup drains together.
   site; some skies carry a faint band of the galaxy or a comet, and some
   sites an old rover, a flag, or a small base with one blinking lamp. A test
   checks every coaster in every character has room to come straight down.
-- **Later sites pay more.** Coasters narrow, tea runs short, and wind grows
+- **Later sites pay more.** Coasters narrow, the cup shrinks, and wind grows
   as the sites go on, so landings are multiplied by the site: ×1 at the
-  first, a quarter more each site, up to ×3. The score ticket shows the
-  multiplier beside the site number.
+  first, a quarter more each site, up to ×3. The multiplier lives in the
+  scoring only and is never shown: a landing's note and the score say the
+  points it paid, not the factor behind them. The coasters' own ×2, ×3, ×5
+  stay on the pads, because they say where to land.
+- **Every coaster is in reach.** The cup shrinks by 30 a site to a floor of
+  450, about a third more than a careful autopilot burns reaching the
+  furthest coaster from the start in the strongest wind. A test holds it to
+  landing on every coaster from the start with a fifth of the cup to spare.
+- **Expert is a lot harder from the first site.** Wind already blows at site
+  1 (3, rising 0.7 a site to normal's cap of 6.5) and gusts harder, with a
+  quick flutter on top; coasters are a quarter narrower (never under 27); the
+  cup starts at 560 and shrinks to a floor of 430; a touchdown must be slower,
+  straighter, and more upright (descent 12, drift 7, tilt 0.15, against 16, 10,
+  and 0.2); and there are two landers. The wind stops at normal's cap because
+  past it even the autopilot can't hold still over the narrowest coaster. A
+  test flies the autopilot to every expert coaster from the start, landing
+  with 15% of the cup to spare.
+- **The demo is the real game flying itself.** The engine's autopilot (the
+  same one the tests fly) presses the three keys on a calm first site and
+  lands on its ×5 coaster in about fifteen seconds, under four lines: hold
+  burn to slow the fall, the tea is the fuel, line up over a coaster, come
+  down slow and level. On touch the hold buttons light as it presses them,
+  and the strip sits at the top, under the tickets.
+- **Sharing** gives one emoji per attempt (the coaster's keycap for a
+  landing, a burst for a crash) after a moon, and a feather for each feather
+  landing.
 - **Fire is animated pixel flame** on the sprite's own grid: tongues
   travelling down the plume, embers, smoke, and dust billowing where it meets
   the ground, with a faint additive firelight (the arcade's only soft-edged
@@ -361,41 +543,80 @@ level in the cup on screen and in the HUD's cup drains together.
 
 ### Sugar rush
 
-An endless run across the rooftops as a delivery cup on legs. **The tea in
-the cup is your health and your pay.**
+An endless run across the rooftops as a delivery cup on legs, faster the
+whole way. **Spare cups are the lives; the tea is the pay.**
 
-- **Rough play spills.** Hard landings, bumps, slams, and pigeons slosh tea
-  out; clean hops and glides don't. The level in the runner's cup and in the
-  HUD's cup are the same number.
-- **One cup.** There are no lives: a fall, or the cup running dry, ends the
-  run. Now and then a **spare cup** waits on the harder line (the top of an
-  awning bounce, the end of a cable, a vent's high line, the upper planks of
-  a split), roughly every five thousand units after the first stretch. The
-  player can hold one; it saves a single fall or dry cup. A spare found
-  while one is held is a golden cup worth points. The HUD shows one slot:
-  the cup when held, a dashed outline when not.
-- **Deliveries are the heartbeat.** Customers wait at coasters along the
-  route. Crossing one hands off a cup: a fuller cup pays more, a streak
-  multiplies it, and the cup refills. A cup at nine tenths or more is a full
-  cup and gets a stamp.
+- **It never stops speeding up.** Speed climbs in a straight line with
+  distance from 180 to a cap of 390 units a second, so in time it gathers
+  pace: about 15% faster after half a minute, a third faster after a minute,
+  nearly double by two and a half. Set pieces unlock and remix with
+  difficulty, and the flat roof between them shrinks, so they come faster
+  still.
+- **Spare cups are the lives.** A run starts with one and can hold two; the
+  HUD shows a slot for each, the cup when held, a dashed outline when not.
+  Running into anything you should have hopped or slid under (a crate, a
+  pigeon, a sign, a barrel) costs one, as does a fall into the alley or a cup
+  run dry. With none left, the next of those ends the run. After a hit the
+  runner stumbles and has a moment of grace (1.2 s) so one mistake is one
+  cup; a fall comes back on the next proper roof.
+- **Losing a cup blinks.** A runner brought back blinks hard on and off
+  through its grace; the lost cup's slot flickers in the accent before it
+  settles empty, and a cup won back flickers in and lands with a pop, as the
+  shared pearls do. Under Reduce Motion both show their final state at once.
+- **Some things are lethal.** A live wire down on the roof, a skylight, a
+  shorting neon sign, and a gap with the railway below end the run with
+  spare cups in hand, in grace or in a rush. They are always avoidable (a
+  test holds every wire and skylight to a tenth of a second or more of
+  take-off, every railway gap to well inside a full jump) and never come
+  before the first stretch.
+- **Spare cups are rare and risky.** One is placed only every fourteen to
+  twenty thousand units after the first nine thousand (about once a minute
+  of running, a third as often as before), and only low at the far end of a
+  skylight or a railway gap, on the line of the earliest full jump that
+  still clears it. The safe jump passes over it; taking it means coming down
+  a moment from the edge. A spare found with both slots full is a golden cup
+  worth points.
+- **The tea is the pay.** Hard landings and slams slosh tea out; clean hops
+  and glides don't. Customers wait at coasters along the route: crossing one
+  hands off a cup, a fuller cup pays more, a streak multiplies it, and the
+  cup refills. A cup at nine tenths or more is a full cup and gets a stamp.
+  Running dry costs a spare cup and refills it part way.
 - **Four moves that combine:** a jump whose height follows the hold, a glide
   on the straw as a rotor, a slide, and a slam.
 - **Sugar rush.** Pearls fill a meter of ten sugar cubes; triggering it
-  smashes obstacles for a few seconds, with afterimages and speed lines. The
-  full meter is the one ticket here that earns a slab.
-- **The course is authored, then shuffled.** Eighteen set pieces (awnings
-  that bounce, vents that lift, cables to ride, crates, pigeons, split
-  routes) unlock with distance and never repeat back to back. A test bot must
-  finish long runs on many seeds on a single cup, so every gap is clearable.
+  smashes anything that would cost a cup (never anything lethal) for a few
+  seconds, with afterimages and speed lines. The full meter is the one
+  ticket here that earns a slab.
+- **The course is authored, then shuffled.** Twenty-seven set pieces unlock
+  with distance and never repeat back to back. Besides awnings that bounce,
+  vents that lift, cables to ride, crates, pigeons and split routes, things
+  move or keep time: barrels that roll at the runner, a rival's drone at
+  slide height, signs swinging from a gantry, steam pipes that blow on a
+  timer (hop the pipe, or jump the plume), and rotten boards over a gap
+  that give way a moment after they take the weight. A test bot (also the
+  demo's player) runs long stretches on many seeds, in both modes, without
+  losing a cup, so every gap is clearable and everything can be avoided.
+- **Expert** starts at 215 and climbs to 430 in about a minute and a half,
+  reaches full difficulty twice as soon, starts with no spare cup and finds
+  one only every fifty thousand units or so after the first forty thousand,
+  and brings lethal pieces in at half their usual distance and more often.
 - **Every pearl can be taken.** Pearl curves are plotted from the runner's
   real speed and take-off, and a test proves each group (and each spare) is
   collected in full by one ordinary input, with a little slack in the timing.
   Pearls are drawn exactly where they are judged.
-- **Hop or slide, at a glance.** Things you hop are ink-outlined with a cream
-  top; things you slide under carry red and cream on their underside.
+- **Hop, slide, or never touch, at a glance.** Things you hop are
+  ink-outlined with a cream top; things you slide under carry red and cream
+  on their underside. Lethal things are striped hazard yellow and ink on the
+  side that kills (the top of what lies on the roof, the underside of what
+  hangs, the walls either side of the railway) and spark or flicker.
 - **The scene** is cup stack's city from the side: dusk at the start, full
   night by about a kilometre and a half, windows coming on as it darkens.
-- New moves are taught in context, once per device, one caption at a time.
+- New moves are taught in context, once per device, one caption at a time;
+  the first lethal thing gets one too (“hazard stripes end the run”).
+- **A demo** plays a calm opening on a fixed seed with the bot at the keys,
+  captioning each move the first time it happens, for about half a minute.
+- **Sharing** pastes the distance, each coaster as a cup (full, part, or
+  missed), and the cups lost, then what ended the run.
 
 ### Spill
 
@@ -416,39 +637,73 @@ room, to steer it into the cup.
   part and the stroke in progress shown live; it turns coral and says `low`
   under a fifth, and `out` when gone. While drawing, a dashed ring around the
   pen shows how far the straw left can still reach.
-- **Rooms teach one thing, then combine.** Eighteen authored rooms in six
-  pages: ramps, fans, moving cups and overflow, jelly and pipes, milk to a
-  ratio with sponges and hot plates in the way, then pearls and a scale that
-  lifts a gate. After those, rooms return as remixes labelled after hours.
+- **Rooms teach one thing, then combine.** Forty-eight authored rooms in
+  sixteen pages of three. Each page brings in or deepens one idea and its
+  last room combines it with what came before: ramps, fans, moving cups and
+  overflow, jelly and pipes, milk to a ratio with sponges and hot plates in
+  the way, pearls and a scale that lifts a gate; then hatched glass that
+  takes no straw (tea flies straight through it), kettles that slide on a
+  rail as they pour, cups that run over into the next, wind that pushes back
+  and holds tea up, flat jelly that bounces, pipes in a row and up a wall,
+  ratios that leave tea out, a sieve that holds pearls and lets tea through,
+  scales weighed by overflow, pearls or milk, and three closing rooms with
+  everything at once. After those, rooms return as remixes labelled after
+  hours, a step harder every sixteen.
 - **Levels, not lives.** Spill has no lives. A failed room shows its one-line
-  hint and is tried again. A `Levels` button (key `L`) opens the room grid:
-  each room's best stars, locked rooms marked with a padlock, the next room
-  to play marked and focused, and after hours as one tile opened by clearing
-  room 18. Progress lives on the device. The leaderboard score is the total
-  of best points across the eighteen rooms, signed when room 18 is cleared.
+  hint and is tried again. A `Levels` button (key `L`) opens the room grid,
+  a page of three to a row on a phone and two pages to a row on a wider
+  screen, scrolling inside its card: each room's best stars, locked rooms
+  marked with a padlock, the next room to play marked and focused, and after
+  hours as one tile opened by clearing the last room. Arrow keys move by
+  what is on screen. Progress lives on the device, expert's apart from
+  normal's; a save from when there were eighteen rooms keeps every star, and
+  the new rooms open in order before after hours does. The leaderboard score
+  is the total of best points across every room, signed when the last room
+  is cleared.
 - **Every room is proven.** Each ships with a reference solution, and tests
-  check that it clears with the solution, fails with nothing drawn, and needs
-  most of its straw.
+  check that it clears with the solution, fails with nothing drawn, needs
+  most of its straw, and settles to a verdict that holds.
 - **Planning time.** Each room gives ten to thirty seconds before the kettle
   pours on its own, shown on a dial by the kettle; pouring early earns a
   bonus.
+- **Expert** is every room with five seconds to plan, just enough straw for
+  the room's own route and three percent more, orders half way up from
+  their minimum to their full line, keep marks a tenth higher for stars, and
+  a ratio tolerance at three fifths. A test draws each expert route one
+  straw every second and a half from the moment the room opens, and every
+  room still clears. Expert after hours cuts straw to exactly the route,
+  keeps each room's own droplet seed, and holds its fuller orders and faster
+  belts back until the second lap, so its first lap is every expert room,
+  mirrored or not, on just the route; a test clears each of them at that
+  pace.
+- **The demo** plays room 1 on its real rules for about twenty seconds: a
+  pen draws a straw the wrong way, takes it back with a tap, draws the
+  room's route, and presses pour, and the room clears. It records nothing,
+  takes no game keys, and holds on pause. Its strip sits at the top, clear
+  of the straw gauge.
+- **The share** is a square per room by its best stars (green three, yellow
+  two, orange one), a page of three to a group and four pages to a line.
 - **The order is drawn on the cup:** a fill line, a two-tone band for a milk
   ratio, slots for pearls, and a tick and a lid once it is met.
 - **Fixtures show how they work before they are used:** a fan's wind drifts
-  across the region it pushes, and a scale is joined to its gate by a dashed
-  line.
+  across the region it pushes, a scale is joined to its gate by a dashed
+  line, a kettle on a rail hangs from a trolley in a slot as long as its run,
+  and a sieve is a steel mesh with gaps.
 - **The scene** is the shop's back kitchen, with the tiles tinted differently
-  for each page.
+  for each of the sixteen pages, and a window where the day passes once over
+  them, then night after hours.
 
 ## Structure
 
 - The arcade is loaded the first time it opens, so its code and its global
   sheet (`arcade.css`) never ship with an ordinary page view. It sets
   `data-justify="off"` so the paragraph justifier leaves game copy alone.
-- Shared pieces live in `src/lib/components/arcade/` (menu, countdown, pause
-  card, results slip with the per-game leaderboard, pearls, cup timer, HUD
+- Shared pieces live in `src/lib/components/arcade/` (menu, leaderboards,
+  countdown, pause card, results slip with the per-game leaderboard and
+  share button, demo card and demo strip, expert tag, pearls, cup timer, HUD
   buttons, track flag), and `src/lib/arcade/shell.ts` wires a game into the
   window (auto-pause, Tab cycling, the pause key, Reduce Motion, resizing).
+  `share.ts` builds share text and `blink.ts` times the revive blink.
 - Each game's rules live in a DOM-free module under `src/lib/arcade/` with
   node tests in `tests/`.
 - Game-specific styles are scoped to the game's component; `arcade.css` holds
