@@ -2,6 +2,9 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { AudioLines, Disc3, VolumeOff } from "@jis3r/icons";
+  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  import { openArcade } from "$lib/boba";
+  import { unlockAudio } from "$lib/sfx";
 
   // DC Time with seconds
   let dcTime = "";
@@ -25,6 +28,25 @@
   const buildDate = new Date(__BUILD_DATE__)
     .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     .toLowerCase();
+
+  // The boba arcade, signposted where the site keeps its other extras (the
+  // music): one quiet word with a small pixel cup, on every page. The
+  // homepage's boba opens the same menu.
+  const ARCADE_CUP = [
+    "...S...",
+    "...S...",
+    "OOOOOOO",
+    ".OLLLO.",
+    ".ObLbO.",
+    "..OOO..",
+  ];
+  const ARCADE_CUP_PALETTE = { O: "currentColor", L: "#c79a6b", b: "currentColor", S: "#ff5277" };
+
+  function playArcade() {
+    // Inside the gesture, so the arcade's first sound can play.
+    unlockAudio();
+    openArcade("menu");
+  }
 
   // Music player
   let isPlaying = false;
@@ -138,6 +160,17 @@
         <div class="inline-flex items-center gap-2">
           <button
             type="button"
+            on:click={playArcade}
+            data-track="footer_arcade"
+            aria-label="Open the boba arcade"
+            title="seven small games"
+            class="arcade-link mr-2 inline-flex items-center gap-1.5 font-[inherit] text-[length:inherit] lowercase text-inherit transition-colors duration-300 hover:text-ink-700 dark:hover:text-cream-300"
+          >
+            <span class="arcade-cup inline-flex"><PixelIcon grid={ARCADE_CUP} palette={ARCADE_CUP_PALETTE} px={2} /></span>
+            <span>arcade</span>
+          </button>
+          <button
+            type="button"
             on:click={skipMusic}
             on:mouseenter={() => (hoveredMusic = true)}
             on:mouseleave={() => (hoveredMusic = false)}
@@ -173,3 +206,25 @@
     </div>
   </div>
 </footer>
+
+<style>
+  .arcade-cup {
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .arcade-link:hover .arcade-cup,
+  .arcade-link:focus-visible .arcade-cup {
+    transform: rotate(-10deg) translateY(-1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .arcade-cup {
+      transition: none;
+    }
+
+    .arcade-link:hover .arcade-cup,
+    .arcade-link:focus-visible .arcade-cup {
+      transform: none;
+    }
+  }
+</style>

@@ -51,7 +51,31 @@
     S: "#ff5277",
   };
 
+  // Once a visit, a few seconds in, the boba gives one small wiggle, so a
+  // reader notices it is a thing to press. Never under Reduce Motion.
+  let bobaNudge = false;
+
   onMount(() => {
+    let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!calm && !sessionStorage.getItem("boba_nudged_v1")) {
+        nudgeTimer = setTimeout(() => {
+          bobaNudge = true;
+          try {
+            sessionStorage.setItem("boba_nudged_v1", "1");
+          } catch {
+            // Storage off: it may wiggle again next load, which is harmless.
+          }
+        }, 3200);
+      }
+    } catch {
+      // No storage, no nudge.
+    }
+    const stopNudge = () => {
+      if (nudgeTimer) clearTimeout(nudgeTimer);
+    };
+
     // Random straw + drink colour each load.
     const straw = STRAWS[Math.floor(Math.random() * STRAWS.length)];
     bobaGrid = [...straw, ...CUP_BODY];
@@ -60,7 +84,10 @@
     // Resume audio on the first click anywhere, so the boba's hover jingle plays.
     const unlock = () => unlockAudio();
     window.addEventListener("pointerdown", unlock, { once: true });
-    return () => window.removeEventListener("pointerdown", unlock);
+    return () => {
+      stopNudge();
+      window.removeEventListener("pointerdown", unlock);
+    };
   });
 
   const parseBanner = (text: string) => parseInline(text);
@@ -277,13 +304,25 @@
             <button
               type="button"
               class="boba-launcher"
+              class:is-nudging={bobaNudge}
               on:click={() => openArcade("menu")}
               on:mouseenter={sfxBoba}
+              on:animationend={() => (bobaNudge = false)}
               aria-label="Open the boba arcade"
-              title="boba?"
+              title="seven small games"
             >
               <PixelIcon grid={bobaGrid} palette={bobaPal} px={6} />
             </button>
+            <!-- A pencilled note in the margin of the photo: says what the
+                 boba is without asking anything of a reader who came for
+                 the research. The boba itself is the control. -->
+            <span class="boba-hint" aria-hidden="true">
+              <span>arcade</span>
+              <svg viewBox="0 0 26 14" width="26" height="14" focusable="false">
+                <path d="M1.5 9.5C6 11.8 13.5 12 19 7.5" />
+                <path d="M15.6 6.6 19.6 7.1 18.4 10.9" />
+              </svg>
+            </span>
           {/if}
         </div>
       </div>
@@ -823,10 +862,73 @@
       transform: rotate(25deg) translateY(-1px) scale(1.08);
     }
   }
+  .boba-launcher.is-nudging {
+    animation: boba-nudge 0.9s ease-in-out 1;
+  }
+  @keyframes boba-nudge {
+    0%,
+    100% {
+      transform: rotate(16deg);
+    }
+    20% {
+      transform: rotate(4deg) translateY(-3px);
+    }
+    40% {
+      transform: rotate(26deg) translateY(-2px);
+    }
+    60% {
+      transform: rotate(10deg) translateY(-1px);
+    }
+    80% {
+      transform: rotate(20deg);
+    }
+  }
+
+  /* The pencilled note under the photo, pointing at the boba. Quiet at rest,
+     inked when the boba is hovered or focused. */
+  .boba-hint {
+    position: absolute;
+    right: 38px;
+    bottom: -27px;
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    color: theme("colors.ink.500");
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-style: italic;
+    line-height: 1;
+    pointer-events: none;
+    transition: color 0.2s ease;
+  }
+  .boba-hint svg {
+    overflow: visible;
+    transform: translateY(-5px);
+  }
+  .boba-hint path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  :global(.dark) .boba-hint {
+    color: theme("colors.cream.500");
+  }
+  .boba-launcher:is(:hover, :focus-visible) + .boba-hint {
+    color: theme("colors.accent.dark");
+  }
+  :global(.dark) .boba-launcher:is(:hover, :focus-visible) + .boba-hint {
+    color: theme("colors.accent.light");
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .boba-launcher:hover {
       animation: none;
       transform: rotate(16deg) scale(1.08);
+    }
+    .boba-launcher.is-nudging {
+      animation: none;
     }
   }
 
