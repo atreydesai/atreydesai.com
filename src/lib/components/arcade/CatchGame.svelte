@@ -897,7 +897,8 @@
     localBest = result.best;
     newBest = result.newBest;
     const cells = shiftCells(events, elapsed);
-    share = [...emojiRows(cells, cells.length <= 12 ? 12 : 10, 3), `⏱️ ${formatShift(elapsed)} on shift`];
+    // The time on shift is already one of the shared stats.
+    share = emojiRows(cells, cells.length <= 12 ? 12 : 10, 3);
     liveMessage = `Game over after ${formatShift(elapsed)} on shift. Final score ${score}.`;
     await tick();
     slip?.focus();

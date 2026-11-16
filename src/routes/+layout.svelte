@@ -14,7 +14,9 @@
   import CustomCursor from "$lib/components/CustomCursor.svelte";
   import { startJustify } from "$lib/justify";
   import { startClickTracking } from "$lib/analytics";
-  import { BOBA_DESKTOP_QUERY, arcadeScreen, openArcade } from "$lib/boba";
+  import { afterNavigate, replaceState } from "$app/navigation";
+  import { page } from "$app/state";
+  import { BOBA_DESKTOP_QUERY, GAMES, arcadeScreen, openArcade, type GameId } from "$lib/boba";
   import {
     PAGE_TRANSITIONS_ENABLED,
     PAGE_TRANSITION_DURATION_MS,
@@ -47,6 +49,27 @@
   // platform's own back-swipe animation.
   $: animatePages = PAGE_TRANSITIONS_ENABLED && !isTouch && !reducedMotion;
 
+  // A shared run links straight into its game (?play=stack): the arcade
+  // opens on it, and the link tidies itself out of the address bar so a
+  // reload is an ordinary visit. A game this device can't play opens the
+  // menu instead (openArcade decides). The address is rewritten a tick
+  // later: the first afterNavigate runs while the router is still starting.
+  afterNavigate(() => {
+    const url = new URL(window.location.href);
+    const play = url.searchParams.get("play");
+    if (play === null) return;
+    const game = GAMES.find((item) => item.id === play);
+    if (game) openArcade(game.id as GameId);
+    url.searchParams.delete("play");
+    setTimeout(() => {
+      try {
+        replaceState(url, page.state);
+      } catch {
+        // The router still isn't ready: leave the address as it is.
+      }
+    }, 0);
+  });
+
   onMount(() => {
     // Knuth–Plass justification for running prose, site-wide.
     const stopJustify = startJustify();
@@ -59,6 +82,7 @@
       if (!bobaMedia.matches && $arcadeScreen === "catch") arcadeScreen.set("menu");
     };
     bobaMedia.addEventListener("change", syncBobaDesktop);
+
 
     // Input mode and Reduce Motion can both change while the page is open —
     // a trackpad gets attached, or the setting is flipped in System Settings.

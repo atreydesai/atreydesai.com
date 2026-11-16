@@ -201,11 +201,24 @@ row). A paper wash fades the site header behind them.
   only its name. Back or Escape returns to the menu.
 - **Pause says each thing once.** A title, one sentence, and three buttons
   that carry their own key chips, on one line. Nothing else.
-- **Share.** The results slip's secondary `Share` button copies the run as a
-  few short lines a player can paste to a friend, the way a word game shares
-  its grid: the game and mode, the score, the game's own emoji lines, and the
-  site. A phone opens the share sheet instead. The label says `Copied` for a
-  moment; nothing else changes.
+- **Share.** The results slip's secondary `Share` button turns the board
+  over to a share panel (`Board` turns it back): the run's card as it will
+  be sent, with `Copy image` and `Copy text` beside it (under it on a
+  phone). A phone whose share sheet takes images offers `Share image`
+  instead of copying it. Each button says `Copied` for a moment.
+  - **The card** (`share-card.ts`) is a 1200 × 800 riso sheet on the shop
+    wall, always in the light palette: the game's pixel icon and name, the
+    mode, the site, the score circled in pen with its unit under it and a
+    `new best` stamp when it earned one, up to three stats as a receipt,
+    and the game's emoji lines along the foot. It stands on its own, since
+    some apps drop the text sent beside an image. It is drawn as the slip
+    opens, so a copy starts inside the click.
+  - **The text** reads without the game: the game and mode, the score in a
+    sentence, up to three stats in words (never the personal best, a stat
+    that repeats the score, or one that came to nothing), the emoji lines,
+    and a link that opens the arcade straight on the game
+    (`atreydesai.com/?play=stack`; the root layout opens it and tidies the
+    address).
 - **Results.** The slip's top is two columns: title, deck, and the circled
   score with its unit on the left, with any `new best` stamp pressed across
   the top of the circle; the run's stats as a single receipt column on the
@@ -291,6 +304,9 @@ exclamation marks, no “Oops”.
 - **Share.** Each game builds its own emoji lines for the results slip's
   `share` prop (`emojiRows` in `src/lib/arcade/share.ts` wraps a sequence):
   at most four short lines that say how the run went without explaining it.
+  The words come from the slip's receipt `stats`, so a game names its stats
+  for a stranger. `/dev/share` draws every game's card and text from sample
+  runs, with an expert run and an empty one.
 - **New rules, new board.** When a game's scoring changes enough that old
   scores can't be matched (catch going endless, sugar rush and cup stack
   getting much harder), its best cookie and its board move to a new version;

@@ -1,10 +1,20 @@
 <script lang="ts">
-  import { createEventDispatcher, onMount } from "svelte";
+  import { createEventDispatcher, onDestroy, onMount, tick } from "svelte";
 
   import { GAMES, type GameId } from "$lib/boba";
   import { LOOPS } from "$lib/arcade/art";
   import { currentMode, fetchBoard, submitScore, type BoardEntry } from "$lib/arcade/scores";
-  import { shareText, shareRun } from "$lib/arcade/share";
+  import {
+    canCopyImage,
+    canShareFile,
+    copyImage,
+    copyText,
+    shareFile,
+    shareText,
+    type ShareInput,
+    type ShareOutcome,
+  } from "$lib/arcade/share";
+  import { renderShareCard } from "$lib/arcade/share-card";
   import { cleanName, MAX_NAME } from "$lib/profanity";
 
   export let game: GameId;
@@ -15,9 +25,9 @@
   export let newBest = false;
   export let stats: Array<{ label: string; value: string | number }> = [];
   /**
-   * The run as a few short lines of emoji for the share text, the way a
-   * word game shares its grid: what happened, at a glance, without spoilers.
-   * Each game builds its own; empty shares the score alone.
+   * The run as a few short lines of emoji for the share text and card, the
+   * way a word game shares its grid: what happened, at a glance. Each game
+   * builds its own; empty shares the words alone.
    */
   export let share: string[] = [];
 
@@ -25,15 +35,95 @@
   const expert = mode === "expert";
   const gameName = GAMES.find((item) => item.id === game)?.name ?? game;
 
-  // "Copied" (or "Shared") stands in the button's label for a moment.
-  let shareState: "" | "copied" | "shared" | "failed" = "";
-  let shareTimer: ReturnType<typeof setTimeout> | null = null;
+  // Share opens a panel in place of the board: the card as it will look,
+  // and a way to send it as an image (copied, or the share sheet on a
+  // phone) or as text. The card is drawn as soon as the slip opens, so a
+  // copy can start inside the click (Safari refuses one that starts later).
+  $: shareInput = {
+    gameId: game,
+    game: gameName,
+    expert,
+    score,
+    unit,
+    newBest,
+    stats,
+    lines: share,
+  } satisfies ShareInput;
 
-  async function shareScore() {
-    const text = shareText({ game: gameName, expert, score, unit, lines: share });
-    shareState = await shareRun(text);
-    if (shareTimer) clearTimeout(shareTimer);
-    shareTimer = setTimeout(() => (shareState = ""), 2200);
+  let sharing = false;
+  let cardPng: Promise<Blob> | null = null;
+  let cardUrl = "";
+  let cardFile: File | null = null;
+  let drawnKey = "";
+  let imageCopy = false;
+  let firstShareButton: HTMLButtonElement;
+
+  $: drawCard(shareInput);
+  $: phoneShare = canShareFile(cardFile);
+
+  function drawCard(input: ShareInput) {
+    if (typeof window === "undefined") return;
+    const key = JSON.stringify(input);
+    if (key === drawnKey) return;
+    drawnKey = key;
+    const png = renderShareCard(input);
+    cardPng = png;
+    png
+      .then((blob) => {
+        if (cardPng !== png) return;
+        if (cardUrl) URL.revokeObjectURL(cardUrl);
+        cardUrl = URL.createObjectURL(blob);
+        cardFile = new File([blob], `boba-${game}-${score}.png`, { type: "image/png" });
+      })
+      .catch(() => {
+        // No card: the text still shares.
+        if (cardPng === png) cardPng = null;
+      });
+  }
+
+  onDestroy(() => {
+    if (cardUrl) URL.revokeObjectURL(cardUrl);
+  });
+
+  async function toggleShare() {
+    sharing = !sharing;
+    if (!sharing) return;
+    await tick();
+    firstShareButton?.focus();
+  }
+
+  // What a button just did stands in its label for a moment.
+  let imageState: ShareOutcome = "";
+  let textState: ShareOutcome = "";
+  let stateTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function report(which: "image" | "text", outcome: ShareOutcome) {
+    imageState = which === "image" ? outcome : "";
+    textState = which === "text" ? outcome : "";
+    if (stateTimer) clearTimeout(stateTimer);
+    stateTimer = setTimeout(() => (imageState = textState = ""), 2200);
+  }
+
+  function onCopyImage() {
+    if (!cardPng) return;
+    // No await before the copy starts: see the note above.
+    void copyImage(cardPng).then((outcome) => report("image", outcome));
+  }
+
+  function onShareImage() {
+    if (!cardFile) return;
+    void shareFile(cardFile, shareText(shareInput)).then((outcome) => report("image", outcome));
+  }
+
+  function onCopyText() {
+    void copyText(shareText(shareInput)).then((outcome) => report("text", outcome));
+  }
+
+  function said(outcome: ShareOutcome, idle: string) {
+    if (outcome === "copied") return "Copied";
+    if (outcome === "shared") return "Shared";
+    if (outcome === "failed") return "Couldn’t copy";
+    return idle;
   }
 
   const dispatch = createEventDispatcher<{ restart: null; menu: null; exit: null }>();
@@ -72,6 +162,7 @@
   }
 
   onMount(async () => {
+    imageCopy = canCopyImage();
     playerName = readName();
     const result = await fetchBoard(game, mode);
     boardAvailable = result.available;
@@ -152,6 +243,46 @@
       {/if}
     </div>
 
+    {#if sharing}
+      <!-- The card as it will be sent, then the ways to send it. -->
+      <section id="boba-share-panel" class="share-panel" aria-label="Share this run">
+        <div class="preview">
+          {#if cardUrl}
+            <img
+              src={cardUrl}
+              alt={`Share card: ${gameName}${expert ? ", expert" : ""}, ${score} ${unit}`}
+              width="1200"
+              height="800"
+            />
+          {/if}
+        </div>
+        <div class="share-buttons">
+          {#if phoneShare}
+            <button
+              bind:this={firstShareButton}
+              type="button"
+              class="boba-btn secondary"
+              disabled={!cardFile}
+              on:click={onShareImage}
+            >
+              {said(imageState, "Share image")}
+            </button>
+          {:else if imageCopy && cardPng}
+            <button
+              bind:this={firstShareButton}
+              type="button"
+              class="boba-btn secondary"
+              on:click={onCopyImage}
+            >
+              {said(imageState, "Copy image")}
+            </button>
+          {/if}
+          <button type="button" class="boba-btn secondary" on:click={onCopyText}>
+            {said(textState, "Copy text")}
+          </button>
+        </div>
+      </section>
+    {:else}
     <div class="lower">
       {#if !boardLoading && boardAvailable && board.length > 0}
         <section class="board" aria-labelledby="boba-board-title">
@@ -198,17 +329,30 @@
         </div>
       {/if}
     </div>
+    {/if}
 
     <p class="sr-only" aria-live="polite">
-      {shareState === "copied" ? "Score copied to share." : shareState === "failed" ? "Couldn’t copy the score." : ""}
+      {imageState === "copied"
+        ? "Image copied to share."
+        : textState === "copied"
+          ? "Text copied to share."
+          : imageState === "failed" || textState === "failed"
+            ? "Couldn’t copy it."
+            : ""}
     </p>
 
     <div class="boba-actions">
       <button type="button" class="boba-btn" on:click={() => dispatch("restart")}>
         Play again
       </button>
-      <button type="button" class="boba-btn secondary share" on:click={shareScore}>
-        {shareState === "copied" ? "Copied" : shareState === "shared" ? "Shared" : shareState === "failed" ? "Couldn’t copy" : "Share"}
+      <button
+        type="button"
+        class="boba-btn secondary"
+        aria-expanded={sharing}
+        aria-controls="boba-share-panel"
+        on:click={toggleShare}
+      >
+        {sharing ? "Board" : "Share"}
       </button>
       <button type="button" class="boba-btn secondary" on:click={() => dispatch("menu")}>
         Menu
@@ -228,9 +372,38 @@
     container-type: inline-size;
   }
 
-  /* Holds its width while the label swaps to "Copied". */
-  .share {
-    min-width: 6.5rem;
+  /* The share panel stands where the board was: the card, then its buttons
+     beside it on a wide slip and under it on a narrow one. */
+  .share-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-5);
+    margin-top: var(--space-6);
+  }
+
+  .preview {
+    aspect-ratio: 3 / 2;
+    overflow: hidden;
+    background: var(--b-wash);
+    border-radius: var(--radius-control);
+  }
+
+  .preview img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .share-buttons {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  /* Each holds its width while its label swaps to "Copied". */
+  .share-buttons .boba-btn {
+    min-width: 8.5rem;
+    white-space: nowrap;
   }
 
   /* Score block on the left, the receipt beside it, centred against it. */
@@ -484,6 +657,14 @@
     .lower {
       grid-template-columns: minmax(0, 1fr);
       gap: var(--space-6);
+    }
+
+    .share-panel {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .share-buttons {
+      grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
     }
   }
 
