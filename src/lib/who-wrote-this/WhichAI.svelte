@@ -85,7 +85,9 @@
 				const anthropic = e.name.startsWith("Anthropic");
 				paths.push({ pts: [[ex, box.y0 - 6], [ex, box.y1]], color: anthropic ? "rgba(200,90,130,.7)" : "rgba(67,126,142,.7)", width: 1.4, dash: [3, 4], progress: 1 });
 				const label = e.name.startsWith("Musk") ? "Musk’s testimony" : `${anthropic ? "Anthropic" : "OpenAI"}, ${month(day(e.date))}`;
-				texts.push({ x: ex, y: box.y0 - 16 - (i % 2) * 14, t: label, color: anthropic ? "#6E2042" : "#0A2B34", size: 11, weight: 500, align: "center" });
+				// close-together reports: the earlier one reads to the left of its line, later ones to the right, on staggered rows
+				const left = i < R.events.length - 1 && day(R.events[i + 1].date) - day(e.date) < 40 * 864e5;
+				texts.push({ x: ex + (left ? -5 : 5), y: box.y0 - 12 - (i % 3) * 14, t: label, color: anthropic ? "#6E2042" : "#0A2B34", size: 11, weight: 500, align: left ? "right" : "left" });
 			});
 		}
 		chart.marks = marks; chart.paths = paths; chart.texts = texts;
