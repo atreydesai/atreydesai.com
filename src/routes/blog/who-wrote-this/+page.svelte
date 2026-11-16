@@ -169,9 +169,13 @@
 		<div class="breath" aria-hidden="true"></div>
 
 		<!-- the last word: the paper's closing line, as the page's final chapter -->
+		<!-- the band is taller than the screen and the line is pinned in it, so the page stays on the dark a while
+		     before the byline and notes come up (Atrey, 16 Nov) -->
 		<section class="finale" aria-label={C.closing.t}>
-			<PrintMark family="main" color="#E8E8E3" px={300} text />
-			<p class="closing">{C.closing.t}</p>
+			<div class="finale-in">
+				<PrintMark family="main" color="#E8E8E3" px={300} text />
+				<p class="closing">{C.closing.t}</p>
+			</div>
 		</section>
 		<footer class="end">
 			<p class="byline small">
@@ -266,9 +270,10 @@
 	.todo { margin-top: 28px; height: 180px; display: grid; place-items: center; border: 1.5px dashed var(--axis); border-radius: 3px; color: var(--ink2); font-size: 13px; }
 
 	/* the finale: full bleed and dark, the closing line at chapter size with the one print */
-	.finale {
-		width: 100vw; margin-left: calc(50% - 50vw); min-height: 92vh; padding: 12vh max(16px, calc(50vw - 36rem));
-		background: #14202D; color: #fff; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6vw;
+	.finale { width: 100vw; margin-left: calc(50% - 50vw); height: 175vh; background: #14202D; color: #fff; }
+	.finale-in {
+		position: sticky; top: 0; min-height: 100vh; padding: 12vh max(16px, calc(50vw - 36rem));
+		display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6vw;
 	}
 	.closing { max-width: 18ch; font-size: clamp(36px, 5.2vw, 80px); line-height: 1.04; font-weight: 600; letter-spacing: -0.04em; text-wrap: balance; color: #fff; }
 	.end { padding-block: 64px 32px; }
@@ -284,7 +289,8 @@
 		.body { grid-template-columns: minmax(0, 1fr); }
 	}
 	@media (max-width: 760px) {
-		.finale { grid-template-columns: 1fr; gap: 6vh; min-height: 0; padding-block: 10vh; }
+		.finale { height: 160vh; }
+		.finale-in { grid-template-columns: 1fr; align-content: center; gap: 6vh; padding-block: 10vh; }
 		.top { grid-template-columns: auto 1fr auto; gap: 8px; }
 	}
 	@media (max-width: 600px) {
