@@ -1,5 +1,5 @@
 {
- "_about": "Section 2 of the launch page (If AI, which AI?), reworked 16 Nov 2026 (second pass: opener, wall of piles, release timeline with one step per report). Strings with src are paper text; ui lists every displayed string that is not; sources holds each report's link, access date and the one short excerpt shown from it; notes are the footnotes. Pile counts, release dates, report dates and the labs each report names come from rq2_writers.json (tools/build_rq2_data.py, from paper/figures/data/rq2_distill.json); model and lab names are its writer and lab fields.",
+ "_about": "Section 2 of the launch page (If AI, which AI?), reworked 16 Nov 2026 (second pass: opener, wall of piles, release timeline with one step per report; third pass after Atrey's review: one key row, plain details, stronger dimming, first-party OpenAI memo, no Explore). Strings with src are paper text; ui lists every displayed string that is not; sources holds each report's link, access date and the one short excerpt shown from it; notes are the footnotes. Pile counts, release dates, report dates and the labs each report names come from rq2_writers.json (tools/build_rq2_data.py, from paper/figures/data/rq2_distill.json); model and lab names are its writer and lab fields.",
  "id": "which-ai",
  "n": 2,
  "rq": 2,
@@ -68,8 +68,8 @@
    "focus": [
     "Grok 4.7"
    ],
-   "t": "Consistent with Musk's testimony that xAI “partly” distilled OpenAI models, the detectors attribute most texts by Grok 4.7 to GPT.",
-   "src": "paper/sections/04_rq2_ai_vs_ai.tex (the Musk clause and Grok 4.7 only; the advisory clause and the other three models dropped)"
+   "t": "The detectors attribute most texts by Grok 4.7 to GPT.",
+   "src": "paper/sections/04_rq2_ai_vs_ai.tex (the main clause of the Musk sentence, for Grok 4.7 only; the testimony itself is on the card as the paper quotes it)"
   },
   {
    "part": "time",
@@ -82,10 +82,6 @@
    "src": "paper/sections/09_appendix.tex (app:md_distill)"
   }
  ],
- "explore_all": {
-  "t": "The misattributions are consistent with reported distillation, but there are other explanations that could produce them.",
-  "src": "paper/sections/09_appendix.tex (app:md_stylometry; the figure reference after 'misattributions' dropped)"
- },
  "legend": [
   {
    "k": "own",
@@ -150,14 +146,20 @@
   {
    "id": "openai_memo",
    "cite": "openai2026deepseek",
-   "title": "OpenAI says China's DeepSeek trained its AI by distilling US models, memo shows",
-   "publisher": "Reuters (on Yahoo Finance)",
+   "title": "Updated Stakes for American-Led, Democratic AI (memo to the US House Select Committee on Strategic Competition between the United States and the Chinese Communist Party)",
+   "publisher": "OpenAI",
    "date": "2026-02-12",
-   "url": "https://finance.yahoo.com/news/openai-accuses-deepseek-distilling-us-221629899.html",
+   "url": "https://cdn.openai.com/pdf/045aa967-ee96-4a09-94ee-3098ddf6db2c/OpenAI-US-House-Select-Cmte-Update-%5B021226%5D.pdf",
    "accessed": "2026-11-16",
-   "quote": "ongoing efforts to free-ride on the capabilities developed by OpenAI and other U.S. frontier labs",
-   "quote_by": "OpenAI's memo, as quoted by Reuters",
-   "how": "WebFetch, read twice; the article quotes the memo's words"
+   "quote": "DeepSeek’s next model … should be understood in the context of its ongoing efforts to free-ride on the capabilities developed by OpenAI and other US frontier labs",
+   "quote_by": "OpenAI",
+   "by_line": "Memo to the House Select Committee on the CCP,",
+   "how": "First-party PDF found by WebSearch (cdn.openai.com), saved by WebFetch, text read locally with pdftotext (sha256 8a59f6272d858836d191245c7aba34f79ee58dcfc431dc22895748a53367aeef). Exact sentence: 'Distillation: DeepSeek’s next model (whatever its form) should be understood in the context of its ongoing efforts to free-ride on the capabilities developed by OpenAI and other US frontier labs.' '(whatever its form)' is left out with an ellipsis.",
+   "secondary": {
+    "note": "The paper's bib entry openai2026deepseek cites Reuters' report of this memo; the page now quotes and links the memo itself.",
+    "url": "https://finance.yahoo.com/news/openai-accuses-deepseek-distilling-us-221629899.html",
+    "quote": "ongoing efforts to free-ride on the capabilities developed by OpenAI and other U.S. frontier labs"
+   }
   },
   {
    "id": "anthropic_feb",
@@ -170,7 +172,8 @@
    "quote": "We have identified industrial-scale campaigns by three AI laboratories—DeepSeek, Moonshot, and MiniMax",
    "quote_by": "Anthropic",
    "how": "WebFetch, read twice; the sentence continues after 'MiniMax' and is cut there (shown with an ellipsis)",
-   "cut": true
+   "cut": true,
+   "by_line": "“Detecting and preventing distillation attacks,”"
   },
   {
    "id": "musk_testimony",
@@ -182,7 +185,8 @@
    "quote": "partly",
    "quote_by": "Elon Musk, testimony",
    "quote_src": "paper/sections/04_rq2_ai_vs_ai.tex (the paper's own quote: xAI “partly” distilled OpenAI models); the transcript has no public URL",
-   "photo": "placeholder frame only; no photo downloaded, one to be supplied"
+   "photo": "placeholder frame only; no photo downloaded. Candidates (not downloaded, permission to be asked): (1) https://commons.wikimedia.org/wiki/File:Elon_Musk_Royal_Society_(crop2).jpg, CC BY-SA 3.0 Unported, credit 'Debbie Rowe / The Royal Society' (the page also lists uploader Duncan.Hull as author), 13 July 2018, 1,337 x 1,771 px, 736 KB, a crop of File:Elon_Musk_Royal_Society.jpg; (2) https://commons.wikimedia.org/wiki/File:Elon_Musk_-_54820081119_(cropped).jpg, CC BY-SA 4.0, Gage Skidmore, 21 September 2025 (Memorial for Charlie Kirk, Glendale, Arizona), 2,924 x 3,843 px, 6.25 MB.",
+   "by_line": "Musk v. Altman, trial transcript"
   },
   {
    "id": "anthropic_sep",
@@ -195,14 +199,15 @@
    "quote": "Since we published our first disclosure in February, we have identified and disrupted additional distillation attacks",
    "quote_by": "Anthropic",
    "how": "WebFetch, read twice: the second sentence under the heading 'Illicit distillation and scaled abuse'; the sentence continues after 'attacks' and is cut there (shown with an ellipsis). Requests naming the labs were refused by the fetch tool's filter, so no lab-naming sentence was taken",
-   "cut": true
+   "cut": true,
+   "by_line": "“Countering misuse of AI,”"
   }
  ],
  "notes": [
   {
    "n": 1,
-   "t": "OpenAI's memo to the U.S. House Select Committee on the Chinese Communist Party, as reported by Reuters on 12 February 2026.",
-   "href": "https://finance.yahoo.com/news/openai-accuses-deepseek-distilling-us-221629899.html"
+   "t": "OpenAI, “Updated Stakes for American-Led, Democratic AI,” memo to the U.S. House Select Committee on Strategic Competition between the United States and the Chinese Communist Party, 12 February 2026.",
+   "href": "https://cdn.openai.com/pdf/045aa967-ee96-4a09-94ee-3098ddf6db2c/OpenAI-US-House-Select-Cmte-Update-%5B021226%5D.pdf"
   },
   {
    "n": 2,
@@ -220,8 +225,6 @@
   }
  ],
  "ui": [
-  "1 tile = 1 text",
-  "Colour: the lab Claude Fable 5.2 named",
   "Anthropic",
   "OpenAI",
   "Google",
@@ -234,22 +237,32 @@
   "Feb",
   "Musk",
   "Sep",
-  "All reports",
   "Release date",
-  "Explore",
-  "Highlight a report",
-  "Point at a pile for details",
-  "Claude Fable 5.2 named",
   "Writer's own lab",
   "Other lab",
   "Photo to be supplied",
-  "Elon Musk, testimony in Musk v. Altman",
-  "OpenAI's memo, as quoted by Reuters",
-  "{n} texts (in the details)",
   "{Mon} ’{YY} (axis ticks)",
-  "{Month} {YYYY} (release, in the details)",
   "{D} {Mon} {YYYY} or {Mon} {YYYY} (report date, on its card)",
+  "Own lab",
+  "Another lab",
+  "{lab} (own lab) (in the details)",
+  "{lab}, released {Month} {YYYY} (in the details)",
+  "Of its {n} texts, Claude Fable 5.2 named: (in the details)",
   "{pct}% (share of a model's texts, in the details)",
-  "{host} ↗ (source link on a card)"
- ]
+  "{host} ↗ (source link on a card)",
+  "Memo to the House Select Committee on the CCP,",
+  "“Detecting and preventing distillation attacks,”",
+  "“Countering misuse of AI,”",
+  "Musk v. Altman, trial transcript"
+ ],
+ "musk_quote": {
+  "before": "xAI ",
+  "after": " distilled OpenAI models",
+  "t": "xAI “partly” distilled OpenAI models",
+  "src": "paper/sections/04_rq2_ai_vs_ai.tex (Musk's testimony that xAI “partly” distilled OpenAI models)"
+ },
+ "june_letter": {
+  "status": "not added",
+  "why": "rq2_distill.json lists an 'Anthropic letter' (2026-06-10, Alibaba) with no citation. Searches (16 Nov 2026) found it reported as a 10 June letter from Anthropic to Senate Banking Committee chair Tim Scott and ranking member Elizabeth Warren (e.g. letsdatascience.com, CNBC via X posts), but no first-party copy on anthropic.com or a Senate site; the only copy found is a PDF on musicbusinessworldwide.com. Anthropic's own September report (already step 5) covers the Alibaba campaign."
+ }
 }

@@ -63,18 +63,8 @@
 		}
 		return out;
 	})();
-	// the top bar hides while scrolling down and comes back on the way up, so it never covers a pinned picture for long
-	let barHidden = $state(false);
-	onMount(() => {
-		let lastY = scrollY;
-		const onScroll = () => {
-			const y = scrollY, d = y - lastY;
-			if (Math.abs(d) > 6) { barHidden = d > 0 && y > 160; lastY = y; }
-		};
-		addEventListener("scroll", onScroll, { passive: true });
-		const stop = startElastic(document);
-		return () => { removeEventListener("scroll", onScroll); stop(); };
-	});
+
+	onMount(() => startElastic(document));
 
 	const jsonLd = [
 		{
@@ -124,7 +114,7 @@
 <DotField />
 
 <div class="wwt" data-justify="off">
-	<header class="top" class:hide={barHidden}>
+	<header class="top">
 		<a class="brand" href="/">Atrey Desai</a>
 		<SectionNav {stops} />
 		<nav aria-label="Site">
@@ -231,15 +221,10 @@
 	:where(.wwt) :global(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
 	.top, article, .site-foot { max-width: 72rem; margin-inline: auto; }
-	/* the top bar: fixed, the section navigation centred; it hides while scrolling down */
-	.top {
-		position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
-		padding: 10px max(16px, calc(50vw - 36rem)); background: rgba(232, 232, 227, .94); border-bottom: 1px solid rgba(20, 32, 45, .06);
-		transition: transform .3s var(--ease, ease);
-	}
-	.top.hide { transform: translateY(-100%); }
+	/* the header as it was (name left, site links right), with the section names centred between them; once the reader
+	   scrolls past it, the names fly into the dot rail on the left (SectionNav) */
+	.top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; gap: 16px; padding-block: 22px 0; }
 	.top > nav { justify-self: end; }
-	article { padding-top: 56px; }
 	.brand { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; text-decoration: none; }
 	.top nav { display: flex; gap: 20px; font-size: 14px; color: var(--ink2); }
 	.top nav a { text-decoration: none; }
@@ -301,7 +286,6 @@
 	@media (max-width: 760px) {
 		.finale { grid-template-columns: 1fr; gap: 6vh; min-height: 0; padding-block: 10vh; }
 		.top { grid-template-columns: auto 1fr auto; gap: 8px; }
-		.top > nav { gap: 10px; }
 	}
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }

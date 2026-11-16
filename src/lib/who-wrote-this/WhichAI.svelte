@@ -11,13 +11,12 @@
 	// two pictures use separate mark ids, so no tile ever flies from one to the other. Steps change colour and alpha.
 	import { onMount, untrack } from "svelte";
 	import Icon from "./Icon.svelte";
-	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes from "./Footnotes.svelte";
 	import { field, chart, type Mark, type Path } from "./field.svelte";
-	import { LAB, GRAY, deepen, TILE } from "./palette";
+	import { LAB, GRAY, INK, deepen, TILE } from "./palette";
 	import S from "./which_ai.json";
 	import { printSprite, printAspect } from "./print/sprites";
 	import R from "./rq2_writers.json";
@@ -31,7 +30,7 @@
 	type Lane = { side: "left" | "right"; level: number; short: boolean; hidden?: boolean };
 	type WallGeo = { piles: Pile[]; labels: Label[]; tips: Record<string, { x: number; y: number }> };
 	type TimeGeo = WallGeo & { base: Path[]; xs: number[]; lanes: Lane[]; laneTop: number; laneLv: number; bot: number; rows: Record<string, [number, number]> };
-	type View = { kind: "intro" | "all" } | { kind: "event"; i: number; guided: boolean };
+	type View = { kind: "intro" } | { kind: "event"; i: number };
 
 	// every displayed string that is not paper text is listed in which_ai.json's ui
 	const u = (t: string) => (S.ui.includes(t) ? t : (console.warn("which_ai: ui string not listed:", t), t));
@@ -61,6 +60,8 @@
 	const TAG_F = F(600, 12.5);
 	const hit = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 	const grow = (r: Rect, d: number) => ({ x: r.x - d, y: r.y - d, w: r.w + 2 * d, h: r.h + 2 * d });
+	// a dimmed tile: its colour mostly washed into the ground, drawn opaque so a dimmed pile still answers the pointer
+	const wash = (hex: string, t = 0.2) => { const a = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)), g = [1, 3, 5].map((i) => parseInt(INK.ground.slice(i, i + 2), 16)); return "#" + a.map((v, i) => Math.round(g[i] + (v - g[i]) * t).toString(16).padStart(2, "0")).join(""); };
 	const rgba = (hex: string, a: number) => `rgba(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(",")},${a})`;
 
 	// the reports, in date order: the date and named labs from rq2_writers.json, the card's words from which_ai.json
@@ -122,15 +123,15 @@
 		return { sprite, spriteKey: `${lab ?? "other"}|${ink}|${px}` };
 	}
 	// a pile's tiles, bottom-up in the paper figure's order; `snap`: a tile sits exactly at its place, only alpha eases
-	function tiles(marks: Mark[], ns: "w" | "t", p: Pile, color: boolean, alpha: number) {
+	function tiles(marks: Mark[], ns: "w" | "t", p: Pile, color: boolean, dim = false) {
 		let i = 0;
-		const px = Math.max(6, Math.round(p.s * 0.94)), print = px >= 14;
+		const px = Math.max(6, Math.round(p.s * 0.94)), print = px >= 14 && !dim;
 		for (const k of STACK) for (let j = 0; j < p.w[k]; j++, i++)
 			marks.push({
 				id: `${ns}:${p.w.writer}#${i}`, group: `${ns}|${p.w.writer}`, square: true, snap: true,
 				...(print ? { ...tileSprite(p.w, k, color, px), aspect: ASPECT, backing: color ? TILE.litBacking : TILE.unlitBacking } : {}),
 				x: p.left + (i % p.c) * p.s + p.s / 2, y: p.bottom - Math.floor(i / p.c) * p.s - p.s / 2, r: print ? px / 2 : p.s * 0.42,
-				color: color ? COL[k] : UNLIT, alpha,
+				color: dim ? wash(color ? COL[k] : UNLIT) : color ? COL[k] : UNLIT, alpha: color || dim ? 1 : 0.62,
 			});
 	}
 	const pileRect = (p: Pile): Rect => { const h = Math.ceil(p.w.n / p.c) * p.s; return { x: p.left, y: p.bottom - h, w: p.c * p.s, h }; };
@@ -293,37 +294,34 @@
 
 	// ---- state -----------------------------------------------------------------------------------------------------
 	let step = $state(0);
-	let pick = $state<"all" | number | null>(null); // Explore: all reports, or one report's index
 	let active = $state(false);
 	let still = $state(false);
 	let narrow = $state(false);
 	let size = $state({ w: 0, h: 0 });
 	let fontsV = $state(0);
 	// where each picture starts and ends inside its frame (measured; they change with the width and fonts, never the step)
-	let offs = $state({ wTop: 0, cTop: 0, cBot: 0, xTop: 0, fw: 0 });
+	let offs = $state({ wTop: 0, cBot: 0, fw: 0 });
 	let fh = $state(800); // a frame's height, to keep the details on screen
 	let wallG = $state.raw<WallGeo | null>(null);
 	let timeG = $state.raw<TimeGeo | null>(null);
-	let keyTags = $state.raw<{ items: Tag[]; h: number; inline: boolean }>({ items: [], h: 28, inline: true });
+	let keyTags = $state.raw<{ items: Tag[]; h: number }>({ items: [], h: 26 });
 	let root: HTMLElement, body: HTMLElement;
 	let wallBlk: HTMLElement, timeBlk: HTMLElement, wallFrame: HTMLElement, timeFrame: HTMLElement;
-	let wKey: HTMLElement, cardsEl: HTMLElement, xrowEl: HTMLElement;
+	let wKey: HTMLElement, cardsEl: HTMLElement;
 
 	const wallStep = $derived(Math.min(step, NW - 1));
 	const wallSt = $derived(STEPS[wallStep]);
 	const wallFocus = $derived(new Set(wallSt.focus ?? []));
 	const view = $derived.by((): View => {
-		if (step >= LAST && pick !== null) return pick === "all" ? { kind: "all" } : { kind: "event", i: pick, guided: false };
 		const ev = STEPS[Math.max(step, NW)].event;
-		return ev ? { kind: "event", i: EVS.findIndex((e) => e.event === ev), guided: true } : { kind: "intro" };
+		return ev ? { kind: "event", i: EVS.findIndex((e) => e.event === ev) } : { kind: "intro" };
 	});
 	const curEv = $derived(view.kind === "event" ? EVS[view.i] : null);
 	const timeFocus = $derived(new Set(curEv?.focus ?? []));
-	// a report's line: the current one; earlier ones (all others, once exploring) faint, but only where their name fits
-	// beside them (a phone has no room between reports days apart); every line when showing all reports
-	const lineOn = (i: number) => view.kind === "all" || (view.kind === "event" && (view.i === i || ((!view.guided || i < view.i) && !timeG?.lanes[i]?.hidden)));
+	// a report's line: the current one, and the earlier ones faint, but only where their name fits beside them (a
+	// phone has no room between reports days apart)
+	const lineOn = (i: number) => view.kind === "event" && (view.i === i || (i < view.i && !timeG?.lanes[i]?.hidden));
 	const rowOn = (lab: string) => !curEv || curEv.labs.includes(lab);
-	$effect(() => { if (step < LAST) pick = null; });
 
 	const shown = $derived(active && field.owner === "rq2");
 	const hovered = $derived.by(() => {
@@ -333,24 +331,20 @@
 		return w && (ns === "w" || ns === "t") ? { ns, w } : null;
 	});
 	const tipAt = $derived(hovered ? (hovered.ns === "w" ? wallG : timeG)?.tips[hovered.w.writer] ?? null : null);
-	const tipRows = $derived(hovered ? STACK.filter((k) => !(k === "anthropic" && hovered.w.lab === "Anthropic") && !(k === "openai" && hovered.w.lab === "OpenAI")).map((k) => ({ k, pct: Math.round((hovered.w[k] / hovered.w.n) * 100) })) : []);
+	// what Fable named for this model's texts, largest share first; the model's own lab by its name
+	const tipRows = $derived(hovered ? STACK.filter((k) => hovered.w[k] > 0).map((k) => ({ k, t: k === "own" ? `${hovered.w.lab} (own lab)` : k === "other" ? u("Another lab") : NAME[k], pct: Math.round((hovered.w[k] / hovered.w.n) * 100) })).sort((a, b) => b.pct - a.pct) : []);
 
-	// the colour key under "1 tile = 1 text": Tags chips in one row (two on a phone), placed by width
+	// the colour key: one row of Tags chips at the top of each picture (a phone shortens "Writer's own lab")
 	function layoutKey(fw: number) {
-		const lead = tw(u("Colour: the lab Claude Fable 5.2 named"), F(500, 12.5)) + 26;
-		const ws = STACK.map((k) => tagW(NAME[k]));
-		const total = ws.reduce((a, b) => a + b + 6, -6);
-		const inline = fw - lead >= total;
-		const room = inline ? fw - lead : fw;
 		const items: Tag[] = [];
 		let x = 0, row = 0;
-		(["own", "anthropic", "openai", "other"] as K[]).forEach((k) => {
-			const w = tagW(NAME[k]);
-			if (x > 0 && x + w > room) { x = 0; row++; }
-			items.push({ id: `k-${k}`, x: x - 10, y: row * 30 + 13, t: NAME[k], color: COL[k], swatch: "square", at: "right" });
+		(["anthropic", "openai", "own", "other"] as K[]).forEach((k) => {
+			const t = k === "own" && narrow ? u("Own lab") : NAME[k], w = tagW(t);
+			if (x > 0 && x + w > fw) { x = 0; row++; }
+			items.push({ id: `k-${k}`, x: x - 10, y: row * 30 + 13, t, color: COL[k], swatch: "square", at: "right" });
 			x += w + 6;
 		});
-		keyTags = { items, h: (row + 1) * 30 - 4, inline };
+		keyTags = { items, h: (row + 1) * 30 - 4 };
 	}
 
 	// ---- build: geometry when the size or fonts change; marks when the step changes ----------------------------------
@@ -360,7 +354,7 @@
 		const fw = wallFrame.clientWidth, wh = wallFrame.clientHeight;
 		layoutKey(fw);
 		wallG = wallLayout({ x: 0, y: offs.wTop + 6, w: fw, h: wh - offs.wTop - 6 }, narrow);
-		timeG = timeLayout({ x: 0, y: offs.cBot, w: fw, h: offs.xTop - offs.cBot - (narrow ? 6 : 10) }, narrow);
+		timeG = timeLayout({ x: 0, y: offs.cBot, w: fw, h: wh - offs.cBot }, narrow);
 	}
 
 	// the built marks and paths in frame coordinates, and their viewport copies handed to the canvas
@@ -371,20 +365,20 @@
 
 	function dress() {
 		if (!wallG || !timeG) return;
-		// the wall: grey before colour; with colour, each tile takes the lab Fable named; a focus dims the rest
+		// the wall: grey before colour; with colour, each tile takes the lab Fable named; a focus washes out the rest
 		const st = wallSt, focus = wallFocus;
 		wM = [];
-		for (const p of wallG.piles) tiles(wM, "w", p, !!st.color, focus.size ? (focus.has(p.w.writer) ? 1 : 0.32) : st.color ? 1 : 0.62);
-		// the timeline: the rows a report names stay lit, the rest dims (never under 0.3: dimmed piles still answer hover)
+		for (const p of wallG.piles) tiles(wM, "w", p, !!st.color, focus.size > 0 && !focus.has(p.w.writer));
+		// the timeline: the rows a report names stay lit, the rest washes out
 		tM = [];
-		for (const p of timeG.piles) tiles(tM, "t", p, true, rowOn(p.w.lab) ? 1 : 0.3);
+		for (const p of timeG.piles) tiles(tM, "t", p, true, !rowOn(p.w.lab));
 		// the reports: one weight for every line; the current one full strength, the earlier ones faint; Anthropic's
 		// solid rose, OpenAI's (and the testimony about OpenAI models) dashed teal
 		tP = [...timeG.base];
 		EVS.forEach((e, i) => {
 			if (!lineOn(i)) return;
 			const cur = view.kind === "event" && view.i === i, x = timeG!.xs[i];
-			tP.push({ pts: [[x, timeG!.laneTop], [x, timeG!.bot + 2]], color: rgba(e.col, cur || view.kind === "all" ? 1 : 0.42), width: 1.5, dash: e.dash ? [5, 4] : undefined, progress: 1 });
+			tP.push({ pts: [[x, timeG!.laneTop], [x, timeG!.bot + 2]], color: rgba(e.col, cur ? 1 : 0.42), width: 1.5, dash: e.dash ? [5, 4] : undefined, progress: 1 });
 		});
 		wV = wM.map((m) => ({ ...m }));
 		tV = tM.map((m) => ({ ...m }));
@@ -434,13 +428,13 @@
 
 	function measure() {
 		if (!wallFrame) return;
-		const next = { wTop: wKey.offsetTop + wKey.offsetHeight, cTop: cardsEl.offsetTop, cBot: cardsEl.offsetTop + cardsEl.offsetHeight, xTop: xrowEl.offsetTop, fw: wallFrame.clientWidth };
+		const next = { wTop: wKey.offsetTop + wKey.offsetHeight, cBot: cardsEl.offsetTop + cardsEl.offsetHeight, fw: wallFrame.clientWidth };
 		fh = wallFrame.clientHeight;
 		if (Object.keys(next).some((k) => Math.abs(next[k as keyof typeof next] - offs[k as keyof typeof offs]) > 0.5)) offs = next;
 	}
 
 	$effect(() => {
-		void [size.w, size.h, fontsV, offs.wTop, offs.cBot, offs.xTop, offs.fw];
+		void [size.w, size.h, fontsV, offs.wTop, offs.cBot, offs.fw];
 		untrack(layout);
 	});
 	$effect(() => {
@@ -460,7 +454,7 @@
 		addEventListener("resize", onResize, { passive: true });
 		addEventListener("scroll", onScroll, { passive: true });
 		const ro = new ResizeObserver(measure);
-		[wallFrame, wKey, cardsEl, xrowEl].forEach((el) => ro.observe(el));
+		[wallFrame, wKey, cardsEl].forEach((el) => ro.observe(el));
 		document.fonts?.ready.then(() => { widths.clear(); fontsV++; measure(); });
 		// the canvas is this section's while any of its pictures is on screen, so tiles never fade out where they stood
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
@@ -478,14 +472,14 @@
 			const ev = EVS.find((x) => `#fnref-wa-${x.note}` === a.getAttribute("href"));
 			if (ev) { e.preventDefault(); go(ev.step); }
 		};
-		root.addEventListener("click", onBack);
+		document.addEventListener("click", onBack);
 		readStep();
 		// dev only: the built layout's bounds, for checking that a step never moves a tile
 		if (import.meta.env.DEV) (window as unknown as { __wa: () => unknown }).__wa = () => {
 			const bb = (ms: Mark[]) => ms.reduce((a, m) => [Math.min(a[0], m.x), Math.min(a[1], m.y), Math.max(a[2], m.x), Math.max(a[3], m.y), a[4] + m.x * 0.37 + m.y * 1.13], [Infinity, Infinity, -Infinity, -Infinity, 0]).map((v) => Math.round(v * 100) / 100);
 			return { step, wall: bb(wM), time: bb(tM), n: chart.marks.length, owner: field.owner };
 		};
-		return () => { removeEventListener("resize", onResize); removeEventListener("scroll", onScroll); ro.disconnect(); io.disconnect(); root.removeEventListener("wa-go", onGo); root.removeEventListener("click", onBack); };
+		return () => { removeEventListener("resize", onResize); removeEventListener("scroll", onScroll); ro.disconnect(); io.disconnect(); root.removeEventListener("wa-go", onGo); document.removeEventListener("click", onBack); };
 	});
 
 	// the card on a report's line: its left edge just before the line, inside the frame
@@ -495,7 +489,7 @@
 		const x = timeScale(offs.fw, false).X(evT(EVS[i].date));
 		return Math.max(0, Math.min(offs.fw - Math.min(CARD_W, offs.fw), x - 28));
 	};
-	const cardOn = (k: "intro" | "all" | number) => (k === "intro" ? view.kind === "intro" : k === "all" ? view.kind === "all" : view.kind === "event" && view.i === k);
+	const cardOn = (k: "intro" | number) => (k === "intro" ? view.kind === "intro" : view.kind === "event" && view.i === k);
 	const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 	const laneTags = $derived.by((): Tag[] => {
 		const G = timeG;
@@ -504,7 +498,7 @@
 			if (!lineOn(i) || (view.kind === "event" && view.i === i)) return [];
 			const L = G.lanes[i];
 			if (L.hidden) return [];
-			return [{ id: `e-${i}`, x: G.xs[i], y: G.laneTop + L.level * 26 + 12, t: u(L.short ? e.short : e.chip), color: e.col, swatch: e.dash ? "dash" : "line", at: L.side, alpha: view.kind === "all" ? 1 : 0.85 } as Tag];
+			return [{ id: `e-${i}`, x: G.xs[i], y: G.laneTop + L.level * 26 + 12, t: u(L.short ? e.short : e.chip), color: e.col, swatch: e.dash ? "dash" : "line", at: L.side, alpha: 0.85 } as Tag];
 		});
 	});
 </script>
@@ -513,36 +507,20 @@
 	<StepDashes count={STEPS.length} current={step} go={(i) => go(i)} />
 {/snippet}
 {#snippet key(color: boolean)}
-	<div class="key" class:stack={!keyTags.inline}>
-		<p class="k1"><i class="sw"></i>{u("1 tile = 1 text")}</p>
-		<div class="k2" class:on={color}>
-			<span class="k-t"><Icon name="ai" class="fable" />{u("Colour: the lab Claude Fable 5.2 named")}</span>
-			<div class="ktags" style:height="{keyTags.h}px"><Tags items={keyTags.items} follow /></div>
-		</div>
-	</div>
+	<div class="key" class:on={color} style:height="{keyTags.h}px"><Tags items={keyTags.items} follow /></div>
 {/snippet}
 {#snippet tip()}
 	{#if hovered && tipAt && shown}
 		{@const w = hovered.w}
-		<div class="tip" class:flip={tipAt.x > offs.fw - 260} style="left:{tipAt.x}px; top:{Math.max(4, Math.min(tipAt.y, fh - 214))}px">
+		<div class="tip" style="left:{tipAt.x + 312 <= offs.fw ? tipAt.x + 12 : Math.max(0, tipAt.x - 312)}px; top:{Math.max(4, Math.min(tipAt.y, fh - 214))}px">
 			<b>{nameOf(w)}</b>
-			<span>{w.lab}{w.release ? ` · ${monthYear(w.release)}` : ""}</span>
-			<span>{w.n} texts</span>
-			<span class="t-k">{u("Claude Fable 5.2 named")}</span>
+			<span>{w.lab}{w.release ? `, released ${monthYear(w.release)}` : ""}</span>
+			<span class="t-k">Of its {w.n} texts, Claude Fable 5.2 named:</span>
 			{#each tipRows as r (r.k)}
-				<span class="row"><i style:background={COL[r.k]}></i>{NAME[r.k]}<span class="bar"><span style:width="{r.pct}%" style:background={COL[r.k]}></span></span><em>{r.pct}%</em></span>
+				<span class="row"><i style:background={COL[r.k]}></i>{r.t}<span class="bar"><span style:width="{r.pct}%" style:background={COL[r.k]}></span></span><em>{r.pct}%</em></span>
 			{/each}
 		</div>
 	{/if}
-{/snippet}
-{#snippet chips(live: boolean)}
-	<div class="seg" role="group" aria-label={u("Highlight a report")}>
-		<button type="button" aria-pressed={live && view.kind === "all"} onclick={() => (pick = "all")}>{u("All reports")}</button>
-		{#each EVS as e, i}
-			<button type="button" aria-pressed={live && view.kind === "event" && view.i === i} onclick={() => (pick = i)} aria-label={e.chip}><i class="ln" class:dash={e.dash} style:--c={e.col}></i>{u(narrow ? e.short : e.chip)}</button>
-		{/each}
-	</div>
-	<p class="hint">{u("Point at a pile for details")}</p>
 {/snippet}
 
 <section class="wa" class:still class:narrow id={S.id} data-rq={S.rq} data-step={step} bind:this={root}>
@@ -586,26 +564,19 @@
 							{@const sr = e.src}
 							<article class="card" class:on={cardOn(i)} inert={!cardOn(i)} style:margin-left="{cardLeft(i)}px">
 								{@render dashes()}
+								<!-- one order on every card: the report and its date, its words, where they come from, then the paper -->
 								<p class="c-h"><i class="ln" class:dash={e.dash} style:--c={e.col}></i>{#if e.icon}<Icon name={e.icon} />{/if}<b>{u(e.label)}</b><span>{dateLabel(e.date)}</span></p>
-								{#if sr.url}
-									<blockquote class="c-q">“{sr.quote}{sr.cut ? "…" : ""}”
-										<cite>{u(sr.id === "openai_memo" ? "OpenAI's memo, as quoted by Reuters" : "Anthropic")} · <a href={sr.url} target="_blank" rel="noopener">{host(sr.url)} ↗</a><sup class="fnref"><a href="#fn-wa-{e.note}" id="fnref-wa-{e.note}">{e.note}</a></sup></cite>
-									</blockquote>
-								{:else}
-									<div class="c-m">
-										<figure class="ph" aria-label={u("Photo to be supplied")}><Icon name="human" /><figcaption>{u("Photo to be supplied")}</figcaption></figure>
-										<blockquote class="c-q big">“{sr.quote}”
-											<cite>{u("Elon Musk, testimony in Musk v. Altman")}<sup class="fnref"><a href="#fn-wa-{e.note}" id="fnref-wa-{e.note}">{e.note}</a></sup></cite>
-										</blockquote>
+								<div class="c-m" class:has-ph={!sr.url}>
+									{#if !sr.url}<figure class="ph" aria-label={u("Photo to be supplied")}><Icon name="human" /><figcaption>{u("Photo to be supplied")}</figcaption></figure>{/if}
+									<div class="c-qs">
+										{#if sr.url}<blockquote class="c-q">“{sr.quote}{sr.cut ? "…" : ""}”</blockquote>
+										{:else}<blockquote class="c-q">{S.musk_quote.before}<em>“{sr.quote}”</em>{S.musk_quote.after}</blockquote>{/if}
+										<p class="c-s">{u(sr.by_line)}{#if sr.url}{" "}<a href={sr.url} target="_blank" rel="noopener">{host(sr.url)} ↗</a>{/if}<sup class="fnref"><a href="#fn-wa-{e.note}" id="fnref-wa-{e.note}">{e.note}</a></sup></p>
 									</div>
-								{/if}
+								</div>
 								<p class="c-t">{SAY[e.step]}</p>
 							</article>
 						{/each}
-						<article class="card" class:on={cardOn("all")} inert={!cardOn("all")}>
-							{@render dashes()}
-							<p class="c-t lead">{S.explore_all.t}</p>
-						</article>
 					</div>
 					<div class="over" aria-hidden="true">
 						{#if shown && timeG}
@@ -614,10 +585,6 @@
 							{/each}
 							<div class="tagbox"><Tags items={laneTags} follow /></div>
 						{/if}
-					</div>
-					<div class="xrow" bind:this={xrowEl}>
-						<div class="ghost" aria-hidden="true" inert><Reveal show={true} label={u("Explore")}>{@render chips(false)}</Reveal></div>
-						<div class="live"><Reveal show={step >= LAST} label={u("Explore")}>{@render chips(true)}</Reveal></div>
 					</div>
 					{#if hovered?.ns === "t"}{@render tip()}{/if}
 				</div>
@@ -642,17 +609,10 @@
 	.cap-t { grid-area: 1 / 1; font-size: clamp(20px, 1.9vw, 26px); line-height: 1.3; font-weight: 500; letter-spacing: -0.018em; color: var(--ink); text-wrap: pretty; opacity: 0; transform: translateY(6px); transition: opacity .4s, transform .45s var(--ease); }
 	.cap-t.on { opacity: 1; transform: none; }
 
-	/* the key: "1 tile = 1 text", and under it the colours, one row */
-	.keyw { margin-top: 14px; }
-	.key { display: grid; gap: 6px; font-size: 12.5px; font-weight: 500; color: var(--ink); }
-	.k1 { display: inline-flex; align-items: center; gap: 6px; }
-	.k1 .sw { width: 10px; height: 10px; border-radius: 1px; border: 1.5px solid var(--ink2); }
-	.k2 { display: flex; align-items: center; gap: 18px; opacity: 0; transition: opacity .4s; }
-	.k2.on { opacity: 1; }
-	.key.stack .k2 { display: grid; gap: 6px; }
-	.k-t { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-	.k-t :global(.fable) { color: var(--fable); }
-	.ktags { position: relative; flex: 1; transform: translateZ(0); } /* Tags are fixed-position: this box is their frame */
+	/* the key: the four colours in one row of chips (Tags are fixed-position: this box is their frame) */
+	.keyw { margin-top: 16px; }
+	.key { position: relative; flex: none; transform: translateZ(0); opacity: 0; transition: opacity .4s; }
+	.key.on { opacity: 1; }
 
 	/* words on the pictures: frame coordinates, over the canvas */
 	.over { position: absolute; inset: 0; pointer-events: none; }
@@ -666,7 +626,7 @@
 	/* on the timeline a report's line may pass behind a model's name: the name keeps a patch of ground */
 	.tl .name { padding: 0 2px; background: rgba(232, 232, 227, .86); border-radius: 2px; text-shadow: none; }
 	.lb.on { color: var(--ink); font-weight: 600; }
-	.lb.dim { opacity: .45; }
+	.lb.dim { opacity: .28; }
 	.tick { font-size: 11.5px; color: var(--ink2); }
 	.narrow .head { font-size: 11px; line-height: 14px; }
 	.narrow .name { font-size: 9.5px; line-height: 11.4px; }
@@ -674,67 +634,50 @@
 
 	/* the report cards: all in one cell, so the row is as tall as the tallest and nothing below moves between steps */
 	.cards { margin-top: 12px; display: grid; align-items: end; }
-	.card { grid-area: 1 / 1; align-self: end; justify-self: start; width: var(--cw); display: grid; gap: 8px; padding: 14px 16px; background: #fff; border-radius: 3px; box-shadow: 0 6px 22px rgba(20, 32, 45, .08); opacity: 0; visibility: hidden; transform: translateY(6px); transition: opacity .35s, transform .4s var(--ease), visibility 0s .35s; }
+	.card { grid-area: 1 / 1; align-self: end; justify-self: start; width: var(--cw); display: grid; gap: 12px; padding: 16px 18px; background: #fff; border-radius: 3px; box-shadow: 0 6px 22px rgba(20, 32, 45, .08); opacity: 0; visibility: hidden; transform: translateY(6px); transition: opacity .35s, transform .4s var(--ease), visibility 0s .35s; }
 	.card.on { opacity: 1; visibility: visible; transform: none; pointer-events: auto; transition: opacity .35s, transform .4s var(--ease); }
 	.c-h { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink2); }
 	.c-h b { font-size: 15px; font-weight: 600; color: var(--ink); }
 	.c-h span { margin-left: auto; font-variant-numeric: tabular-nums; }
 	.ln { flex: none; display: inline-block; width: 18px; height: 2px; background: var(--c); }
 	.ln.dash { background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 9px); }
-	.c-q { margin: 0; font-size: 15.5px; line-height: 1.42; font-weight: 500; letter-spacing: -0.008em; color: var(--ink); }
-	.c-q cite { display: block; margin-top: 4px; font-style: normal; font-size: 12px; font-weight: 500; letter-spacing: 0; color: var(--ink2); }
-	.c-q cite a { color: var(--ink); text-underline-offset: 2px; }
-	.c-q.big { font-size: 34px; line-height: 1; font-weight: 600; letter-spacing: -0.03em; }
+	/* the report's words, then where they come from: one block, one rhythm */
 	.c-m { display: flex; align-items: center; gap: 14px; }
+	.c-qs { display: grid; gap: 6px; min-width: 0; }
+	.c-q { margin: 0; font-size: 16px; line-height: 1.42; font-weight: 500; letter-spacing: -0.008em; color: var(--ink); }
+	.c-q em { font-style: normal; font-weight: 600; }
+	.c-s { font-size: 12px; line-height: 1.4; color: var(--ink2); }
+	.c-s a { color: var(--ink); text-underline-offset: 2px; }
 	.ph { flex: none; margin: 0; width: 56px; height: 70px; display: grid; place-items: center; align-content: center; gap: 4px; border: 1.25px dashed var(--gray-mid); border-radius: 3px; background: var(--field); color: var(--gray); font-size: 9.5px; line-height: 1.15; text-align: center; }
 	.ph :global(svg) { width: 22px; height: 22px; }
-	.c-t { padding-top: 8px; border-top: 1px solid var(--rule); font-size: 14.5px; line-height: 1.45; color: var(--ink); }
+	/* the paper's sentence: the card's conclusion */
+	.c-t { font-size: 14.5px; line-height: 1.45; color: var(--ink); }
 	.c-t.lead { padding-top: 0; border-top: 0; font-size: 18px; line-height: 1.4; font-weight: 500; letter-spacing: -0.01em; }
 
-	/* Explore, under the timeline: the same block is laid out invisibly, so revealing it moves nothing */
-	.xrow { margin-top: auto; display: grid; pointer-events: auto; }
-	.xrow > div { grid-area: 1 / 1; align-self: end; }
-	.ghost { visibility: hidden; }
-	.seg { display: flex; flex-wrap: wrap; gap: 6px; }
-	.seg button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1.25px solid var(--ink); border-radius: 2px; font-size: 12.5px; font-weight: 500; transition: background-color .15s, color .15s; }
-	.seg button[aria-pressed="true"] { background: var(--ink); color: var(--field); }
-	.seg button[aria-pressed="true"] .ln { --c: var(--field); }
-	.seg button:not([aria-pressed="true"]):hover { background: var(--chip); }
-	.hint { font-size: 12px; color: var(--ink2); }
-	.xrow :global(.reveal .body) { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
-	.narrow .hint { display: none; }
-
 	/* a model's own numbers */
-	.tip { position: absolute; z-index: 5; transform: translate(12px, 0); display: grid; gap: 3px; width: 244px; padding: 12px 14px; background: #fff; border-radius: 3px; box-shadow: 0 6px 20px rgba(20, 32, 45, .14); font-size: 12.5px; color: var(--ink2); pointer-events: none; }
-	.tip.flip { transform: translate(calc(-100% - 12px), 0); }
+	.tip { position: absolute; z-index: 5; display: grid; gap: 4px; width: 300px; padding: 12px 14px; background: #fff; border-radius: 3px; box-shadow: 0 6px 20px rgba(20, 32, 45, .14); font-size: 12.5px; color: var(--ink2); pointer-events: none; }
 	.tip b { font-size: 15px; color: var(--ink); }
-	.t-k { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rule); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-	.row { display: grid; grid-template-columns: 10px minmax(0, 1fr) 54px 34px; align-items: center; gap: 6px; white-space: nowrap; color: var(--ink); }
+	.t-k { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink); }
+	.row { display: grid; grid-template-columns: 10px max-content minmax(24px, 1fr) 34px; align-items: center; gap: 8px; white-space: nowrap; color: var(--ink); }
 	.row i { width: 9px; height: 9px; border-radius: 1px; }
 	.bar { height: 5px; background: var(--ground); border-radius: 1px; overflow: hidden; }
 	.bar span { display: block; height: 100%; }
 	.row em { font-style: normal; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 
-	/* the footnote numbers: the page's list reset (list-style: none on every ol) hides Footnotes' markers */
-	.wa :global(.fns ol) { list-style: decimal; }
 	/* a dashed swatch as long as Tags' (16 px) draws solid in Chrome: the report lines' own dash, [5, 4], instead */
 	.tagbox :global(.sw-dash) { height: 2px; border: 0; background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 9px); }
 
 	@media (max-width: 860px) {
 		.frame { top: 14px; bottom: 10px; }
 		.cap-t { font-size: 17px; line-height: 1.38; }
-		.keyw { margin-top: 10px; }
+		.keyw { margin-top: 12px; }
 		.cards { margin-top: 10px; }
-		.card { padding: 12px 14px; gap: 6px; }
-		.c-q { font-size: 14px; }
-		.c-q.big { font-size: 28px; }
-		.c-t { font-size: 13.5px; padding-top: 6px; }
+		.card { padding: 14px; gap: 10px; }
+		.c-q { font-size: 14.5px; }
+		.c-t { font-size: 13.5px; }
 		.c-t.lead { font-size: 15px; }
-		.ph { width: 52px; height: 64px; }
-		.seg { gap: 4px; }
-		.seg button { gap: 4px; padding: 4px 7px; font-size: 12px; }
-		.seg .ln { width: 12px; }
+		.ph { width: 48px; height: 60px; }
 	}
-	.still .cap-t, .still .card, .still .k2, .still .lb { transition: none; animation: none; }
-	@media (prefers-reduced-motion: reduce) { .cap-t, .card, .k2, .lb { transition: none; animation: none; } }
+	.still .cap-t, .still .card, .still .key, .still .lb { transition: none; animation: none; }
+	@media (prefers-reduced-motion: reduce) { .cap-t, .card, .key, .lb { transition: none; animation: none; } }
 </style>
