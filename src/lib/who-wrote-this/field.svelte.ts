@@ -30,7 +30,8 @@ export const field = $state({
 });
 
 /** What a chart section draws. Plain (not reactive): rewritten every frame, read only by DotField's draw loop. */
-export type Paint = (ctx: CanvasRenderingContext2D, f: { now: number; dt: number; w: number; h: number; dpr: number }) => void;
+/** A section that paints its own art. Return false once nothing is moving, so the canvas can rest until input changes. */
+export type Paint = (ctx: CanvasRenderingContext2D, f: { now: number; dt: number; w: number; h: number; dpr: number }) => boolean | void;
 export const chart = { marks: [] as Mark[], paths: [] as Path[], texts: [] as Text[], paint: null as Paint | null };
 
 export type Box = { x: number; y: number; w: number; h: number };

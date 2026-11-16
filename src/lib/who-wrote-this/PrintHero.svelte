@@ -60,8 +60,9 @@
 			colors: { human: "#C85A82", ai: "#461E47", lit: "#437E8E", ink: "#14202D", labs: ["#C85A82", "#437E8E", "#461E47"], other: "#8A8F98" },
 		});
 		let pointer: { x: number; y: number } | null = null;
-		let lastAnchors = 0;
+		let lastAnchors = 0, anchorKey = "";
 		const rect = (el: Element): Box => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+		const mast = document.querySelector(".mast");
 
 		chart.paint = (ctx, f) => {
 			if (field.owner !== "hero") return;
@@ -73,15 +74,22 @@
 				? { x: 0, y: Math.max(top, p.y + p.h + 8), w: f.w, h: Math.max(0, bottom - Math.max(top, p.y + p.h + 8)) }
 				: { x: p.x + p.w + 24, y: top, w: f.w - (p.x + p.w + 24), h: Math.max(0, bottom - top) };
 			const enter = Math.max(0, Math.min(1, 1 - Math.max(0, s.y) / f.h, (s.y + s.h) / f.h));
-			const mast = document.querySelector(".mast");
-			const quiet = [p, ...(mast ? [rect(mast)] : [])];
+			const quiet = mast ? [p, rect(mast)] : [p];
 			print.draw(ctx, { level: lv, t: f.now / 1000, dt: Math.min(0.05, f.dt), view: { w: f.w, h: f.h, dpr: f.dpr }, stage, quiet, pointer, enter, reduce });
 			if (f.now - lastAnchors > 50) {
 				lastAnchors = f.now;
-				anchors = print.anchors();
-				// the prints move under a still pointer as the level changes: keep the tooltip honest
-				if (pointer) { const h = print.hit(pointer.x, pointer.y); hover = h ? { id: h.id, x: pointer.x, y: pointer.y } : null; }
+				// labels re-render only when a print moved or faded, not on every painted frame
+				const next = print.anchors();
+				let k = "";
+				for (const a of next) k += `${a.id}${Math.round(a.x)},${Math.round(a.y)},${Math.round(a.r)},${Math.round(a.alpha * 40)};`;
+				if (k !== anchorKey) {
+					anchorKey = k;
+					anchors = next;
+					// the prints move under a still pointer as the level changes: keep the tooltip honest
+					if (pointer) { const h = print.hit(pointer.x, pointer.y); hover = h ? { id: h.id, x: pointer.x, y: pointer.y } : null; }
+				}
 			}
+			return print.busy?.() ?? true;
 		};
 
 		const onMove = (e: PointerEvent) => {
@@ -97,11 +105,10 @@
 		document.addEventListener("pointerleave", onLeave);
 
 		const own = () => { field.mode = "paint"; field.owner = "hero"; field.dim = 0.55; field.interactive = false; };
-		// retake the canvas if a neighbour left it on the plain ground while this section is in view
-		let watch = 0;
-		const check = () => {
+		// where the reader is, from the scroll position itself (robust to remounts and jumps); runs on scroll and resize,
+		// not every frame. Also retakes the canvas if a neighbour left it on the plain ground while this section is in view.
+		const update = () => {
 			if (active && field.mode === "ground") own();
-			// where the reader is, from the scroll position itself (robust to remounts and jumps)
 			const r = root.getBoundingClientRect();
 			const p = Math.max(0, (innerHeight * 0.5 - r.top) / (innerHeight * 0.9));
 			if (Math.abs(p - pos) > 0.002) pos = p;
@@ -109,18 +116,19 @@
 			const next = k >= STEPS.length - 1 ? STEPS[k] : STEPS[k] + (STEPS[k + 1] - STEPS[k]) * smooth(0.62, 0.98, p - k);
 			const want = reduce ? Math.round(next) : next;
 			if (Math.abs(want - lv) > 0.001) lv = want;
-			watch = requestAnimationFrame(check);
 		};
-		watch = requestAnimationFrame(check);
+		addEventListener("scroll", update, { passive: true });
+		addEventListener("resize", update, { passive: true });
+		update();
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
-			if (active) own();
+			if (active) { own(); update(); }
 			else if (field.owner === "hero") { field.mode = "ground"; field.dim = 0; field.owner = ""; hover = null; }
 		}), { rootMargin: "0px 0px -10% 0px" });
 		io.observe(root);
 		return () => {
 			removeEventListener("pointermove", onMove); removeEventListener("pointerdown", onMove); document.removeEventListener("pointerleave", onLeave);
-			io.disconnect(); cancelAnimationFrame(watch); print.dispose?.();
+			io.disconnect(); removeEventListener("scroll", update); removeEventListener("resize", update); print.dispose?.();
 			if (field.owner === "hero") { field.mode = "ground"; field.dim = 0; field.owner = ""; chart.paint = null; }
 		};
 	});

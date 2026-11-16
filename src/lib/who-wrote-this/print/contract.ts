@@ -48,6 +48,9 @@ export interface Print {
 	/** which print is under a viewport point, for hover and tap */
 	hit(x: number, y: number): Hit;
 	dispose?(): void;
+	/** true while anything is still moving (easing toward the level, inking in, baking, the lens following the pointer).
+	 * When false the host stops redrawing until the input changes, so an idle page costs nothing. */
+	busy?(): boolean;
 }
 
 export type PrintOptions = {
