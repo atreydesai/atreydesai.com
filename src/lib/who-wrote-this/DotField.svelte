@@ -218,7 +218,7 @@
 				const hov = F.hover !== null && F.hover === (m.group ?? m.id);
 				const flat = m.square || !!m.sprite;
 				if (hov && flat) { hx0 = Math.min(hx0, m.x - m.r); hy0 = Math.min(hy0, m.y - m.r); hx1 = Math.max(hx1, m.x + m.r); hy1 = Math.max(hy1, m.y + m.r); hcol = m.color; }
-				const tr = hov && !flat ? m.r * 1.7 : m.r, ta = m.alpha ?? 1;
+				const tr = hov && !flat ? m.r * 1.3 : m.r, ta = m.alpha ?? 1; // a modest lift: hovered dots should not cover neighbours
 				const ex = m.x - l.x, ey = m.y - l.y, er = tr - l.r, ea = ta - l.a;
 				if (Math.abs(ex) + Math.abs(ey) + Math.abs(er) > 0.05 || Math.abs(ea) > 0.003) moving = true;
 				l.x += ex * k; l.y += ey * k; l.r += er * k; l.a += ea * k;

@@ -1,5 +1,5 @@
 {
- "_about": "Strings for the launch page's section 'Model accuracy has improved over time' (site: src/lib/who-wrote-this/Timeline.svelte, which imports a byte-identical copy at src/lib/who-wrote-this/timeline.json). Copied from content.json's timeline object on 16 Nov 2026 and reworked for the guided scroll: closed-weights line traces, open-weights line traces, then both lines are named on the picture, then the trained detectors. content.json is unchanged (the hero still reads timeline.steps from it). Paper text is {t, src}; every string that is not paper text is in `ui`. Numbers on the picture come from timeline_rq1.json (built by docs/launch_20261116/tools/build_timeline_data.py from paper/figures/data/rq1_points.json, Figure 2's 860-document sample), never from this file.",
+ "_about": "Strings for the launch page's section 'Model accuracy has improved over time' (site: src/lib/who-wrote-this/Timeline.svelte, which imports a byte-identical copy at src/lib/who-wrote-this/timeline.json). Copied from content.json's timeline object on 16 Nov 2026 and reworked for the guided scroll; second rework (16 Nov, blocking pass): four steps, the closed-weights line traces, then the open-weights line (each line is named at its end as soon as it is drawn, so the old step that only named the lines is merged into the open-weights step, its sentence without the colour words, which the picture now carries), then the trained detectors (prose, then ideas, where Explore opens). content.json is unchanged (the hero still reads timeline.steps from it). Paper text is {t, src}; every string that is not paper text is in `ui`. Numbers on the picture come from timeline_rq1.json (built by docs/launch_20261116/tools/build_timeline_data.py from paper/figures/data/rq1_points.json, Figure 2's 860-document sample), never from this file.",
  "id": "recent",
  "title": {
   "t": "Model accuracy has improved over time.",
@@ -9,7 +9,7 @@
   {
    "metric": "both",
    "draw": ["closed"],
-   "focus": ["GPT-4o (2024-08-06)", "GPT-5.2", "Claude Fable 5.2"],
+   "focus": ["GPT-4o (2024-08-06)", "GPT-5.2"],
    "t": "Accuracy on both labels climbed from 27% for GPT-4o in 2024 and 59% for GPT-5.2 in 2025 to 91% for present-day frontier models.",
    "src": "paper/sections/03_rq1_ai_vs_human.tex"
   },
@@ -17,26 +17,19 @@
    "metric": "both",
    "draw": ["closed", "open"],
    "focus": ["Kimi K3.1 Pro"],
-   "t": "The best open-weight models still trail, with Kimi K3.1 Pro reaching 63%.",
-   "src": "paper/sections/03_rq1_ai_vs_human.tex"
-  },
-  {
-   "metric": "both",
-   "draw": ["closed", "open", "labels"],
-   "focus": [],
-   "t": "Closed-weight models (solid purple) consistently outperform open-weight models (dashed pink).",
-   "src": "paper/sections/03_rq1_ai_vs_human.tex (Figure 2 caption)"
+   "t": "Closed-weight models consistently outperform open-weight models. The best open-weight models still trail, with Kimi K3.1 Pro reaching 63%.",
+   "src": "paper/sections/03_rq1_ai_vs_human.tex (Figure 2 caption, then the RQ1 timeline paragraph)"
   },
   {
    "metric": "prose",
-   "draw": ["closed", "open", "labels", "ref"],
+   "draw": ["closed", "open", "ref"],
    "focus": [],
    "t": "Frontier models are competitive with trained detectors such as Pangram 4 at prose detection.",
    "src": "paper/sections/03_rq1_ai_vs_human.tex"
   },
   {
    "metric": "ideas",
-   "draw": ["closed", "open", "labels", "ref"],
+   "draw": ["closed", "open", "ref"],
    "focus": [],
    "t": "On idea detection, they exceed the accuracy of IdeaLens, the only existing state-of-the-art idea detector.",
    "src": "paper/sections/03_rq1_ai_vs_human.tex"
@@ -55,14 +48,15 @@
  ],
  "ui": [
   { "id": "metric.both", "t": "Both correct" },
-  { "id": "metric.ideas", "t": "Who had the ideas" },
-  { "id": "metric.prose", "t": "Who wrote the prose" },
+  { "id": "metric.ideas", "t": "Ideas" },
+  { "id": "metric.prose", "t": "Prose" },
   { "id": "weights.all", "t": "All" },
   { "id": "weights.closed", "t": "Closed weights" },
   { "id": "weights.open", "t": "Open weights" },
   { "id": "trained", "t": "trained detector" },
   { "id": "x_label", "t": "Detector release date" },
   { "id": "explore", "t": "Explore" },
+  { "id": "step", "t": "Step" },
   { "id": "dates", "t": "Dates" },
   { "id": "dates.all", "t": "all dates" },
   { "id": "dates.reset", "t": "All dates" },
