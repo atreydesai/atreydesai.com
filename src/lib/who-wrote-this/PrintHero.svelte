@@ -331,8 +331,21 @@
 	.steps { position: absolute; inset: 0; pointer-events: none; }
 	.step { height: 90vh; }
 	@media (max-width: 860px) {
-		.insp { width: min(300px, calc(100vw - 32px)); left: 16px !important; top: auto !important; bottom: 64px; transform: none; }
+		/* on a phone the card is a compact strip docked under the prints (clear of the rail's arrows at the left), holding
+		   only the name and the number, or the quote and the writer, so it never covers a print's name (Atrey, 16 Nov) */
+		.insp {
+			width: auto; left: 48px !important; right: 12px; top: auto !important; bottom: 10px; transform: none;
+			display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: 8px 12px; transition: none;
+		}
 		.insp::before { display: none; }
+		.insp .k, .insp .ex, .insp .models, .insp .note, .insp blockquote:not(.reads) { display: none; }
+		.insp h3 { font-size: 17px; }
+		.insp h3 :global(svg) { width: 16px; height: 16px; }
+		.insp .stat { gap: 7px; }
+		.insp .stat b { font-size: 24px; }
+		.insp .stat span { font-size: 11px; }
+		.insp .who { font-size: 14px; }
+		.insp .reads { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 		.panel { top: 12px; transform: none; width: auto; right: 0; gap: 6px; }
 		.lead { font-size: 16px; }
 		.fact, .without { display: none; }
