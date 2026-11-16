@@ -42,7 +42,11 @@
 		{ id: C.timeline.id, label: C.timeline.title.t.replace(/\.$/, "") },
 		...C.sections.map((s) => ({ id: s.id, label: s.title })),
 	];
-	onMount(() => startElastic(document));
+	let artSwitch = $state(false);
+	onMount(() => {
+		artSwitch = new URLSearchParams(location.search).has("art");
+		return startElastic(document);
+	});
 
 	const jsonLd = [
 		{
@@ -164,8 +168,8 @@
 		<a href="/">Atrey Desai</a>
 		<span>{#each nav as link}<a href={link.href}>{link.name}</a>{/each}</span>
 	</footer>
-	{#if dev}
-		<!-- art direction preview (development only): the hero art variants, with filler images -->
+	{#if dev && artSwitch}
+		<!-- art direction preview (development only, with ?art=…): the earlier hero variants -->
 		<nav class="art-switch" aria-label="Art">
 			<span>Art</span>
 			{#each [["print", "Print"], ["dots", "Dots"], ["fingerprint", "Fingerprint"], ["mosaic", "Mosaic"]] as [k, label]}

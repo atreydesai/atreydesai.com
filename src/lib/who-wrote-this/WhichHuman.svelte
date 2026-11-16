@@ -117,7 +117,7 @@
 		m.color = ink;
 		if (!m.sprite && !m.spriteKey) return; // a plain square (too small for a print)
 		const px = Math.round(m.r * 2), wi = id % 64;
-		m.sprite = printSprite({ family: "writer", index: wi, color: lit ? deepen(ink, TILE.inkDepth) : ink, px, clarity: lit ? 1 : 0.35 });
+		m.sprite = printSprite({ family: "writer", index: wi, color: lit ? deepen(ink, TILE.inkDepth) : ink, px, clarity: 1 });
 		m.spriteKey = `w${wi}|${ink}|${px}|${lit ? 1 : 0}`;
 		m.backing = lit ? TILE.litBacking : TILE.unlitBacking;
 	}
@@ -128,14 +128,14 @@
 		const on = Math.round(cur), rows = Math.ceil(b.n / b.cols);
 		for (let i = 0; i < b.n; i++) {
 			const c = b.order === "row" ? i % b.cols : Math.floor(i / rows), r = b.order === "row" ? Math.floor(i / b.cols) : i % rows;
-			// each tile is a writer's print: crisp in the model's colour when it was named, smudged gray when not
+			// each tile is a writer's print: solid in the model's colour when it was named, pale when not (clarity is kept for familiarity, sections 4-5)
 			const lit = i < on, px = Math.max(6, Math.round(b.s * 0.9)), wi = (base + i) % 64;
 			const ink = lit ? b.color : UNLIT;
 			// prints only where they can be read (14 px and up); smaller tiles stay plain squares
 			const pr = px >= 14;
 			G.marks.push({
 				id: `t${base + i}`, square: true, x: b.x + c * b.s + b.s / 2, y: b.y + r * b.s + b.s / 2, r: pr ? px / 2 : b.s * 0.36, color: ink, alpha: b.alpha,
-				...(pr ? { sprite: printSprite({ family: "writer", index: wi, color: lit ? deepen(ink, TILE.inkDepth) : ink, px, clarity: lit ? 1 : 0.35 }), spriteKey: `w${wi}|${ink}|${px}|${lit ? 1 : 0}`, aspect: ASPECT, backing: lit ? TILE.litBacking : TILE.unlitBacking } : {}),
+				...(pr ? { sprite: printSprite({ family: "writer", index: wi, color: lit ? deepen(ink, TILE.inkDepth) : ink, px, clarity: 1 }), spriteKey: `w${wi}|${ink}|${px}|${lit ? 1 : 0}`, aspect: ASPECT, backing: lit ? TILE.litBacking : TILE.unlitBacking } : {}),
 			});
 		}
 		const e = { b, base, on };
