@@ -1,5 +1,5 @@
 {
- "_about": "RQ3 section strings and numbers, built by docs/launch_20261116/tools/build_rq3_data.py from the paper's figure data; do not edit by hand. Paper text is {t, src}; `edits` lists every change to a paper sentence; `numbers` gives each displayed number's data file and the paper file that prints it. Tiles stand for counts, not individual texts: no reviewer, username or per-review result is included. Every string that is not paper text is in `ui` (labels and controls), `demo` (the one illustrative example: a synthetic review, written for this page; the answer's name is a row of soft blank blocks, never a name) or `notes` without a `src` (the section's footnotes; a note with `src` is paper text).",
+ "_about": "RQ3 section strings and numbers, built by docs/launch_20261116/tools/build_rq3_data.py from the paper's figure data; do not edit by hand. Paper text is {t, src}; `edits` lists every change to a paper sentence; `numbers` gives each displayed number's data file and the paper file that prints it. Tiles stand for counts, not individual texts: no reviewer, username or per-review result is included. Every string that is not paper text is in `ui` (labels and controls), `demo` (the one illustrative example: a synthetic review, written for this page; the answer's name is the placeholder John Doe, never a real name) or `notes` without a `src` (the section's footnotes; a note with `src` is paper text).",
  "id": "which-human",
  "n": 3,
  "rq": 3,
@@ -29,7 +29,13 @@
   {
    "view": "icml",
    "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
-   "src": "paper/sections/01_abstract.tex"
+   "src": "paper/sections/01_abstract.tex",
+   "marks": [
+    {
+     "after": "never made public.",
+     "note": "privacy"
+    }
+   ]
   },
   {
    "view": "models",
@@ -39,7 +45,21 @@
   {
    "view": "domains",
    "t": "On texts published after its training cutoff, it also names the reviewer of 76% of Nature-family reviews, the writer of all 15 stories by authors with >1M Goodreads ratings, at least one author of 46% of arXiv papers, and the username behind 69% of comments made by active Redditors.",
-   "src": "paper/sections/02_introduction.tex"
+   "src": "paper/sections/02_introduction.tex",
+   "marks": [
+    {
+     "after": "Nature-family reviews,",
+     "note": "nature"
+    },
+    {
+     "after": ">1M Goodreads ratings,",
+     "note": "famous"
+    },
+    {
+     "after": "active Redditors.",
+     "note": "inactive"
+    }
+   ]
   },
   {
    "view": "confidence",
@@ -67,14 +87,23 @@
    },
    {
     "t": "human author",
-    "b": true
+    "b": true,
+    "hl": true
    },
    {
-    "t": " wrote the attached piece of writing. Name the author as precisely as you can ("
+    "t": " wrote the attached piece of writing. "
+   },
+   {
+    "t": "Name the author",
+    "hl": true
+   },
+   {
+    "t": " as precisely as you can ("
    },
    {
     "t": "the full name they publish under",
-    "b": true
+    "b": true,
+    "hl": true
    },
    {
     "t": "). Give your best answer even when you are unsure […]"
@@ -90,6 +119,7 @@
    {
     "k": "author:",
     "v": "the author's name",
+    "hl": true,
     "src": "paper/figures/data/prompt_overview_sources.json sources.rq3.excerpts ('author: <the author's name>', from experiments/E8_human_author_attribution/rq3_ready_20261101/prompts/holistic.txt)"
    }
   ]
@@ -151,11 +181,7 @@
    "k": 15,
    "n": 15,
    "pct": 100,
-   "unit": "stories",
-   "more": {
-    "t": "Fable 5.2 identifies 4% of stories by authors without a Goodreads profile, 50% by those with 1k–10k ratings, and 100% by authors with over 10k ratings.",
-    "src": "paper/sections/06_discussion.tex"
-   }
+   "unit": "stories"
   },
   {
    "id": "nature",
@@ -167,11 +193,7 @@
    "k": 48,
    "n": 63,
    "pct": 76,
-   "unit": "reviews",
-   "more": {
-    "t": "On private peer reviews, Fable 5.2 also leads with 56% accuracy, while on public reviews from the Nature journal family it reaches 76%.",
-    "src": "paper/sections/05_rq3_human_vs_human.tex"
-   }
+   "unit": "reviews"
   },
   {
    "id": "papers",
@@ -183,11 +205,7 @@
    "k": 55,
    "n": 119,
    "pct": 46,
-   "unit": "papers",
-   "more": {
-    "t": "For NLP papers, we consider a prediction correct if the model names any co-author.",
-    "src": "paper/sections/05_rq3_human_vs_human.tex"
-   }
+   "unit": "papers"
   },
   {
    "id": "active",
@@ -199,11 +217,7 @@
    "k": 113,
    "n": 164,
    "pct": 69,
-   "unit": "comments",
-   "more": {
-    "t": "Pseudonymity is especially fragile for active users in niche communities.",
-    "src": "paper/sections/05_rq3_human_vs_human.tex"
-   }
+   "unit": "comments"
   },
   {
    "id": "inactive",
@@ -215,11 +229,7 @@
    "k": 1,
    "n": 47,
    "pct": 2,
-   "unit": "comments",
-   "more": {
-    "t": "Claude Fable 5.2's attribution accuracy rises from 2% for inactive users to 13% for those with 1–50 posts, reaching 69% for users with over 500 posts.",
-    "src": "paper/sections/06_discussion.tex"
-   }
+   "unit": "comments"
   }
  ],
  "confidence": {
@@ -364,7 +374,11 @@
   },
   {
    "id": "review.who",
-   "t": "Reviewer: anonymous"
+   "t": "Reviewer:"
+  },
+  {
+   "id": "review.anon",
+   "t": "anonymous"
   },
   {
    "id": "prompt.head",
@@ -379,6 +393,10 @@
    "t": "Answer"
   },
   {
+   "id": "answer.name",
+   "t": "John Doe"
+  },
+  {
    "id": "answer.verdict",
    "t": "Named correctly"
   }
@@ -389,13 +407,28 @@
    "t": "Illustrative example, written for this page: not a real review."
   },
   {
-   "id": "withheld",
-   "t": "Name withheld."
+   "id": "placeholder",
+   "t": "The name shown is a placeholder."
   },
   {
    "id": "privacy",
    "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
    "src": "paper/sections/05_rq3_human_vs_human.tex"
+  },
+  {
+   "id": "nature",
+   "t": "On private peer reviews, Fable 5.2 also leads with 56% accuracy, while on public reviews from the Nature journal family it reaches 76%.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
+  },
+  {
+   "id": "famous",
+   "t": "Fable 5.2 identifies 4% of stories by authors without a Goodreads profile, 50% by those with 1k–10k ratings, and 100% by authors with over 10k ratings.",
+   "src": "paper/sections/06_discussion.tex"
+  },
+  {
+   "id": "inactive",
+   "t": "Claude Fable 5.2's attribution accuracy rises from 2% for inactive users to 13% for those with 1–50 posts, reaching 69% for users with over 500 posts.",
+   "src": "paper/sections/06_discussion.tex"
   }
  ],
  "ui": [
@@ -432,42 +465,6 @@
    "t": "{share}% of responses"
   },
   {
-   "id": "explore",
-   "t": "Explore"
-  },
-  {
-   "id": "x.example",
-   "t": "Example"
-  },
-  {
-   "id": "x.icml",
-   "t": "ICML 2020"
-  },
-  {
-   "id": "x.domains",
-   "t": "Recent texts"
-  },
-  {
-   "id": "x.confidence",
-   "t": "Confidence"
-  },
-  {
-   "id": "x.aria",
-   "t": "Show"
-  },
-  {
-   "id": "x.models",
-   "t": "Model"
-  },
-  {
-   "id": "all",
-   "t": "All"
-  },
-  {
-   "id": "explain",
-   "t": "Explanation"
-  },
-  {
    "id": "role",
    "t": "Author"
   },
@@ -485,16 +482,6 @@
    "paper": "Here, Fable 5.2 identifies 4% of stories by authors without a Goodreads profile, 50% by those with 1k–10k ratings, and 100% by authors with over 10k ratings.",
    "shown": "Fable 5.2 identifies 4% of stories by authors without a Goodreads profile, 50% by those with 1k–10k ratings, and 100% by authors with over 10k ratings.",
    "src": "paper/sections/06_discussion.tex"
-  },
-  {
-   "paper": "For NLP papers, we consider a prediction correct if the model names any co-author",
-   "shown": "For NLP papers, we consider a prediction correct if the model names any co-author.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex"
-  },
-  {
-   "paper": "pseudonymity is especially fragile for active users in niche communities.",
-   "shown": "Pseudonymity is especially fragile for active users in niche communities.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
    "paper": "Using this metric, Claude Fable 5.2's attribution accuracy rises from 2% for inactive users to 13% for those with 1–50 posts, reaching 69% for users with over 500 posts.",

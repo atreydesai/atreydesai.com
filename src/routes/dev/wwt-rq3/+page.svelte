@@ -5,6 +5,7 @@
 	import { onMount } from "svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import WhichHuman from "$lib/who-wrote-this/WhichHuman.svelte";
+	import FootnoteList from "$lib/who-wrote-this/FootnoteList.svelte";
 	import { startElastic } from "$lib/who-wrote-this/elastic";
 
 	// the page's scroll-speed spacing for [data-lag] blocks, as on the post
@@ -46,6 +47,8 @@
 		<div class="lead-in" aria-hidden="true"></div>
 		<WhichHuman />
 		<div class="lead-out" aria-hidden="true"></div>
+		<!-- the page's footnote list (marks renumbered page-wide, previews on hover), as on the post -->
+		<FootnoteList />
 	</article>
 </div>
 
