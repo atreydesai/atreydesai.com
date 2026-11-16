@@ -8,6 +8,7 @@
 	// evidence and numbers; the renderer brings that print forward.
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
+	import StepDashes from "./StepDashes.svelte";
 	import { field, chart } from "./field.svelte";
 	import { createPrint, type Anchor, type Box, type Print } from "./print";
 	import C from "./content.json";
@@ -161,6 +162,7 @@
 <section class="ph" id="levels" bind:this={root} aria-label={L.lead.t} style="--steps:{STEPS.length}" data-level={lv.toFixed(2)} data-pos={pos.toFixed(2)}>
 	<div class="stick" bind:this={stick}>
 		<div class="panel" bind:this={panel}>
+			<StepDashes count={STEPS.length} current={level} go={(i) => go(STEPS[i])} />
 			<p class="lead">{L.lead.t}:</p>
 			<ol data-lag="1">
 				{#each L.items as it}
@@ -180,7 +182,6 @@
 				<span class="icons">{#each C.hero.without as w}<span class="struck" title={w.t}><Icon name={w.icon} /><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="21" x2="21" y2="3" /></svg></span>{/each}</span>
 				{C.hero.without_line.t}
 			</p>
-			<p class="say-n" aria-hidden="true">{#each STEPS as _, i}<i><b style:width="{Math.max(0, Math.min(1, pos - i)) * 100}%"></b></i>{/each}</p>
 		</div>
 		{#if active && pos < 0.6}
 			<button type="button" class="cue" style:opacity={1 - pos / 0.6} onclick={() => go(1)}><Icon name="arrow" />Scroll</button>

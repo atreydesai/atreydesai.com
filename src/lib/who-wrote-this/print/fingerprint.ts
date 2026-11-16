@@ -515,7 +515,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const IN = (p: number) => ss(0.86, 1, p), OUT = (p: number) => 1 - ss(0, 0.12, p);
 		set(main, l.main[0], l.main[1], l.main[2], 0, OUT(p1));
 		const hp = mix3(l.human1, l.human2, q2);
-		set(human, hp[0], hp[1], hp[2], 0, IN(p1) * lerp(1, 0.55, q2) * OUT(p3));
+		// level 2 is about the labs only: the human print leaves (Atrey, 16 Nov), and the crowd re-forms from its place at 3
+		set(human, hp[0], hp[1], hp[2], 0, IN(p1) * lerp(1, 0, q2) * OUT(p3));
 		set(ai, l.ai1[0], l.ai1[1], l.ai1[2], 0, IN(p1) * OUT(p2));
 		// 2 → 3: the labs draw up into a row and step back
 		labs.forEach((it, i) => {
@@ -903,7 +904,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		}
 		lensA = s.reduce ? want : lensA + (want - lensA) * Math.min(1, s.dt * 10);
 		if (Math.abs(want - lensA) < 0.004) lensA = want;
-		const rad = Math.min(92, Math.max(58, Math.min(stage.w, stage.h) * 0.13)) * (0.9 + 0.1 * lensA);
+		// a smaller, quieter lens (Atrey, 16 Nov: "slightly smaller, less intrusive")
+		const rad = Math.min(70, Math.max(44, Math.min(stage.w, stage.h) * 0.098)) * (0.9 + 0.1 * lensA);
 		if (lensA !== want) lensMoving = true;
 		if (lensA > 0.01) {
 			// magnify the print under the glass; between prints, look at the edge of the nearest one within reach

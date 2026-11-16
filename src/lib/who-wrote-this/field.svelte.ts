@@ -16,6 +16,7 @@ export type Mark = {
 	spriteKey?: string; // identifies the sprite, so a changed sprite redraws the chart
 	aspect?: number; // sprite width / height (default 0.8)
 	backing?: number; // with a sprite: a square of the mark's colour behind the print, at this share of its alpha
+	snap?: boolean; // position (and size) jump to the target at once; only alpha eases (a chart whose lines are drawn exact)
 };
 
 export type Path = { pts: [number, number][]; color: string; width: number; dash?: number[]; progress: number };

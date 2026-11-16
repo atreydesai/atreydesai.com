@@ -20,7 +20,7 @@
 	const GRAY: RGB = [137, 137, 137];
 	type RGB = [number, number, number];
 	type Dot = { gx: number; gy: number; x: number; y: number; r: number; a: number; c: RGB; seed: number; s2: number; s3: number };
-	type Live = { x: number; y: number; r: number; a: number };
+	type Live = { x: number; y: number; r: number; a: number; tx: number; ty: number };
 
 	const mix = (p: RGB, q: RGB, t: number): RGB => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
 	const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -158,6 +158,7 @@
 				s += m.x * 1.13 + m.y * 2.71 + m.r * 3.3 + (m.alpha ?? 1) * 5.9 + (m.ring ? 11 : 0) + (m.square ? 13 : 0)
 					+ c.charCodeAt(1) + c.charCodeAt(3) * 3 + c.charCodeAt(5) * 7;
 				if (m.backing) s += m.backing * 23;
+				if (m.snap) s += 29;
 				if (m.spriteKey) { const q = m.spriteKey; s += q.length * 17 + q.charCodeAt(0) + q.charCodeAt(q.length - 1) * 5 + q.charCodeAt(q.length >> 1) * 9; }
 			}
 			for (const p of chart.paths) {
@@ -190,16 +191,34 @@
 				ctx.fillText(t.t, t.x, t.y);
 			}
 			const seen = new Set<string>();
+			// a chart that moved as a whole (its stage scrolling in or out) moves at once: only real changes tween, so
+			// tiles never drift behind their lines and labels while the page scrolls
+			let tdx = NaN, tdy = NaN, uniform = true, any = false;
+			for (const m of chart.marks) {
+				const l = live.get(m.id);
+				if (!l) continue;
+				const dx = m.x - l.tx, dy = m.y - l.ty;
+				if (!any) { tdx = dx; tdy = dy; any = true; }
+				else if (Math.abs(dx - tdx) > 0.5 || Math.abs(dy - tdy) > 0.5) { uniform = false; break; }
+			}
+			if (any && uniform && (Math.abs(tdx) > 0.01 || Math.abs(tdy) > 0.01))
+				for (const m of chart.marks) { const l = live.get(m.id); if (l) { l.x += tdx; l.y += tdy; } }
+			// hover: square tiles and prints keep their size (they would overlap); the group gets one outline instead
+			let hx0 = Infinity, hy0 = Infinity, hx1 = -Infinity, hy1 = -Infinity, hcol = "";
 			for (const m of chart.marks) {
 				seen.add(m.id);
 				let l = live.get(m.id);
-				if (!l) { // a new mark lifts off the ground near where it is going
-					const a = Math.random() * 6.28, d = 140 + Math.random() * 220;
-					l = { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, r: 1.1, a: 0.1 };
+				if (!l) { // a new mark lifts off the ground near where it is going (or appears in place, if it snaps)
+					const a = Math.random() * 6.28, d = m.snap ? 0 : 140 + Math.random() * 220;
+					l = { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, r: m.snap ? m.r : 1.1, a: 0.1, tx: m.x, ty: m.y };
 					live.set(m.id, l);
 				}
+				l.tx = m.x; l.ty = m.y;
+				if (m.snap) { l.x = m.x; l.y = m.y; }
 				const hov = F.hover !== null && F.hover === (m.group ?? m.id);
-				const tr = hov ? m.r * 1.7 : m.r, ta = m.alpha ?? 1;
+				const flat = m.square || !!m.sprite;
+				if (hov && flat) { hx0 = Math.min(hx0, m.x - m.r); hy0 = Math.min(hy0, m.y - m.r); hx1 = Math.max(hx1, m.x + m.r); hy1 = Math.max(hy1, m.y + m.r); hcol = m.color; }
+				const tr = hov && !flat ? m.r * 1.7 : m.r, ta = m.alpha ?? 1;
 				const ex = m.x - l.x, ey = m.y - l.y, er = tr - l.r, ea = ta - l.a;
 				if (Math.abs(ex) + Math.abs(ey) + Math.abs(er) > 0.05 || Math.abs(ea) > 0.003) moving = true;
 				l.x += ex * k; l.y += ey * k; l.r += er * k; l.a += ea * k;
@@ -209,7 +228,6 @@
 					const h = l.r * 2, w = h * (m.aspect ?? 0.8);
 					if (m.backing) { ctx.globalAlpha = l.a * m.backing; ctx.fillRect(l.x - h / 2, l.y - h / 2, h, h); ctx.globalAlpha = l.a; }
 					ctx.drawImage(m.sprite, l.x - w / 2, l.y - h / 2, w, h);
-					if (hov) { ctx.strokeStyle = m.color; ctx.lineWidth = 1.5; ctx.strokeRect(l.x - w / 2 - 3, l.y - h / 2 - 3, w + 6, h + 6); }
 					continue;
 				}
 				if (m.square) { ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2); continue; }
@@ -219,6 +237,7 @@
 				if (hov) { ctx.strokeStyle = m.color; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(l.x, l.y, l.r + 5, 0, 6.2832); ctx.stroke(); }
 			}
 			ctx.globalAlpha = 1;
+			if (hcol) { ctx.strokeStyle = "#14202D"; ctx.lineWidth = 1.5; ctx.strokeRect(hx0 - 4, hy0 - 4, hx1 - hx0 + 8, hy1 - hy0 + 8); }
 			// marks that left the chart fade back into the ground
 			for (const [id, l] of live) if (!seen.has(id)) { moving = true; l.a += (0 - l.a) * k; if (l.a < 0.02) live.delete(id); }
 			return moving;

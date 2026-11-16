@@ -43,11 +43,7 @@
 		{ id: C.timeline.id, label: C.timeline.title.t.replace(/\.$/, "") },
 		...C.sections.map((s) => ({ id: s.id, label: s.title })),
 	];
-	let artSwitch = $state(false);
-	onMount(() => {
-		artSwitch = new URLSearchParams(location.search).has("art");
-		return startElastic(document);
-	});
+	onMount(() => startElastic(document));
 
 	const jsonLd = [
 		{
@@ -169,15 +165,6 @@
 		<a href="/">Atrey Desai</a>
 		<span>{#each nav as link}<a href={link.href}>{link.name}</a>{/each}</span>
 	</footer>
-	{#if dev && artSwitch}
-		<!-- art direction preview (development only, with ?art=…): the earlier hero variants -->
-		<nav class="art-switch" aria-label="Art">
-			<span>Art</span>
-			{#each [["print", "Print"], ["dots", "Dots"], ["fingerprint", "Fingerprint"], ["mosaic", "Mosaic"]] as [k, label]}
-				<a href="?art={k}" data-sveltekit-noscroll aria-current={art === k ? "page" : undefined}>{label}</a>
-			{/each}
-		</nav>
-	{/if}
 </div>
 
 <style>
@@ -256,11 +243,6 @@
 	.close-row { display: flex; align-items: center; gap: 28px; }
 	.closing { max-width: 30ch; font-size: clamp(24px, 3vw, 34px); line-height: 1.2; font-weight: 600; letter-spacing: -0.025em; text-wrap: balance; }
 	.byline.small { font-size: 13px; color: var(--ink2); margin-top: 24px; max-width: 52rem; }
-	.art-switch { position: fixed; left: 16px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 4px; background: rgba(20, 32, 45, .92); font-size: 12.5px; box-shadow: 0 6px 20px rgba(20, 32, 45, .25); }
-	.art-switch span { padding: 0 8px; color: rgba(255, 255, 255, .55); }
-	.art-switch a { padding: 5px 10px; border-radius: 3px; color: #fff; text-decoration: none; }
-	.art-switch a:hover { background: rgba(255, 255, 255, .12); }
-	.art-switch a[aria-current] { background: #fff; color: var(--ink); }
 	.site-foot { display: flex; justify-content: space-between; gap: 16px; padding-block: 28px 40px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink2); }
 	.site-foot span { display: flex; gap: 16px; }
 	.site-foot a { text-decoration: none; }
