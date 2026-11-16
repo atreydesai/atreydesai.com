@@ -1,14 +1,16 @@
 <script lang="ts">
 	// Dev preview: sections 4 (Who can be identified?) and 5 (Implications for anonymity) on the page's dot field,
-	// with the launch page's base styles. ?y=<px> scrolls there on load (for headless screenshots of later steps).
+	// with the launch page's base styles and its scroll-speed spacing (elastic.ts). ?y=<px> scrolls there on load (for headless screenshots of later steps).
 	import { onMount } from "svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import Familiar from "$lib/who-wrote-this/Familiar.svelte";
 	import Anonymity from "$lib/who-wrote-this/Anonymity.svelte";
+	import { startElastic } from "$lib/who-wrote-this/elastic";
 
 	onMount(() => {
 		const y = Number(new URLSearchParams(location.search).get("y"));
 		if (y) requestAnimationFrame(() => scrollTo(0, y));
+		return startElastic(document); // the page's scroll-speed spacing for [data-lag] blocks
 	});
 </script>
 

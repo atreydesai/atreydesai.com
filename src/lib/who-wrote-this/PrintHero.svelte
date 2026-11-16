@@ -72,7 +72,7 @@
 		let lastAnchors = 0, anchorKey = "", inspKey = "";
 		let lastStage: Box = { x: 0, y: 0, w: 1, h: 1 };
 		// the crowd's kinds of writers sit in bands across it, in proportion, so moving the lens explores them
-		const bands = (() => { let a = 0; return H.crowd.map((c) => (a += c.share)); })();
+		const bands = (() => { let a = 0; return H.crowd.map((c) => (a += c.layout_share)); })();
 		const kindAt = (x: number) => {
 			const t = ((x - lastStage.x) / Math.max(1, lastStage.w)) * bands[bands.length - 1];
 			const i = bands.findIndex((b) => t <= b);

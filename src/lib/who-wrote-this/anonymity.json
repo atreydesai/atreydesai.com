@@ -1,5 +1,5 @@
 {
- "_about": "Section 5 of the launch page, built by docs/launch_20261116/tools/build_familiarity_anonymity_data.py from the paper only. Strings are paper text (src gives the file); ui lists control words that are not. Numbers carry the paper file they come from.",
+ "_about": "Section 5 of the launch page, built by docs/launch_20261116/tools/build_familiarity_anonymity_data.py from the paper only. Strings are paper text (src gives the file); `ui` lists control and chart words and `demo` the demo's own words. Numbers carry the paper file they come from.",
  "id": "anonymity",
  "n": 5,
  "title": {
@@ -16,7 +16,7 @@
    "t": "Once a model is familiar with a writer, it is hard to stay anonymous.",
    "src": "paper/sections/06_discussion.tex",
    "more": {
-    "t": "Even when a text is brand new, a model can identify its writer from what it learned about them elsewhere; i.e., once that knowledge is in the weights, the writer cannot do anything about it.",
+    "t": "Even when a text is brand new, a model can identify its writer from what it learned about them elsewhere.",
     "src": "paper/sections/06_discussion.tex"
    }
   },
@@ -27,33 +27,6 @@
    "more": {
     "t": "Fable 5.2 and Opus 5.5 refuse most often, on under 2% of all documents and mostly on public peer reviews.",
     "src": "paper/sections/06_discussion.tex"
-   },
-   "details": [
-    {
-     "t": "Refusals are far rarer through the Anthropic API than through Claude Code.",
-     "src": "paper/sections/06_discussion.tex"
-    },
-    {
-     "t": "Claude Fable 5.2 returns a written refusal on 323 of 1,258 Reddit posts through Claude Code but only 3 (0.2%) through the batch API, which our results use.",
-     "src": "paper/sections/06_discussion.tex"
-    },
-    {
-     "t": "We additionally identify 162 written abstentions from Fable 5.2 and 130 from Opus 5.5, mostly citing insufficient evidence; only 50 of Fable 5.2's abstentions mention privacy or concerns about incorrect attributions.",
-     "src": "paper/sections/06_discussion.tex"
-    },
-    {
-     "t": "With our observed low refusal rates and rapidly improving models, another security leak is not needed to undermine the blind peer reviewing process; it could take just a few prompts.",
-     "src": "paper/sections/06_discussion.tex"
-    }
-   ]
-  },
-  {
-   "view": "para_setup",
-   "t": "We test paraphrasing as a defense against author identification, using Argon at medium effort to revise texts.",
-   "src": "paper/sections/06_discussion.tex",
-   "more": {
-    "t": "The prompt asks it to make the author's style less identifiable while preserving content and meaning, a form of authorship obfuscation.",
-    "src": "paper/sections/06_discussion.tex"
    }
   },
   {
@@ -61,14 +34,9 @@
    "t": "Paraphrasing lowers accuracy, though more familiar authors remain easier to identify.",
    "src": "paper/sections/06_discussion.tex",
    "more": {
-    "t": "On Reddit, Opus 5.5 drops from 16.8% to 10.4%.",
+    "t": "We test paraphrasing as a defense against author identification, using Argon at medium effort to revise texts.",
     "src": "paper/sections/06_discussion.tex"
    }
-  },
-  {
-   "view": "stories",
-   "t": "Of the 34 stories whose authors Opus 5.5 rates very familiar (2.5–3 on the 0–3 scale), it names 32 authors before rewriting and 27.5 after, on average over the two rewrites.",
-   "src": "paper/sections/06_discussion.tex"
   },
   {
    "view": "defenses",
@@ -93,31 +61,34 @@
    ]
   }
  ],
- "captions": {
-  "bins": {
-   "t": "Familiarity is the model's self-reported rating from 0–3.",
-   "src": "paper/sections/06_discussion.tex (fig:atrey_rq3_familiarity caption)"
+ "details": [
+  {
+   "t": "The prompt asks it to make the author's style less identifiable while preserving content and meaning, a form of authorship obfuscation.",
+   "src": "paper/sections/06_discussion.tex"
   },
-  "public_reviews": {
-   "t": "The public-review results exclude the 70 Nature-family reviews, which lack familiarity ratings in this analysis.",
-   "src": "paper/sections/09_appendix.tex (tab:rq3_familiarity_cross caption)"
-  },
-  "rewrite": {
+  {
    "t": "We rewrite each text twice, run author attribution on both rewrites with Opus 5.5 and Argon, and average the two accuracies.",
    "src": "paper/sections/06_discussion.tex"
-  },
-  "refusals": {
-   "t": "Claude Fable 5.2 returns a written refusal on 323 of 1,258 Reddit posts through Claude Code but only 3 (0.2%) through the batch API, which our results use.",
-   "src": "paper/sections/06_discussion.tex"
   }
- },
+ ],
  "labels": {
-  "familiarity_axis": "Familiarity rating",
-  "bins": [
-   "0",
-   "0.5–1",
-   "1.5–2",
-   "2.5–3"
+  "groups": [
+   {
+    "bin": "0",
+    "t": "Don't recognize it"
+   },
+   {
+    "bin": "0.5–1",
+    "t": "Vaguely familiar"
+   },
+   {
+    "bin": "1.5–2",
+    "t": "Know roughly what it posts"
+   },
+   {
+    "bin": "2.5–3",
+    "t": "Know it well"
+   }
   ],
   "domains": {
    "reddit": "Reddit",
@@ -129,31 +100,65 @@
    "Opus": "Opus 5.5",
    "Argon": "Gemini 4 Argon"
   },
+  "colors": {
+   "Opus 5.5": "#C85A82",
+   "Gemini 4 Argon": "#6E4B78",
+   "Fable 5.2": "#B4501C"
+  },
+  "explore": "Explore",
   "original": "Original",
-  "rewrite1": "Rewrite 1",
-  "rewrite2": "Rewrite 2",
   "paraphrased": "Paraphrased",
-  "posts": "Reddit posts",
-  "batch": "batch API",
-  "claude_code": "Claude Code",
+  "replay": "Replay",
+  "details": "Details",
+  "rewriting": "Rewriting",
+  "domain": "Domain",
+  "model": "Model",
+  "named": "named the writer",
+  "still": "still named the writer",
+  "lost": "Lost to paraphrasing",
+  "not_named": "Not named",
+  "few": "Too few texts",
+  "unit": "1 tile = 1% of texts",
+  "post_unit": "1 tile = 1 Reddit post",
   "fable": "Fable 5.2",
-  "refusal": "Written refusal",
-  "legend_kept": "Correct",
-  "legend_lost": "Before rewriting"
+  "refused": "refused",
+  "answered": "Answered",
+  "posts": "posts",
+  "lt1": "<1%"
  },
  "ui": [
+  "Explore",
   "Original",
   "Paraphrased",
   "Replay",
   "Details",
-  "of",
-  "texts",
-  "1 tile = 1% of texts",
-  "1 tile = 1 post",
-  "Correct",
-  "Model",
+  "Rewriting",
   "Domain",
-  "n"
+  "Model",
+  "Reddit",
+  "Stories",
+  "Papers",
+  "Public reviews",
+  "Opus 5.5",
+  "Gemini 4 Argon",
+  "Fable 5.2",
+  "named the writer",
+  "still named the writer",
+  "Lost to paraphrasing",
+  "Not named",
+  "Too few texts",
+  "1 tile = 1% of texts",
+  "1 tile = 1 Reddit post",
+  "refused",
+  "Answered",
+  "posts",
+  "<1%"
+ ],
+ "demo": [
+  "Don't recognize it",
+  "Vaguely familiar",
+  "Know roughly what it posts",
+  "Know it well"
  ],
  "data": {
   "bins": {
@@ -166,109 +171,69 @@
      "Opus": [
       {
        "bin": "0",
-       "n": 527,
        "shown": true,
-       "k": 6,
        "pct": 1.1,
        "tiles": 1,
-       "k_rw": 2.5,
        "pct_rw": 0.5,
-       "tiles_rw": 0,
-       "k_rw1": 3,
-       "k_rw2": 2
+       "tiles_rw": 0
       },
       {
        "bin": "0.5–1",
-       "n": 313,
        "shown": true,
-       "k": 29,
        "pct": 9.3,
        "tiles": 9,
-       "k_rw": 11.5,
        "pct_rw": 3.7,
-       "tiles_rw": 4,
-       "k_rw1": 12,
-       "k_rw2": 11
+       "tiles_rw": 4
       },
       {
        "bin": "1.5–2",
-       "n": 359,
        "shown": true,
-       "k": 140,
        "pct": 39.0,
        "tiles": 39,
-       "k_rw": 87.5,
        "pct_rw": 24.4,
-       "tiles_rw": 24,
-       "k_rw1": 84,
-       "k_rw2": 91
+       "tiles_rw": 24
       },
       {
        "bin": "2.5–3",
-       "n": 37,
        "shown": true,
-       "k": 33,
        "pct": 89.2,
        "tiles": 89,
-       "k_rw": 27.0,
        "pct_rw": 73.0,
-       "tiles_rw": 73,
-       "k_rw1": 28,
-       "k_rw2": 26
+       "tiles_rw": 73
       }
      ],
      "Argon": [
       {
        "bin": "0",
-       "n": 1134,
        "shown": true,
-       "k": 56,
        "pct": 4.9,
        "tiles": 5,
-       "k_rw": 31.0,
        "pct_rw": 2.7,
-       "tiles_rw": 3,
-       "k_rw1": 33,
-       "k_rw2": 29
+       "tiles_rw": 3
       },
       {
        "bin": "0.5–1",
-       "n": 35,
        "shown": true,
-       "k": 14,
        "pct": 40.0,
        "tiles": 40,
-       "k_rw": 11.5,
        "pct_rw": 32.9,
-       "tiles_rw": 33,
-       "k_rw1": 11,
-       "k_rw2": 12
+       "tiles_rw": 33
       },
       {
        "bin": "1.5–2",
-       "n": 27,
        "shown": true,
-       "k": 15,
        "pct": 55.6,
        "tiles": 56,
-       "k_rw": 11.0,
        "pct_rw": 40.7,
-       "tiles_rw": 41,
-       "k_rw1": 11,
-       "k_rw2": 11
+       "tiles_rw": 41
       },
       {
        "bin": "2.5–3",
-       "n": 57,
        "shown": true,
-       "k": 40,
        "pct": 70.2,
        "tiles": 70,
-       "k_rw": 32.5,
        "pct_rw": 57.0,
-       "tiles_rw": 57,
-       "k_rw1": 33,
-       "k_rw2": 32
+       "tiles_rw": 57
       }
      ]
     },
@@ -276,109 +241,69 @@
      "Opus": [
       {
        "bin": "0",
-       "n": 87,
        "shown": true,
-       "k": 0,
        "pct": 0.0,
        "tiles": 0,
-       "k_rw": 0.0,
        "pct_rw": 0.0,
-       "tiles_rw": 0,
-       "k_rw1": 0,
-       "k_rw2": 0
+       "tiles_rw": 0
       },
       {
        "bin": "0.5–1",
-       "n": 43,
        "shown": true,
-       "k": 1,
        "pct": 2.3,
        "tiles": 2,
-       "k_rw": 0.5,
        "pct_rw": 1.2,
-       "tiles_rw": 1,
-       "k_rw1": 0,
-       "k_rw2": 1
+       "tiles_rw": 1
       },
       {
        "bin": "1.5–2",
-       "n": 35,
        "shown": true,
-       "k": 7,
        "pct": 20.0,
        "tiles": 20,
-       "k_rw": 4.5,
        "pct_rw": 12.9,
-       "tiles_rw": 13,
-       "k_rw1": 5,
-       "k_rw2": 4
+       "tiles_rw": 13
       },
       {
        "bin": "2.5–3",
-       "n": 34,
        "shown": true,
-       "k": 32,
        "pct": 94.1,
        "tiles": 94,
-       "k_rw": 27.5,
        "pct_rw": 80.9,
-       "tiles_rw": 81,
-       "k_rw1": 27,
-       "k_rw2": 28
+       "tiles_rw": 81
       }
      ],
      "Argon": [
       {
        "bin": "0",
-       "n": 119,
        "shown": true,
-       "k": 0,
        "pct": 0.0,
        "tiles": 0,
-       "k_rw": 0.0,
        "pct_rw": 0.0,
-       "tiles_rw": 0,
-       "k_rw1": 0,
-       "k_rw2": 0
+       "tiles_rw": 0
       },
       {
        "bin": "0.5–1",
-       "n": 11,
        "shown": true,
-       "k": 0,
        "pct": 0.0,
        "tiles": 0,
-       "k_rw": 0.0,
        "pct_rw": 0.0,
-       "tiles_rw": 0,
-       "k_rw1": 0,
-       "k_rw2": 0
+       "tiles_rw": 0
       },
       {
        "bin": "1.5–2",
-       "n": 27,
        "shown": true,
-       "k": 4,
        "pct": 14.8,
        "tiles": 15,
-       "k_rw": 2.0,
        "pct_rw": 7.4,
-       "tiles_rw": 7,
-       "k_rw1": 2,
-       "k_rw2": 2
+       "tiles_rw": 7
       },
       {
        "bin": "2.5–3",
-       "n": 42,
        "shown": true,
-       "k": 33,
        "pct": 78.6,
        "tiles": 79,
-       "k_rw": 29.5,
        "pct_rw": 70.2,
-       "tiles_rw": 70,
-       "k_rw1": 29,
-       "k_rw2": 30
+       "tiles_rw": 70
       }
      ]
     },
@@ -386,109 +311,69 @@
      "Opus": [
       {
        "bin": "0",
-       "n": 3,
        "shown": false,
-       "k": 0,
        "pct": 0.0,
        "tiles": 0,
-       "k_rw": 0.0,
        "pct_rw": 0.0,
-       "tiles_rw": 0,
-       "k_rw1": 0,
-       "k_rw2": 0
+       "tiles_rw": 0
       },
       {
        "bin": "0.5–1",
-       "n": 14,
        "shown": true,
-       "k": 3,
        "pct": 21.4,
        "tiles": 21,
-       "k_rw": 2.0,
        "pct_rw": 14.3,
-       "tiles_rw": 14,
-       "k_rw1": 2,
-       "k_rw2": 2
+       "tiles_rw": 14
       },
       {
        "bin": "1.5–2",
-       "n": 58,
        "shown": true,
-       "k": 17,
        "pct": 29.3,
        "tiles": 29,
-       "k_rw": 14.5,
        "pct_rw": 25.0,
-       "tiles_rw": 25,
-       "k_rw1": 15,
-       "k_rw2": 14
+       "tiles_rw": 25
       },
       {
        "bin": "2.5–3",
-       "n": 43,
        "shown": true,
-       "k": 21,
        "pct": 48.8,
        "tiles": 49,
-       "k_rw": 20.5,
        "pct_rw": 47.7,
-       "tiles_rw": 48,
-       "k_rw1": 20,
-       "k_rw2": 21
+       "tiles_rw": 48
       }
      ],
      "Argon": [
       {
        "bin": "0",
-       "n": 14,
        "shown": true,
-       "k": 2,
        "pct": 14.3,
        "tiles": 14,
-       "k_rw": 1.5,
        "pct_rw": 10.7,
-       "tiles_rw": 11,
-       "k_rw1": 2,
-       "k_rw2": 1
+       "tiles_rw": 11
       },
       {
        "bin": "0.5–1",
-       "n": 7,
        "shown": false,
-       "k": 1,
        "pct": 14.3,
        "tiles": 14,
-       "k_rw": 1.0,
        "pct_rw": 14.3,
-       "tiles_rw": 14,
-       "k_rw1": 1,
-       "k_rw2": 1
+       "tiles_rw": 14
       },
       {
        "bin": "1.5–2",
-       "n": 33,
        "shown": true,
-       "k": 3,
        "pct": 9.1,
        "tiles": 9,
-       "k_rw": 2.5,
        "pct_rw": 7.6,
-       "tiles_rw": 8,
-       "k_rw1": 2,
-       "k_rw2": 3
+       "tiles_rw": 8
       },
       {
        "bin": "2.5–3",
-       "n": 66,
        "shown": true,
-       "k": 32,
        "pct": 48.5,
        "tiles": 48,
-       "k_rw": 25.0,
        "pct_rw": 37.9,
-       "tiles_rw": 38,
-       "k_rw1": 23,
-       "k_rw2": 27
+       "tiles_rw": 38
       }
      ]
     },
@@ -496,214 +381,80 @@
      "Opus": [
       {
        "bin": "0",
-       "n": 184,
        "shown": true,
-       "k": 2,
        "pct": 1.1,
        "tiles": 1,
-       "k_rw": 1.5,
        "pct_rw": 0.8,
-       "tiles_rw": 1,
-       "k_rw1": 1,
-       "k_rw2": 2
+       "tiles_rw": 1
       },
       {
        "bin": "0.5–1",
-       "n": 164,
        "shown": true,
-       "k": 9,
        "pct": 5.5,
        "tiles": 5,
-       "k_rw": 6.5,
        "pct_rw": 4.0,
-       "tiles_rw": 4,
-       "k_rw1": 8,
-       "k_rw2": 5
+       "tiles_rw": 4
       },
       {
        "bin": "1.5–2",
-       "n": 231,
        "shown": true,
-       "k": 67,
        "pct": 29.0,
        "tiles": 29,
-       "k_rw": 48.0,
        "pct_rw": 20.8,
-       "tiles_rw": 21,
-       "k_rw1": 47,
-       "k_rw2": 49
+       "tiles_rw": 21
       },
       {
        "bin": "2.5–3",
-       "n": 32,
        "shown": true,
-       "k": 27,
        "pct": 84.4,
        "tiles": 84,
-       "k_rw": 17.5,
        "pct_rw": 54.7,
-       "tiles_rw": 55,
-       "k_rw1": 18,
-       "k_rw2": 17
+       "tiles_rw": 55
       }
      ],
      "Argon": [
       {
        "bin": "0",
-       "n": 374,
        "shown": true,
-       "k": 19,
        "pct": 5.1,
        "tiles": 5,
-       "k_rw": 14.0,
        "pct_rw": 3.7,
-       "tiles_rw": 4,
-       "k_rw1": 14,
-       "k_rw2": 14
+       "tiles_rw": 4
       },
       {
        "bin": "0.5–1",
-       "n": 47,
        "shown": true,
-       "k": 8,
        "pct": 17.0,
        "tiles": 17,
-       "k_rw": 6.0,
        "pct_rw": 12.8,
-       "tiles_rw": 13,
-       "k_rw1": 6,
-       "k_rw2": 6
+       "tiles_rw": 13
       },
       {
        "bin": "1.5–2",
-       "n": 134,
        "shown": true,
-       "k": 47,
        "pct": 35.1,
        "tiles": 35,
-       "k_rw": 24.0,
        "pct_rw": 17.9,
-       "tiles_rw": 18,
-       "k_rw1": 25,
-       "k_rw2": 23
+       "tiles_rw": 18
       },
       {
        "bin": "2.5–3",
-       "n": 77,
        "shown": true,
-       "k": 45,
        "pct": 58.4,
        "tiles": 58,
-       "k_rw": 30.5,
        "pct_rw": 39.6,
-       "tiles_rw": 40,
-       "k_rw1": 29,
-       "k_rw2": 32
+       "tiles_rw": 40
       }
      ]
     }
    }
   },
-  "rewrite_table": {
-   "source": "paper/tables/rq3_rewrite_accuracy.tex",
-   "rows": {
-    "Private reviews": {
-     "Argon": {
-      "n": 398,
-      "original": 40.2,
-      "rewrite1": 14.1,
-      "rewrite2": 14.3
-     },
-     "Opus": {
-      "n": 398,
-      "original": 41.0,
-      "rewrite1": 15.3,
-      "rewrite2": 14.8
-     }
-    },
-    "Reddit": {
-     "Argon": {
-      "n": 1253,
-      "original": 10.0,
-      "rewrite1": 7.0,
-      "rewrite2": 6.7
-     },
-     "Opus": {
-      "n": 1236,
-      "original": 16.8,
-      "rewrite1": 10.3,
-      "rewrite2": 10.5
-     }
-    },
-    "Public reviews": {
-     "Argon": {
-      "n": 702,
-      "original": 23.5,
-      "rewrite1": 15.1,
-      "rewrite2": 15.4
-     },
-     "Opus": {
-      "n": 672,
-      "original": 20.8,
-      "rewrite1": 15.0,
-      "rewrite2": 14.6
-     }
-    },
-    "Stories": {
-     "Argon": {
-      "n": 199,
-      "original": 18.6,
-      "rewrite1": 15.6,
-      "rewrite2": 16.1
-     },
-     "Opus": {
-      "n": 199,
-      "original": 20.1,
-      "rewrite1": 16.1,
-      "rewrite2": 16.6
-     }
-    },
-    "Papers": {
-     "Argon": {
-      "n": 120,
-      "original": 31.7,
-      "rewrite1": 23.3,
-      "rewrite2": 26.7
-     },
-     "Opus": {
-      "n": 118,
-      "original": 34.7,
-      "rewrite1": 31.4,
-      "rewrite2": 31.4
-     }
-    }
-   }
-  },
-  "headline": {
-   "source": "paper/sections/06_discussion.tex",
-   "domain": "reddit",
-   "model": "Opus",
-   "before": 16.8,
-   "after": 10.4
-  },
-  "stories_top": {
-   "source": "paper/sections/06_discussion.tex",
-   "n": 34,
-   "before": 32,
-   "after": 27.5,
-   "rewrite1": 27,
-   "rewrite2": 28
-  },
   "refusals": {
    "source": "paper/sections/06_discussion.tex",
    "under_pct": 2.0,
    "posts": 1258,
-   "batch_api": 3,
-   "batch_api_pct": 0.2,
-   "claude_code": 323,
-   "abstentions_fable": 162,
-   "abstentions_opus": 130,
-   "privacy": 50
+   "refused": 3,
+   "refused_pct": 0.2
   }
  }
 }

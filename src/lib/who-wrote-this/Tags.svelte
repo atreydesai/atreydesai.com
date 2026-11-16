@@ -5,7 +5,7 @@
 		y: number;
 		t: string;
 		color?: string; // swatch colour (omit for no swatch)
-		swatch?: "dot" | "square" | "ring" | "line" | "dash"; // mark style the swatch shows (default square)
+		swatch?: "dot" | "square" | "ring" | "hollow" | "line" | "dash"; // mark style the swatch shows (default square; hollow = outlined square)
 		icon?: string; // Icon name before the words (e.g. a lab logo, bulb, pen)
 		sub?: string; // a second, smaller line (a number, a count)
 		at?: "above" | "below" | "left" | "right" | "center"; // where the tag sits relative to the point
@@ -31,7 +31,7 @@
 	{#each items as tg (tg.id)}
 		<span class="tag at-{tg.at ?? 'right'}" class:strong={tg.strong} style:left="{tg.x}px" style:top="{tg.y}px" style:opacity={tg.alpha ?? 1} style:--c={tg.color ?? "var(--ink)"}>
 			<span class="line">
-				{#if tg.color}<i class="sw {tg.swatch ?? 'square'}"></i>{/if}
+				{#if tg.color}<i class="sw sw-{tg.swatch ?? 'square'}"></i>{/if}
 				{#if tg.icon}<Icon name={tg.icon} />{/if}
 				<span class="t">{tg.t}</span>
 			</span>
@@ -48,10 +48,12 @@
 	.line :global(svg) { width: 1em; height: 1em; color: var(--c); }
 	.sub { font-size: 11.5px; font-weight: 500; color: var(--ink2); font-variant-numeric: tabular-nums; }
 	.sw { flex: none; display: inline-block; width: 10px; height: 10px; background: var(--c); border-radius: 1px; }
-	.sw.dot { border-radius: 50%; }
-	.sw.ring { border-radius: 50%; background: transparent; border: 2px solid var(--c); }
-	.sw.line { width: 16px; height: 2.5px; border-radius: 1px; }
-	.sw.dash { width: 16px; height: 0; background: none; border-top: 2.5px dashed var(--c); }
+	/* sw-* names: the site's Tailwind utilities (.ring, …) would otherwise style these */
+	.sw-dot { border-radius: 50%; }
+	.sw-ring { border-radius: 50%; background: transparent; border: 2px solid var(--c); }
+	.sw-hollow { background: transparent; border: 1.5px solid var(--c); }
+	.sw-line { width: 16px; height: 2.5px; border-radius: 1px; }
+	.sw-dash { width: 16px; height: 0; background: none; border-top: 2.5px dashed var(--c); }
 	.at-right { transform: translate(10px, -50%); }
 	.at-left { transform: translate(calc(-100% - 10px), -50%); }
 	.at-above { transform: translate(-50%, calc(-100% - 8px)); }

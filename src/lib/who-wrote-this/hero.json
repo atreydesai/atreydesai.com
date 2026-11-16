@@ -33,7 +33,7 @@
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
   },
   "explanation": {
-   "t": "The deciding factors are the non-idiomatic and ungrammatical slips.",
+   "t": "The deciding factors are the non-idiomatic and ungrammatical slips: “mistook greatness with size”",
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
   },
   "stat": {
@@ -51,7 +51,7 @@
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
   },
   "explanation": {
-   "t": "The deciding factor is the concentration of stock choices and the stated moral with a “from that day on” coda.",
+   "t": "The deciding factor is the concentration of stock choices: […] and the stated moral with a “from that day on” coda.",
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
   },
   "stat": {
@@ -299,7 +299,7 @@
     "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
     "src": "paper/sections/01_abstract.tex"
    },
-   "share": 0.34
+   "layout_share": 0.34
   },
   {
    "id": "active",
@@ -310,40 +310,7 @@
     "t": "The username behind 69% of comments made by active Redditors.",
     "src": "paper/sections/02_introduction.tex"
    },
-   "share": 0.2
-  },
-  {
-   "id": "papers",
-   "label": "Paper authors",
-   "rate": 46,
-   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
-   "t": {
-    "t": "At least one author of 46% of arXiv papers.",
-    "src": "paper/sections/02_introduction.tex"
-   },
-   "share": 0.16
-  },
-  {
-   "id": "nature",
-   "label": "Nature reviewers",
-   "rate": 76,
-   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
-   "t": {
-    "t": "The reviewer of 76% of Nature-family reviews.",
-    "src": "paper/sections/02_introduction.tex"
-   },
-   "share": 0.12
-  },
-  {
-   "id": "inactive",
-   "label": "Redditors with no prior activity",
-   "rate": 2,
-   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
-   "t": {
-    "t": "Claude Fable 5.2's attribution accuracy rises from 2% for inactive users.",
-    "src": "paper/sections/06_discussion.tex"
-   },
-   "share": 0.1
+   "layout_share": 0.2
   },
   {
    "id": "famous",
@@ -354,7 +321,40 @@
     "t": "The writer of all 15 stories by authors with >1M Goodreads ratings.",
     "src": "paper/sections/02_introduction.tex"
    },
-   "share": 0.08
+   "layout_share": 0.08
+  },
+  {
+   "id": "papers",
+   "label": "Paper authors",
+   "rate": 46,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "At least one author of 46% of arXiv papers.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "layout_share": 0.16
+  },
+  {
+   "id": "nature",
+   "label": "Nature reviewers",
+   "rate": 76,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "The reviewer of 76% of Nature-family reviews.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "layout_share": 0.12
+  },
+  {
+   "id": "inactive",
+   "label": "Redditors with no prior activity",
+   "rate": 2,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "Claude Fable 5.2's attribution accuracy rises from 2% for inactive users.",
+    "src": "paper/sections/06_discussion.tex"
+   },
+   "layout_share": 0.1
   }
  ],
  "privacy": {
@@ -369,7 +369,7 @@
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
   },
   "explanation": {
-   "t": "The deciding factor is the combination of style and theme: fragmentary, subject-dropping sentences, sentence-initial “For”, and unquoted menacing speech.",
+   "t": "The deciding factor is the combination of style and theme: fragmentary, subject-dropping sentences, sentence-initial “For”, and unquoted menacing speech, […]",
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
   },
   "source": "Human story",

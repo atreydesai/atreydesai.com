@@ -120,9 +120,11 @@
 			// each tile is a writer's print: crisp in the model's colour when it was named, smudged gray when not
 			const lit = i < on, px = Math.max(6, Math.round(b.s * 0.9)), wi = (base + i) % 64;
 			const ink = lit ? b.color : UNLIT;
+			// prints only where they can be read (14 px and up); smaller tiles stay plain squares
+			const pr = px >= 14;
 			G.marks.push({
-				id: `t${base + i}`, square: true, x: b.x + c * b.s + b.s / 2, y: b.y + r * b.s + b.s / 2, r: px / 2, color: ink, alpha: b.alpha,
-				sprite: printSprite({ family: "writer", index: wi, color: ink, px, clarity: lit ? 1 : 0.35 }), spriteKey: `w${wi}|${ink}|${px}|${lit ? 1 : 0}`, aspect: ASPECT, backing: lit ? 0.34 : 0.2,
+				id: `t${base + i}`, square: true, x: b.x + c * b.s + b.s / 2, y: b.y + r * b.s + b.s / 2, r: pr ? px / 2 : b.s * 0.36, color: ink, alpha: b.alpha,
+				...(pr ? { sprite: printSprite({ family: "writer", index: wi, color: ink, px, clarity: lit ? 1 : 0.35 }), spriteKey: `w${wi}|${ink}|${px}|${lit ? 1 : 0}`, aspect: ASPECT, backing: lit ? 0.34 : 0.2 } : {}),
 			});
 		}
 		const e = { b, base, on };
@@ -200,7 +202,7 @@
 		G.paths.push(G.edge);
 		const gw = f.cols * f.s, litH = Math.ceil(m.lit / f.cols) * f.s, allH = f.rows * f.s;
 		// the abstract's 55% in the guided step; the paper's one-decimal figures in Explore
-		const pct = explore ? m.pct : Math.round(m.pct);
+		const pct = Math.round(m.pct); // whole percents (style guide)
 		G.tags.push({ id: "icml:lit", x: box.x0 + gw / 2, y: top + litH / 2, at: "center", color: hue(m), t: fill(U["key.correct"], { model: m.short }), sub: fill(U.pct, { pct }), strong: true });
 		G.tags.push({ id: "icml:unlit", x: box.x0 + gw / 2, y: top + (litH + allH) / 2, at: "center", color: UNLIT, t: U["key.wrong"] });
 		return { x: box.x0, y: top + allH + 12, w: gw };
@@ -216,7 +218,7 @@
 		S.models.forEach((m, i) => {
 			place({ id: i === 0 ? "icml" : `m:${m.id}`, n: S.icml.tiles, k: m.lit, x: box.x0, y: y + lab, cols: f.cols, s: f.s, alpha: 1, color: hue(m), order: "col" }, base);
 			base += S.icml.tiles;
-			G.tags.push({ id: `models:${m.id}`, x: box.x0 - 10, y: y + lab / 2 - 1, at: "right", color: hue(m), t: `${m.short} · ${fill(U.pct, { pct: m.pct })}`, strong: i < 2 });
+			G.tags.push({ id: `models:${m.id}`, x: box.x0 - 10, y: y + lab / 2 - 1, at: "right", color: hue(m), t: `${m.short} · ${fill(U.pct, { pct: Math.round(m.pct) })}`, strong: i < 2 });
 			y += lab + f.rows * f.s + gap;
 		});
 		return { x: box.x0, y: y - gap + 12, w: W };
@@ -255,7 +257,7 @@
 			base += d.n;
 			const yb = p.y + p.rows * p.s;
 			G.texts.push({ x: p.x, y: p.y - 38, t: d.label.t, color: on ? INK : FAINT, size: 13, weight: 600 });
-			G.texts.push({ x: p.x, y: p.y - 15, t: fill(U.pct, { pct: d.pct }), color: on ? FABLE.ink : FAINT, size: 22, weight: 600 });
+			G.texts.push({ x: p.x, y: p.y - 15, t: fill(U.pct, { pct: Math.round(d.pct) }), color: on ? FABLE.ink : FAINT, size: 22, weight: 600 });
 			if (d.sub) G.texts.push({ x: p.x, y: yb + 13, t: d.sub.t, color: on ? INK2 : FAINT, size: 11.5 });
 			nh.push({ id: d.id, x: p.x - r.left - 8, y: p.y - 50 - r.top, w: Math.max(p.cols * p.s, lw(d)) + 16, h: yb - p.y + 50 + bottom(d) + 8 });
 		}
@@ -398,7 +400,7 @@
 					<button type="button" class="c-why" aria-expanded={open} aria-controls="wh-why" onclick={() => { open = !open; cue = null; }}>{U.explain}<Icon name="arrow" class="c-arrow" /></button>
 				{:else if view === "icml"}
 					<div class="seg models" role="group" aria-label={U["x.models"]}>
-						{#each S.models as m}<button type="button" aria-pressed={xmodel === m.id} style:--c={hue(m)} onclick={() => (xmodel = m.id)}><i class="sw"></i>{m.short}<b>{fill(U.pct, { pct: m.pct })}</b></button>{/each}
+						{#each S.models as m}<button type="button" aria-pressed={xmodel === m.id} style:--c={hue(m)} onclick={() => (xmodel = m.id)}><i class="sw"></i>{m.short}<b>{fill(U.pct, { pct: Math.round(m.pct) })}</b></button>{/each}
 					</div>
 				{:else if view === "domains"}
 					<div class="chips" role="group" aria-label={U["x.domains"]}>
@@ -417,7 +419,7 @@
 		{#if active && view === "domains" && explore}
 			{#each hits as h (h.id)}
 				{@const d = dom(h.id)}
-				<button type="button" class="hit" class:on={dsel === h.id} style="left:{h.x}px; top:{h.y}px; width:{h.w}px; height:{h.h}px" aria-pressed={dsel === h.id} aria-label="{d.label.t}, {fill(U.pct, { pct: d.pct })}" onclick={() => (dsel = dsel === h.id ? null : h.id)} onpointerenter={() => (dpeek = h.id)} onpointerleave={() => (dpeek = null)} onfocus={() => (dpeek = h.id)} onblur={() => (dpeek = null)}></button>
+				<button type="button" class="hit" class:on={dsel === h.id} style="left:{h.x}px; top:{h.y}px; width:{h.w}px; height:{h.h}px" aria-pressed={dsel === h.id} aria-label="{d.label.t}, {fill(U.pct, { pct: Math.round(d.pct) })}" onclick={() => (dsel = dsel === h.id ? null : h.id)} onpointerenter={() => (dpeek = h.id)} onpointerleave={() => (dpeek = null)} onfocus={() => (dpeek = h.id)} onblur={() => (dpeek = null)}></button>
 			{/each}
 		{/if}
 
