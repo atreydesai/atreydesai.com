@@ -76,3 +76,6 @@ export function deepen(hex: string, t = 0.5): string {
 
 /** tiles that show a result: solid enough to read as a mass even in grayscale, with the print as texture on top */
 export const TILE = { litBacking: 0.82, unlitBacking: 0.2, inkDepth: 0.55 } as const;
+
+/** light ramp steps of the three hues, for marks on the dark chapter openers (style guide ramps) */
+export const LIGHT = { rose: "#DC89A7", teal: "#8CB5C0", aubergine: "#9A82B4" } as const;

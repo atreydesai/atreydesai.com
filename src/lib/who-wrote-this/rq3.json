@@ -1,5 +1,5 @@
 {
- "_about": "RQ3 section strings and numbers, built by docs/launch_20261116/tools/build_rq3_data.py from the paper's figure data; do not edit by hand. Paper text is {t, src}; `edits` lists every change to a paper sentence; `numbers` gives each displayed number's data file and the paper file that prints it. Tiles stand for counts, not individual texts: no reviewer, username or per-review result is included. Every string that is not paper text is in `ui` (labels and controls) or `demo` (the one illustrative example: a synthetic review, written for this page; the answer's name is a redaction bar, never a name).",
+ "_about": "RQ3 section strings and numbers, built by docs/launch_20261116/tools/build_rq3_data.py from the paper's figure data; do not edit by hand. Paper text is {t, src}; `edits` lists every change to a paper sentence; `numbers` gives each displayed number's data file and the paper file that prints it. Tiles stand for counts, not individual texts: no reviewer, username or per-review result is included. Every string that is not paper text is in `ui` (labels and controls), `demo` (the one illustrative example: a synthetic review, written for this page; the answer's name is a row of soft blank blocks, never a name) or `notes` without a `src` (the section's footnotes; a note with `src` is paper text).",
  "id": "which-human",
  "n": 3,
  "rq": 3,
@@ -13,10 +13,6 @@
  },
  "context": {
   "t": "We provide no tools, web access, or candidate lists.",
-  "src": "paper/sections/05_rq3_human_vs_human.tex"
- },
- "privacy": {
-  "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
   "src": "paper/sections/05_rq3_human_vs_human.tex"
  },
  "steps": [
@@ -33,11 +29,7 @@
   {
    "view": "icml",
    "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
-   "src": "paper/sections/01_abstract.tex",
-   "more": {
-    "t": "On the ICML 2020 corpus, Fable 5.2 correctly identifies the author of 55.4% of the reviews, followed by Opus 5.5 (48.8%), Argon (37.7%), Sol (22.3%), and DeepSeek (5.4%).",
-    "src": "paper/sections/05_rq3_human_vs_human.tex"
-   }
+   "src": "paper/sections/01_abstract.tex"
   },
   {
    "view": "models",
@@ -56,11 +48,7 @@
     "src": "paper/sections/05_rq3_human_vs_human.tex"
    },
    "t": "When Fable 5.2's confidence is 25% or more (28% of responses), its predictions are 89% correct.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex",
-   "more": {
-    "t": "Furthermore, confident mistakes are rare. Of all Fable 5.2 answers, 0.3% report both at least 80% confidence and name the wrong person.",
-    "src": "paper/sections/05_rq3_human_vs_human.tex"
-   }
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
    "view": "example",
@@ -235,10 +223,6 @@
   }
  ],
  "confidence": {
-  "what": {
-   "t": "Each model's prediction includes a confidence level.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex"
-  },
   "groups": [
    {
     "id": "lo",
@@ -351,14 +335,6 @@
  },
  "demo": [
   {
-   "id": "label",
-   "t": "Illustrative example"
-  },
-  {
-   "id": "label.sub",
-   "t": "written for this page, not a real review"
-  },
-  {
    "id": "review.head",
    "t": "Anonymous peer review"
   },
@@ -399,12 +375,27 @@
    "t": "The review"
   },
   {
-   "id": "answer.hidden",
-   "t": "Name hidden"
+   "id": "answer.head",
+   "t": "Answer"
   },
   {
    "id": "answer.verdict",
    "t": "Named correctly"
+  }
+ ],
+ "notes": [
+  {
+   "id": "demo",
+   "t": "Illustrative example, written for this page: not a real review."
+  },
+  {
+   "id": "withheld",
+   "t": "Name withheld."
+  },
+  {
+   "id": "privacy",
+   "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
   }
  ],
  "ui": [
@@ -485,10 +476,6 @@
    "t": "Confidence {n}%"
   },
   {
-   "id": "step",
-   "t": "Step {i} of {n}"
-  },
-  {
    "id": "pct",
    "t": "{pct}%"
   }
@@ -552,11 +539,6 @@
    "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
-   "paper": "Furthermore, confident mistakes are rare. Of all Fable 5.2 answers, 0.3% report both at least 80% confidence and name the wrong person",
-   "shown": "Furthermore, confident mistakes are rare. Of all Fable 5.2 answers, 0.3% report both at least 80% confidence and name the wrong person.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex"
-  },
-  {
    "paper": "we provide no tools, web access, or candidate lists.",
    "shown": "We provide no tools, web access, or candidate lists.",
    "src": "paper/sections/05_rq3_human_vs_human.tex"
@@ -573,14 +555,14 @@
   {
    "key": "icml_fable_lenient",
    "value": 55.4,
-   "shown": "55% (guided step) / 55.4% (Explore)",
+   "shown": "55%",
    "data": "paper/figures/data/rq3_icml.json fable52.lenient (8,387 / 15,136)",
    "text": "paper/sections/01_abstract.tex; paper/sections/05_rq3_human_vs_human.tex"
   },
   {
    "key": "icml_opus",
    "value": 48.8,
-   "shown": "48.8%",
+   "shown": "49% (whole percent of the paper's 48.8%)",
    "data": "paper/figures/data/rq3_icml.json acc_percent.opus",
    "text": "paper/sections/05_rq3_human_vs_human.tex"
   },
@@ -655,7 +637,7 @@
     "sol": 22.3,
     "deepseek": 5.4
    },
-   "shown": "37.7% / 22.3% / 5.4%",
+   "shown": "38% / 22% / 5% (whole percents of the paper's 37.7% / 22.3% / 5.4%)",
    "data": "paper/figures/data/rq3_icml.json acc_percent",
    "text": "paper/sections/05_rq3_human_vs_human.tex"
   },
@@ -678,13 +660,6 @@
    "value": 88.7,
    "shown": "89%",
    "data": "paper/figures/data/rq3_confidence.json sets.public.fable52 bins >= 25 (535 / 603); table.public.fable52.acc25",
-   "text": "paper/sections/05_rq3_human_vs_human.tex"
-  },
-  {
-   "key": "conf_wrong80",
-   "value": 0.3,
-   "shown": "0.3%",
-   "data": "paper/figures/data/rq3_confidence.json table.public.fable52.wrong80",
    "text": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {

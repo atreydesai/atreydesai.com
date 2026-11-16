@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Dev preview of section 3 (If human, which human?) on the launch page's field and base styles.
-	// ?step=N scrolls to scroll step N (0-based) on load, for screenshots; ?still settles this section's own animations
-	// (the shared field follows prefers-reduced-motion).
+	// ?step=N scrolls to scroll step N (0-based) on load, for screenshots, landing where that step's dash lands (the
+	// section's go(i)); ?still settles this section's own animations (the shared field follows prefers-reduced-motion).
 	import { onMount } from "svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import WhichHuman from "$lib/who-wrote-this/WhichHuman.svelte";
@@ -13,10 +13,8 @@
 	onMount(() => {
 		const n = new URLSearchParams(location.search).get("step");
 		if (n === null) return;
-		const el = document.querySelectorAll("#which-human .step")[Number(n)];
-		// after the route transition settles; the field's observers then pick the step up
-		// (instant: the site's html has scroll-behavior: smooth)
-		const t = setTimeout(() => el && scrollTo({ top: el.getBoundingClientRect().top + scrollY - innerHeight * 0.3, behavior: "instant" }), 600);
+		// click that step's dash (StepDashes), after the route transition settles: the same scroll a reader's click makes
+		const t = setTimeout(() => document.querySelectorAll<HTMLButtonElement>("#which-human .dashes button")[Number(n)]?.click(), 600);
 		return () => clearTimeout(t);
 	});
 </script>
@@ -35,6 +33,9 @@
 			color: #14202D;
 		}
 		html.wwt-field-on body, html.wwt-field-on.dark body { background-image: none; }
+		/* the launch page hides the site's header (its layout "takeover"); so does this preview, so the pinned stage
+		   is seen as it is on the page */
+		header.site-header { display: none; }
 	</style>`}
 </svelte:head>
 
