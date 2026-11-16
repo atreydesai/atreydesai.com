@@ -6,12 +6,15 @@
 	//   2. a manuscript: the story set large and centred like a book page, pinned while the reader scrolls; the two
 	//      verdicts are margin notes in the gutters, ideas on the left and prose on the right, with leader lines to the
 	//      words they cite; they light one at a time, then together with the conclusion under the story;
-	//   3. a showcase: Claude Fable 5.2's three numbers as giant numerals across the full width, its print behind.
+	//   3. a showcase: Claude Fable 5.2's three numbers as giant numerals across the full width (no box, no extras).
 	// DOM only (no canvas); the step comes from a passive scroll listener; the leaders are measured only when the step
-	// or the size changes.
+	// or the size changes. Reveal order: the opener's headline, then the story's steps, then the Explore choice.
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
-	import PrintMark from "./PrintMark.svelte";
+	import SectionOpener from "./SectionOpener.svelte";
+	import StepDashes from "./StepDashes.svelte";
+	import Reveal from "./Reveal.svelte";
+	import Footnotes from "./Footnotes.svelte";
 	import { FABLE, KIND, LAB } from "./palette";
 	import S from "./s1.json";
 
@@ -21,7 +24,7 @@
 	const kindOf: Record<string, Kind> = Object.fromEntries(E.judgments.flatMap((j) => j.cues.map((c) => [c, j.id as Kind])));
 	const J = Object.fromEntries(E.judgments.map((j) => [j.id, j])) as Record<Kind, (typeof E.judgments)[number]>;
 	const STEPS = ["read", "ideas", "prose", "both"] as const;
-	const STEP_VH = 0.62;
+	const STEP_VH = 0.92; // scroll per step: an ordinary scroll never skips one
 
 	let step = $state(STEPS.length - 1); // settled until mounted
 	let ms: HTMLElement, pin: HTMLElement, page: HTMLElement;
@@ -29,7 +32,16 @@
 	let leaders = $state<{ id: string; d: string; color: string; kind: Kind }[]>([]);
 	let wide = $state(true);
 
-	const view = $derived(STEPS[step]);
+	let pick = $state<"both" | Kind>("both"); // the Explore choice, after the guided steps
+	const explore = $derived(step >= STEPS.length - 1);
+	const view = $derived(explore ? (pick === "both" ? "both" : pick) : STEPS[step]);
+	$effect(() => { if (!explore) pick = "both"; });
+	// a dash click scrolls to that step's place in the pinned story
+	function go(i: number) {
+		const top = ms.getBoundingClientRect().top + scrollY;
+		scrollTo({ top: top + (i + 0.4) * innerHeight * STEP_VH - innerHeight * 0.5, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+	}
+	const NOTES = [{ n: 1, t: "The example is the paper's first table entry: a story whose ideas came from a model and whose prose a person wrote." }];
 	const lit = (c: string) => view === "both" || kindOf[c] === view;
 	const noteOn = (k: Kind) => view === "both" || view === k;
 	const noteSeen = (k: Kind) => STEPS.indexOf(view) >= STEPS.indexOf(k);
@@ -74,25 +86,9 @@
 </script>
 
 <section class="hb" id={S.id} data-rq={S.rq}>
-	<!-- 1. the opener: dark, full bleed, the question at chapter size -->
-	<header class="opener">
-		<div class="o-text">
-			<p class="o-n">{S.n}</p>
-			<h2 class="o-q">{S.title}</h2>
-			<p class="o-t">{S.takeaway.t}</p>
-			<p class="o-d">{S.context[0].t}</p>
-		</div>
-		<div class="o-prints" aria-hidden="true">
-			<figure class="o-p ideas">
-				<PrintMark family="ai" color="#9A82B4" px={wide ? 300 : 170} text />
-				<figcaption><Icon name={KIND.ideas.icon} />{KIND.ideas.label}</figcaption>
-			</figure>
-			<figure class="o-p prose">
-				<PrintMark family="human" color="#DC89A7" px={wide ? 300 : 170} text />
-				<figcaption><Icon name={KIND.prose.icon} />{KIND.prose.label}</figcaption>
-			</figure>
-		</div>
-	</header>
+	<!-- 1. the opener: dark, full bleed, the question at chapter size (shared SectionOpener) -->
+	<SectionOpener n={S.n} title={S.title} takeaway={S.takeaway.t} context={S.context[0].t} accent="#C85A82"
+		prints={[{ family: "ai", color: "#9A82B4", label: KIND.ideas.label, icon: KIND.ideas.icon }, { family: "human", color: "#DC89A7", label: KIND.prose.label, icon: KIND.prose.icon }]} />
 
 	<!-- 2. the manuscript: the story as the page, the verdicts in the margins -->
 	<div class="ms" bind:this={ms} style="--steps:{STEPS.length}">
@@ -104,12 +100,20 @@
 			</aside>
 
 			<div class="page" bind:this={page}>
-				<p class="p-cap"><Icon name="anthropic" />{E.caption.t}</p>
+				<StepDashes count={STEPS.length} current={step} {go} />
+				<p class="p-cap"><Icon name="anthropic" />{E.caption.t}<sup class="fnref"><a href="#fn-s1-1" id="fnref-s1-1">1</a></sup></p>
 				<blockquote class="story">“{#each E.text as seg}{#if seg.cue}<span class="cue {kindOf[seg.cue]}" data-cue={seg.cue} class:lit={lit(seg.cue)} style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</blockquote>
 				<p class="concl" class:on={view === "both"}>
 					<span class="pair"><span class="kind fill"><Icon name="bulb" /></span><Icon name="ai" /><span class="kind"><Icon name="pen" /></span><Icon name="human" /></span>
 					{E.source}.
 				</p>
+				<Reveal show={explore}>
+					<div class="seg" role="group" aria-label="Show">
+						<button type="button" aria-pressed={pick === "both"} onclick={() => (pick = "both")}>{S.ui[0]}</button>
+						<button type="button" aria-pressed={pick === "ideas"} onclick={() => (pick = "ideas")}><Icon name="bulb" />{S.ui[1]}</button>
+						<button type="button" aria-pressed={pick === "prose"} onclick={() => (pick = "prose")}><Icon name="pen" />{S.ui[2]}</button>
+					</div>
+				</Reveal>
 			</div>
 
 			<aside class="note prose" class:on={noteOn("prose")} class:seen={noteSeen("prose")} bind:this={notes.prose}>
@@ -125,7 +129,6 @@
 					{/each}
 				</svg>
 			{/if}
-			<p class="dots" aria-hidden="true">{#each STEPS as _, i}<i class:on={step === i}></i>{/each}</p>
 		</div>
 	</div>
 
@@ -144,7 +147,6 @@
 
 	<!-- 3. the showcase: one model, three numbers, as large as the page allows -->
 	<aside class="sc" aria-labelledby="hb-fable">
-		<div class="sc-print" aria-hidden="true"><PrintMark family="lab" index={0} color={FABLE.strong} px={wide ? 520 : 300} text /></div>
 		<p class="sc-k">{S.ui[8]}</p>
 		<h3 id="hb-fable"><Icon name="anthropic" />{S.stats_model}</h3>
 		<div class="sc-nums">
@@ -156,33 +158,13 @@
 			{/each}
 		</div>
 		<p class="sc-d">{S.detectors.t}</p>
-		<div class="climb" aria-label={S.climb_label.t}>
-			<p class="cl-k">{S.climb_label.t}</p>
-			<div class="cl-track">
-				{#each S.climb as c}
-					<span class="cl-pt" class:fable={c.lab === "Anthropic"} style:left="{c.v}%"><b>{c.v}%</b><i></i><em>{c.t}<br />{c.year}</em></span>
-				{/each}
-			</div>
-		</div>
 	</aside>
+
+	<Footnotes id="s1" notes={NOTES} />
 </section>
 
 <style>
 	.hb { --f: #B4501C; position: relative; }
-	/* 1. opener */
-	.opener {
-		width: 100vw; margin-left: calc(50% - 50vw); min-height: 92vh; padding: 12vh max(16px, calc(50vw - 36rem)) 10vh;
-		background: #14202D; color: #F3F3EF; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: 4vw;
-	}
-	.o-n { font-size: clamp(64px, 9vw, 140px); line-height: .8; font-weight: 600; letter-spacing: -0.05em; color: #C85A82; }
-	.o-q { margin-top: 18px; font-size: clamp(48px, 7.4vw, 112px); line-height: .95; font-weight: 600; letter-spacing: -0.045em; color: #fff; }
-	.o-t { margin-top: 28px; max-width: 22ch; font-size: clamp(22px, 2.3vw, 32px); line-height: 1.2; font-weight: 500; letter-spacing: -0.02em; color: #F3F3EF; text-wrap: balance; }
-	.o-d { margin-top: 18px; max-width: 46ch; font-size: 16px; line-height: 1.55; color: rgba(243, 243, 239, .62); }
-	.o-prints { display: flex; justify-content: center; align-items: center; gap: 2vw; }
-	.o-p { display: grid; justify-items: center; gap: 14px; margin: 0; }
-	.o-p.prose { margin-top: 18vh; }
-	.o-p figcaption { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: .02em; color: #F3F3EF; }
-	.o-p.ideas figcaption :global(svg) { color: #9A82B4; } .o-p.prose figcaption :global(svg) { color: #DC89A7; }
 
 	/* 2. manuscript */
 	.ms { position: relative; height: calc((var(--steps) + 0.5) * 62vh + 100vh); }
@@ -214,10 +196,10 @@
 	.leaders { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 	.leaders path { fill: none; stroke-width: 1.4; opacity: 0; transition: opacity .5s; }
 	.leaders path.on { opacity: .9; }
-	.dots { position: absolute; left: 50%; bottom: 7vh; transform: translateX(-50%); display: flex; gap: 6px; }
-	.dots i { width: 22px; height: 3px; border-radius: 2px; background: var(--rule, #c9c9c9); transition: background-color .3s; }
-	.dots i.on { background: var(--ink); }
 
+	.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 3px; background: var(--chip); }
+	.seg button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 2px; font-size: 13px; font-weight: 500; color: var(--ink2); }
+	.seg button[aria-pressed="true"] { background: var(--ink); color: var(--field); }
 	/* the four cases */
 	.cases { max-width: 72rem; margin: 0 auto; border-top: 1px solid var(--rule, #c9c9c9); border-bottom: 1px solid var(--rule, #c9c9c9); }
 	.cases summary { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px 0; cursor: pointer; font-size: 15px; color: var(--ink2); list-style: none; }
@@ -231,8 +213,6 @@
 
 	/* 3. showcase */
 	.sc { position: relative; overflow: hidden; margin: 14vh 0 0; padding: 8vh 0 6vh; border-top: 4px solid var(--f); }
-	.sc > :not(.sc-print) { position: relative; }
-	.sc-print { position: absolute; right: -4%; top: 50%; transform: translateY(-50%); opacity: .14; pointer-events: none; }
 	.sc-k { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--f); }
 	.sc h3 { margin-top: 10px; display: inline-flex; align-items: center; gap: 12px; font-size: clamp(30px, 3.4vw, 46px); font-weight: 600; letter-spacing: -0.03em; color: #7A3410; }
 	.sc-nums { margin-top: 5vh; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2vw; }
@@ -240,18 +220,8 @@
 	.num b { font-size: clamp(80px, 13vw, 200px); line-height: .82; font-weight: 600; letter-spacing: -0.06em; color: var(--f); font-variant-numeric: tabular-nums; }
 	.num span { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; color: var(--ink); }
 	.sc-d { margin-top: 5vh; max-width: 48ch; font-size: 18px; line-height: 1.5; color: var(--ink2); }
-	.climb { margin-top: 5vh; max-width: 46rem; }
-	.cl-k { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); }
-	.cl-track { position: relative; height: 92px; margin-top: 42px; border-top: 1.5px solid var(--ink2); }
-	.cl-pt { position: absolute; top: 0; transform: translateX(-50%); display: grid; justify-items: center; }
-	.cl-pt b { position: absolute; bottom: calc(100% + 8px); font-size: 22px; font-weight: 600; color: var(--ink); }
-	.cl-pt i { width: 12px; height: 12px; margin-top: -6.5px; border-radius: 50%; background: var(--ink2); }
-	.cl-pt.fable b { color: var(--f); font-size: 30px; } .cl-pt.fable i { background: var(--f); width: 16px; height: 16px; margin-top: -8.5px; }
-	.cl-pt em { margin-top: 8px; font-style: normal; font-size: 12.5px; line-height: 1.3; text-align: center; color: var(--ink2); white-space: nowrap; }
 
 	@media (max-width: 979px) {
-		.opener { grid-template-columns: 1fr; min-height: 0; padding-top: 10vh; gap: 8vh; }
-		.o-p.prose { margin-top: 10vh; }
 		.ms { height: auto; }
 		.pin { position: static; height: auto; grid-template-columns: 1fr; gap: 24px; padding: 8vh 0; }
 		.page, .note.ideas, .note.prose { grid-column: 1; }
@@ -260,8 +230,7 @@
 		.concl { opacity: 1; transform: none; }
 		.cue.ideas { background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -2.5px 0 var(--c); }
 		.cue.prose { box-shadow: inset 0 0 0 2px var(--c); }
-		.dots { display: none; }
-		.cases ul { grid-template-columns: 1fr; }
+			.cases ul { grid-template-columns: 1fr; }
 		.sc-nums { grid-template-columns: 1fr; gap: 28px; }
 	}
 	@media (prefers-reduced-motion: reduce) { .cue, .note, .concl, .leaders path { transition: none; } }
