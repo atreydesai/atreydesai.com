@@ -5,8 +5,8 @@
 	// Blocking: the chart runs the full width of the stage. The headline is set large above its empty upper-left
 	// corner and the narration card sits in that corner, under the headline (the guided steps' pictures are checked to
 	// keep clear of it; where they would not, the plot starts right of the card instead). Reveal order: the headline
-	// alone while the stage arrives, then the card with the guided steps, then on the last step the Explore controls
-	// (metric, weights, labs, date window) slide in under the card and the plot moves over to make room for them.
+	// alone while the stage arrives, then the card with the guided steps, then on the last step the controls (metric,
+	// weights, a labs menu, date window: one row, no heading) slide in under the card and the plot starts under them.
 	// Guided scroll, one or two paper sentences per step: the closed-weights frontier traces in, then the open-weights
 	// frontier, then the trained detectors join (prose, then ideas). Each line is named at its end as soon as it is
 	// drawn. The step comes from the scroll position (no gaps: every position maps to one step, each step ~95vh);
@@ -91,7 +91,7 @@
 	let wa = $state(0), wb = $state(N); // the date window, in days from START
 	let step = $state(-1); // -1: the headline alone, before the first step
 	let active = $state(false);
-	let stage: HTMLElement, root: HTMLElement, head: HTMLElement, col: HTMLElement, card: HTMLElement, track: HTMLElement;
+	let stage: HTMLElement, root: HTMLElement, head: HTMLElement, col: HTMLElement, card: HTMLElement, bar: HTMLElement, track: HTMLElement;
 	const explore = $derived(step >= LAST);
 	const full = $derived(wa === 0 && wb === N);
 	let hovered = $derived(field.hover ? models.find((m) => m.model === field.hover) ?? null : null);
@@ -108,8 +108,9 @@
 	const trace: Record<Layer, number> = { closed: 0, open: 0, ref: 0 };
 	const gate: Record<Line, number> = { closed: 0, open: 0 };
 	let traced = T.steps[0].metric as Metric; // the metric the lines last traced for
-	// where the plot's left edge is: 0 = the full width (the card sits in its corner), 1 = right of the column (Explore)
-	let side = 0, sideGoal = 0, laidW = 0;
+	// where the plot is: side 1 = it starts right of the card (only where the guided pictures would run under the card);
+	// down 1 = it starts under the control row (Explore, the last step); 0 = the full stage with the card in its corner
+	let side = 0, sideGoal = 0, down = 0, downGoal = 0, laidW = 0;
 	let reduce = false;
 	const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 	const drawn = () => (step < 0 ? [] : T.steps[step].draw);
@@ -129,10 +130,9 @@
 			out = trace[k] === g ? Math.max(out, 1) : 2;
 		}
 		for (const l of LINES) gate[l] = want.includes(l) ? Math.max(gate[l], trace[l]) : trace[l];
-		if (side !== sideGoal) {
-			side = reduce ? sideGoal : sideGoal > side ? Math.min(sideGoal, side + dt / SIDE_S) : Math.max(sideGoal, side - dt / SIDE_S);
-			out = side === sideGoal ? Math.max(out, 1) : 2;
-		}
+		const toward = (v: number, g: number) => (reduce ? g : g > v ? Math.min(g, v + dt / SIDE_S) : Math.max(g, v - dt / SIDE_S));
+		if (side !== sideGoal) { side = toward(side, sideGoal); out = side === sideGoal ? Math.max(out, 1) : 2; }
+		if (down !== downGoal) { down = toward(down, downGoal); out = down === downGoal ? Math.max(out, 1) : 2; }
 		return out;
 	}
 
@@ -187,6 +187,15 @@
 			}
 		}
 		return true;
+	}
+	// a dash pattern stretched so a leg between two marks starts AND ends on a dash (both rings touch the line); a leg
+	// too short for two dashes is drawn solid; the last leg (to the plot's edge) keeps the plain pattern
+	function fit(d: number[], len: number, both: boolean): number[] {
+		if (!d.length || !both) return d;
+		const [on, gap] = d;
+		let n = Math.round((len - on) / (on + gap));
+		while (n >= 1 && (len - (n + 1) * on) / n < gap * 0.5) n--; // gaps never shrink below half their size
+		return n < 1 ? [] : [on, (len - (n + 1) * on) / n];
 	}
 	// a polyline of axis-aligned legs, less `a` px at its start and `b` px at its end (null if nothing is left)
 	function trim(pts: [number, number][], a: number, b: number): [number, number][] | null {
@@ -250,8 +259,10 @@
 			for (const q of S.placed) { const o = overlap(b, q); if (o > 0) cost += 200 + (o / (b.w * b.h)) * 300; }
 			// plain canvas words sit under the dots (which are drawn last), so a dot costs them more; a line less, as
 			// a ground-coloured band under the words hides it
-			for (const m of S.dots) if (m.x > b.x - m.r && m.x < b.x + b.w + m.r && m.y > b.y - m.r && m.y < b.y + b.h + m.r) cost += m.id === self || m.id === FABLE ? 40 : c.plain ? 25 : S.key.has(m.id) ? 12 : 1.5;
-			for (const s of S.segs) if (Math.max(s[0], s[2]) > b.x + 2 && Math.min(s[0], s[2]) < b.x + b.w - 2 && Math.max(s[1], s[3]) > b.y + 2 && Math.min(s[1], s[3]) < b.y + b.h - 2) cost += c.plain ? 3 : 5;
+			// a boxed tag keeps a clear gap (P) from every line and dot, so it never reads as touching them
+			const P = c.plain ? 0 : 5;
+			for (const m of S.dots) if (m.x > b.x - m.r - P && m.x < b.x + b.w + m.r + P && m.y > b.y - m.r - P && m.y < b.y + b.h + m.r + P) cost += m.id === self || m.id === FABLE ? 40 : c.plain ? 25 : S.key.has(m.id) ? 12 : 1.5;
+			for (const s of S.segs) if (Math.max(s[0], s[2]) > b.x - P && Math.min(s[0], s[2]) < b.x + b.w + P && Math.max(s[1], s[3]) > b.y - P && Math.min(s[1], s[3]) < b.y + b.h + P) cost += c.plain ? 3 : 30;
 			if (cost < bestC) { bestC = cost; best = c; bestB = b; }
 		});
 		S.placed.push(bestB);
@@ -266,8 +277,12 @@
 		{ ...tg, x: x + 2, y, at: "right" },
 		{ ...tg, x, y: y + 6, at: "below" },
 		{ ...tg, x: x - 2, y: y + 16, at: "left" },
+		{ ...tg, x: x + 2, y: y - 28, at: "right" },
+		{ ...tg, x: x + 2, y: y + 30, at: "right" },
 		{ ...tg, x: x - 2, y: y - 34, at: "left" },
 		{ ...tg, x: x - 2, y: y + 38, at: "left" },
+		{ ...tg, x: x + 2, y: y - 46, at: "right" },
+		{ ...tg, x: x + 2, y: y + 48, at: "right" },
 		{ ...tg, x: x - 2, y: y - 58, at: "left" },
 		{ ...tg, x: x - 2, y: y + 62, at: "left" },
 	];
@@ -276,20 +291,21 @@
 	// ---- the chart: rebuilt only when an input changed or a line is tracing ----------------------------------------
 	const pos = new Map<string, { x: number; y: number }>();
 	let tagSig = "";
-	type Geo = { r: DOMRect; hb: DOMRect; cr: DOMRect; cl: DOMRect; more: number; narrow: boolean };
-	function layout({ r, hb, cr, cl, more, narrow }: Geo) {
+	type Geo = { r: DOMRect; hb: DOMRect; cr: DOMRect; cl: DOMRect; foot: number; narrow: boolean };
+	function layout({ r, hb, cr, cl, foot, narrow }: Geo) {
 		const W = innerWidth;
 		let box: Box;
 		if (narrow) {
 			// stacked: the plot under the column, sized for the column's final height (so Explore opening does not
 			// re-lay the chart out on every frame of its slide)
-			box = { x0: r.left + 34, x1: r.right - 6, y0: cr.bottom + more + 44, y1: r.bottom - 56 };
-			sideGoal = 0; side = 0;
+			box = { x0: r.left + 34, x1: r.right - 6, y0: foot + 44, y1: r.bottom - 56 };
+			sideGoal = 0; side = 0; downGoal = 0; down = 0;
 		} else {
 			const over: Box = { x0: r.left + AX, x1: Math.min(r.right - 24, W - 196), y0: hb.bottom + 44, y1: r.bottom - 64 }; // room on the right for the line labels, clear of the page's side rail
-			sideGoal = explore || !clearOf(over, cr) ? 1 : 0;
-			if (laidW !== W) side = sideGoal; // first drawing, or a new size: no slide
-			box = { ...over, x0: over.x0 + (cl.right + 52 - over.x0) * ease(side) };
+			sideGoal = !explore && !clearOf(over, cr) ? 1 : 0;
+			downGoal = explore ? 1 : 0;
+			if (laidW !== W) { side = sideGoal; down = downGoal; } // first drawing, or a new size: no slide
+			box = { ...over, x0: over.x0 + (cl.right + 52 - over.x0) * ease(side), y0: over.y0 + (foot + 34 - over.y0) * ease(down) };
 		}
 		laidW = W;
 		const t0 = START + wa * DAY, t1 = START + wb * DAY;
@@ -313,7 +329,7 @@
 
 		// each line as legs, one per step, built from the marks' own points: across to the next model's date, then up
 		// to it. A leg starts and ends at the marks' edges, so the dash pattern starts fresh at every ring.
-		type Leg = { pts: [number, number][]; s: number; e: number };
+		type Leg = { pts: [number, number][]; s: number; e: number; dash: number[] };
 		const legs: Record<Line, Leg[]> = { closed: [], open: [] };
 		const poly: Record<Line, [number, number][] | null> = { closed: null, open: null };
 		const total: Record<Line, number> = { closed: 0, open: 0 };
@@ -329,7 +345,7 @@
 				const len = Math.abs(pts[1][0] - pts[0][0]) + (nx ? Math.abs(nx.y - a.y) : 0);
 				const ra = outer(m), rb = nx ? outer(f[i + 1]) : 0;
 				const cut = trim(pts, ra, rb);
-				if (cut) legs[l].push({ pts: cut, s: acc + ra, e: acc + len - rb });
+				if (cut) legs[l].push({ pts: cut, s: acc + ra, e: acc + len - rb, dash: fit(DASH[l], len - ra - rb, !!nx) });
 				all.push(...pts.slice(1));
 				acc += len;
 			});
@@ -338,16 +354,33 @@
 		const dotHead = { closed: headX(poly.closed, ease(gate.closed)), open: headX(poly.open, ease(gate.open)) };
 		const penHead = { closed: headX(poly.closed, ease(trace.closed)), open: headX(poly.open, ease(trace.open)) };
 
-		// dots: every one snaps (no flying in, no lag behind the lines); a ring is drawn half its stroke smaller
+		// dots: every one snaps (no flying in, no lag behind the lines); a ring is drawn half its stroke smaller. The
+		// frontier's marks (and Fable's) are drawn last, over the others; another model sitting under one of them (Beam 1.0
+		// a day after Kimi K3.1 Pro, 1 point lower) is left out, so no sliver of a second ring reads as the line's ring
+		// sitting off its corner.
+		// Two other models drawn almost on top of each other (Kimi K3.1 Pro and Beam 1.0 on ideas) would read as one ring
+		// drawn twice, off centre: the lower-scoring one is left out too (hover reaches the one kept).
+		const key = (m: Model) => m === FAB || front.has(m.model);
+		// (under a frontier mark: any centre inside its ring plus half a dot. A mark dimmed by a filter never hides one the
+		// filter picked out.)
+		const kept = models.filter((m) => key(m) && inWin(m) && !off(m)).map((m) => ({ p: pos.get(m.model)!, d: outer(m) + R_DOT * 0.5, l: "" }));
+		const hidden = new Set<string>();
+		for (const m of models.filter((k) => !key(k) && inWin(k)).sort((a, b) => +off(a) - +off(b) || b[metric] - a[metric])) {
+			const p = pos.get(m.model)!;
+			// two marks of the same style overlapping by more than about half; a ring and a dot only when nearly coincident
+			if (kept.some((q) => Math.hypot(q.p.x - p.x, q.p.y - p.y) < (q.l === "" ? q.d : q.l === m.line ? q.d * 1.4 : q.d * 0.8))) hidden.add(m.model);
+			else kept.push({ p, d: outer(m), l: m.line });
+		}
 		const marks: Mark[] = [];
-		for (const m of models) {
+		for (const m of [...models.filter((k) => !key(k)), ...models.filter(key)]) {
 			const l = m.line as Line, fable = m === FAB, p = pos.get(m.model)!;
 			const shown = inWin(m) && p.x <= dotHead[l] + 1;
 			const R = outer(m), ring = l === "open" && !fable;
+			const under = hidden.has(m.model);
 			marks.push({
 				id: m.model, x: p.x, y: p.y, r: ring ? R - RING_W / 2 : R, snap: true,
 				color: fable ? CLAY : COLOR[l], ring,
-				alpha: !shown ? 0 : off(m) ? 0.12 : fable || front.has(m.model) || focus.has(m.model) ? 1 : 0.42,
+				alpha: !shown || under ? 0 : off(m) ? 0.12 : key(m) || focus.has(m.model) ? 1 : 0.42,
 			});
 		}
 
@@ -379,7 +412,7 @@
 			const pen = ease(trace[l]) * total[l];
 			const prog = (g: Leg) => Math.max(0, Math.min(1, (pen - g.s) / Math.max(1e-6, g.e - g.s)));
 			for (const g of legs[l]) if (prog(g) > 0) paths.push({ pts: g.pts, color: INK.ground, width: CASE_W, progress: prog(g) });
-			for (const g of legs[l]) if (prog(g) > 0) paths.push({ pts: g.pts, color: COLOR[l], width: LINE_W, dash: DASH[l], progress: prog(g) });
+			for (const g of legs[l]) if (prog(g) > 0) paths.push({ pts: g.pts, color: COLOR[l], width: LINE_W, dash: g.dash, progress: prog(g) });
 			const q = poly[l]!;
 			for (let i = 1; i < q.length; i++) segs.push([q[i - 1][0], q[i - 1][1], q[i][0], q[i][1]]);
 		}
@@ -387,7 +420,7 @@
 		// ---- tags: every colour on the picture is named on it ---------------------------------------------------
 		const S: Scene = {
 			placed: narrow ? [] : [rect(hb, 4), rect(cl, 8)], segs, dots: marks.filter((m) => (m.alpha ?? 1) > 0.3), key: new Set(LINES.map((l) => lines[l][lines[l].length - 1]?.model ?? "")),
-			bounds: { x0: box.x0 - 2, x1: narrow ? W - 4 : W - 34, y0: narrow ? cl.bottom + 6 : r.top + 40, y1: box.y1 + 4 },
+			bounds: { x0: box.x0 - 2, x1: narrow ? W - 4 : W - 34, y0: narrow || explore ? foot + 6 : r.top + 40, y1: box.y1 + 4 },
 		};
 		const items: Tag[] = [];
 
@@ -413,7 +446,7 @@
 			}
 			// keep the column on the stage: below its top, then nothing overlapping on the way down
 			for (let i = 0; i < colm.length; i++)
-				colm[i].cy = Math.max(colm[i].cy, i ? colm[i - 1].cy + (colm[i - 1].h + colm[i].h) / 2 + 8 : r.top + 44 + colm[i].h / 2);
+				colm[i].cy = Math.max(colm[i].cy, i ? colm[i - 1].cy + (colm[i - 1].h + colm[i].h) / 2 + 8 : (explore ? foot + 8 : r.top + 44) + colm[i].h / 2);
 			for (const c of colm) {
 				c.e.tg.y = c.cy;
 				S.placed.push(boxOf(c.e.tg));
@@ -494,13 +527,15 @@
 		if (active && field.mode === "ground") { field.mode = "chart"; field.owner = "rq1"; field.dim = 0.75; field.interactive = true; }
 		if (active && field.owner === "rq1") {
 			const narrow = innerWidth <= 860;
-			const g: Geo = { r: stage.getBoundingClientRect(), hb: head.getBoundingClientRect(), cr: card.getBoundingClientRect(), cl: col.getBoundingClientRect(), more: 0, narrow };
-			if (narrow && explore) { const inner = col.querySelector<HTMLElement>(".inner"); g.more = inner ? 8 + inner.scrollHeight : 0; }
-			const s = [g.r.left, g.r.top, g.r.width, g.r.height, g.hb.bottom, g.cr.left, g.cr.top, g.cr.right, g.cr.bottom, g.cl.right, g.cl.bottom, g.more, innerWidth].join(",");
+			const g: Geo = { r: stage.getBoundingClientRect(), hb: head.getBoundingClientRect(), cr: card.getBoundingClientRect(), cl: col.getBoundingClientRect(), foot: 0, narrow };
+			// where the card and the control row end once Explore has fully opened (its natural height, not the sliding one)
+			const inner = bar.querySelector<HTMLElement>(".inner");
+			g.foot = explore && inner ? bar.getBoundingClientRect().top + inner.scrollHeight : g.cr.bottom;
+			const s = [g.r.left, g.r.top, g.r.width, g.r.height, g.hb.bottom, g.cr.left, g.cr.top, g.cr.right, g.cr.bottom, g.cl.right, g.foot, innerWidth].join(",");
 			const changed = s !== prevSig;
 			prevSig = s;
 			if (dirty || moved || changed) { dirty = false; layout(g); }
-			if (side !== sideGoal) moved = 2;
+			if (side !== sideGoal || down !== downGoal) moved = 2;
 		}
 		if (moved === 2) kick(); else last = 0;
 	}
@@ -574,6 +609,7 @@
 		const ro = new ResizeObserver(kick);
 		ro.observe(col);
 		ro.observe(head);
+		ro.observe(bar);
 		addEventListener("scroll", onScroll, { passive: true });
 		addEventListener("resize", onScroll, { passive: true });
 		// a transform that settles (the route transition) moves the stage without a scroll or resize: check once more
@@ -600,7 +636,10 @@
 					<StepDashes count={T.steps.length} current={step} {go} label={U.step} />
 					{#key step}<p class="say-t">{T.steps[Math.max(0, step)].t}</p>{/key}
 				</div>
-				<Reveal show={explore} label={U.explore}>
+			</div>
+			<!-- the controls, on the last step: one row under the card (it scrolls sideways where it does not fit) -->
+			<div class="bar" bind:this={bar}>
+				<Reveal show={explore}>
 					<div class="ctl">
 						<div class="seg" role="group" aria-label={U["aria.score"]}>
 							{#each METRICS as m}<button type="button" aria-pressed={metric === m} onclick={() => (metric = m)}>{#if m !== "both"}<Icon name={m === "ideas" ? "bulb" : "pen"} />{/if}{U["metric." + m]}</button>{/each}
@@ -608,9 +647,10 @@
 						<div class="seg" role="group" aria-label={U["aria.weights"]}>
 							{#each WEIGHT_IDS as w}<button type="button" aria-pressed={weights === w} onclick={() => (weights = w)}>{U["weights." + w]}</button>{/each}
 						</div>
-						<div class="labs" role="group" aria-label={U["aria.labs"]}>
-							{#each labs as l}<button type="button" aria-pressed={lab === l} onclick={() => (lab = lab === l ? null : l)}>{l}</button>{/each}
-						</div>
+						<select class="lab" class:on={lab !== null} aria-label={U["aria.labs"]} value={lab ?? ""} onchange={(e) => (lab = e.currentTarget.value || null)}>
+							<option value="">{U["labs.all"]}</option>
+							{#each labs as l}<option value={l}>{l}</option>{/each}
+						</select>
 						<!-- the date window -->
 						<div class="dates" role="group" aria-label={U.dates}>
 							<div class="range">
@@ -629,10 +669,9 @@
 							</div>
 							<p class="xzinfo">
 								<span class="val">{readout[0]} – {readout[1]}</span>
-								{#if full}<small>{U["dates.all"]}</small>{:else}<button type="button" class="reset" onclick={() => { wa = 0; wb = N; }}>{U["dates.reset"]}</button>{/if}
+								{#if !full}<button type="button" class="reset" onclick={() => { wa = 0; wb = N; }}>{U["dates.reset"]}</button>{/if}
 							</p>
 						</div>
-						<p class="cap">{T.caption.t}</p>
 					</div>
 				</Reveal>
 			</div>
@@ -665,20 +704,22 @@
 	.say-t { margin-top: 6px; font-size: 16px; line-height: 1.5; animation: say .45s var(--ease); }
 	@keyframes say { from { opacity: 0; transform: translateY(6px); } }
 
-	.ctl { display: grid; gap: 8px; }
-	/* controls: one line each; a row that is too wide scrolls inside itself, it never wraps */
-	.seg { display: flex; flex-wrap: nowrap; gap: 2px; justify-self: start; max-width: 100%; overflow-x: auto; scrollbar-width: none; background: var(--chip); border-radius: 3px; padding: 3px; }
-	.seg::-webkit-scrollbar, .labs::-webkit-scrollbar { display: none; }
-	.seg button, .labs button { flex: none; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; padding: 5px 8px; font-size: 12.5px; font-weight: 500; color: var(--ink2); border-radius: 2px; }
-	.seg button:hover, .labs button:hover { color: var(--ink); }
-	.seg button[aria-pressed="true"], .labs button[aria-pressed="true"] { background: var(--ink); color: var(--field); }
-	.labs { display: flex; flex-wrap: wrap; gap: 4px; }
-	.labs button { background: rgba(243, 243, 239, .9); }
-	.cap { font-size: 12px; color: var(--ink2); }
+	/* the controls: all on one row; where the row is too wide it scrolls sideways, it never wraps */
+	.bar { pointer-events: auto; max-width: 100%; min-width: 0; }
+	.ctl { display: flex; flex-wrap: nowrap; align-items: center; gap: 10px; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+	.ctl::-webkit-scrollbar { display: none; }
+	.seg { flex: none; display: flex; flex-wrap: nowrap; gap: 2px; background: var(--chip); border-radius: 3px; padding: 3px; }
+	.seg button { flex: none; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; padding: 5px 8px; font-size: 12.5px; font-weight: 500; color: var(--ink2); border-radius: 2px; }
+	.seg button:hover { color: var(--ink); }
+	.seg button[aria-pressed="true"] { background: var(--ink); color: var(--field); }
+	.lab { flex: none; height: 32px; padding: 0 26px 0 10px; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--ink2); border: 0; border-radius: 3px; cursor: pointer; -webkit-appearance: none; appearance: none;
+		background: var(--chip) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235A6270' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center; }
+	.lab:hover { color: var(--ink); }
+	.lab.on { background-color: var(--ink); color: var(--field); }
 
 	/* the date window (after the detection-frontiers dashboard's .rqx-range) */
-	.dates { display: grid; gap: 2px; margin-top: 4px; }
-	.range { position: relative; height: 22px; }
+	.dates { flex: none; display: flex; align-items: center; gap: 4px; }
+	.range { position: relative; height: 22px; width: 180px; }
 	.track { position: absolute; left: 7px; right: 7px; top: 10px; height: 2px; border-radius: 1px; background: var(--rule); }
 	.fill { position: absolute; top: -1px; height: 4px; border-radius: 2px; background: var(--ink); }
 	.win { position: absolute; top: -9px; height: 20px; cursor: grab; touch-action: none; border-radius: 3px; }
@@ -696,9 +737,8 @@
 	.range input:focus-visible { outline: none; }
 	.range input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(20, 32, 45, .2); }
 	.range input:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px rgba(20, 32, 45, .2); }
-	.xzinfo { display: flex; align-items: center; gap: 10px; padding-left: 7px; min-height: 26px; white-space: nowrap; }
+	.xzinfo { display: flex; align-items: center; gap: 8px; min-height: 26px; white-space: nowrap; }
 	.val { font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
-	.xzinfo small { font-size: 11.5px; color: var(--ink2); }
 	.reset { padding: 2px 8px; font-size: 12px; font-weight: 500; color: var(--ink2); background: var(--chip); border-radius: 2px; }
 	.reset:hover { color: var(--ink); }
 
@@ -717,11 +757,9 @@
 	@media (max-width: 860px) {
 		.lead { left: 0; top: 16px; gap: 10px; }
 		h2 { font-size: clamp(28px, 8.4vw, 36px); }
-		.col { width: 100%; gap: 8px; }
-		.labs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-		.cap { display: none; }
+		.col, .bar { width: 100%; }
+		.ctl { gap: 8px; }
 		.seg { gap: 1px; }
 		.seg button { padding-inline: 6px; }
-		.dates { margin-top: 0; }
 	}
 </style>

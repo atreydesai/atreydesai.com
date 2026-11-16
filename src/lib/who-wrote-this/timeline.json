@@ -1,5 +1,5 @@
 {
- "_about": "Strings for the launch page's section 'Model accuracy has improved over time' (site: src/lib/who-wrote-this/Timeline.svelte, which imports a byte-identical copy at src/lib/who-wrote-this/timeline.json). Copied from content.json's timeline object on 16 Nov 2026 and reworked for the guided scroll; second rework (16 Nov, blocking pass): four steps, the closed-weights line traces, then the open-weights line (each line is named at its end as soon as it is drawn, so the old step that only named the lines is merged into the open-weights step, its sentence without the colour words, which the picture now carries), then the trained detectors (prose, then ideas, where Explore opens). content.json is unchanged (the hero still reads timeline.steps from it). Paper text is {t, src}; every string that is not paper text is in `ui`. Numbers on the picture come from timeline_rq1.json (built by docs/launch_20261116/tools/build_timeline_data.py from paper/figures/data/rq1_points.json, Figure 2's 860-document sample), never from this file.",
+ "_about": "Strings for the launch page's section 'Model accuracy has improved over time' (site: src/lib/who-wrote-this/Timeline.svelte, which imports a byte-identical copy at src/lib/who-wrote-this/timeline.json). Copied from content.json's timeline object on 16 Nov 2026 and reworked for the guided scroll; second rework (16 Nov, blocking pass): four steps, the closed-weights line traces, then the open-weights line (each line is named at its end as soon as it is drawn, so the old step that only named the lines is merged into the open-weights step, its sentence without the colour words, which the picture now carries), then the trained detectors (prose, then ideas, where the controls open in one row under the card, with no 'Explore' heading). Third pass (16 Nov): the caption 'Lines step up at each new best model.' and the 'all dates' note are cut; labs are one menu so every control fits one row. content.json is unchanged (the hero still reads timeline.steps from it). Paper text is {t, src}; every string that is not paper text is in `ui`. Numbers on the picture come from timeline_rq1.json (built by docs/launch_20261116/tools/build_timeline_data.py from paper/figures/data/rq1_points.json, Figure 2's 860-document sample), never from this file.",
  "id": "recent",
  "title": {
   "t": "Model accuracy has improved over time.",
@@ -35,10 +35,6 @@
    "src": "paper/sections/03_rq1_ai_vs_human.tex"
   }
  ],
- "caption": {
-  "t": "Lines step up at each new best model.",
-  "src": "paper/sections/03_rq1_ai_vs_human.tex (Figure 2 caption)"
- },
  "names": [
   {
    "model": "GPT-4o (2024-08-06)",
@@ -55,15 +51,14 @@
   { "id": "weights.open", "t": "Open weights" },
   { "id": "trained", "t": "trained detector" },
   { "id": "x_label", "t": "Detector release date" },
-  { "id": "explore", "t": "Explore" },
   { "id": "step", "t": "Step" },
   { "id": "dates", "t": "Dates" },
-  { "id": "dates.all", "t": "all dates" },
   { "id": "dates.reset", "t": "All dates" },
   { "id": "tip.closed", "t": "closed weights" },
   { "id": "tip.open", "t": "open weights" },
   { "id": "aria.score", "t": "Score" },
   { "id": "aria.weights", "t": "Weights" },
+  { "id": "labs.all", "t": "All labs" },
   { "id": "aria.labs", "t": "Labs" },
   { "id": "aria.lo", "t": "First date shown" },
   { "id": "aria.hi", "t": "Last date shown" },
