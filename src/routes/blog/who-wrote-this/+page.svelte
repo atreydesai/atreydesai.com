@@ -16,6 +16,7 @@
 	import PrintHero from "$lib/who-wrote-this/PrintHero.svelte";
 	import Timeline from "$lib/who-wrote-this/Timeline.svelte";
 	import HumanOrAI from "$lib/who-wrote-this/HumanOrAI.svelte";
+	import HumanOrAIB from "$lib/who-wrote-this/HumanOrAIB.svelte";
 	import WhichAI from "$lib/who-wrote-this/WhichAI.svelte";
 	import WhichHuman from "$lib/who-wrote-this/WhichHuman.svelte";
 	import Familiar from "$lib/who-wrote-this/Familiar.svelte";
@@ -138,7 +139,7 @@
 		<div class="breath" aria-hidden="true"></div>
 		<Timeline />
 		<div class="breath" aria-hidden="true"></div>
-		<HumanOrAI section={C.sections[0]} />
+		{#if data.mock === "s1"}<HumanOrAIB />{:else}<HumanOrAI section={C.sections[0]} />{/if}
 		<div class="breath" aria-hidden="true"></div>
 		<WhichAI />
 		<div class="breath" aria-hidden="true"></div>
