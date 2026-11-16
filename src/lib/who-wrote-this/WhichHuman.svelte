@@ -14,7 +14,7 @@
 	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
 	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
-	import { FABLE, GRAY, INK as TONE, modelColor } from "./palette";
+	import { FABLE, GRAY, INK as TONE, modelColor, deepen, TILE } from "./palette";
 	import S from "./rq3.json";
 	import { printSprite, printAspect } from "./print/sprites";
 
@@ -110,6 +110,17 @@
 	const tagW = (t: string) => 16 + 16 + tw(t, 12.5, 600);
 
 	const ASPECT = printAspect();
+	// a tile as named or not: colour, and (at readable sizes) its writer's print, crisp on a solid tile in the model's
+	// colour when named, a pale smudge when not; used when a tile is placed and when it flips as the count eases
+	function dress(m: Mark, id: number, lit: boolean, color: string) {
+		const ink = lit ? color : UNLIT;
+		m.color = ink;
+		if (!m.sprite && !m.spriteKey) return; // a plain square (too small for a print)
+		const px = Math.round(m.r * 2), wi = id % 64;
+		m.sprite = printSprite({ family: "writer", index: wi, color: lit ? deepen(ink, TILE.inkDepth) : ink, px, clarity: lit ? 1 : 0.35 });
+		m.spriteKey = `w${wi}|${ink}|${px}|${lit ? 1 : 0}`;
+		m.backing = lit ? TILE.litBacking : TILE.unlitBacking;
+	}
 	function place(b: Block, base: number): Entry {
 		const cur = anim[b.id] ?? (reduce ? b.k : 0);
 		anim[b.id] = cur;
@@ -124,7 +135,7 @@
 			const pr = px >= 14;
 			G.marks.push({
 				id: `t${base + i}`, square: true, x: b.x + c * b.s + b.s / 2, y: b.y + r * b.s + b.s / 2, r: pr ? px / 2 : b.s * 0.36, color: ink, alpha: b.alpha,
-				...(pr ? { sprite: printSprite({ family: "writer", index: wi, color: ink, px, clarity: lit ? 1 : 0.35 }), spriteKey: `w${wi}|${ink}|${px}|${lit ? 1 : 0}`, aspect: ASPECT, backing: lit ? 0.34 : 0.2 } : {}),
+				...(pr ? { sprite: printSprite({ family: "writer", index: wi, color: lit ? deepen(ink, TILE.inkDepth) : ink, px, clarity: lit ? 1 : 0.35 }), spriteKey: `w${wi}|${ink}|${px}|${lit ? 1 : 0}`, aspect: ASPECT, backing: lit ? TILE.litBacking : TILE.unlitBacking } : {}),
 			});
 		}
 		const e = { b, base, on };
@@ -147,7 +158,7 @@
 			const on = Math.round(cur);
 			if (on === e.on) continue;
 			const ms = geo!.marks;
-			for (let i = Math.min(on, e.on), hi = Math.max(on, e.on); i < hi; i++) ms[e.base + i].color = i < on ? b.color : UNLIT;
+			for (let i = Math.min(on, e.on), hi = Math.max(on, e.on); i < hi; i++) dress(ms[e.base + i], e.base + i, i < on, b.color);
 			e.on = on;
 			if (geo!.edgeOf === e) geo!.edge!.pts = edge(b, on);
 		}

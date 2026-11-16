@@ -12,7 +12,7 @@
 	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
 	import { field, chart, type Mark, type Path } from "./field.svelte";
-	import { LAB, GRAY } from "./palette";
+	import { LAB, GRAY, deepen, TILE } from "./palette";
 	import S from "./which_ai.json";
 	import { printSprite, printAspect } from "./print/sprites";
 	import R from "./rq2_writers.json";
@@ -104,7 +104,7 @@
 	const ASPECT = printAspect();
 	function tileSprite(w: W, k: K, color: boolean, px: number) {
 		const lab = !color || k === "own" ? w.lab : k === "anthropic" ? "Anthropic" : k === "openai" ? "OpenAI" : null;
-		const ink = color ? COL[k] : UNLIT;
+		const ink = color ? deepen(COL[k], TILE.inkDepth) : UNLIT;
 		const sprite = lab ? printSprite({ family: "lab", index: Math.max(0, HERO_LABS.indexOf(lab)), color: ink, px }) : printSprite({ family: "main", color: ink, px });
 		return { sprite, spriteKey: `${lab ?? "other"}|${ink}|${px}` };
 	}
@@ -113,7 +113,7 @@
 		const px = Math.max(6, Math.round(p.s * 0.94));
 		for (const k of STACK) for (let j = 0; j < p.w[k]; j++, i++)
 			// prints only where they can be read (14 px and up); smaller tiles stay plain squares
-			marks.push({ id: `${p.w.writer}#${i}`, group: p.w.writer, square: true, ...(px >= 14 ? { ...tileSprite(p.w, k, color, px), aspect: ASPECT, backing: color ? 0.34 : 0.22 } : {}), x: p.left + (i % p.c) * p.s + p.s / 2, y: p.bottom - Math.floor(i / p.c) * p.s - p.s / 2, r: px >= 14 ? px / 2 : p.s * 0.42, color: color ? COL[k] : UNLIT, alpha });
+			marks.push({ id: `${p.w.writer}#${i}`, group: p.w.writer, square: true, ...(px >= 14 ? { ...tileSprite(p.w, k, color, px), aspect: ASPECT, backing: color ? TILE.litBacking : TILE.unlitBacking } : {}), x: p.left + (i % p.c) * p.s + p.s / 2, y: p.bottom - Math.floor(i / p.c) * p.s - p.s / 2, r: px >= 14 ? px / 2 : p.s * 0.42, color: color ? COL[k] : UNLIT, alpha });
 	}
 	const pileRect = (p: Pile): Rect => { const h = Math.ceil(p.w.n / p.c) * p.s; return { x: p.left, y: p.bottom - h, w: p.c * p.s, h }; };
 	const labelRect = (l: Label, font: string, lh: number): Rect => {

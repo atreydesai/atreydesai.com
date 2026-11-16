@@ -67,3 +67,12 @@ export const KIND = {
  * unlit takes GRAY.unlit. Teal means OpenAI (or Sol), never "correct".
  */
 export const modelColor = (name: string) => MODEL[name] ?? GRAY.strong;
+
+/** a colour mixed toward ink by t (0..1): the ridge ink for a print stamped on a tile of that colour */
+export function deepen(hex: string, t = 0.5): string {
+	const a = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)), b = [20, 32, 45];
+	return "#" + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, "0")).join("");
+}
+
+/** tiles that show a result: solid enough to read as a mass even in grayscale, with the print as texture on top */
+export const TILE = { litBacking: 0.82, unlitBacking: 0.2, inkDepth: 0.55 } as const;

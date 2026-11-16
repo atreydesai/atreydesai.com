@@ -14,7 +14,8 @@
 	import Icon from "./Icon.svelte";
 	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
-	import { MODEL, GRAY, INK as INKS, SIGNED } from "./palette";
+	import { MODEL, GRAY, INK as INKS, SIGNED, deepen, TILE } from "./palette";
+	import { printSprite, printAspect } from "./print/sprites";
 	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
 	import F from "./familiarity.json";
 
@@ -140,6 +141,8 @@
 		if (!m) { m = { id, x: 0, y: 0, r: 1, color: OFF }; pool.set(id, m); }
 		return m;
 	};
+	const CLARITY = [0.1, 0.4, 0.7, 1]; // legibility of the prints in each familiarity group, least to most familiar
+	const ASPECT = printAspect();
 	const IDS = Array.from({ length: 4 }, (_, g) => Array.from({ length: 100 }, (_, i) => `${OWNER}:g${g}:${i}`));
 	const marks: Mark[] = [];
 	let lastKey = "", lastKind = "", t0 = 0, raf = 0;
@@ -227,6 +230,19 @@
 		if (sel !== null && G4[sel] && kind !== "ask") {
 			const g = G4[sel], w = g.gw, x = ox + g.x - 5, y = oy + g.y - 5;
 			paths.push({ pts: [[x, y], [x + w + 10, y], [x + w + 10, y + w + 10], [x, y + w + 10], [x, y]], color: INK, width: 1.5, progress: 1 });
+		}
+		// the motif: every tile is a writer's print, and how legible it is follows the group's familiarity: smudged
+		// where the model does not recognize the writer, crisp where it knows them well (named tiles solid, in the
+		// model's colour, with the print in a deeper ink; the rest pale)
+		for (const m of marks) {
+			const gi = m.id.startsWith(`${OWNER}:g`) ? +m.id.charAt(OWNER.length + 2) : -1;
+			const pitch = geo.g[gi]?.p ?? 0;
+			if (gi < 0 || !m.square || pitch < 15) { m.sprite = undefined; m.backing = undefined; continue; }
+			const lit = m.color !== OFF, px = Math.round(pitch * 0.9), clarity = CLARITY[gi], idx = +m.id.slice(m.id.lastIndexOf(":") + 1);
+			const ink = lit ? deepen(m.color, TILE.inkDepth) : m.color;
+			m.sprite = printSprite({ family: "writer", index: idx % 48, color: ink, px, clarity });
+			m.spriteKey = `f${idx % 48}|${ink}|${px}|${clarity}`;
+			m.aspect = ASPECT; m.r = px / 2; m.backing = lit ? TILE.litBacking : TILE.unlitBacking;
 		}
 		chart.marks = marks;
 		chart.paths = paths;
