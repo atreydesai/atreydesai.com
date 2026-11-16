@@ -509,6 +509,19 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		main.full = r0; human.full = r1; ai.full = r1;
 		labs.forEach((it, i) => (it.full = lab2[i][2]));
 		crowd.forEach((it, i) => (it.full = pts[i] ? pts[i][2] : 0));
+		// each writer takes the colour of the band of the stage it stands in (the kinds of text, left to right)
+		const bands = opts.crowdBands;
+		if (bands?.length) for (let i = 0; i < pts.length; i++) {
+			const u = (pts[i][0] - S.x) / (S.w || 1);
+			let color = bands[bands.length - 1].color;
+			for (let b = 0; b < bands.length; b++) if (u <= bands[b].to) { color = bands[b].color; break; }
+			const it = crowd[i];
+			if (it.color === color) continue;
+			// a new colour is a new sprite, and new thread colours for the division it forms in
+			it.color = color; it.rgb = hexRgb(color);
+			(it.sprite as any)?.close?.(); it.sprite = null; it.spriteEpoch = -1;
+			splits[2] = null;
+		}
 		lit.full = litR;
 		litIndex = best; traced = false;
 		return L;

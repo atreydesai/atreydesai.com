@@ -21,6 +21,14 @@
 	const LABS = ["Anthropic", "OpenAI", "Google", "Alibaba", "DeepSeek", "Moonshot", "Zhipu", "MiniMax", "Mistral", "xAI", "Cohere"];
 	const LOGO: Record<string, string> = { Anthropic: "anthropic", OpenAI: "openai", Google: "google" };
 	const STEPS = [0, 1, 2, 3];
+	// scroll per level, in viewport heights: short enough that a slow scroller sees the prints change soon, while the
+	// renderer paces each division on its own clock so a fast scroller still sees every one (Atrey, 16 Nov)
+	const STEP = 0.65;
+	// level 3: each set of texts has its own colour, in hero.json's crowd order (icml, active, famous, papers, nature,
+	// inactive). Three families of two from the page palette: teal for reviews, rose for Reddit, aubergine for published
+	// writing; the writer the model finds is in ink, like the one print at level 0 (Atrey, 16 Nov: different fingerprint
+	// colours for different sets of texts; one teal ramp read as one grey crowd)
+	const KIND_COLORS = ["#437E8E", "#C85A82", "#461E47", "#9A82B4", "#8CB5C0", "#DC89A7"];
 
 	let root: HTMLElement, stick: HTMLElement, panel: HTMLElement;
 	let pos = $state(0); // scroll position through the section, in steps (0..4.6)
@@ -56,7 +64,7 @@
 	// a row click scrolls to where that level is held, so the print morphs there with the scroll
 	function go(n: number) {
 		const top = root.getBoundingClientRect().top + scrollY;
-		const y = top + (STEPS.indexOf(n) + 0.3) * innerHeight * 0.9 - innerHeight * 0.5;
+		const y = top + (STEPS.indexOf(n) + 0.3) * innerHeight * STEP - innerHeight * 0.5;
 		scrollTo({ top: y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 	}
 
@@ -68,7 +76,8 @@
 		];
 		print = createPrint({
 			text, labs: LABS, litText: LIT.excerpt.t, ridge: RIDGE,
-			colors: { human: "#C85A82", ai: "#461E47", lit: "#437E8E", ink: "#14202D", labs: ["#C85A82", "#437E8E", "#461E47"], other: "#8A8F98" },
+			crowdBands: (() => { const tot = H.crowd.reduce((a, c) => a + c.layout_share, 0); let a = 0; return H.crowd.map((c, i) => ({ to: (a += c.layout_share) / tot, color: KIND_COLORS[i] })); })(),
+			colors: { human: "#C85A82", ai: "#461E47", lit: "#14202D", ink: "#14202D", labs: ["#C85A82", "#437E8E", "#461E47"], other: "#8A8F98" },
 		});
 		let pointer: { x: number; y: number } | null = null;
 		let lastAnchors = 0, anchorKey = "", inspKey = "";
@@ -111,8 +120,8 @@
 				const L = print.lens?.() ?? (pointer ? { x: pointer.x, y: pointer.y, r: 56 } : null);
 				const h = L ? print.hit(L.x, L.y) : null;
 				let id = h?.id ?? null;
-				// level 0: the card shows only once the reader has started scrolling, and only what the lens reads
-				if (id === "main" && (pos < 0.18 || !print.lensText?.())) id = null;
+				// level 0 has no card: the one print speaks for itself (Atrey, 16 Nov: remove the preview)
+				if (id === "main") id = null;
 				const kind = id?.startsWith("writer:") && L ? kindAt(L.x) : -1;
 				const ik = id && L ? `${id}|${kind}|${Math.round(L.x / 3)}|${Math.round(L.y / 3)}|${Math.round(L.r)}` : "";
 				if (ik !== inspKey) { inspKey = ik; insp = id && L ? { id, kind, x: L.x, y: L.y, r: L.r } : null; }
@@ -139,7 +148,7 @@
 		const update = () => {
 			if (active && field.mode === "ground") own();
 			const r = root.getBoundingClientRect();
-			const p = Math.max(0, (innerHeight * 0.5 - r.top) / (innerHeight * 0.9));
+			const p = Math.max(0, (innerHeight * 0.5 - r.top) / (innerHeight * STEP));
 			if (Math.abs(p - pos) > 0.002) pos = p;
 			const k = Math.min(STEPS.length - 1, Math.floor(p));
 			// past two thirds of a step the next level starts, and the renderer plays the whole division smoothly
@@ -166,7 +175,7 @@
 <section class="ph" id="levels" bind:this={root} aria-label={L.lead.t} style="--steps:{STEPS.length}" data-level={lv.toFixed(2)} data-pos={pos.toFixed(2)}>
 	<div class="stick" bind:this={stick}>
 		<div class="panel" bind:this={panel}>
-			<StepDashes count={STEPS.length} current={level} go={(i) => go(STEPS[i])} />
+			<StepDashes count={STEPS.length} current={level} go={(i) => go(STEPS[i])} progress={step < STEPS.length - 1 ? Math.min(1, (pos - step) / 0.66) : -1} />
 			<p class="lead">{L.lead.t}:</p>
 			<ol data-lag="1">
 				{#each L.items as it}
@@ -178,17 +187,24 @@
 								<span class="fact">{#if it.v}<b>{it.v}</b>{" "}{/if}{it.fact}</span>
 							</span>
 						</button>
-						<a class="go" href="#{it.target}" aria-label="Go to {it.t}"><Icon name="arrow" /></a>
 					</li>
 				{/each}
 			</ol>
+			<!-- level 3's key: what each shade of the crowd is, and how often Claude Fable 5.2 names its writers (space kept at every level so the art never moves) -->
+			<ul class="kinds" class:show={level === 3} aria-hidden={level !== 3}>
+				{#each H.crowd as c, i}<li><i style:background={KIND_COLORS[i]}></i>{c.label}<b>{c.rate}%</b></li>{/each}
+			</ul>
 			<p class="without" data-lag="2">
 				<span class="icons">{#each C.hero.without as w}<span class="struck" title={w.t}><Icon name={w.icon} /><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="21" x2="21" y2="3" /></svg></span>{/each}</span>
 				{C.hero.without_line.t}
 			</p>
 		</div>
-		{#if active && pos < 0.6}
-			<button type="button" class="cue" style:opacity={1 - pos / 0.6} onclick={() => go(1)}><Icon name="arrow" />Scroll</button>
+		{#if active && pos < 0.5}
+			<!-- an unmissable cue to scroll (Atrey, 16 Nov): it fades as the reader starts -->
+			<button type="button" class="cue" style:opacity={1 - pos / 0.5} onclick={() => go(1)}>
+				<span class="mouse" aria-hidden="true"><i></i></span>Scroll to see all three levels
+				<span class="chev" aria-hidden="true"><Icon name="arrow" /><Icon name="arrow" /></span>
+			</button>
 		{/if}
 		{#if active}
 			<div class="tags" aria-hidden="true">
@@ -253,7 +269,7 @@
 </section>
 
 <style>
-	.ph { position: relative; margin-top: 24px; height: calc((var(--steps) + 0.6) * 90vh); }
+	.ph { position: relative; margin-top: 24px; height: calc((var(--steps) + 0.6) * 65vh); }
 	.stick { position: sticky; top: 0; height: 100vh; pointer-events: none; }
 	.panel { pointer-events: auto; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: min(36%, 430px); display: grid; gap: 10px; }
 	.lead { font-size: clamp(19px, 1.9vw, 23px); line-height: 1.3; font-weight: 500; letter-spacing: -0.015em; text-wrap: balance; }
@@ -269,8 +285,6 @@
 	.t { font-size: clamp(17px, 1.6vw, 20px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; }
 	.fact { font-size: 13.5px; line-height: 1.45; color: var(--ink2); }
 	.fact b { font-size: 15.5px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
-	.go { display: grid; place-items: center; width: 32px; border-radius: 3px; color: var(--ink2); background: rgba(243, 243, 239, .9); text-decoration: none; }
-	.go:hover { color: var(--ink); background: #fff; }
 	.without { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--ink2); }
 	.icons { display: inline-flex; gap: 8px; font-size: 16px; color: var(--ink); }
 	.struck { position: relative; display: inline-flex; }
@@ -325,12 +339,31 @@
 	.insp .who { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; color: #046B55; }
 	.insp .who b { color: var(--ink); }
 	.insp .who span { margin-left: 6px; font-size: 12px; color: var(--ink2); }
-	.cue { pointer-events: auto; position: absolute; left: calc(min(36%, 430px) + (100% - min(36%, 430px)) / 2); bottom: 22px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: rgba(243, 243, 239, .92); font-size: 12.5px; font-weight: 500; color: var(--ink2); }
-	.cue :global(svg) { transform: rotate(90deg); animation: nudge 1.6s ease-in-out infinite; }
-	@keyframes nudge { 50% { transform: rotate(90deg) translateX(3px); } }
+	.kinds { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px 14px; font-size: 12.5px; line-height: 1.3; color: var(--ink2); opacity: 0; transition: opacity .4s var(--ease); }
+	.kinds.show { opacity: 1; }
+	.panel .kinds li { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; opacity: 1; }
+	.kinds i { width: 10px; height: 10px; border-radius: 2px; }
+	.kinds b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+	.cue {
+		pointer-events: auto; position: fixed; z-index: 6; left: 50%; bottom: 28px; transform: translateX(-50%);
+		display: inline-flex; align-items: center; gap: 12px; padding: 12px 20px 12px 16px; border-radius: 999px; background: #14202D; color: #fff;
+		font-size: 15px; font-weight: 600; letter-spacing: -0.005em; white-space: nowrap; box-shadow: 0 10px 30px rgba(20, 32, 45, .28); animation: cue-in .6s .4s both;
+	}
+	.cue::after { content: ""; position: absolute; inset: -6px; border-radius: inherit; border: 2px solid #14202D; opacity: 0; animation: ring 2s 1s ease-out infinite; }
+	.mouse { position: relative; width: 16px; height: 24px; border: 2px solid #fff; border-radius: 9px; }
+	.mouse i { position: absolute; left: 50%; top: 4px; width: 2px; height: 5px; margin-left: -1px; border-radius: 1px; background: #fff; animation: wheel 1.4s ease-in-out infinite; }
+	.chev { display: grid; line-height: 0; }
+	.chev :global(svg) { width: 14px; height: 14px; transform: rotate(90deg); animation: drop 1.4s ease-in-out infinite; }
+	.chev :global(svg + svg) { margin-top: -7px; animation-delay: .15s; }
+	@keyframes wheel { 0% { transform: translateY(0); opacity: 1; } 70% { transform: translateY(8px); opacity: 0; } 100% { opacity: 0; } }
+	@keyframes drop { 0%, 100% { transform: rotate(90deg) translateX(-2px); opacity: .5; } 50% { transform: rotate(90deg) translateX(3px); opacity: 1; } }
+	@keyframes ring { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(1.18); } }
+	@keyframes cue-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 	.steps { position: absolute; inset: 0; pointer-events: none; }
-	.step { height: 90vh; }
+	.step { height: 65vh; }
 	@media (max-width: 860px) {
+		.cue { bottom: 24px; font-size: 14px; padding: 10px 16px 10px 12px; }
+		.kinds { font-size: 11px; gap: 3px 10px; }
 		/* on a phone the card is a compact strip docked under the prints (clear of the rail's arrows at the left), holding
 		   only the name and the number, or the quote and the writer, so it never covers a print's name (Atrey, 16 Nov) */
 		.insp {
@@ -353,5 +386,5 @@
 		.n { width: 26px; height: 26px; font-size: 13px; }
 		.t { font-size: 15px; }
 	}
-	@media (prefers-reduced-motion: reduce) { .panel li, .row, .tag { transition: none; } .tag.lit, .cue :global(svg) { animation: none; } }
+	@media (prefers-reduced-motion: reduce) { .panel li, .row, .tag { transition: none; } .tag.lit, .cue, .cue::after, .mouse i, .chev :global(svg) { animation: none; } }
 </style>

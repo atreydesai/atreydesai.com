@@ -11,7 +11,7 @@
 	import SectionNav from "$lib/who-wrote-this/SectionNav.svelte";
 	import FootnoteList from "$lib/who-wrote-this/FootnoteList.svelte";
 	import PrintMark from "$lib/who-wrote-this/PrintMark.svelte";
-	import { startElastic } from "$lib/who-wrote-this/elastic";
+	import ScrollHint from "$lib/who-wrote-this/ScrollHint.svelte";
 	import { field } from "$lib/who-wrote-this/field.svelte";
 	import Levels from "$lib/who-wrote-this/Levels.svelte";
 	import PrintHero from "$lib/who-wrote-this/PrintHero.svelte";
@@ -64,7 +64,6 @@
 		return out;
 	})();
 
-	onMount(() => startElastic(document));
 
 	const jsonLd = [
 		{
@@ -188,6 +187,7 @@
 		</footer>
 	</article>
 
+	<ScrollHint />
 	<footer class="site-foot">
 		<a href="/">Atrey Desai</a>
 		<span>{#each nav as link}<a href={link.href}>{link.name}</a>{/each}</span>
@@ -247,7 +247,8 @@
 	.btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1.25px solid var(--ink); border-radius: 2px; font-size: 13px; font-weight: 500; text-decoration: none; transition: background-color .15s, color .15s; }
 	.btn:hover { background: var(--ink); color: var(--field); }
 	.links time { margin-left: 8px; font-size: 13px; color: var(--ink2); }
-	.breath { height: 42vh; }
+	/* a short pause of empty ground between scenes: long gaps left slow scrollers wondering whether the page had ended */
+	.breath { height: 18vh; }
 	.lede { margin-top: 0; max-width: 46rem; font-size: 19px; line-height: 1.6; }
 	/* a book's drop cap: the opening "I" spans three lines */
 	.lede::first-letter { float: left; font-family: Georgia, "Times New Roman", serif !important; font-size: calc(19px * 1.6 * 3 * 0.86); line-height: .8; font-weight: 400; margin: 6px 12px 0 -2px; color: var(--ink); }
@@ -296,7 +297,7 @@
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }
 		.lede { font-size: 17px; }
-		.breath { height: 28vh; }
+		.breath { height: 12vh; }
 		.lede::first-letter { font-size: calc(17px * 1.6 * 3 * 0.86); }
 		.top nav { gap: 14px; }
 	}

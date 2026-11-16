@@ -72,6 +72,10 @@ export type PrintOptions = {
 	labs: string[];
 	/** colours: rq1 human #C85A82, rq2 AI #461E47, rq3 #437E8E, ink #14202D; lab colours for the first three */
 	colors: { human: string; ai: string; lit: string; ink: string; labs: string[]; other: string };
+	/** level 3: the crowd in vertical bands across the stage, left to right, one colour per kind of text. `to` is the
+	 * cumulative fraction of the stage width (0..1) where the band ends; a writer takes the colour of the band its place
+	 * falls in. Without it the crowd is `colors.human`. The lit writer keeps `colors.lit`. */
+	crowdBands?: { to: number; color: string }[];
 	/** the lit writer's ridge text in level 3 (readable in the lens) */
 	litText: string;
 	seed?: number;

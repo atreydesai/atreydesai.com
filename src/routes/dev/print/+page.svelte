@@ -81,6 +81,7 @@
 		const parked = q.get("lens")?.split(",").map(Number);
 		const print = createPrint({
 			text, labs, litText, ridge: RIDGE,
+			crowdBands: [[0.34, "#0F3640"], [0.54, "#8CB5C0"], [0.62, "#2A5F6E"], [0.78, "#B5D0D7"], [0.9, "#437E8E"], [1, "#6A9AA8"]].map(([to, color]) => ({ to: to as number, color: color as string })),
 			colors: { human: "#C85A82", ai: "#461E47", lit: "#437E8E", ink: "#14202D", labs: ["#C85A82", "#437E8E", "#461E47"], other: "#8A8F98" },
 		});
 		const ctx = canvas.getContext("2d")!;
