@@ -15,6 +15,7 @@
 	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
 	import T from "./timeline.json";
+	import { printSprite, printAspect } from "./print/sprites";
 	import D from "./timeline_rq1.json";
 
 	type Metric = "both" | "ideas" | "prose";
@@ -27,6 +28,7 @@
 	const NAME: Record<string, string> = Object.fromEntries(T.names.map((n) => [n.model, n.t]));
 	const LAST = T.steps.length - 1;
 	const FABLE = "Claude Fable 5.2";
+	const FAB_PRINT = typeof document !== "undefined" ? printSprite({ family: "lab", index: 0, color: MODEL["Claude Fable 5.2"], px: 26 }) : undefined;
 	const CLAY = MODEL[FABLE];
 	const LINES: Line[] = ["closed", "open"];
 	const LAYERS: Layer[] = ["closed", "open", "ref"];
@@ -239,6 +241,8 @@
 				r: (front.has(m.model) ? 6 : 4.5) + (focus.has(m.model) ? 2.5 : 0),
 				color: fable ? CLAY : COLOR[l], ring: l === "open" && !fable,
 				alpha: !shown ? 0 : off(m) ? 0.12 : focus.size && !focus.has(m.model) ? 0.55 : 1,
+				// Claude Fable 5.2 is marked with its own print from the hero (Anthropic's pattern, in clay)
+				...(fable ? { r: 13, sprite: FAB_PRINT, spriteKey: "fable-print", aspect: printAspect() } : {}),
 			});
 			pos.set(m.model, { x: mx, y: my });
 		}
