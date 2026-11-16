@@ -100,7 +100,12 @@
 
 	onMount(() => {
 		let raf = 0;
-		const loop = () => { if (active && field.owner === "rq2") layout(); raf = requestAnimationFrame(loop); };
+		const loop = () => {
+			// retake the canvas if a neighbour left it on the plain ground while this section is in view
+			if (active && field.mode === "ground") { field.mode = "chart"; field.owner = "rq2"; field.dim = 0.75; field.interactive = true; }
+			if (active && field.owner === "rq2") layout();
+			raf = requestAnimationFrame(loop);
+		};
 		raf = requestAnimationFrame(loop);
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;

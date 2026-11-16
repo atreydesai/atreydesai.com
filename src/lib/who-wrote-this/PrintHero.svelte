@@ -92,6 +92,10 @@
 		document.addEventListener("pointerleave", onLeave);
 
 		const own = () => { field.mode = "paint"; field.owner = "hero"; field.dim = 0.55; field.interactive = false; };
+		// retake the canvas if a neighbour left it on the plain ground while this section is in view
+		let watch = 0;
+		const check = () => { if (active && field.mode === "ground") own(); watch = requestAnimationFrame(check); };
+		watch = requestAnimationFrame(check);
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
 			if (active) own();
@@ -103,7 +107,7 @@
 		steps.forEach((s) => so.observe(s));
 		return () => {
 			removeEventListener("pointermove", onMove); removeEventListener("pointerdown", onMove); document.removeEventListener("pointerleave", onLeave);
-			io.disconnect(); so.disconnect(); print.dispose?.();
+			io.disconnect(); so.disconnect(); cancelAnimationFrame(watch); print.dispose?.();
 			if (field.owner === "hero") { field.mode = "ground"; field.dim = 0; field.owner = ""; chart.paint = null; }
 		};
 	});

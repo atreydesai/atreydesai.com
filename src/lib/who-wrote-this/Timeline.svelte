@@ -127,6 +127,8 @@
 				const goal = want.includes(k) || reduce ? 1 : 0;
 				draw[k] += (goal - draw[k]) * (reduce ? 1 : Math.min(1, dt * 1.6));
 			}
+			// retake the canvas if a neighbour left it on the plain ground while this section is in view
+			if (active && field.mode === "ground") { field.mode = "chart"; field.owner = "rq1"; field.dim = 0.75; field.interactive = true; }
 			if (active && field.owner === "rq1") layout();
 			raf = requestAnimationFrame(loop);
 		};

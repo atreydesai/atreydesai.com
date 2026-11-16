@@ -14,6 +14,9 @@
 	import Timeline from "$lib/who-wrote-this/Timeline.svelte";
 	import HumanOrAI from "$lib/who-wrote-this/HumanOrAI.svelte";
 	import WhichAI from "$lib/who-wrote-this/WhichAI.svelte";
+	import WhichHuman from "$lib/who-wrote-this/WhichHuman.svelte";
+	import Familiar from "$lib/who-wrote-this/Familiar.svelte";
+	import Anonymity from "$lib/who-wrote-this/Anonymity.svelte";
 	import C from "$lib/who-wrote-this/content.json";
 	import type { PageData } from "./$types";
 
@@ -130,13 +133,11 @@
 
 		<WhichAI />
 
-		{#each C.sections.slice(2) as s}
-			<section class="section pending" id={s.id} data-rq={s.rq}>
-				<header class="s-head"><span class="badge">{s.n}</span><h2>{s.title}</h2></header>
-				<p class="finding">{s.takeaway.t}</p>
-				<div class="todo">Scene in progress</div>
-			</section>
-		{/each}
+		<WhichHuman />
+
+		<Familiar />
+
+		<Anonymity />
 
 		<footer class="end">
 			<p class="closing">{C.closing.t}</p>
