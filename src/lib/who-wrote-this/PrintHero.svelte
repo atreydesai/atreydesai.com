@@ -18,13 +18,16 @@
 	const STEPS = [0, 1, 2, 3];
 
 	let root: HTMLElement, stick: HTMLElement, panel: HTMLElement;
-	let step = $state(0);
+	let pos = $state(0); // scroll position through the section, in steps (0..4.6)
+	let lv = $state(0); // the level shown: held for most of each step, morphing to the next over the step's last third
 	let active = $state(false);
 	let anchors = $state<Anchor[]>([]);
 	let hover = $state<{ id: string; x: number; y: number } | null>(null);
 	let print: Print;
 
-	const level = $derived(STEPS[step]);
+	const level = $derived(Math.round(lv)); // the level the copy and controls point at
+	const step = $derived(Math.max(0, Math.min(STEPS.length - 1, Math.floor(pos))));
+	const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 	// labels shown at anchors: the two kinds, the labs (big three with logos), and the lit writer
 	const tags = $derived(
 		anchors.filter((a) => a.alpha > 0.25 && (a.id === "human" || a.id === "ai" || a.id.startsWith("lab:") || a.id === "lit")),
@@ -39,9 +42,11 @@
 		return null;
 	});
 
+	// a row click scrolls to where that level is held, so the print morphs there with the scroll
 	function go(n: number) {
-		const el = root.querySelectorAll(".step")[STEPS.indexOf(n)] as HTMLElement | undefined;
-		el?.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+		const top = root.getBoundingClientRect().top + scrollY;
+		const y = top + (STEPS.indexOf(n) + 0.3) * innerHeight * 0.9 - innerHeight * 0.5;
+		scrollTo({ top: y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 	}
 
 	onMount(() => {
@@ -70,7 +75,7 @@
 			const enter = Math.max(0, Math.min(1, 1 - Math.max(0, s.y) / f.h, (s.y + s.h) / f.h));
 			const mast = document.querySelector(".mast");
 			const quiet = [p, ...(mast ? [rect(mast)] : [])];
-			print.draw(ctx, { level, t: f.now / 1000, dt: Math.min(0.05, f.dt), view: { w: f.w, h: f.h, dpr: f.dpr }, stage, quiet, pointer, enter, reduce });
+			print.draw(ctx, { level: lv, t: f.now / 1000, dt: Math.min(0.05, f.dt), view: { w: f.w, h: f.h, dpr: f.dpr }, stage, quiet, pointer, enter, reduce });
 			if (f.now - lastAnchors > 50) {
 				lastAnchors = f.now;
 				anchors = print.anchors();
@@ -94,7 +99,18 @@
 		const own = () => { field.mode = "paint"; field.owner = "hero"; field.dim = 0.55; field.interactive = false; };
 		// retake the canvas if a neighbour left it on the plain ground while this section is in view
 		let watch = 0;
-		const check = () => { if (active && field.mode === "ground") own(); watch = requestAnimationFrame(check); };
+		const check = () => {
+			if (active && field.mode === "ground") own();
+			// where the reader is, from the scroll position itself (robust to remounts and jumps)
+			const r = root.getBoundingClientRect();
+			const p = Math.max(0, (innerHeight * 0.5 - r.top) / (innerHeight * 0.9));
+			if (Math.abs(p - pos) > 0.002) pos = p;
+			const k = Math.min(STEPS.length - 1, Math.floor(p));
+			const next = k >= STEPS.length - 1 ? STEPS[k] : STEPS[k] + (STEPS[k + 1] - STEPS[k]) * smooth(0.62, 0.98, p - k);
+			const want = reduce ? Math.round(next) : next;
+			if (Math.abs(want - lv) > 0.001) lv = want;
+			watch = requestAnimationFrame(check);
+		};
 		watch = requestAnimationFrame(check);
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
@@ -102,18 +118,15 @@
 			else if (field.owner === "hero") { field.mode = "ground"; field.dim = 0; field.owner = ""; hover = null; }
 		}), { rootMargin: "0px 0px -10% 0px" });
 		io.observe(root);
-		const steps = [...root.querySelectorAll(".step")];
-		const so = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) step = steps.indexOf(e.target); }), { rootMargin: "-45% 0px -45% 0px" });
-		steps.forEach((s) => so.observe(s));
 		return () => {
 			removeEventListener("pointermove", onMove); removeEventListener("pointerdown", onMove); document.removeEventListener("pointerleave", onLeave);
-			io.disconnect(); so.disconnect(); cancelAnimationFrame(watch); print.dispose?.();
+			io.disconnect(); cancelAnimationFrame(watch); print.dispose?.();
 			if (field.owner === "hero") { field.mode = "ground"; field.dim = 0; field.owner = ""; chart.paint = null; }
 		};
 	});
 </script>
 
-<section class="ph" bind:this={root} aria-label={L.lead.t} style="--steps:{STEPS.length}">
+<section class="ph" bind:this={root} aria-label={L.lead.t} style="--steps:{STEPS.length}" data-level={lv.toFixed(2)} data-pos={pos.toFixed(2)}>
 	<div class="stick" bind:this={stick}>
 		<div class="panel" bind:this={panel}>
 			<p class="lead">{L.lead.t}:</p>
@@ -135,8 +148,11 @@
 				<span class="icons">{#each C.hero.without as w}<span class="struck" title={w.t}><Icon name={w.icon} /><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="21" x2="21" y2="3" /></svg></span>{/each}</span>
 				{C.hero.without_line.t}
 			</p>
-			<p class="say-n" aria-hidden="true">{#each STEPS as _, i}<i class:on={step === i}></i>{/each}</p>
+			<p class="say-n" aria-hidden="true">{#each STEPS as _, i}<i><b style:width="{Math.max(0, Math.min(1, pos - i)) * 100}%"></b></i>{/each}</p>
 		</div>
+		{#if active && pos < 0.6}
+			<button type="button" class="cue" style:opacity={1 - pos / 0.6} onclick={() => go(1)}><Icon name="arrow" />Scroll</button>
+		{/if}
 		{#if active}
 			<div class="tags" aria-hidden="true">
 				{#each tags as a (a.id)}
@@ -151,7 +167,7 @@
 						{#if a.id === "human"}<Icon name="human" />Human{/if}
 						{#if a.id === "ai"}<Icon name="ai" />AI{/if}
 						{#if lab}{#if LOGO[lab]}<Icon name={LOGO[lab]} />{/if}{lab}{/if}
-						{#if a.id === "lit"}<Icon name="human" /><b>{LIT.answers[0].verdict}</b>{/if}
+						{#if a.id === "lit"}<span class="q">“{LIT.excerpt.t}”</span><span class="who"><Icon name="check" /><b>{LIT.answers[0].verdict}</b></span>{/if}
 					</span>
 				{/each}
 			</div>
@@ -192,8 +208,8 @@
 	.struck svg { position: absolute; inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); }
 	.struck line { stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; }
 	.say-n { display: flex; gap: 5px; margin-top: 4px; }
-	.say-n i { width: 18px; height: 3px; border-radius: 2px; background: var(--rule); }
-	.say-n i.on { background: var(--ink); }
+	.say-n i { position: relative; width: 22px; height: 3px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+	.say-n b { position: absolute; inset: 0 auto 0 0; background: var(--ink); }
 	.tags { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
 	.tag {
 		position: fixed; transform: translate(-50%, 0); display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; white-space: nowrap;
@@ -203,11 +219,17 @@
 	.tag :global(svg) { width: 14px; height: 14px; }
 	.tag[data-k="human"] { color: var(--rq1); } .tag[data-k="ai"] { color: var(--rq2); }
 	.tag.small { font-size: 11.5px; font-weight: 500; padding: 2px 7px; color: var(--ink2); }
-	.tag.lit { color: var(--rq3); font-size: 14px; }
+	.tag.lit { flex-direction: column; align-items: flex-start; gap: 3px; padding: 8px 12px; color: var(--rq3); font-size: 14px; animation: lit-in .6s .2s both; }
+	.tag.lit .q { font-weight: 400; font-style: italic; color: var(--ink2); font-size: 13px; }
+	.tag.lit .who { display: inline-flex; align-items: center; gap: 6px; color: #046B55; }
 	.tag.lit b { color: var(--ink); }
+	@keyframes lit-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 	.tip { position: fixed; z-index: 5; transform: translate(16px, -50%); display: grid; gap: 4px; max-width: 280px; padding: 10px 12px; background: #fff; border-radius: 3px; box-shadow: 0 6px 20px rgba(20, 32, 45, .14); font-size: 13px; line-height: 1.45; color: var(--ink2); pointer-events: none; }
 	.tip.flip { transform: translate(calc(-100% - 16px), -50%); }
 	.tip b { font-size: 14px; color: var(--ink); }
+	.cue { pointer-events: auto; position: absolute; left: calc(min(36%, 430px) + (100% - min(36%, 430px)) / 2); bottom: 22px; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; background: rgba(243, 243, 239, .92); font-size: 12.5px; font-weight: 500; color: var(--ink2); }
+	.cue :global(svg) { transform: rotate(90deg); animation: nudge 1.6s ease-in-out infinite; }
+	@keyframes nudge { 50% { transform: rotate(90deg) translateX(3px); } }
 	.steps { position: absolute; inset: 0; pointer-events: none; }
 	.step { height: 90vh; }
 	@media (max-width: 860px) {
@@ -218,5 +240,5 @@
 		.n { width: 26px; height: 26px; font-size: 13px; }
 		.t { font-size: 15px; }
 	}
-	@media (prefers-reduced-motion: reduce) { li, .row, .tag { transition: none; } }
+	@media (prefers-reduced-motion: reduce) { li, .row, .tag { transition: none; } .tag.lit, .cue :global(svg) { animation: none; } }
 </style>

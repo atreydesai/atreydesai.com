@@ -1,3 +1,3 @@
-// Which renderer the hero uses: the stand-in until Fable 5.2's fingerprint.ts lands, then that.
-export { createStub as createPrint } from "./stub";
+// Which renderer the hero uses: Claude Fable 5.2's procedural fingerprint (stub.ts is the plain stand-in it replaced).
+export { createPrint } from "./fingerprint";
 export type * from "./contract";
