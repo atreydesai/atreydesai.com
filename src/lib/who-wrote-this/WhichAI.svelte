@@ -567,7 +567,7 @@
 								<!-- one order on every card: the report and its date, its words, where they come from, then the paper -->
 								<p class="c-h"><i class="ln" class:dash={e.dash} style:--c={e.col}></i>{#if e.icon}<Icon name={e.icon} />{/if}<b>{u(e.label)}</b><span>{dateLabel(e.date)}</span></p>
 								<div class="c-m" class:has-ph={!sr.url}>
-									{#if !sr.url}<figure class="ph" aria-label={u("Photo to be supplied")}><Icon name="human" /><figcaption>{u("Photo to be supplied")}</figcaption></figure>{/if}
+									{#if !sr.url}<figure class="ph photo"><img src="/images/who-wrote-this/musk_royal_society.webp" alt={u("Elon Musk (photo: Debbie Rowe / The Royal Society, CC BY-SA 3.0)")} width="420" height="556" loading="lazy" /><sup class="fnref"><a href="#fn-wa-5" id="fnref-wa-5">5</a></sup></figure>{/if}
 									<div class="c-qs">
 										{#if sr.url}<blockquote class="c-q">“{sr.quote}{sr.cut ? "…" : ""}”</blockquote>
 										{:else}<blockquote class="c-q">{S.musk_quote.before}<em>“{sr.quote}”</em>{S.musk_quote.after}</blockquote>{/if}
@@ -650,6 +650,9 @@
 	.c-s a { color: var(--ink); text-underline-offset: 2px; }
 	.ph { flex: none; margin: 0; width: 56px; height: 70px; display: grid; place-items: center; align-content: center; gap: 4px; border: 1.25px dashed var(--gray-mid); border-radius: 3px; background: var(--field); color: var(--gray); font-size: 9.5px; line-height: 1.15; text-align: center; }
 	.ph :global(svg) { width: 22px; height: 22px; }
+	.ph.photo { position: relative; width: 64px; height: 84px; padding: 0; border: 0; background: none; overflow: visible; }
+	.ph.photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 3px; filter: grayscale(.15); }
+	.ph.photo :global(sup) { position: absolute; right: -8px; top: -6px; }
 	/* the paper's sentence: the card's conclusion */
 	.c-t { font-size: 14.5px; line-height: 1.45; color: var(--ink); }
 	.c-t.lead { padding-top: 0; border-top: 0; font-size: 18px; line-height: 1.4; font-weight: 500; letter-spacing: -0.01em; }

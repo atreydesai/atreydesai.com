@@ -201,6 +201,15 @@
    "how": "WebFetch, read twice: the second sentence under the heading 'Illicit distillation and scaled abuse'; the sentence continues after 'attacks' and is cut there (shown with an ellipsis). Requests naming the labs were refused by the fetch tool's filter, so no lab-naming sentence was taken",
    "cut": true,
    "by_line": "“Countering misuse of AI,”"
+  },
+  {
+   "id": "musk_photo",
+   "file": "docs/launch_20261116/art/photos/musk_royal_society_crop2.jpg",
+   "url": "https://commons.wikimedia.org/wiki/File:Elon_Musk_Royal_Society_(crop2).jpg",
+   "licence": "CC BY-SA 3.0",
+   "credit": "Debbie Rowe / The Royal Society",
+   "accessed": "2026-11-16",
+   "web_copy": "static/images/who-wrote-this/musk_royal_society.webp (420 px wide, metadata removed)"
   }
  ],
  "notes": [
@@ -222,6 +231,11 @@
    "n": 4,
    "t": "Anthropic, “Countering Misuse of AI: September 2026,” threat intelligence report.",
    "href": "https://www.anthropic.com/threat-intelligence-report-september-2026"
+  },
+  {
+   "n": 5,
+   "t": "Photo of Elon Musk: Debbie Rowe / The Royal Society, via Wikimedia Commons, CC BY-SA 3.0.",
+   "href": "https://commons.wikimedia.org/wiki/File:Elon_Musk_Royal_Society_(crop2).jpg"
   }
  ],
  "ui": [
@@ -240,7 +254,6 @@
   "Release date",
   "Writer's own lab",
   "Other lab",
-  "Photo to be supplied",
   "{Mon} ’{YY} (axis ticks)",
   "{D} {Mon} {YYYY} or {Mon} {YYYY} (report date, on its card)",
   "Own lab",
@@ -253,7 +266,8 @@
   "Memo to the House Select Committee on the CCP,",
   "“Detecting and preventing distillation attacks,”",
   "“Countering misuse of AI,”",
-  "Musk v. Altman, trial transcript"
+  "Musk v. Altman, trial transcript",
+  "Elon Musk (photo: Debbie Rowe / The Royal Society, CC BY-SA 3.0)"
  ],
  "musk_quote": {
   "before": "xAI ",
