@@ -23,10 +23,11 @@
 	import Icon from "./Icon.svelte";
 
 
-	let { items }: { items: Tag[] } = $props();
+	// follow: no easing on position, so tags stay glued to something that moves with the page (a pinned card)
+	let { items, follow = false }: { items: Tag[]; follow?: boolean } = $props();
 </script>
 
-<div class="tags" aria-hidden="true">
+<div class="tags" class:follow aria-hidden="true">
 	{#each items as tg (tg.id)}
 		<span class="tag at-{tg.at ?? 'right'}" class:strong={tg.strong} style:left="{tg.x}px" style:top="{tg.y}px" style:opacity={tg.alpha ?? 1} style:--c={tg.color ?? "var(--ink)"}>
 			<span class="line">
@@ -56,5 +57,6 @@
 	.at-above { transform: translate(-50%, calc(-100% - 8px)); }
 	.at-below { transform: translate(-50%, 8px); }
 	.at-center { transform: translate(-50%, -50%); }
+	.follow .tag { transition: opacity .3s; }
 	@media (prefers-reduced-motion: reduce) { .tag { transition: none; } }
 </style>

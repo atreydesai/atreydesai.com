@@ -1,0 +1,216 @@
+{
+ "_about": "Section 1 (Human or AI?) strings for HumanOrAI.svelte, copied from content.json sections[0] on 16 Nov 2026 and cut per Atrey's feedback: no sample size, micro-averages, 'mean over all four combinations' or per-case numbers (those stay in the paper). Paper strings carry src; every other displayed word is in ui. The site copy (atreydesai.com src/lib/who-wrote-this/s1.json) is byte-identical. The climb's chart keeps only its label: its paper sentence (“Model accuracy has improved over time.”) is already the timeline section's heading.",
+ "id": "human-or-ai",
+ "n": 1,
+ "rq": 1,
+ "title": "Human or AI?",
+ "takeaway": {
+  "t": "Frontier models can detect AI prose and ideas",
+  "src": "paper/sections/02_introduction.tex"
+ },
+ "context": [
+  {
+   "t": "We define a document's ideas as what its author decided to say (e.g., its claims, events, and organization), as opposed to the words used to say it (its prose).",
+   "src": "paper/sections/03_rq1_ai_vs_human.tex"
+  }
+ ],
+ "example": {
+  "source": "A person wrote, in their own words, from a model's ideas",
+  "caption": {
+   "t": "Claude Fable 5.2 bases each decision on concrete evidence",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  "text": [
+   {
+    "t": "The most meaningful light is that which is provided in moments of need.",
+    "cue": "rose"
+   },
+   {
+    "t": " […] "
+   },
+   {
+    "t": "From that day on,",
+    "cue": "teal"
+   },
+   {
+    "t": " travelers to the forest always saw two lights […] the lantern never again "
+   },
+   {
+    "t": "mistook greatness with size",
+    "cue": "clay"
+   },
+   {
+    "t": "."
+   }
+  ],
+  "judgments": [
+   {
+    "id": "ideas",
+    "icon": "bulb",
+    "label": "Ideas",
+    "verdict": "AI",
+    "share": "90% AI",
+    "cues": [
+     "rose",
+     "teal"
+    ],
+    "explanation": [
+     {
+      "t": "The deciding factor is the concentration of stock choices: […] and the "
+     },
+     {
+      "t": "stated moral",
+      "cue": "rose"
+     },
+     {
+      "t": " with a "
+     },
+     {
+      "t": "“from that day on” coda",
+      "cue": "teal"
+     },
+     {
+      "t": "."
+     }
+    ]
+   },
+   {
+    "id": "prose",
+    "icon": "pen",
+    "label": "Prose",
+    "verdict": "Human",
+    "share": "10% AI",
+    "cues": [
+     "clay"
+    ],
+    "explanation": [
+     {
+      "t": "The deciding factors are the "
+     },
+     {
+      "t": "non-idiomatic and ungrammatical slips: “mistook greatness with size”",
+      "cue": "clay"
+     }
+    ]
+   }
+  ],
+  "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1)"
+ },
+ "steps": [
+  "ideas",
+  "prose",
+  "both"
+ ],
+ "tags": [
+  {
+   "cue": "rose",
+   "kind": "ideas",
+   "t": "stated moral",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1, Ideas explanation)"
+  },
+  {
+   "cue": "teal",
+   "kind": "ideas",
+   "t": "“from that day on” coda",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1, Ideas explanation)"
+  },
+  {
+   "cue": "clay",
+   "kind": "prose",
+   "t": "ungrammatical slips",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1, Prose explanation: “non-idiomatic and ungrammatical slips”)"
+  }
+ ],
+ "cases_intro": {
+  "t": "A document's prose and ideas can each come from a person or an AI model, giving the following four cases:",
+  "src": "paper/sections/03_rq1_ai_vs_human.tex"
+ },
+ "cases": [
+  {
+   "ideas": "human",
+   "prose": "human",
+   "t": "Fully human",
+   "def": "A person wrote the prose and came up with the ideas."
+  },
+  {
+   "ideas": "ai",
+   "prose": "human",
+   "t": "AI ideas, human prose",
+   "def": "A person wrote, in their own words, from a model's ideas.",
+   "example": true
+  },
+  {
+   "ideas": "ai",
+   "prose": "ai",
+   "t": "Fully AI",
+   "def": "A model wrote the prose and came up with the ideas."
+  },
+  {
+   "ideas": "human",
+   "prose": "ai",
+   "t": "Human ideas, AI prose",
+   "def": "A person came up with the ideas, and a model wrote, rewrote, or polished the prose."
+  }
+ ],
+ "cases_src": "paper/sections/03_rq1_ai_vs_human.tex itemize (lines 30-33)",
+ "stats_model": "Claude Fable 5.2",
+ "stats": [
+  {
+   "v": 97,
+   "t": "Who had the ideas",
+   "kind": "ideas"
+  },
+  {
+   "v": 94,
+   "t": "Who wrote the prose",
+   "kind": "prose"
+  },
+  {
+   "v": 91,
+   "t": "Both correct",
+   "kind": "both"
+  }
+ ],
+ "stats_src": "labels: paper Figure 1 (paper/figures/data/figure1_fable_sources.json rq1.rows[].figure_label); values: paper/sections/03_rq1_ai_vs_human.tex line 69 (Claude Fable 5.2: 94%, 97%; 91% on both labels) and footnote line 8; data: figure1_fable_sources.json rq1.rows percent 96.6 / 94.4 / 91.4, paper/tables/rq1_quadrants.tex Fable row, paper/appendix/rq1_timeline.tex line 86",
+ "climb_label": {
+  "t": "Accuracy on both labels",
+  "src": "paper/sections/03_rq1_ai_vs_human.tex line 69 (“accuracy on both labels climbed from 27% …”)"
+ },
+ "climb": [
+  {
+   "t": "GPT-4o",
+   "lab": "OpenAI",
+   "year": "2024",
+   "v": 27
+  },
+  {
+   "t": "GPT-5.2",
+   "lab": "OpenAI",
+   "year": "2025",
+   "v": 59
+  },
+  {
+   "t": "Claude Fable 5.2",
+   "lab": "Anthropic",
+   "year": "2026",
+   "v": 91
+  }
+ ],
+ "climb_src": "values and years: paper/sections/03_rq1_ai_vs_human.tex line 69 (27% for GPT-4o in 2024, 59% for GPT-5.2 in 2025, 91% for present-day frontier models, Claude Fable 5.2); Both (avg.) column of paper/appendix/rq1_timeline.tex lines 22 (27.2), 39 (58.6), 86 (91.4); release dates paper/appendix/detectors.tex lines 54, 50, 25 (Fable 2026-11-09)",
+ "detectors": {
+  "t": "The latest models (Claude Fable 5.2, GPT-6.1 Sol, Gemini 4 Carbon) match trained detectors like Pangram.",
+  "src": "paper/sections/01_abstract.tex (sentence cut after “Pangram”)"
+ },
+ "ui": [
+  "Both",
+  "Ideas",
+  "Prose",
+  "Human",
+  "AI",
+  "Explore",
+  "Four cases",
+  "This story",
+  "Model showcase",
+  "Show (aria-label of the Explore buttons)"
+ ]
+}
