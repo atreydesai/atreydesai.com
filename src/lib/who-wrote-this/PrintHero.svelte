@@ -11,6 +11,7 @@
 	import StepDashes from "./StepDashes.svelte";
 	import { field, chart } from "./field.svelte";
 	import { createPrint, type Anchor, type Box, type Print } from "./print";
+	import RIDGE from "./print_text.json";
 	import C from "./content.json";
 	import H from "./hero.json";
 	import { MODEL, LAB as LABC, RQ } from "./palette";
@@ -66,7 +67,7 @@
 			(C.sections[0].example?.text ?? []).map((s) => s.t).join(""), ...C.timeline.steps.map((s) => s.t), ...C.art.decipher.map((d) => d.excerpt.t), C.closing.t,
 		];
 		print = createPrint({
-			text, labs: LABS, litText: LIT.excerpt.t,
+			text, labs: LABS, litText: LIT.excerpt.t, ridge: RIDGE,
 			colors: { human: "#C85A82", ai: "#461E47", lit: "#437E8E", ink: "#14202D", labs: ["#C85A82", "#437E8E", "#461E47"], other: "#8A8F98" },
 		});
 		let pointer: { x: number; y: number } | null = null;

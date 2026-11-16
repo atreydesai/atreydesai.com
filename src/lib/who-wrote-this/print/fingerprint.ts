@@ -169,6 +169,7 @@ export type Glyphs = {
 	n: number;
 	x: Float32Array; y: Float32Array; c: Float32Array; s: Float32Array; a: Float32Array; q: Uint8Array;
 	ch: string[];
+	ti: Int32Array; // per glyph: where its letter sits in the text (not wrapped)
 	start: Int32Array; // per ridge: first glyph, plus one past the end
 	box: Float32Array; // per ridge: minx, miny, maxx, maxy
 };
@@ -196,19 +197,20 @@ export function setType(ridges: Float32Array[], ds: number, text: string, offset
 	const f = ds * TYPE;
 	const X: number[] = [], Y: number[] = [], C: number[] = [], S: number[] = [], A: number[] = [], Q: number[] = [], CH: string[] = [];
 	const start = new Int32Array(ridges.length + 1), box = new Float32Array(ridges.length * 4);
-	let ti = offset % text.length;
+	const L = text.length, TI: number[] = [];
+	let ti = offset % L; // counts on without wrapping; the letter is text[ti % L]
 	ridges.forEach((r, ri) => {
 		start[ri] = X.length;
 		let minx = 9, miny = 9, maxx = -9, maxy = -9;
 		for (let i = 0; i < r.length; i += 2) { if (r[i] < minx) minx = r[i]; if (r[i] > maxx) maxx = r[i]; if (r[i + 1] < miny) miny = r[i + 1]; if (r[i + 1] > maxy) maxy = r[i + 1]; }
 		box.set([minx, miny, maxx, maxy], ri * 4);
 		// begin each ridge on a word
-		for (let g = 0; g < 40 && text[ti] !== " "; g++) ti = (ti + 1) % text.length;
-		while (text[ti] === " ") ti = (ti + 1) % text.length;
+		for (let g = 0; g < 40 && text[ti % L] !== " "; g++) ti++;
+		while (text[ti % L] === " ") ti++;
 		const n = r.length / 2;
 		let seg = 0, segStart = 0, segLen = Math.hypot(r[2] - r[0], r[3] - r[1]), at = f * 0.3;
 		for (;;) {
-			const ch = text[ti];
+			const ch = text[ti % L];
 			const adv = (widthOf(ch) + 0.045) * f, mid = at + adv / 2;
 			while (seg < n - 2 && mid > segStart + segLen) { segStart += segLen; seg++; segLen = Math.hypot(r[seg * 2 + 2] - r[seg * 2], r[seg * 2 + 3] - r[seg * 2 + 1]); }
 			if (mid + adv / 2 > segStart + segLen && seg >= n - 2) break;
@@ -217,14 +219,14 @@ export function setType(ridges: Float32Array[], ds: number, text: string, offset
 				const x0 = r[seg * 2], y0 = r[seg * 2 + 1], dx = r[seg * 2 + 2] - x0, dy = r[seg * 2 + 3] - y0, l = Math.hypot(dx, dy) || 1;
 				const x = x0 + dx * u, y = y0 + dy * u;
 				const q = ((Math.round((Math.atan2(dy, dx) / TAU) * STEPS) % STEPS) + STEPS) % STEPS;
-				X.push(x); Y.push(y); C.push(COS[q]); S.push(SIN[q]); Q.push(q); A.push(ink(x, y)); CH.push(ch);
+				X.push(x); Y.push(y); C.push(COS[q]); S.push(SIN[q]); Q.push(q); A.push(ink(x, y)); CH.push(ch); TI.push(ti);
 			}
 			at += adv;
-			ti = (ti + 1) % text.length;
+			ti++;
 		}
 	});
 	start[ridges.length] = X.length;
-	return { n: X.length, x: Float32Array.from(X), y: Float32Array.from(Y), c: Float32Array.from(C), s: Float32Array.from(S), a: Float32Array.from(A), q: Uint8Array.from(Q), ch: CH, start, box };
+	return { n: X.length, x: Float32Array.from(X), y: Float32Array.from(Y), c: Float32Array.from(C), s: Float32Array.from(S), a: Float32Array.from(A), q: Uint8Array.from(Q), ch: CH, ti: Int32Array.from(TI), start, box };
 }
 
 // ───────────────────────────────────────────────────────────── the cast
@@ -253,6 +255,7 @@ type Item = {
 	cap: number; // the tallest its sprite may be, device px
 	lensPx: number; lensFont: string; // the last face set for it in the lens
 	hit: { id: string };
+	aim: number; // the ink it settles at once formed (threads end at this strength, so there is no jump to the sprite)
 	fo: number; // 0..1: how far it has come forward as the print being inspected
 	rest: Pose; // where it sits and how present it is, for the frame just drawn
 };
@@ -300,7 +303,7 @@ export function patternSpec(family: "main" | "human" | "ai" | "lab" | "writer" |
 type Layout = {
 	key: string; sx: number; sy: number; sw: number; sh: number; wide: boolean;
 	main: number[]; // x, y, r
-	human1: number[]; ai1: number[]; human2: number[];
+	human1: number[]; ai1: number[]; human2: number[]; crowd0: number[];
 	lab2: number[][]; lab3: number[][];
 	crowd: number[][]; // x, y, r, rot
 	lit: number; litR: number;
@@ -313,22 +316,27 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	const body = opts.text.join("   ") + "   ";
 	sharedText = body; // the small prints elsewhere on the page set the same text
 	const litBody = opts.litText + "   ";
+	// each print's own passage (a lab's prose on its print, human prose on the human print and the crowd); the paper's
+	// text wherever there is none
+	const own = (t: string | undefined) => { const c = (t ?? "").replace(/\s+/g, " ").trim(); return c.length > 20 ? c + "   " : body; };
+	const ridge = opts.ridge ?? {};
 	const C = opts.colors;
 	const R0 = rng(seed);
 
 	const make = (id: string, sp: Spec, gap: number, color: string, text = body): Item => ({
 		id, spec: sp, gap, color, rgb: hexRgb(color), text, offset: Math.floor(R0() * text.length), phase: R0() * TAU,
-		lines: false, edge: 1, cap: 2600, lensPx: 0, lensFont: "", hit: { id }, fo: 0, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
+		lines: false, edge: 1, cap: 2600, lensPx: 0, lensFont: "", hit: { id }, aim: 1, fo: 0, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
 		rest: { x: 0, y: 0, r: 0, rot: 0, a: 0 },
 	});
 
 	const main = make("main", patternSpec("main", 0, seed), 7.4, C.ink);
-	const human = make("human", patternSpec("human", 0, seed), 6.6, C.human);
-	const ai = make("ai", patternSpec("ai", 0, seed), 6.6, C.ai);
-	const labs = opts.labs.map((name, i) => make(`lab:${name}`, patternSpec("lab", i, seed), i < 3 ? 5.2 : 4.6, C.labs[i] ?? C.other));
+	const human = make("human", patternSpec("human", 0, seed), 6.6, C.human, own(ridge.human));
+	const ai = make("ai", patternSpec("ai", 0, seed), 6.6, C.ai, own(ridge.ai));
+	const labs = opts.labs.map((name, i) => make(`lab:${name}`, patternSpec("lab", i, seed), i < 3 ? 5.2 : 4.6, C.labs[i] ?? C.other, own(ridge.labs?.[name])));
 	for (const it of labs) it.cap = 640;
+	const writerText = ridge.writers?.length ? ridge.writers.map(own) : [body];
 	const crowd: Item[] = [];
-	for (let i = 0; i < MAX_CROWD; i++) { const it = make(`writer:${i}`, patternSpec("writer", i, seed), 3.7, C.human); it.lines = true; it.cap = 200; crowd.push(it); }
+	for (let i = 0; i < MAX_CROWD; i++) { const it = make(`writer:${i}`, patternSpec("writer", i, seed), 3.7, C.human, writerText[i % writerText.length]); it.lines = true; it.cap = 200; crowd.push(it); }
 	const lit = make("lit", patternSpec("lit", 0, seed), 5.8, C.lit, litBody);
 	lit.offset = 0;
 	const cast = [main, human, ai, lit, ...labs];
@@ -356,7 +364,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	let focusItem: Item | null = null, focusTwin: Item | null = null, dim = 0;
 	const RECEDE = 0.6;
 	const inkOf = (it: Item) => { const a = it.rest.a; return a * lerp(1 - (1 - RECEDE) * dim, 1, it.fo) + it.fo * (1 - a) * ss(0.1, 0.4, a); };
-	let lensR = 0, lensShown = false;
+	let lensR = 0, lensShown = false, lensTop: Item | null = null;
+	let readKey = "", readText: string | null = null;
 	const sway = (it: Item) => (breathing ? 0.008 * Math.sin(bt * 0.37 + it.phase * 1.7) : 0);
 	let disposed = false;
 	let lastGoal = 0, leap: { from: number; to: number; t: number; dur: number } | null = null;
@@ -495,7 +504,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		let best = 0, bd = 1e9;
 		pts.forEach((p, i) => { const d = (p[0] - tx) ** 2 + (p[1] - ty) ** 2; if (d < bd) { bd = d; best = i; } });
 		const litR = Math.min(K.h * 0.19, K.w * 0.23);
-		L = { key, sx: S.x | 0, sy: S.y | 0, sw: S.w | 0, sh: S.h | 0, wide, main: [cx, cy, r0], human1: [cx - S.w * 0.25, cy, r1], ai1: [cx + S.w * 0.25, cy, r1], human2, lab2, lab3, crowd: pts, lit: best, litR };
+		L = { key, sx: S.x | 0, sy: S.y | 0, sw: S.w | 0, sh: S.h | 0, wide, main: [cx, cy, r0], human1: [cx - S.w * 0.25, cy, r1], ai1: [cx + S.w * 0.25, cy, r1], human2, crowd0: [K.x + K.w / 2, K.y + K.h / 2, Math.min(K.h * 0.34, K.w * 0.34)], lab2, lab3, crowd: pts, lit: best, litR };
 		// full sizes decide ridge counts and sprite sizes
 		main.full = r0; human.full = r1; ai.full = r1;
 		labs.forEach((it, i) => (it.full = lab2[i][2]));
@@ -513,15 +522,17 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const p1 = clamp01(e), p2 = clamp01(e - 1), p3 = clamp01(e - 2);
 		const q1 = ease(p1), q2 = ease(p2);
 		// each division is drawn as threads (see Split); the cached prints only hold the two ends of it
-		const IN = (p: number) => ss(0.86, 1, p), OUT = (p: number) => 1 - ss(0, 0.12, p);
+		const IN = (p: number) => ss(0.84, 1, p), OUT = (p: number) => 1 - ss(0, 0.12, p);
 		set(main, l.main[0], l.main[1], l.main[2], 0, OUT(p1));
-		const hp = mix3(l.human1, l.human2, q2);
+		// the human print steps out as the labs form (it does not travel); at 3 it returns in the middle of the stage,
+		// only as the threads the crowd blooms from
+		const hp = p3 > 0 ? l.crowd0 : l.human1;
 		// level 2 is about the labs only: the human print leaves (Atrey, 16 Nov), and the crowd re-forms from its place at 3
-		set(human, hp[0], hp[1], hp[2], 0, IN(p1) * lerp(1, 0, q2) * OUT(p3));
+		set(human, hp[0], hp[1], hp[2], 0, IN(p1) * (1 - ss(0, 0.22, p2)) * OUT(p3));
 		set(ai, l.ai1[0], l.ai1[1], l.ai1[2], 0, IN(p1) * OUT(p2));
 		// 2 → 3: the labs draw up into a row and step back
 		labs.forEach((it, i) => {
-			const t3 = ease(clamp01(p3 * 1.25 - i * 0.02));
+			const t3 = ease(clamp01(p3 * 2.3 - i * 0.03)); // gone to their row before the crowd forms
 			const p = mix3(l.lab2[i], l.lab3[i], t3);
 			set(it, p[0], p[1], p[2], 0, IN(p2) * lerp(1, 0.42, t3));
 		});
@@ -545,6 +556,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 				set(it, x, y, lerp(c[2], l.litR, grow), c[3] * (1 - grow), IN(p3) * (1 - ss(0.25, 0.8, grow)));
 				set(lit, x, y, it.rest.r, it.rest.rot, ss(0.1, 0.7, grow));
 			} else set(it, x, y, c[2], c[3], IN(p3) * out * room * lerp(0.86, 0.62, grow));
+			it.aim = lerp(0.86, 0.62, grow);
 		}
 	}
 
@@ -649,7 +661,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	/** One division at progress p. The parent comes apart into its pieces, each piece travels to its child's place,
 	 * and there its threads re-form, top to bottom, into the child's own ridges. */
 	function weave(g: CanvasRenderingContext2D, sp: Split, p: number, aFrom: number, dashed: boolean, gain: number) {
-		const env = ss(0, 0.1, p) * (1 - ss(0.9, 1, p)) * gain;
+		const env = ss(0, 0.14, p) * (1 - ss(0.88, 1, p)) * gain;
 		if (env < 0.01) return;
 		const P = sp.parent.rest, wp = sp.parent.ds * P.r * 0.27;
 		g.lineCap = "butt"; g.lineJoin = "round";
@@ -659,9 +671,13 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			const c = Math.cos(K.rot) * K.r, sn = Math.sin(K.rot) * K.r;
 			const d = sp.kd[ki] * 0.16;
 			const m = ease((p - 0.02 - d) / 0.38); // the piece travels
-			// the piece at rest in the parent, and carried to the child (grown or shrunk to the child's size)
-			const k0 = lerp(P.r, K.r * sp.cs[ki], m), ox = lerp(P.x, K.x - sp.cx[ki] * k0, m), oy = lerp(P.y, K.y - sp.cy[ki] * k0, m);
-			const wk = kid.ds * K.r * (kid.lines ? 0.4 : 0.27), aTo = kid.lines ? 0.85 : 0.8;
+			// the piece at rest in the parent, and carried to the child: it grows or shrinks to the child's size and turns
+			// to the child's tilt on the way, as one rigid piece, so that re-forming is not also a twist
+			const k0 = lerp(P.r, K.r * sp.cs[ki], m), pcx = sp.cx[ki], pcy = sp.cy[ki];
+			const ox = lerp(P.x + pcx * P.r, K.x, m), oy = lerp(P.y + pcy * P.r, K.y, m);
+			const rc = Math.cos(K.rot * m) * k0, rs = Math.sin(K.rot * m) * k0;
+			// threads end as heavy as the cached print they hand over to
+			const wk = kid.ds * K.r * (kid.lines ? 0.4 : 0.2), aTo = (kid.lines ? 0.8 : 0.62) * kid.aim;
 			const hue = sp.hue[ki][Math.round(ss(0.1, 0.8, m) * (HUES - 1))];
 			for (let b = 0; b < BINS; b++) {
 				let any = false;
@@ -671,9 +687,9 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 					if (!any) { any = true; g.beginPath(); }
 					const u = 1 - f;
 					for (let i = sp.off[th], e2 = sp.off[th + 1], i0 = i; i < e2; i++) {
-						const sx = sp.src[i * 2], sy = sp.src[i * 2 + 1], dx = sp.dst[i * 2], dy = sp.dst[i * 2 + 1];
-						const x = u * (ox + sx * k0) + f * (K.x + dx * c - dy * sn);
-						const y = u * (oy + sy * k0) + f * (K.y + dx * sn + dy * c);
+						const sx = sp.src[i * 2] - pcx, sy = sp.src[i * 2 + 1] - pcy, dx = sp.dst[i * 2], dy = sp.dst[i * 2 + 1];
+						const x = u * (ox + sx * rc - sy * rs) + f * (K.x + dx * c - dy * sn);
+						const y = u * (oy + sx * rs + sy * rc) + f * (K.y + dx * sn + dy * c);
 						if (i === i0) g.moveTo(x, y); else g.lineTo(x, y);
 					}
 				}
@@ -697,7 +713,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		if (splits[2] && splits[2].kids.length !== live) splits[2] = null;
 		if (p1 > 0 && p1 < 1) { splits[0] ??= buildSplit(main, [human, ai], l.main, [l.human1, l.ai1]); if (splits[0]) weave(g, splits[0], p1, 0.8, true, gain); }
 		if (p2 > 0 && p2 < 1) { splits[1] ??= buildSplit(ai, labs, l.ai1, l.lab2); if (splits[1]) weave(g, splits[1], p2, 0.8, true, gain); }
-		if (p3 > 0 && p3 < 1) { splits[2] ??= buildSplit(human, crowd.slice(0, live), l.human2, l.crowd); if (splits[2]) weave(g, splits[2], p3, 0.5, false, gain); }
+		if (p3 > 0 && p3 < 1) { splits[2] ??= buildSplit(human, crowd.slice(0, live), l.crowd0, l.crowd); if (splits[2]) weave(g, splits[2], clamp01((p3 - 0.1) / 0.9), 0.5, false, gain); } // the labs start for their row first
 	}
 
 	// ── drawing
@@ -898,7 +914,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const lv = Math.round(e);
 		const rest = lv <= 0 ? main : lv === 1 ? ai : lv === 2 ? labs[0] : lit;
 		const want = (free || rest.rest.r > 4) && stage.w > 40 && stage.h > 40 ? 1 : 0;
-		const tx = free ? ptr!.x : rest.rest.x + rest.rest.r * HW * 0.36, ty = free ? ptr!.y : rest.rest.y + rest.rest.r * 0.34;
+		// (at level 2 it rests high on the print, so a card hung beside it stays above the row of names)
+		const tx = free ? ptr!.x : rest.rest.x + rest.rest.r * HW * (lv === 2 ? 0.1 : 0.36), ty = free ? ptr!.y : rest.rest.y + rest.rest.r * (lv === 2 ? -0.42 : 0.34);
 		let lensMoving = false;
 		if (s.reduce || free || lensA < 0.02) { lensX = tx; lensY = ty; }
 		else {
@@ -915,6 +932,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		if (lensA > 0.01) {
 			// magnify the print under the glass; between prints, look at the edge of the nearest one within reach
 			const top = nearest(lensX, lensY, rad * 0.6);
+			lensTop = top;
 			let ax = 0, ay = 0;
 			if (top && !within(top, lensX, lensY)) {
 				const p = top.rest, n = Math.hypot((lensX - p.x) / (p.r * HW), (lensY - p.y) / p.r) || 1;
@@ -1044,5 +1062,43 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	/** where the lens is this frame, for the host's card; null when it is not shown */
 	function lens() { return lensShown ? { x: lensX, y: lensY, r: lensR } : null; }
 
-	return { draw, anchors, hit, dispose, busy, lens };
+	/** The words the lens is on: the nearest ridge's text around the point it looks at, as whole words (up to 12). */
+	function lensText(): string | null {
+		const it = lensTop;
+		if (!lensShown || !it || !it.ridges || it.rest.r < 1) return null;
+		const p = it.rest, cr = Math.cos(p.rot), sr = Math.sin(p.rot);
+		const dx = (lensX + aimX - p.x) / p.r, dy = (lensY + aimY - p.y) / p.r;
+		const ux = dx * cr + dy * sr, uy = -dx * sr + dy * cr;
+		const G = glyphsOf(it);
+		let best = -1, bd = 1e9, ridgeOf = 0;
+		for (let ri = 0, nr = it.ridges.length; ri < nr; ri++) {
+			const b = ri * 4, ox = Math.max(G.box[b] - ux, 0, ux - G.box[b + 2]), oy = Math.max(G.box[b + 1] - uy, 0, uy - G.box[b + 3]);
+			if (ox * ox + oy * oy >= bd) continue;
+			for (let i = G.start[ri], end = G.start[ri + 1]; i < end; i++) {
+				const ex = G.x[i] - ux, ey = G.y[i] - uy, d = ex * ex + ey * ey;
+				if (d < bd) { bd = d; best = i; ridgeOf = ri; }
+			}
+		}
+		if (best < 0) return null;
+		const key = it.id + "|" + fontEpoch + "|" + best;
+		if (key === readKey) return readText;
+		readKey = key;
+		// the ridge's stretch of text, cut back to whole words, and a window of them around the letter under the glass
+		const T = it.text, n = T.length, a = G.ti[G.start[ridgeOf]], b = G.ti[G.start[ridgeOf + 1] - 1];
+		const at = (i: number) => T[((i % n) + n) % n];
+		let from = a, to = b;
+		if (at(a - 1) !== " ") { while (from <= b && at(from) !== " ") from++; }
+		if (at(b + 1) !== " ") { while (to >= from && at(to) !== " ") to--; }
+		const words: string[] = [];
+		let cur = "", mine = 0;
+		for (let i = from; i <= to + 1; i++) {
+			const ch = i <= to ? at(i) : " ";
+			if (ch === " ") { if (cur) { words.push(cur); cur = ""; } } else { cur += ch; if (i <= G.ti[best]) mine = words.length; }
+		}
+		if (words.length < 3) return (readText = null);
+		const take = Math.min(12, words.length), first = Math.max(0, Math.min(words.length - take, mine - (take >> 1)));
+		return (readText = words.slice(first, first + take).join(" "));
+	}
+
+	return { draw, anchors, hit, dispose, busy, lens, lensText };
 };

@@ -4,6 +4,7 @@
 	// ?dpr=2 forces the backing scale, ?lens=x,y parks the lens.
 	import { onMount } from "svelte";
 	import C from "$lib/who-wrote-this/content.json";
+	import RIDGE from "$lib/who-wrote-this/print_text.json";
 	import { createPrint } from "$lib/who-wrote-this/print/fingerprint";
 	import type { Anchor, Box } from "$lib/who-wrote-this/print/contract";
 	import { printSprite, printAspect, setSpriteText, type SpriteOpts } from "$lib/who-wrote-this/print/sprites";
@@ -28,7 +29,7 @@
 	let hover = $state("");
 	let quiet = $state<Box>({ x: 0, y: 0, w: 0, h: 0 });
 	let narrow = $state(false);
-	let card = $state<{ x: number; y: number; r: number; id: string } | null>(null);
+	let card = $state<{ x: number; y: number; r: number; id: string; words: string } | null>(null);
 	let gallery = $state(false);
 	let shelf: HTMLDivElement | undefined = $state();
 	let built = $state("");
@@ -79,7 +80,7 @@
 		let focus: string | null = null;
 		const parked = q.get("lens")?.split(",").map(Number);
 		const print = createPrint({
-			text, labs, litText,
+			text, labs, litText, ridge: RIDGE,
 			colors: { human: "#C85A82", ai: "#461E47", lit: "#437E8E", ink: "#14202D", labs: ["#C85A82", "#437E8E", "#461E47"], other: "#8A8F98" },
 		});
 		const ctx = canvas.getContext("2d")!;
@@ -122,7 +123,8 @@
 			// the inspector, the way the host will do it: whatever is under the lens is the focus, and gets a card (?nofocus: off)
 			const ln = print.lens?.() ?? null;
 			const under = ln && !nofocus ? (print.hit(ln.x, ln.y)?.id ?? null) : null;
-			if (under !== focus || (ln ? !card || card.x !== ln.x || card.y !== ln.y : !!card)) { focus = under; card = ln && under ? { ...ln, id: under } : null; }
+			const words = print.lensText?.() ?? "";
+			if (under !== focus || (ln ? !card || card.x !== ln.x || card.y !== ln.y || card.words !== words : !!card)) { focus = under; card = ln && under ? { ...ln, id: under, words } : null; }
 			cpu += c; gap += dt * 1000; worst = Math.max(worst, c); n++;
 			if (now - tick > 500) {
 				ms = `draw ${(cpu / n).toFixed(2)} ms (worst ${worst.toFixed(1)}) · ${(n * 2)} draws/s · dpr ${dpr}`;
@@ -166,7 +168,7 @@
 			<span class="tag" class:small={a.r < 40} style="left:{a.x}px; top:{a.y + a.r + (narrow ? 2 : 5)}px; opacity:{a.alpha}">{label(a.id)}</span>
 		{/if}
 	{/each}
-	{#if card}<div class="card" style="left:{card.x + card.r + 10}px; top:{card.y}px">{card.id}</div>{/if}
+	{#if card}<div class="card" style="left:{card.x + card.r + 10}px; top:{card.y}px">{card.id}<i>{card.words}</i></div>{/if}
 	<div class="bar">
 		{#each [0, 1, 2, 3] as n}<button class:on={level === n} onclick={() => (level = n)}>{n}</button>{/each}
 		<span>{ms}</span>
@@ -189,5 +191,6 @@
 	.bar button { width: 26px; height: 26px; border: 1px solid #14202D; background: #F3F3EF; border-radius: 2px; font: inherit; font-weight: 600; cursor: pointer; }
 	.bar button.on { background: #14202D; color: #fff; }
 	.bar b { font-weight: 600; }
+	.card i { display: block; font-weight: 400; max-width: 260px; white-space: normal; color: #5A6270; }
 	.card { position: absolute; transform: translateY(-50%); padding: 6px 10px; background: #fff; border-radius: 3px; box-shadow: 0 6px 20px rgba(20, 32, 45, 0.14); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; }
 </style>

@@ -75,13 +75,16 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 		const steps = px < 40 ? 6 : 14;
 		for (let i = 0; i < steps; i++) {
 			const u = 0.42 + (0.56 * i) / (steps - 1);
-			g.globalAlpha = (lost * lost * 0.51) / steps;
+			g.globalAlpha = (lost * lost * 0.3) / steps;
 			g.beginPath(); g.ellipse(ox + (R() - 0.5) * k * 0.1, oy + (R() - 0.5) * k * 0.1, k * HW * u, k * u, 0, 0, 6.2832); g.fill();
 		}
 	}
 	// and it smears: the ridges are laid down more than once, slipped along one direction
 	const passes = lost > 0.05 ? 3 : 1, slipA = R() * 6.2832, slip = lost * (gap / r) * 1.15;
-	const strength = (0.3 + 0.7 * c) / (passes === 1 ? 1 : 1.9);
+	const strength = (0.42 + 0.58 * c) / (passes === 1 ? 1 : 1.9);
+	// However faint, it is still a whole fingerprint: every ridge is laid once, unbroken and quiet, under whatever
+	// broke or smeared. Low clarity takes legibility away, not the print.
+	const floor = lost > 0.05 ? 0.2 + 0.2 * lost : 0;
 
 	if (text) {
 		if (!fontWatch && typeof document !== "undefined" && document.fonts?.load) {
@@ -92,7 +95,7 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 		const T = setType(G.ridges, G.ds, body, Math.floor(R() * body.length), G.field.ink);
 		g.font = `500 ${G.ds * TYPE * k}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
 		// a hairline under the type keeps each ridge whole (it goes first as the print degrades)
-		g.lineWidth = Math.max(0.5, G.ds * TYPE * k * 0.07); g.globalAlpha = 0.16 * c * c;
+		g.lineWidth = Math.max(0.5, G.ds * TYPE * k * (0.07 + 0.3 * lost)); g.globalAlpha = Math.max(0.16 * c * c, floor); g.lineCap = "round"; g.lineJoin = "round";
 		g.beginPath();
 		for (const rd of G.ridges) { g.moveTo(ox + rd[0] * k, oy + rd[1] * k); for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k); }
 		g.stroke();
@@ -101,7 +104,7 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 			let run = 0, on = true;
 			for (let i = 0; i < T.n; i++) {
 				// letters drop out in runs, so words go missing rather than a uniform fade
-				if (--run <= 0) { on = lost < 0.05 || R() > lost * 0.85; run = on ? 2 + R() * 30 * c * c : 2 + R() * 14 * lost; }
+				if (--run <= 0) { on = lost < 0.05 || R() > lost * 0.6; run = on ? 2 + R() * 30 * c * c : 2 + R() * 14 * lost; }
 				if (!on) continue;
 				g.globalAlpha = T.a[i] * strength * (p ? 0.55 : 1);
 				g.setTransform(T.c[i], T.s[i], -T.s[i], T.c[i], ox + T.x[i] * k + sx, oy + T.y[i] * k + sy);
@@ -112,6 +115,12 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 	} else {
 		g.lineCap = "round"; g.lineJoin = "round";
 		const lw = G.ds * k * 0.42;
+		if (floor) {
+			g.lineWidth = lw; g.globalAlpha = floor * 0.6; // ink lines are heavier than type, so their floor is lower
+			g.beginPath();
+			for (const rd of G.ridges) { g.moveTo(ox + rd[0] * k, oy + rd[1] * k); for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k); }
+			g.stroke();
+		}
 		for (let p = 0; p < passes; p++) {
 			const sx = Math.cos(slipA) * slip * p * k, sy = Math.sin(slipA) * slip * p * k;
 			for (const rd of G.ridges) {
