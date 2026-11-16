@@ -8,7 +8,8 @@
 	import { SITE_URL } from "$lib/seo";
 	import Icon from "$lib/who-wrote-this/Icon.svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
-	import SideNav from "$lib/who-wrote-this/SideNav.svelte";
+	import SectionNav from "$lib/who-wrote-this/SectionNav.svelte";
+	import FootnoteList from "$lib/who-wrote-this/FootnoteList.svelte";
 	import PrintMark from "$lib/who-wrote-this/PrintMark.svelte";
 	import { startElastic } from "$lib/who-wrote-this/elastic";
 	import { field } from "$lib/who-wrote-this/field.svelte";
@@ -38,11 +39,42 @@
 
 	// the side rail's stops, and the scroll-speed spacing (elastic.ts) for every [data-lag] block on the page
 	const stops = [
-		{ id: "levels", label: C.meta.title.t },
-		{ id: C.timeline.id, label: C.timeline.title.t.replace(/\.$/, "") },
-		...C.sections.map((s) => ({ id: s.id, label: s.title })),
+		{ id: "levels", short: "Intro", label: C.meta.title.t },
+		{ id: C.timeline.id, short: "Over time", label: C.timeline.title.t.replace(/\.$/, "") },
+		{ id: "human-or-ai", short: "Human or AI", label: C.sections[0].title },
+		{ id: "which-ai", short: "Which AI", label: C.sections[1].title },
+		{ id: "which-human", short: "Which human", label: C.sections[2].title },
+		{ id: "who-can-be-identified", short: "Familiarity", label: C.sections[3].title },
+		{ id: "anonymity", short: "Anonymity", label: C.sections[4].title },
 	];
-	onMount(() => startElastic(document));
+	// the lede's key phrases, highlighted (Atrey, 16 Nov)
+	const HL = ["Frontier models now identify AI text as well as specialized detectors", "given a single text", "even the specific person"];
+	const lede = C.lede.map((s) => s.t).join(" ");
+	const ledeParts = (() => {
+		const out: { t: string; hl: boolean }[] = [];
+		let rest = lede;
+		while (rest.length) {
+			let at = -1, hit = "";
+			for (const h of HL) { const i = rest.indexOf(h); if (i >= 0 && (at < 0 || i < at)) { at = i; hit = h; } }
+			if (at < 0) { out.push({ t: rest, hl: false }); break; }
+			if (at > 0) out.push({ t: rest.slice(0, at), hl: false });
+			out.push({ t: hit, hl: true });
+			rest = rest.slice(at + hit.length);
+		}
+		return out;
+	})();
+	// the top bar hides while scrolling down and comes back on the way up, so it never covers a pinned picture for long
+	let barHidden = $state(false);
+	onMount(() => {
+		let lastY = scrollY;
+		const onScroll = () => {
+			const y = scrollY, d = y - lastY;
+			if (Math.abs(d) > 6) { barHidden = d > 0 && y > 160; lastY = y; }
+		};
+		addEventListener("scroll", onScroll, { passive: true });
+		const stop = startElastic(document);
+		return () => { removeEventListener("scroll", onScroll); stop(); };
+	});
 
 	const jsonLd = [
 		{
@@ -85,15 +117,16 @@
 			color: #14202D;
 		}
 		html.wwt-field-on body, html.wwt-field-on.dark body { background-image: none; }
+		html ::selection { background: rgb(126, 34, 62); color: #fff; }
 	</style>`}
 </svelte:head>
 
 <DotField />
 
 <div class="wwt" data-justify="off">
-	<SideNav {stops} />
-	<header class="top">
+	<header class="top" class:hide={barHidden}>
 		<a class="brand" href="/">Atrey Desai</a>
+		<SectionNav {stops} />
 		<nav aria-label="Site">
 			{#each nav as link}<a href={link.href}>{link.name}</a>{/each}
 		</nav>
@@ -128,7 +161,7 @@
 		<div class="breath" aria-hidden="true"></div>
 
 		<div class="lede" data-lag="1">
-			{#each C.lede as s}{s.t + " "}{/each}
+			{#each ledeParts as p}{#if p.hl}<mark class="hl">{p.t}</mark>{:else}{p.t}{/if}{/each}
 		</div>
 
 		<div class="breath" aria-hidden="true"></div>
@@ -145,18 +178,19 @@
 		<Anonymity />
 		<div class="breath" aria-hidden="true"></div>
 
+		<!-- the last word: the paper's closing line, as the page's final chapter -->
+		<section class="finale" aria-label={C.closing.t}>
+			<PrintMark family="main" color="#E8E8E3" px={300} text />
+			<p class="closing">{C.closing.t}</p>
+		</section>
 		<footer class="end">
-			<div class="close-row">
-				<!-- the one print again: the page ends where it began -->
-				<PrintMark family="main" color="#14202D" px={132} text />
-				<p class="closing" data-lag="1">{C.closing.t}</p>
-			</div>
 			<p class="byline small">
 				{#each C.meta.authors as a, i}<span>{a.name}{#if a.equal}*{/if}{#if i < C.meta.authors.length - 1}{", "}{/if}</span>{/each}
 			</p>
 			<div class="links">
 				{#each C.meta.links as l}<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>{/each}
 			</div>
+			<FootnoteList />
 		</footer>
 	</article>
 
@@ -197,7 +231,15 @@
 	:where(.wwt) :global(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
 	.top, article, .site-foot { max-width: 72rem; margin-inline: auto; }
-	.top { display: flex; align-items: baseline; justify-content: space-between; padding-block: 22px 0; }
+	/* the top bar: fixed, the section navigation centred; it hides while scrolling down */
+	.top {
+		position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
+		padding: 10px max(16px, calc(50vw - 36rem)); background: rgba(232, 232, 227, .94); border-bottom: 1px solid rgba(20, 32, 45, .06);
+		transition: transform .3s var(--ease, ease);
+	}
+	.top.hide { transform: translateY(-100%); }
+	.top > nav { justify-self: end; }
+	article { padding-top: 56px; }
 	.brand { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; text-decoration: none; }
 	.top nav { display: flex; gap: 20px; font-size: 14px; color: var(--ink2); }
 	.top nav a { text-decoration: none; }
@@ -238,9 +280,15 @@
 	.wwt :global(.context) { margin-top: 14px; max-width: 44rem; font-size: 17px; line-height: 1.6; color: var(--ink); }
 	.todo { margin-top: 28px; height: 180px; display: grid; place-items: center; border: 1.5px dashed var(--axis); border-radius: 3px; color: var(--ink2); font-size: 13px; }
 
-	.end { padding-block: 72px 32px; border-top: 1px solid var(--rule); }
-	.close-row { display: flex; align-items: center; gap: 28px; }
-	.closing { max-width: 30ch; font-size: clamp(24px, 3vw, 34px); line-height: 1.2; font-weight: 600; letter-spacing: -0.025em; text-wrap: balance; }
+	/* the finale: full bleed and dark, the closing line at chapter size with the one print */
+	.finale {
+		width: 100vw; margin-left: calc(50% - 50vw); min-height: 92vh; padding: 12vh max(16px, calc(50vw - 36rem));
+		background: #14202D; color: #fff; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6vw;
+	}
+	.closing { max-width: 18ch; font-size: clamp(36px, 5.2vw, 80px); line-height: 1.04; font-weight: 600; letter-spacing: -0.04em; text-wrap: balance; color: #fff; }
+	.end { padding-block: 64px 32px; }
+	/* the lede's highlights, and selection, in a deep rose (rgb 126 34 62) */
+	.lede :global(mark.hl) { color: rgb(126, 34, 62); background: linear-gradient(transparent 58%, rgba(126, 34, 62, .14) 58%); padding: 0 1px; font-weight: 500; }
 	.byline.small { font-size: 13px; color: var(--ink2); margin-top: 24px; max-width: 52rem; }
 	.site-foot { display: flex; justify-content: space-between; gap: 16px; padding-block: 28px 40px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink2); }
 	.site-foot span { display: flex; gap: 16px; }
@@ -249,6 +297,11 @@
 
 	@media (max-width: 1100px) {
 		.body { grid-template-columns: minmax(0, 1fr); }
+	}
+	@media (max-width: 760px) {
+		.finale { grid-template-columns: 1fr; gap: 6vh; min-height: 0; padding-block: 10vh; }
+		.top { grid-template-columns: auto 1fr auto; gap: 8px; }
+		.top > nav { gap: 10px; }
 	}
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }

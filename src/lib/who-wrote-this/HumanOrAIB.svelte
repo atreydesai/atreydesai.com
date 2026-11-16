@@ -8,12 +8,11 @@
 	//      words they cite; they light one at a time, then together with the conclusion under the story;
 	//   3. a showcase: Claude Fable 5.2's three numbers as giant numerals across the full width (no box, no extras).
 	// DOM only (no canvas); the step comes from a passive scroll listener; the leaders are measured only when the step
-	// or the size changes. Reveal order: the opener's headline, then the story's steps, then the Explore choice.
+	// or the size changes. Reveal order: the opener's headline, then the story's steps (prose first, then ideas).
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
-	import Reveal from "./Reveal.svelte";
 	import Footnotes from "./Footnotes.svelte";
 	import { FABLE, KIND, LAB } from "./palette";
 	import S from "./s1.json";
@@ -23,7 +22,7 @@
 	const CUE: Record<string, string> = { rose: LAB.Anthropic, teal: LAB.OpenAI, clay: FABLE.strong };
 	const kindOf: Record<string, Kind> = Object.fromEntries(E.judgments.flatMap((j) => j.cues.map((c) => [c, j.id as Kind])));
 	const J = Object.fromEntries(E.judgments.map((j) => [j.id, j])) as Record<Kind, (typeof E.judgments)[number]>;
-	const STEPS = ["read", "ideas", "prose", "both"] as const;
+	const STEPS = ["read", "prose", "ideas", "both"] as const; // prose first, as the takeaway reads ("AI prose and ideas")
 	const STEP_VH = 0.92; // scroll per step: an ordinary scroll never skips one
 
 	let step = $state(STEPS.length - 1); // settled until mounted
@@ -32,10 +31,7 @@
 	let leaders = $state<{ id: string; d: string; color: string; kind: Kind }[]>([]);
 	let wide = $state(true);
 
-	let pick = $state<"both" | Kind>("both"); // the Explore choice, after the guided steps
-	const explore = $derived(step >= STEPS.length - 1);
-	const view = $derived(explore ? (pick === "both" ? "both" : pick) : STEPS[step]);
-	$effect(() => { if (!explore) pick = "both"; });
+	const view = $derived(STEPS[step]);
 	// a dash click scrolls to that step's place in the pinned story
 	function go(i: number) {
 		const top = ms.getBoundingClientRect().top + scrollY;
@@ -51,13 +47,14 @@
 		if (!wide || !pin) { leaders = []; return; }
 		const P = pin.getBoundingClientRect();
 		const out: typeof leaders = [];
+		const pg = page.querySelector(".story")!.getBoundingClientRect();
 		for (const el of page.querySelectorAll<HTMLElement>(".cue")) {
 			const c = el.dataset.cue!, k = kindOf[c], n = notes[k];
 			if (!n) continue;
-			const rs = el.getClientRects(), r = k === "ideas" ? rs[0] : rs[rs.length - 1], nr = n.getBoundingClientRect();
-			// from the note's inner edge to the cited words: a soft horizontal S
-			const x0 = k === "ideas" ? nr.right - P.left : nr.left - P.left, y0 = nr.top - P.top + 28;
-			const x1 = k === "ideas" ? r.left - P.left - 4 : r.right - P.left + 4, y1 = r.top - P.top + r.height / 2;
+			// the cue's first line: the leader ends in the margin beside it (left notes on the left, right on the right)
+			const r = el.getClientRects()[0], nr = n.getBoundingClientRect(), left = nr.right < pg.left;
+			const x0 = left ? nr.right - P.left : nr.left - P.left, y0 = nr.top - P.top + 28;
+			const x1 = left ? pg.left - P.left - 10 : pg.right - P.left + 10, y1 = r.top - P.top + r.height / 2;
 			const mx = (x0 + x1) / 2;
 			out.push({ id: c, d: `M${x0},${y0} C${mx},${y0} ${mx},${y1} ${x1},${y1}`, color: CUE[c], kind: k });
 		}
@@ -87,17 +84,19 @@
 
 <section class="hb" id={S.id} data-rq={S.rq}>
 	<!-- 1. the opener: dark, full bleed, the question at chapter size (shared SectionOpener) -->
-	<SectionOpener n={S.n} title={S.title} takeaway={S.takeaway.t} context={S.context[0].t} accent="#C85A82"
-		prints={[{ family: "ai", color: "#9A82B4", label: KIND.ideas.label, icon: KIND.ideas.icon }, { family: "human", color: "#DC89A7", label: KIND.prose.label, icon: KIND.prose.icon }]} />
+	<SectionOpener n={S.n} title={S.title} takeaway={S.takeaway.t} context={S.context[0].t} accent="#C85A82" marks={["its author decided to say", "words used to say it"]}
+		prints={[{ family: "human", color: "#DC89A7", label: KIND.prose.label, icon: KIND.prose.icon }, { family: "ai", color: "#9A82B4", label: KIND.ideas.label, icon: KIND.ideas.icon }]} />
 
 	<!-- 2. the manuscript: the story as the page, the verdicts in the margins -->
 	<div class="ms" bind:this={ms} style="--steps:{STEPS.length}">
 		<div class="pin" bind:this={pin}>
-			<aside class="note ideas" class:on={noteOn("ideas")} class:seen={noteSeen("ideas")} bind:this={notes.ideas}>
-				<p class="n-k"><span class="kind fill"><Icon name="bulb" /></span>{J.ideas.label}</p>
-				<p class="n-v"><Icon name="check" />{J.ideas.verdict}<span>{J.ideas.share}</span></p>
-				<p class="n-x">“{#each J.ideas.explanation as seg}{#if seg.cue}<span class="ref" style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</p>
+			<aside class="note left prose" class:on={noteOn("prose")} class:seen={noteSeen("prose")} bind:this={notes.prose}>
+				<p class="n-k"><span class="kind"><Icon name="pen" /></span>{J.prose.label}</p>
+				<p class="n-v"><Icon name="check" />{J.prose.verdict}</p>
+				<p class="n-x">“{#each J.prose.explanation as seg}{#if seg.cue}<span class="ref" style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</p>
 			</aside>
+			<!-- __IDEAS_PLACEHOLDER__
+-->
 
 			<div class="page" bind:this={page}>
 				<StepDashes count={STEPS.length} current={step} {go} />
@@ -107,19 +106,12 @@
 					<span class="pair"><span class="kind fill"><Icon name="bulb" /></span><Icon name="ai" /><span class="kind"><Icon name="pen" /></span><Icon name="human" /></span>
 					{E.source}.
 				</p>
-				<Reveal show={explore}>
-					<div class="seg" role="group" aria-label="Show">
-						<button type="button" aria-pressed={pick === "both"} onclick={() => (pick = "both")}>{S.ui[0]}</button>
-						<button type="button" aria-pressed={pick === "ideas"} onclick={() => (pick = "ideas")}><Icon name="bulb" />{S.ui[1]}</button>
-						<button type="button" aria-pressed={pick === "prose"} onclick={() => (pick = "prose")}><Icon name="pen" />{S.ui[2]}</button>
-					</div>
-				</Reveal>
 			</div>
 
-			<aside class="note prose" class:on={noteOn("prose")} class:seen={noteSeen("prose")} bind:this={notes.prose}>
-				<p class="n-k"><span class="kind"><Icon name="pen" /></span>{J.prose.label}</p>
-				<p class="n-v"><Icon name="check" />{J.prose.verdict}<span>{J.prose.share}</span></p>
-				<p class="n-x">“{#each J.prose.explanation as seg}{#if seg.cue}<span class="ref hollow" style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</p>
+			<aside class="note right ideas" class:on={noteOn("ideas")} class:seen={noteSeen("ideas")} bind:this={notes.ideas}>
+				<p class="n-k"><span class="kind fill"><Icon name="bulb" /></span>{J.ideas.label}</p>
+				<p class="n-v"><Icon name="check" />{J.ideas.verdict}</p>
+				<p class="n-x">“{#each J.ideas.explanation as seg}{#if seg.cue}<span class="ref" style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</p>
 			</aside>
 
 			{#if wide}
@@ -132,25 +124,11 @@
 		</div>
 	</div>
 
-	<!-- the four cases, on request -->
-	<details class="cases">
-		<summary>{S.cases_intro.t} <span class="sum-b">{S.ui[6]}</span></summary>
-		<ul>
-			{#each S.cases as c}
-				<li class:this={c.example}>
-					<b>{c.t}</b><span>{c.def}</span>
-					{#if c.example}<em>{S.ui[7]}</em>{/if}
-				</li>
-			{/each}
-		</ul>
-	</details>
-
 	<!-- 3. the showcase: one model, three numbers, as large as the page allows -->
 	<aside class="sc" aria-labelledby="hb-fable">
-		<p class="sc-k">{S.ui[8]}</p>
 		<h3 id="hb-fable"><Icon name="anthropic" />{S.stats_model}</h3>
 		<div class="sc-nums">
-			{#each S.stats as st}
+			{#each [...S.stats].sort((a, b) => ["prose", "ideas", "both"].indexOf(a.kind) - ["prose", "ideas", "both"].indexOf(b.kind)) as st}
 				<div class="num">
 					<b>{st.v}%</b>
 					<span>{#if st.kind !== "both"}<Icon name={st.kind === "ideas" ? "bulb" : "pen"} />{/if}{st.t}</span>
@@ -175,15 +153,15 @@
 	.story { margin: 0; font-size: clamp(24px, 2.4vw, 34px); line-height: 1.55; letter-spacing: -0.012em; color: var(--ink); }
 	.cue { padding: 0 2px; border-radius: 2px; transition: background-color .45s, color .45s, box-shadow .45s; box-shadow: inset 0 -2px 0 rgba(20, 32, 45, .14); }
 	.cue.lit.ideas { background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -2.5px 0 var(--c); }
-	.cue.lit.prose { box-shadow: inset 0 0 0 2px var(--c); }
+	.cue.lit.prose { background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -2.5px 0 var(--c); }
 	.concl { display: flex; align-items: center; gap: 14px; font-size: clamp(18px, 1.6vw, 22px); font-weight: 600; letter-spacing: -0.015em; color: var(--ink); opacity: 0; transform: translateY(8px); transition: opacity .5s, transform .5s; }
 	.concl.on { opacity: 1; transform: none; }
 	.pair { display: inline-flex; align-items: center; gap: 4px; font-size: 18px; }
 	.note { display: grid; gap: 8px; align-self: center; padding: 18px 0; opacity: .14; transform: translateY(10px); transition: opacity .5s, transform .5s; }
 	.note.seen { opacity: .38; transform: none; }
 	.note.on { opacity: 1; }
-	.note.ideas { grid-column: 1; text-align: right; justify-items: end; }
-	.note.prose { grid-column: 3; }
+	.note.left { grid-column: 1; text-align: right; justify-items: end; }
+	.note.right { grid-column: 3; }
 	.n-k { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); }
 	.n-v { display: inline-flex; align-items: baseline; gap: 8px; font-size: clamp(30px, 3vw, 44px); line-height: 1; font-weight: 600; letter-spacing: -0.03em; color: var(--ink); }
 	.n-v :global(svg) { width: .6em; height: .6em; color: #046B55; align-self: center; }
@@ -197,27 +175,13 @@
 	.leaders path { fill: none; stroke-width: 1.4; opacity: 0; transition: opacity .5s; }
 	.leaders path.on { opacity: .9; }
 
-	.seg { justify-self: start; display: inline-flex; gap: 2px; padding: 3px; border-radius: 3px; background: var(--chip); }
-	.seg button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 2px; font-size: 13px; font-weight: 500; color: var(--ink2); }
-	.seg button[aria-pressed="true"] { background: var(--ink); color: var(--field); }
-	/* the four cases */
-	.cases { max-width: 72rem; margin: 0 auto; border-top: 1px solid var(--rule, #c9c9c9); border-bottom: 1px solid var(--rule, #c9c9c9); }
-	.cases summary { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 18px 0; cursor: pointer; font-size: 15px; color: var(--ink2); list-style: none; }
-	.cases summary::-webkit-details-marker { display: none; }
-	.sum-b { flex: none; padding: 6px 12px; border: 1px solid var(--ink); border-radius: 3px; color: var(--ink); font-weight: 500; }
-	.cases ul { list-style: none; margin: 0 0 22px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-	.cases li { display: grid; gap: 4px; padding: 14px 16px; background: var(--field); border-radius: 3px; font-size: 14px; color: var(--ink2); }
-	.cases li b { color: var(--ink); font-size: 16px; }
-	.cases li.this { outline: 2px solid var(--ink); }
-	.cases li em { font-style: normal; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink); }
 
 	/* 3. showcase */
-	.sc { position: relative; overflow: hidden; margin: 14vh 0 0; padding: 8vh 0 6vh; border-top: 4px solid var(--f); }
-	.sc-k { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--f); }
+	.sc { position: relative; margin: 14vh 0 0; padding: 4vh 0 6vh; }
 	.sc h3 { margin-top: 10px; display: inline-flex; align-items: center; gap: 12px; font-size: clamp(30px, 3.4vw, 46px); font-weight: 600; letter-spacing: -0.03em; color: #7A3410; }
-	.sc-nums { margin-top: 5vh; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2vw; }
-	.num { display: grid; gap: 10px; border-top: 1.5px solid #7A3410; padding-top: 12px; }
-	.num b { font-size: clamp(80px, 13vw, 200px); line-height: .82; font-weight: 600; letter-spacing: -0.06em; color: var(--f); font-variant-numeric: tabular-nums; }
+	.sc-nums { margin-top: 5vh; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4vw; }
+	.num { display: grid; gap: 10px; }
+	.num b { font-size: clamp(64px, 9.5vw, 148px); line-height: .85; font-weight: 600; letter-spacing: -0.045em; color: var(--f); font-variant-numeric: tabular-nums; }
 	.num span { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; color: var(--ink); }
 	.sc-d { margin-top: 5vh; max-width: 48ch; font-size: 18px; line-height: 1.5; color: var(--ink2); }
 
@@ -230,7 +194,6 @@
 		.concl { opacity: 1; transform: none; }
 		.cue.ideas { background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -2.5px 0 var(--c); }
 		.cue.prose { box-shadow: inset 0 0 0 2px var(--c); }
-			.cases ul { grid-template-columns: 1fr; }
 		.sc-nums { grid-template-columns: 1fr; gap: 28px; }
 	}
 	@media (prefers-reduced-motion: reduce) { .cue, .note, .concl, .leaders path { transition: none; } }

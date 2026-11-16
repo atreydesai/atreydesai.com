@@ -86,11 +86,12 @@
 			if (field.owner !== "hero") return;
 			const s = rect(stick), p = rect(panel);
 			const narrow = f.w < 860;
-			const top = Math.max(0, s.y), bottom = Math.min(f.h, s.y + s.h);
-			// the art lives beside the panel (wide) or below it (narrow), within the part of the stage on screen
+			// the art lives beside the panel (wide) or below it (narrow); the box keeps one size and moves with the section,
+			// so the prints never re-set or shrink while it scrolls in or out (that jitter is what "gyrating" was)
+			const top = s.y, pb = p.y + p.h + 8 - s.y;
 			const stage: Box = narrow
-				? { x: 0, y: Math.max(top, p.y + p.h + 8), w: f.w, h: Math.max(0, bottom - Math.max(top, p.y + p.h + 8)) }
-				: { x: p.x + p.w + 24, y: top, w: f.w - (p.x + p.w + 24), h: Math.max(0, bottom - top) };
+				? { x: 0, y: top + pb, w: f.w, h: Math.max(160, f.h - pb) }
+				: { x: p.x + p.w + 24, y: top, w: f.w - (p.x + p.w + 24), h: f.h };
 			const enter = Math.max(0, Math.min(1, 1 - Math.max(0, s.y) / f.h, (s.y + s.h) / f.h));
 			const quiet = mast ? [p, rect(mast)] : [p];
 			lastStage = stage;
@@ -108,7 +109,9 @@
 				// the inspector: what the lens is on now (it may be parked by the renderer when there is no pointer)
 				const L = print.lens?.() ?? (pointer ? { x: pointer.x, y: pointer.y, r: 56 } : null);
 				const h = L ? print.hit(L.x, L.y) : null;
-				const id = h?.id ?? null;
+				let id = h?.id ?? null;
+				// level 0: the card shows only once the reader has started scrolling, and only what the lens reads
+				if (id === "main" && (pos < 0.18 || !print.lensText?.())) id = null;
 				const kind = id?.startsWith("writer:") && L ? kindAt(L.x) : -1;
 				const ik = id && L ? `${id}|${kind}|${Math.round(L.x / 3)}|${Math.round(L.y / 3)}|${Math.round(L.r)}` : "";
 				if (ik !== inspKey) { inspKey = ik; insp = id && L ? { id, kind, x: L.x, y: L.y, r: L.r } : null; }
@@ -138,8 +141,8 @@
 			const p = Math.max(0, (innerHeight * 0.5 - r.top) / (innerHeight * 0.9));
 			if (Math.abs(p - pos) > 0.002) pos = p;
 			const k = Math.min(STEPS.length - 1, Math.floor(p));
-			const next = k >= STEPS.length - 1 ? STEPS[k] : STEPS[k] + (STEPS[k + 1] - STEPS[k]) * smooth(0.62, 0.98, p - k);
-			const want = reduce ? Math.round(next) : next;
+			// past two thirds of a step the next level starts, and the renderer plays the whole division smoothly
+			const want = k >= STEPS.length - 1 ? STEPS[k] : p - k > 0.66 ? STEPS[k + 1] : STEPS[k];
 			if (Math.abs(want - lv) > 0.001) lv = want;
 		};
 		addEventListener("scroll", update, { passive: true });
@@ -211,10 +214,7 @@
 				{@const kind = id.startsWith("writer:") ? H.crowd[Math.max(0, insp.kind)] : null}
 				<div class="insp" class:right={card.right} style:left="{card.x}px" style:top="{card.y}px" aria-live="polite">
 					{#if id === "main"}
-						<p class="k">One text</p>
-						<h3>{H.main.title.t}</h3>
-						<ol class="qs">{#each H.main.items as it, i}<li style:--c={RQ[(i + 1) as 1 | 2 | 3]}><span>{i + 1}</span>{it.t}</li>{/each}</ol>
-						<p class="hint">Move the circle over any print</p>
+						<blockquote class="reads">“{print.lensText?.()}”</blockquote>
 					{:else if id === "human" || id === "ai"}
 						{@const E = id === "human" ? H.human : H.ai}
 						<p class="k"><Icon name={E.kind === "prose" ? "pen" : "bulb"} />{E.kind === "prose" ? "Prose" : "Ideas"}</p>
@@ -314,7 +314,7 @@
 	.insp .qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 	.insp .qs li { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--ink); }
 	.insp .qs span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 2px; background: var(--c); color: #fff; font-size: 11px; }
-	.insp .hint { font-size: 12px; color: var(--ink2); }
+	.insp .reads { margin: 0; font-size: 14.5px; line-height: 1.45; font-style: italic; color: var(--ink); }
 	.insp .models { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 	.insp .models li { display: grid; grid-template-columns: 9.5em 1fr 2.6em; align-items: center; gap: 8px; font-size: 12px; color: var(--ink); white-space: nowrap; }
 	.insp .models i { height: 6px; background: #EDEDED; border-radius: 1px; overflow: hidden; }

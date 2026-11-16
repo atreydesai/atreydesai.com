@@ -9,12 +9,29 @@
 	import type { SpriteOpts } from "./print/sprites";
 
 	type P = { family: SpriteOpts["family"]; index?: number; color: string; label?: string; icon?: string; clarity?: number };
-	let { n, title, takeaway, context = "", accent = "#C85A82", prints = [] }:
-		{ n: number | string; title: string; takeaway: string; context?: string; accent?: string; prints?: P[] } = $props();
+	let { n, title, takeaway, context = "", marks = [], accent = "#C85A82", prints = [] }:
+		{ n: number | string; title: string; takeaway: string; context?: string; marks?: string[]; accent?: string; prints?: P[] } = $props();
+	// the context sentence, with its key phrases highlighted
+	const parts = $derived.by(() => {
+		const out: { t: string; hl: boolean }[] = [];
+		let rest = context;
+		while (rest.length) {
+			let at = -1, hit = "";
+			for (const m of marks) { const i = rest.indexOf(m); if (i >= 0 && (at < 0 || i < at)) { at = i; hit = m; } }
+			if (at < 0) { out.push({ t: rest, hl: false }); break; }
+			if (at > 0) out.push({ t: rest.slice(0, at), hl: false });
+			out.push({ t: hit, hl: true });
+			rest = rest.slice(at + hit.length);
+		}
+		return out;
+	});
+	// prints are sized for the screen they land on (drawn after mount, so a phone never gets the desktop size)
+	let mounted = $state(false);
+	$effect(() => { mounted = true; });
 
 	let wide = $state(true);
 	$effect(() => { wide = innerWidth >= 980; });
-	const px = $derived(prints.length > 2 ? (wide ? 190 : 120) : wide ? 300 : 170);
+	const px = $derived(prints.length > 3 ? (wide ? 150 : 96) : prints.length > 2 ? (wide ? 190 : 110) : wide ? 300 : 160);
 </script>
 
 <header class="opener" style:--accent={accent}>
@@ -22,10 +39,10 @@
 		<p class="o-n">{n}</p>
 		<h2 class="o-q">{title}</h2>
 		<p class="o-t">{takeaway}</p>
-		{#if context}<p class="o-d">{context}</p>{/if}
+		{#if context}<p class="o-d">{#each parts as p}{#if p.hl}<mark>{p.t}</mark>{:else}{p.t}{/if}{/each}</p>{/if}
 	</div>
-	{#if prints.length}
-		<div class="o-prints" class:many={prints.length > 2} aria-hidden="true">
+	{#if prints.length && mounted}
+		<div class="o-prints" class:many={prints.length > 2} style:--cols={prints.length} aria-hidden="true">
 			{#each prints as p, i}
 				<figure class="o-p" style:--drop="{prints.length <= 2 && i % 2 ? 18 : 0}vh">
 					<PrintMark family={p.family} index={p.index ?? 0} color={p.color} {px} clarity={p.clarity ?? 1} text={px >= 120} />
@@ -46,11 +63,13 @@
 	.o-t { margin-top: 28px; max-width: 22ch; font-size: clamp(22px, 2.3vw, 32px); line-height: 1.2; font-weight: 500; letter-spacing: -0.02em; color: #F3F3EF; text-wrap: balance; }
 	.o-d { margin-top: 18px; max-width: 46ch; font-size: 16px; line-height: 1.55; color: rgba(243, 243, 239, .62); }
 	.o-prints { display: flex; justify-content: center; align-items: center; gap: 2vw; }
-	.o-prints.many { flex-wrap: wrap; gap: 2.4vw 2vw; }
+	.o-prints.many { display: grid; grid-template-columns: repeat(var(--cols), auto); justify-content: center; gap: 2vw; }
+	.o-d :global(mark) { color: #fff; background: linear-gradient(transparent 55%, rgba(220, 137, 167, .35) 55%); font-weight: 500; }
 	.o-p { display: grid; justify-items: center; gap: 14px; margin: var(--drop) 0 0; }
 	.o-p figcaption { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: .02em; color: #F3F3EF; }
 	@media (max-width: 979px) {
 		.opener { grid-template-columns: 1fr; min-height: 0; padding-top: 10vh; gap: 8vh; }
 		.o-p { margin-top: calc(var(--drop) / 2); }
+		.o-prints.many { grid-template-columns: repeat(min(var(--cols), 2), auto); }
 	}
 </style>

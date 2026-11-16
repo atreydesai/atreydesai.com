@@ -58,11 +58,16 @@ export interface Print {
 	/** where the lens is drawn this frame (viewport px, radius), or null when it is not shown; the host attaches its
 	 * information card to the lens's edge */
 	lens?(): { x: number; y: number; r: number } | null;
+	/** the ridge sentence under the lens's centre (the text the lens is deciphering), or null */
+	lensText?(): string | null;
 }
 
 export type PrintOptions = {
-	/** ridge text: paper sentences already vetted for the page */
+	/** ridge text: paper sentences already vetted for the page (the main print, and anything without its own text) */
 	text: string[];
+	/** each print's own ridge text: a lab's prints carry its models' prose, the AI print model prose, the human print and
+	 * the crowd human prose (print_text.json); missing entries fall back to `text` */
+	ridge?: { labs?: Record<string, string>; ai?: string; human?: string; writers?: string[] };
 	/** the lab prints in level 2, in this order; the first three are drawn larger and in colour */
 	labs: string[];
 	/** colours: rq1 human #C85A82, rq2 AI #461E47, rq3 #437E8E, ink #14202D; lab colours for the first three */
