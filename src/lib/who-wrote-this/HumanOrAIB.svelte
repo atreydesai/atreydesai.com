@@ -197,7 +197,7 @@
 	.leaders path { fill: none; stroke-width: 1.4; opacity: 0; transition: opacity .5s; }
 	.leaders path.on { opacity: .9; }
 
-	.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 3px; background: var(--chip); }
+	.seg { justify-self: start; display: inline-flex; gap: 2px; padding: 3px; border-radius: 3px; background: var(--chip); }
 	.seg button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 2px; font-size: 13px; font-weight: 500; color: var(--ink2); }
 	.seg button[aria-pressed="true"] { background: var(--ink); color: var(--field); }
 	/* the four cases */
