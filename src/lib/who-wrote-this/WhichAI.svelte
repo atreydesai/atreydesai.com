@@ -5,6 +5,7 @@
 	// then lays the open labs' piles along their release dates under the reports the paper cites.
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
+	import Emblem from "./Emblem.svelte";
 	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
 	import C from "./content.json";
 	import R from "./rq2_writers.json";
@@ -117,7 +118,7 @@
 <section class="wa" id={S.id} bind:this={root} style="--steps:{S.steps.length}">
 	<div class="stick" bind:this={stage}>
 		<div class="panel">
-			<p class="kick"><span class="badge">{S.n}</span>{S.title}</p>
+			<p class="kick"><Emblem n={2} /><span class="badge">{S.n}</span>{S.title}</p>
 			<h2>{S.takeaway.t}</h2>
 			<p class="key">
 				{#each S.legend as l}<span><i style="background:{COL[l.k as keyof typeof COL]}"></i>{l.t}</span>{/each}

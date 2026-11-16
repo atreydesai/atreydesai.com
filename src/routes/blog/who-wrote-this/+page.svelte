@@ -2,11 +2,13 @@
 	// The paper launch page. It brings its own chrome and theme (the llm-detectors house style: warm gray
 	// dotted ground, Inter, Figure 1's question colours) in place of the site's header, footer and palette.
 	// All copy is paper text, from content.json (built in the private llm-detectors repo, docs/launch_20261116).
-	import { onMount } from "svelte";
+	import { onMount, setContext } from "svelte";
+	import { dev } from "$app/environment";
 	import Seo from "$lib/components/Seo.svelte";
 	import { SITE_URL } from "$lib/seo";
 	import Icon from "$lib/who-wrote-this/Icon.svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
+	import { field } from "$lib/who-wrote-this/field.svelte";
 	import Levels from "$lib/who-wrote-this/Levels.svelte";
 	import Timeline from "$lib/who-wrote-this/Timeline.svelte";
 	import HumanOrAI from "$lib/who-wrote-this/HumanOrAI.svelte";
@@ -16,6 +18,9 @@
 
 	let { data }: { data: PageData } = $props();
 	const post = data.post;
+	const art = $derived(data.art);
+	setContext("wwt-art", () => data.art);
+	$effect(() => { field.shape = art === "mosaic" ? "tile" : "dot"; });
 	const url = `${SITE_URL}/blog/who-wrote-this/`;
 	const affIndex = Object.fromEntries(C.meta.affiliations.map((a, i) => [a.key, i + 1]));
 	const nav = [
@@ -112,7 +117,7 @@
 			</div>
 		</header>
 
-		<Levels />
+		{#key art}<Levels {art} />{/key}
 
 		<div class="lede">
 			{#each C.lede as s}{s.t + " "}{/each}
@@ -147,6 +152,15 @@
 		<a href="/">Atrey Desai</a>
 		<span>{#each nav as link}<a href={link.href}>{link.name}</a>{/each}</span>
 	</footer>
+	{#if dev}
+		<!-- art direction preview (development only): the hero art variants, with filler images -->
+		<nav class="art-switch" aria-label="Art">
+			<span>Art</span>
+			{#each [["dots", "Dots"], ["fingerprint", "Fingerprint"], ["mosaic", "Mosaic"]] as [k, label]}
+				<a href="?art={k}" data-sveltekit-noscroll aria-current={art === k ? "page" : undefined}>{label}</a>
+			{/each}
+		</nav>
+	{/if}
 </div>
 
 <style>
@@ -229,6 +243,11 @@
 	.end { padding-block: 72px 32px; border-top: 1px solid var(--rule); }
 	.closing { max-width: 30ch; font-size: clamp(24px, 3vw, 34px); line-height: 1.2; font-weight: 600; letter-spacing: -0.025em; text-wrap: balance; }
 	.byline.small { font-size: 13px; color: var(--ink2); margin-top: 24px; max-width: 52rem; }
+	.art-switch { position: fixed; left: 16px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 4px; background: rgba(20, 32, 45, .92); font-size: 12.5px; box-shadow: 0 6px 20px rgba(20, 32, 45, .25); }
+	.art-switch span { padding: 0 8px; color: rgba(255, 255, 255, .55); }
+	.art-switch a { padding: 5px 10px; border-radius: 3px; color: #fff; text-decoration: none; }
+	.art-switch a:hover { background: rgba(255, 255, 255, .12); }
+	.art-switch a[aria-current] { background: #fff; color: var(--ink); }
 	.site-foot { display: flex; justify-content: space-between; gap: 16px; padding-block: 28px 40px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink2); }
 	.site-foot span { display: flex; gap: 16px; }
 	.site-foot a { text-decoration: none; }

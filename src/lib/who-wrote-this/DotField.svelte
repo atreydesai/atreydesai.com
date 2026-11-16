@@ -48,7 +48,10 @@
 		// where each dot wants to be, how big, how dark and what colour, for the current mode
 		function target(d: Dot, oy: number): { x: number; y: number; r: number; a: number; c: RGB } {
 			const x = d.gx, y = d.gy + 9 - oy;
-			const base = { x, y, r: 1.1, a: 0.07 * (1 - field.dim * 0.85), c: INK };
+			const tile = field.shape === "tile";
+			// mosaic: the ground is tesserae, a few of them in the three questions' colours
+			const tint = tile && d.seed < 0.05 ? [ROSE, AUB, TEAL][Math.floor(d.seed * 60) % 3] : null;
+			const base = { x, y, r: tile ? 1.5 : 1.1, a: (tint ? 0.22 : tile ? 0.06 : 0.07) * (1 - field.dim * 0.85), c: tint ?? INK };
 			if (field.mode !== "levels" || field.level === 0) return base;
 			const A = field.anchor;
 			if (field.level === 1) {
@@ -92,7 +95,8 @@
 				}
 				if (d.y < -10 || d.y > H + 10 || a < 0.01) continue;
 				ctx.fillStyle = `rgba(${d.c[0] | 0},${d.c[1] | 0},${d.c[2] | 0},${a})`;
-				ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, 6.2832); ctx.fill();
+				if (field.shape === "tile") ctx.fillRect(d.x - r, d.y - r, r * 2, r * 2);
+				else { ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, 6.2832); ctx.fill(); }
 				if (field.mode === "levels" && field.level === 3 && r > 6) {
 					ctx.strokeStyle = `rgba(67,126,142,${0.35 + 0.25 * Math.sin(now / 300)})`; ctx.lineWidth = 2;
 					ctx.beginPath(); ctx.arc(d.x, d.y, r + 8 + 3 * Math.sin(now / 300), 0, 6.2832); ctx.stroke();

@@ -5,6 +5,7 @@
 	// story and in the explanation.
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
+	import Emblem from "./Emblem.svelte";
 
 	let { section }: { section: any } = $props();
 	const S = section;
@@ -46,7 +47,7 @@
 
 <section class="section s1" id={S.id} data-rq={S.rq} bind:this={root}>
 	<!-- read -->
-	<header class="s-head"><span class="badge">{S.n}</span><h2>{S.title}</h2></header>
+	<header class="s-head"><Emblem n={1} /><span class="badge">{S.n}</span><h2>{S.title}</h2></header>
 	<p class="finding">{S.takeaway.t}</p>
 	<p class="context">{S.context[0].t}</p>
 

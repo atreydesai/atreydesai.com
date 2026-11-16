@@ -542,7 +542,12 @@
   "Contents",
   "All",
   "2026",
-  "All dates"
+  "All dates",
+  "Move over the print",
+  "Dots",
+  "Fingerprint",
+  "Mosaic",
+  "Art"
  ],
  "levels": {
   "lead": {
@@ -759,5 +764,69 @@
   },
   "profiles_src": "paper/sections/04_rq2_ai_vs_ai.tex",
   "x_label": "Release date"
+ },
+ "art": {
+  "_about": "Hero art variants (?art=fingerprint|mosaic). Images are Codex filler until Claude Fable 5.2 makes the real art; the excerpts and answers are the paper's example table.",
+  "decipher": [
+   {
+    "level": 1,
+    "rq": 1,
+    "excerpt": {
+     "t": "the lantern never again mistook greatness with size.",
+     "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+    },
+    "answers": [
+     {
+      "icon": "bulb",
+      "label": "Ideas",
+      "verdict": "AI"
+     },
+     {
+      "icon": "pen",
+      "label": "Prose",
+      "verdict": "Human"
+     }
+    ],
+    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+   },
+   {
+    "level": 2,
+    "rq": 2,
+    "excerpt": {
+     "t": "Row. Steer. Live. And never, ever laugh.",
+     "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+    },
+    "answers": [
+     {
+      "icon": "google",
+      "label": "Developer",
+      "verdict": "Google"
+     },
+     {
+      "icon": "ai",
+      "label": "Model",
+      "verdict": "Gemini 3 Flash"
+     }
+    ],
+    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+   },
+   {
+    "level": 3,
+    "rq": 3,
+    "excerpt": {
+     "t": "Hurry, sweetie! God damn.",
+     "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+    },
+    "answers": [
+     {
+      "icon": "human",
+      "label": "Author",
+      "verdict": "Joyce Carol Oates"
+     }
+    ],
+    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+   }
+  ],
+  "fragments_src": "Lens fragments on hover are the page's own paper strings (lede, levels, excerpts)."
  }
 }

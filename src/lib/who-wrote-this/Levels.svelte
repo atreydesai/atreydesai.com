@@ -5,8 +5,13 @@
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
 	import { field } from "./field.svelte";
+	import ArtFingerprint from "./ArtFingerprint.svelte";
+	import ArtMosaic from "./ArtMosaic.svelte";
 	import C from "./content.json";
 
+	// art: "dots" plays the levels on the page-wide dot field; "fingerprint" and "mosaic" play them in the hero art
+	let { art = "dots" }: { art?: string } = $props();
+	const onField = art === "dots";
 	const L = C.levels;
 	let active = $state(0); // 0 = all three settled
 	let stage: HTMLElement;
@@ -15,6 +20,7 @@
 
 	function show(n: number) {
 		active = n;
+		if (!onField) return;
 		field.mode = "levels";
 		field.level = n;
 	}
@@ -39,7 +45,7 @@
 		let played = false;
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			if (e.isIntersecting) {
-				if (field.mode !== "levels") { field.mode = "levels"; field.level = active; }
+				if (onField && field.mode !== "levels") { field.mode = "levels"; field.level = active; }
 				if (!played && !reduce) { played = true; play(); }
 			} else if (field.mode === "levels") {
 				field.mode = "ground"; field.level = 0;
@@ -60,7 +66,7 @@
 						<span class="n">{it.n}</span>
 						<span class="body">
 							<span class="t">{it.t}</span>
-							<span class="fact">{#if it.v}<b>{it.v}</b> {/if}{it.fact}</span>
+							<span class="fact">{#if it.v}<b>{it.v}</b>{" "}{/if}{it.fact}</span>
 						</span>
 					</button>
 					<a class="go" href="#{it.target}" aria-label="Go to {it.t}"><Icon name="arrow" /></a>
@@ -73,8 +79,11 @@
 		</p>
 		<button type="button" class="replay" onclick={play}><Icon name="replay" /> Replay</button>
 	</div>
-	<!-- the field draws the three levels into this box -->
-	<div class="stage" bind:this={stage} aria-hidden="true"></div>
+	<!-- the field draws the three levels into this box, or the art plays them -->
+	<div class="stage" class:art={!onField} bind:this={stage} aria-hidden="true">
+		{#if art === "fingerprint"}<ArtFingerprint level={active} />{/if}
+		{#if art === "mosaic"}<ArtMosaic level={active} onpick={pick} />{/if}
+	</div>
 </section>
 
 <style>
@@ -101,10 +110,12 @@
 	.struck line { stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; }
 	.replay { margin-top: 14px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ink2); }
 	.replay:hover { color: var(--ink); }
-	.stage { min-height: 360px; border-radius: 4px; }
+	.stage { min-height: 360px; border-radius: 4px; position: relative; }
+	.stage.art { min-height: 480px; }
 	@media (max-width: 860px) {
 		.levels { grid-template-columns: 1fr; min-height: 0; }
 		.stage { min-height: 240px; order: -1; }
+		.stage.art { min-height: 380px; }
 	}
 	@media (prefers-reduced-motion: reduce) { li, .row { transition: none; } }
 </style>

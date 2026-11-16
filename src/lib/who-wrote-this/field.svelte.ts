@@ -25,6 +25,7 @@ export const field = $state({
 	dim: 0, // 0..1, how far the ground fades behind a chart
 	anchor: { x: 0, y: 0, w: 0, h: 0 }, // viewport box the hero's levels draw into
 	owner: "" as string, // which section currently draws the chart (only it may clear it)
+	shape: "dot" as "dot" | "tile", // the ground's marks: dots, or tesserae for the mosaic art variant
 });
 
 /** What a chart section draws. Plain (not reactive): rewritten every frame, read only by DotField's draw loop. */
