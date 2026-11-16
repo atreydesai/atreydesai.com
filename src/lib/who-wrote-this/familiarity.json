@@ -152,7 +152,6 @@
    "Gemini 4 Argon": "#6E4B78",
    "Fable 5.2": "#B4501C"
   },
-  "explore": "Explore",
   "view": "View",
   "domain": "Domain",
   "model": "Model",
@@ -172,7 +171,6 @@
   "writer": "This writer's texts"
  },
  "ui": [
-  "Explore",
   "Familiarity",
   "Reasoning effort",
   "View",

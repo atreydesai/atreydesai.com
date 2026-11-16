@@ -114,7 +114,6 @@
    "Gemini 4 Argon": "#6E4B78",
    "Fable 5.2": "#B4501C"
   },
-  "explore": "Explore",
   "original": "Original",
   "paraphrased": "Paraphrased",
   "replay": "Replay",
@@ -136,7 +135,6 @@
   "lt1": "<1%"
  },
  "ui": [
-  "Explore",
   "Original",
   "Paraphrased",
   "Replay",

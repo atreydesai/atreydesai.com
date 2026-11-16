@@ -57,7 +57,7 @@
 		return "#" + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, "0")).join("");
 	};
 	const OPENER = [
-		{ family: "writer" as const, index: PRINT, color: INKS.field, clarity: 1, label: L.original, icon: "quote" },
+		{ family: "writer" as const, index: PRINT, color: INKS.field, clarity: 1, label: L.original },
 		{ family: "writer" as const, index: PRINT, color: INKS.field, clarity: 0.4, label: L.paraphrased, icon: "rewrite" },
 	];
 	// abstract positions for the refused posts: a fixed shuffle of the grid, so the marks say how many, not which
@@ -85,7 +85,6 @@
 	// phone that overflow would widen the page for a moment, just as the field canvas measures it
 	let ready = $state(false);
 	let stage: HTMLElement;
-	let sec: HTMLElement; // the whole section (its footnotes' ↩ links are redirected)
 	let root: HTMLElement; // the pinned part (the opener and footnotes sit outside it)
 
 	const st = $derived(STEPS[step]);
@@ -107,7 +106,7 @@
 			slot: { x: 0, y: 0, w: 0, h: 0 }, smallNumSize: 20 };
 		if (!W || !H) return o;
 		// the band: its tallest text, plus the dashes, gaps and padding around it, plus Explore's rows under it
-		const exploreH = narrow ? 150 : 108, capFull = (capMax || (narrow ? 170 : 110)) + (narrow ? 54 : 58);
+		const exploreH = narrow ? 50 : 50, capFull = (capMax || (narrow ? 170 : 110)) + (narrow ? 54 : 58);
 		const zT = narrow ? 60 : 76, zB = H - 16 - capFull - exploreH - (narrow ? 8 : 20), zh = zB - zT;
 		if (!narrow) {
 			// left: the giant numeral over the less familiar groups; right: the very familiar group, large
@@ -186,7 +185,7 @@
 		const m = mk(IDS[gi][i]);
 		m.x = ox + g.x + (i % 10) * g.p + g.p / 2;
 		m.y = oy + g.y + (9 - Math.floor(i / 10)) * g.p + g.p / 2;
-		m.square = true; m.r = g.p * 0.36; m.alpha = 1; m.color = OFF;
+		m.square = true; m.r = g.p * 0.36; m.alpha = 1; m.color = OFF; m.snap = true; // in place, never flying in
 		return m;
 	}
 
@@ -216,7 +215,7 @@
 			for (let i = 0; i < R.posts; i++) {
 				const m = mk(PIDS[i]);
 				m.x = ox + x0 + (i % cols) * p + p / 2; m.y = oy + y0 + Math.floor(i / cols) * p + p / 2;
-				m.square = true; m.r = p * 0.36; m.alpha = 1; m.sprite = undefined; m.backing = undefined;
+				m.square = true; m.r = p * 0.36; m.alpha = 1; m.snap = true; m.sprite = undefined; m.backing = undefined;
 				const j = RANK.get(i)!;
 				m.color = j < on ? CLAY : OFF;
 				marks.push(m);
@@ -309,12 +308,14 @@
 	}
 	function replay() { para = true; replays++; }
 	// a dash click scrolls to the middle of that step's stretch of the pinned stage
-	// a footnote's ↩: the citing words live in the pinned stage (and only while their step shows), so go to that step
+	// a footnote's ↩ (the page's list): the citing words live in the pinned stage, so go to the step that cites the note
 	function back(e: MouseEvent) {
-		const a = (e.target as HTMLElement).closest?.("a.back") as HTMLAnchorElement | null;
-		const n = a ? Number(a.getAttribute("href")?.match(/^#fnref-s5-(\d+)$/)?.[1]) : NaN;
-		const i = STEPS.findIndex((s) => s.fn === n);
-		if (i < 0) return;
+		const a = (e.target as HTMLElement)?.closest?.("a.back") as HTMLAnchorElement | null;
+		const id = a?.getAttribute("href")?.slice(1);
+		const mark = id ? document.getElementById(id) : null;
+		if (!mark || !root?.contains(mark)) return;
+		const i = Number(mark.closest<HTMLElement>("[data-i]")?.dataset.i);
+		if (!(i >= 0 && i <= LAST)) return;
 		e.preventDefault();
 		go(i);
 	}
@@ -341,7 +342,7 @@
 		};
 		update();
 		addEventListener("scroll", onScroll, { passive: true });
-		sec.addEventListener("click", back);
+		document.addEventListener("click", back);
 		addEventListener("resize", onScroll, { passive: true });
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
@@ -349,7 +350,7 @@
 			else if (field.mode === "chart" && field.owner === OWNER) { field.mode = "ground"; field.dim = 0; field.interactive = false; chart.marks = []; chart.paths = []; chart.texts = []; }
 		}), { rootMargin: "-35% 0px -35% 0px" });
 		io.observe(root);
-		return () => { cancelAnimationFrame(raf); io.disconnect(); removeEventListener("scroll", onScroll); removeEventListener("resize", onScroll); sec.removeEventListener("click", back); };
+		return () => { cancelAnimationFrame(raf); io.disconnect(); removeEventListener("scroll", onScroll); removeEventListener("resize", onScroll); document.removeEventListener("click", back); };
 	});
 
 	const hitIdx = $derived(view === "refusals" ? [] : showSmall ? [0, 1, 2, 3] : [FOCUS]);
@@ -374,7 +375,7 @@
 	});
 </script>
 
-<section class="an" bind:this={sec} id={A.id} data-rq="0" data-step={step}>
+<section class="an" id={A.id} data-rq="0" data-step={step}>
 	<SectionOpener n={A.n} title={A.title.t} takeaway={A.takeaway.t} context={A.context.t} accent={GRAY.mid} prints={ready ? OPENER : []} />
 
 	<div class="scrolly" class:still={reduce} bind:this={root} style="--steps:{STEPS.length}; --step-vh:{STEP_VH * 100}vh">
@@ -395,7 +396,7 @@
 
 			<!-- the paraphrasing test: original → the rewriting model → paraphrased -->
 			<div class="diag" class:on={view === "rewrite"} aria-hidden={view !== "rewrite"}>
-				<p class="node" style="left:{diag.l}px; top:{diag.cy}px; width:{diag.nw}px"><Icon name="quote" />{L.original}</p>
+				<p class="node" style="left:{diag.l}px; top:{diag.cy}px; width:{diag.nw}px">{L.original}</p>
 				<span class="av" style="left:{diag.c - diag.av / 2}px; top:{diag.cy - diag.av / 2}px; width:{diag.av}px; height:{diag.av}px; color:{REWRITER}"><Icon name="google" /></span>
 				<p class="node" style="left:{diag.r}px; top:{diag.cy}px; width:{diag.nw}px"><Icon name="rewrite" />{L.paraphrased}</p>
 				<svg class="lines" aria-hidden="true">{#each diag.arrows as d}<path {d} />{/each}</svg>
@@ -422,46 +423,33 @@
 				</div>
 			{/if}
 
-			<!-- the narration: a caption band along the bottom; the dashes jump to a step; Explore opens inside it -->
+			<!-- the narration: a caption band along the bottom; the dashes jump to a step; the controls open inside it -->
 			<div class="cap">
 				<StepDashes count={STEPS.length} current={step} {go} />
-				<div class="say" aria-live="polite">
-					{#key step}
-						<div class="say-in">
-							<p class="say-t">{st.t}{#if st.fn}<sup class="fnref"><a href="#fn-s5-{st.fn}" id="fnref-s5-{st.fn}">{st.fn}</a></sup>{/if}</p>
-							{#if st.more}<p class="say-m">{st.more.t}</p>{/if}
-							{#if st.items}<ul class="defs">{#each st.items as it}<li><Icon name={it.icon} /><span>{it.t[0].toUpperCase() + it.t.slice(1)}</span></li>{/each}</ul>{/if}
-						</div>
-					{/key}
-				</div>
-				<Reveal show={explore} label={L.explore}>
-					<div class="row">
-						<div class="ctrl" role="group" aria-label={L.rewriting}>
-							<button type="button" aria-pressed={!para} onclick={() => (para = false)}><i class="sw" style:background={mcolor}></i>{L.original}</button>
-							<button type="button" aria-pressed={para} onclick={() => (para = true)}><i class="sw" style:background={mlight}></i>{L.paraphrased}</button>
-							<span class="sep"></span>
-							<button type="button" onclick={replay} aria-label={L.replay} title={L.replay}><Icon name="replay" /></button>
-						</div>
-						<div class="ctrl" role="group" aria-label={L.domain}>
-							{#each Object.entries(DOMS) as [id, t]}<button type="button" aria-pressed={dom === id} onclick={() => (dom = id)}>{t}</button>{/each}
-						</div>
-						<div class="ctrl" role="group" aria-label={L.model}>
-							{#each Object.entries(MODELS) as [id, t]}<button type="button" aria-pressed={model === id} onclick={() => (model = id)}><i class="sw" style:background={col(t)}></i>{t}</button>{/each}
-						</div>
-					</div>
-				</Reveal>
-			</div>
-			<!-- the tallest step's text, unseen: the band's height the layout keeps clear -->
-			<div class="cap measure" aria-hidden="true">
-				<div class="say stack" bind:clientHeight={capMax}>
-					{#each STEPS as s}
-						<div class="say-in">
-							<p class="say-t">{s.t}</p>
+				<div class="say" aria-live="polite" bind:clientHeight={capMax}>
+					{#each STEPS as s, i}
+						<div class="say-in" class:on={i === step} aria-hidden={i !== step} data-i={i}>
+							<p class="say-t">{s.t}{#if s.fn}<sup class="fnref"><a href="#fn-s5-{s.fn}" id="fnref-s5-{s.fn}" tabindex={i === step ? 0 : -1}>{s.fn}</a></sup>{/if}</p>
 							{#if s.more}<p class="say-m">{s.more.t}</p>{/if}
-							{#if s.items}<ul class="defs">{#each s.items as it}<li><Icon name={it.icon} /><span>{it.t}</span></li>{/each}</ul>{/if}
+							{#if s.items}<ul class="defs">{#each s.items as it}<li><Icon name={it.icon} /><span>{it.t[0].toUpperCase() + it.t.slice(1)}</span></li>{/each}</ul>{/if}
 						</div>
 					{/each}
 				</div>
+				<!-- the controls, in one row (sideways on a phone) -->
+				<Reveal show={explore}>
+					<div class="ctrl" role="group" aria-label={L.rewriting}>
+						<button type="button" aria-pressed={!para} onclick={() => (para = false)}><i class="sw" style:background={mcolor}></i>{L.original}</button>
+						<button type="button" aria-pressed={para} onclick={() => (para = true)}><i class="sw" style:background={mlight}></i>{L.paraphrased}</button>
+						<span class="sep"></span>
+						<button type="button" onclick={replay} aria-label={L.replay} title={L.replay}><Icon name="replay" /></button>
+					</div>
+					<div class="ctrl" role="group" aria-label={L.domain}>
+						{#each Object.entries(DOMS) as [id, t]}<button type="button" aria-pressed={dom === id} onclick={() => (dom = id)}>{t}</button>{/each}
+					</div>
+					<div class="ctrl" role="group" aria-label={L.model}>
+						{#each Object.entries(MODELS) as [id, t]}<button type="button" aria-pressed={model === id} onclick={() => (model = id)}><i class="sw" style:background={col(t)}></i>{t}</button>{/each}
+					</div>
+				</Reveal>
 			</div>
 		</div>
 	</div>
@@ -476,21 +464,18 @@
 	.stick { position: sticky; top: 0; height: 100vh; pointer-events: none; }
 
 	/* the caption band, along the bottom */
-	.cap { position: absolute; z-index: 2; left: 50%; bottom: 16px; width: min(760px, 100%); transform: translateX(-50%); pointer-events: auto; padding: 14px 18px 16px; background: #fff; border-radius: 3px; box-shadow: 0 2px 14px rgba(20, 32, 45, .06); display: grid; gap: 10px; }
-	.cap.measure { visibility: hidden; pointer-events: none; bottom: auto; top: 0; }
-	.say { margin-top: 4px; }
-	.say.stack { display: grid; }
-	.say.stack .say-in { grid-area: 1 / 1; animation: none; }
-	.say-in { display: grid; gap: 6px; animation: say .45s var(--ease); }
+	.cap { position: absolute; z-index: 2; left: 50%; bottom: 16px; width: min(800px, 100%); transform: translateX(-50%); pointer-events: auto; padding: 14px 18px 16px; background: #fff; border-radius: 3px; box-shadow: 0 2px 14px rgba(20, 32, 45, .06); display: grid; gap: 10px; }
+	.say { display: grid; margin-top: 4px; }
+	.say-in { grid-area: 1 / 1; display: grid; align-content: start; gap: 6px; opacity: 0; visibility: hidden; transform: translateY(6px); transition: opacity .4s, transform .45s var(--ease), visibility 0s .4s; }
+	.say-in.on { opacity: 1; visibility: visible; transform: none; transition: opacity .4s, transform .45s var(--ease), visibility 0s; }
 	@keyframes say { from { opacity: 0; transform: translateY(6px); } }
 	.say-t { font-size: 19px; line-height: 1.45; letter-spacing: -0.01em; color: var(--ink); }
 	.say-m { font-size: 15px; line-height: 1.5; color: var(--ink2); }
 	.defs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 4px; }
 	.defs li { display: flex; gap: 9px; font-size: 14.5px; line-height: 1.45; color: var(--ink); }
 	.defs :global(.ic) { flex: none; margin-top: 3px; font-size: 16px; }
-	.row { display: flex; flex-wrap: wrap; gap: 8px; }
-	.ctrl { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; background: var(--chip); border-radius: 3px; padding: 3px; justify-self: start; }
-	.ctrl button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; font-size: 12.5px; font-weight: 500; color: var(--ink2); border-radius: 2px; }
+	.ctrl { flex: none; display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 2px; background: var(--chip); border-radius: 3px; padding: 3px; }
+	.ctrl button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 12.5px; font-weight: 500; color: var(--ink2); border-radius: 2px; white-space: nowrap; }
 	.ctrl button:hover { color: var(--ink); }
 	.ctrl button[aria-pressed="true"] { background: var(--ink); color: var(--field); }
 	.sw { flex: none; display: inline-block; width: 9px; height: 9px; border-radius: 1px; }
@@ -531,5 +516,5 @@
 		.av { font-size: 18px; }
 	}
 	.still .say-in, .still .from, .still .big, .still .diag { animation: none; transition: none; }
-	@media (prefers-reduced-motion: reduce) { .say-in, .from, .big { animation: none; } .diag { transition: none; } }
+	@media (prefers-reduced-motion: reduce) { .from, .big { animation: none; } .say-in, .diag { transition: none; } }
 </style>

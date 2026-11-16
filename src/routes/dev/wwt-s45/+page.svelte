@@ -5,6 +5,7 @@
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import Familiar from "$lib/who-wrote-this/Familiar.svelte";
 	import Anonymity from "$lib/who-wrote-this/Anonymity.svelte";
+	import FootnoteList from "$lib/who-wrote-this/FootnoteList.svelte";
 	import { startElastic } from "$lib/who-wrote-this/elastic";
 
 	onMount(() => {
@@ -35,6 +36,7 @@
 		<p class="pad">Sections 4 and 5 (dev preview)</p>
 		<Familiar />
 		<Anonymity />
+		<FootnoteList />
 		<p class="pad end">End of preview</p>
 	</article>
 </div>
