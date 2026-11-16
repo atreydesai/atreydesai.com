@@ -24,7 +24,7 @@
 {
 "writer": "Qwen3.6 27B",
 "lab": "Alibaba",
-"release": "2026-04-27",
+"release": "2026-04-22",
 "own": 67,
 "anthropic": 0,
 "openai": 1,
@@ -44,7 +44,7 @@
 {
 "writer": "Qwen Max",
 "lab": "Alibaba",
-"release": "2026-09-03",
+"release": "2026-09-02",
 "own": 0,
 "anthropic": 0,
 "openai": 71,
@@ -184,7 +184,7 @@
 {
 "writer": "MiniMax M3",
 "lab": "MiniMax",
-"release": "2026-05-31",
+"release": "2026-06-01",
 "own": 0,
 "anthropic": 1,
 "openai": 72,
@@ -194,7 +194,7 @@
 {
 "writer": "MiniMax M3.1 Flash",
 "lab": "MiniMax",
-"release": "2026-10-18",
+"release": "2026-10-19",
 "own": 0,
 "anthropic": 0,
 "openai": 74,
@@ -274,7 +274,7 @@
 {
 "writer": "GPT-6 Astra",
 "lab": "OpenAI",
-"release": "2026-09-04",
+"release": "2026-09-03",
 "own": 75,
 "anthropic": 0,
 "openai": 0,

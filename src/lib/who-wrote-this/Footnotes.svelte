@@ -24,7 +24,8 @@
 
 <style>
 	.fns { max-width: 72rem; margin: 6vh auto 0; padding-top: 14px; border-top: 1px solid #C9C9C9; }
-	ol { margin: 0; padding-left: 1.4em; display: grid; gap: 6px; font-size: 12.5px; line-height: 1.5; color: #5A6270; }
+	ol { margin: 0; padding-left: 1.4em; list-style: decimal outside !important; display: grid; gap: 6px; font-size: 12.5px; line-height: 1.5; color: #5A6270; }
+	li { display: list-item; }
 	li::marker { font-variant-numeric: tabular-nums; color: #14202D; }
 	a { color: #14202D; }
 	.back { margin-left: 4px; text-decoration: none; }

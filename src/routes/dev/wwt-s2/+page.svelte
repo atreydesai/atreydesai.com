@@ -1,17 +1,20 @@
 <script lang="ts">
 	// Dev preview of section 2 (If AI, which AI?) on the launch page's field and base styles.
-	// ?step=N scrolls to scroll step N (0-based) on load, for screenshots; ?still (or reduced motion) settles animation.
+	// ?step=N scrolls to guided step N (0-based) on load, for screenshots; ?still (or reduced motion) settles animation.
+	// The site header is hidden, as on the launch page (its route brings its own chrome).
 	import { onMount } from "svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import WhichAI from "$lib/who-wrote-this/WhichAI.svelte";
+	import { startElastic } from "$lib/who-wrote-this/elastic";
+
+	// the page's scroll-speed spacing for [data-lag] blocks, as on the launch page
+	onMount(() => startElastic());
 
 	onMount(() => {
 		const n = new URLSearchParams(location.search).get("step");
 		if (n === null) return;
-		const el = document.querySelectorAll("#which-ai .step")[Number(n)];
-		// after the route transition settles; the field's observers then pick the step up
-		// (instant: the site's html has scroll-behavior: smooth)
-		const t = setTimeout(() => el && scrollTo({ top: el.getBoundingClientRect().top + scrollY - innerHeight * 0.3, behavior: "instant" }), 600);
+		// after the route transition settles; the section scrolls to the middle of that step (instantly)
+		const t = setTimeout(() => document.getElementById("which-ai")?.dispatchEvent(new CustomEvent("wa-go", { detail: { i: Number(n), instant: true } })), 600);
 		return () => clearTimeout(t);
 	});
 </script>
@@ -30,6 +33,7 @@
 			color: #14202D;
 		}
 		html.wwt-field-on body, html.wwt-field-on.dark body { background-image: none; }
+		header.site-header, footer.site-footer { display: none !important; }
 	</style>`}
 </svelte:head>
 

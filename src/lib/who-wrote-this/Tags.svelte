@@ -53,7 +53,7 @@
 	.sw-ring { border-radius: 50%; background: transparent; border: 2px solid var(--c); }
 	.sw-hollow { background: transparent; border: 1.5px solid var(--c); }
 	.sw-line { width: 16px; height: 2.5px; border-radius: 1px; }
-	.sw-dash { width: 16px; height: 0; background: none; border-top: 2.5px dashed var(--c); }
+	.sw-dash { width: 16px; height: 2.5px; border: 0; background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 8px); }
 	.at-right { transform: translate(10px, -50%); }
 	.at-left { transform: translate(calc(-100% - 10px), -50%); }
 	.at-above { transform: translate(-50%, calc(-100% - 8px)); }

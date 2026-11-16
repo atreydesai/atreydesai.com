@@ -245,6 +245,8 @@
 
 		function frame(now: number) {
 			raf = requestAnimationFrame(frame);
+			// the viewport can change size without a resize event (device emulation, zoom): keep the canvas matched
+			if (innerWidth !== W || innerHeight !== H) resize();
 			const dt = Math.min(0.05, (now - last) / 1000);
 			last = now;
 			const reduce = reduceMQ.matches;
