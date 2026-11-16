@@ -1,0 +1,394 @@
+{
+ "_about": "What the hero's inspector lens says about each print. Built by tools/build_hero_data.py; every string has its paper source.",
+ "main": {
+  "title": {
+   "t": "Who wrote this?",
+   "src": "paper/main.tex"
+  },
+  "items": [
+   {
+    "t": "Whether an AI or human wrote it",
+    "src": "paper/sections/01_abstract.tex"
+   },
+   {
+    "t": "If an AI, which lab",
+    "src": "paper/sections/01_abstract.tex"
+   },
+   {
+    "t": "If a human, often exactly who",
+    "src": "paper/sections/01_abstract.tex"
+   }
+  ]
+ },
+ "example": {
+  "source": "A person wrote, in their own words, from a model's ideas",
+  "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1)"
+ },
+ "human": {
+  "kind": "prose",
+  "verdict": "Human",
+  "share": "10% AI",
+  "excerpt": {
+   "t": "mistook greatness with size",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  "explanation": {
+   "t": "The deciding factors are the non-idiomatic and ungrammatical slips.",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  "stat": {
+   "v": "94%",
+   "t": "Who wrote the prose",
+   "src": "labels: paper Figure 1 (paper/figures/data/figure1_fable_sources.json rq1.rows[].figure_label); values: paper/sections/03_rq1_ai_vs_human.tex line 69 (Claude Fable 5.2: 94%, 97%; 91% on both labels) and footnote line 8; data: figure1_fable_sources.json rq1.rows percent 96.6 / 94.4 / 91.4, paper/tables/rq1_quadrants.tex Fable row, paper/appendix/rq1_timeline.tex line 86"
+  }
+ },
+ "ai": {
+  "kind": "ideas",
+  "verdict": "AI",
+  "share": "90% AI",
+  "excerpt": {
+   "t": "From that day on,",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  "explanation": {
+   "t": "The deciding factor is the concentration of stock choices and the stated moral with a “from that day on” coda.",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  "stat": {
+   "v": "97%",
+   "t": "Who had the ideas",
+   "src": "labels: paper Figure 1 (paper/figures/data/figure1_fable_sources.json rq1.rows[].figure_label); values: paper/sections/03_rq1_ai_vs_human.tex line 69 (Claude Fable 5.2: 94%, 97%; 91% on both labels) and footnote line 8; data: figure1_fable_sources.json rq1.rows percent 96.6 / 94.4 / 91.4, paper/tables/rq1_quadrants.tex Fable row, paper/appendix/rq1_timeline.tex line 86"
+  }
+ },
+ "labs": {
+  "Anthropic": {
+   "logo": "anthropic",
+   "models": [
+    {
+     "name": "Claude Sonnet 4.6",
+     "own": 100
+    },
+    {
+     "name": "Claude Opus 5",
+     "own": 100
+    },
+    {
+     "name": "Claude Fable 5.1",
+     "own": 100
+    },
+    {
+     "name": "Claude Opus 5.5",
+     "own": 97
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json",
+   "rate": 99,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq2 rows; Figure 1)",
+   "profile": {
+    "t": "Claude treats opposing views charitably, writes with dry wit, and ends quietly.",
+    "src": "paper/sections/04_rq2_ai_vs_ai.tex"
+   },
+   "family": "Claude"
+  },
+  "OpenAI": {
+   "logo": "openai",
+   "models": [
+    {
+     "name": "GPT-5.4",
+     "own": 100
+    },
+    {
+     "name": "GPT-5.6 Sol",
+     "own": 100
+    },
+    {
+     "name": "GPT-6 Astra",
+     "own": 100
+    },
+    {
+     "name": "GPT-6.1 Sol",
+     "own": 100
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json",
+   "rate": 100,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq2 rows; Figure 1)",
+   "profile": {
+    "t": "GPT hedges its claims, flags gaps instead of inventing specifics, and leans on aphorisms.",
+    "src": "paper/sections/04_rq2_ai_vs_ai.tex"
+   },
+   "family": "GPT"
+  },
+  "Google": {
+   "logo": "google",
+   "models": [
+    {
+     "name": "Gemma 3 27B",
+     "own": 100
+    },
+    {
+     "name": "Gemini 3 Flash",
+     "own": 100
+    },
+    {
+     "name": "Gemma 4 31B",
+     "own": 100
+    },
+    {
+     "name": "Gemini 3.8",
+     "own": 100
+    },
+    {
+     "name": "Gemini 4 Argon",
+     "own": 100
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json",
+   "rate": 100,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq2 rows; Figure 1)",
+   "profile": {
+    "t": "Gemini stacks adjectives and piles on intensifiers and stock clichés, and invents named sources and quotes in its news articles.",
+    "src": "paper/sections/04_rq2_ai_vs_ai.tex"
+   },
+   "family": "Gemini"
+  },
+  "Alibaba": {
+   "logo": null,
+   "models": [
+    {
+     "name": "Qwen2.5 72B",
+     "own": 87
+    },
+    {
+     "name": "Qwen3 235B (2507)",
+     "own": 80
+    },
+    {
+     "name": "Qwen3.6 27B",
+     "own": 89
+    },
+    {
+     "name": "Qwen3.8 27B",
+     "own": 1
+    },
+    {
+     "name": "Qwen Max",
+     "own": 0
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  },
+  "DeepSeek": {
+   "logo": null,
+   "models": [
+    {
+     "name": "DeepSeek V3.2",
+     "own": 67
+    },
+    {
+     "name": "DeepSeek V4.1 Flash",
+     "own": 15
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  },
+  "Moonshot": {
+   "logo": null,
+   "models": [
+    {
+     "name": "Kimi K2 (0905)",
+     "own": 57
+    },
+    {
+     "name": "Kimi K2.5",
+     "own": 93
+    },
+    {
+     "name": "Kimi K2.6",
+     "own": 77
+    },
+    {
+     "name": "Kimi K3",
+     "own": 0
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  },
+  "Zhipu": {
+   "logo": null,
+   "models": [
+    {
+     "name": "GLM-4.5",
+     "own": 5
+    },
+    {
+     "name": "GLM-4.7",
+     "own": 26
+    },
+    {
+     "name": "GLM-5.1",
+     "own": 11
+    },
+    {
+     "name": "GLM-5.3",
+     "own": 0
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  },
+  "MiniMax": {
+   "logo": null,
+   "models": [
+    {
+     "name": "MiniMax M2.5",
+     "own": 7
+    },
+    {
+     "name": "MiniMax M3",
+     "own": 0
+    },
+    {
+     "name": "MiniMax M3.1 Flash",
+     "own": 0
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  },
+  "Mistral": {
+   "logo": null,
+   "models": [
+    {
+     "name": "Mistral Large 3",
+     "own": 92
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  },
+  "xAI": {
+   "logo": null,
+   "models": [
+    {
+     "name": "Grok 4.7",
+     "own": 5
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  },
+  "Cohere": {
+   "logo": null,
+   "models": [
+    {
+     "name": "Command A",
+     "own": 21
+    }
+   ],
+   "models_src": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2), via content/rq2_writers.json"
+  }
+ },
+ "labs_note": {
+  "t": "Claude Fable 5.2 recognizes most texts from earlier Kimi and Qwen releases, but attributes nearly every Kimi K3 and GLM-5.3 text to Claude and most Qwen3.8 27B and Grok 4.7 texts to GPT.",
+  "src": "paper/sections/09_appendix.tex (fig:md_distill_cols caption)"
+ },
+ "crowd": [
+  {
+   "id": "icml",
+   "label": "ICML 2020 reviewers",
+   "rate": 55,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
+    "src": "paper/sections/01_abstract.tex"
+   },
+   "share": 0.34
+  },
+  {
+   "id": "active",
+   "label": "Active Redditors",
+   "rate": 69,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "The username behind 69% of comments made by active Redditors.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "share": 0.2
+  },
+  {
+   "id": "papers",
+   "label": "Paper authors",
+   "rate": 46,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "At least one author of 46% of arXiv papers.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "share": 0.16
+  },
+  {
+   "id": "nature",
+   "label": "Nature reviewers",
+   "rate": 76,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "The reviewer of 76% of Nature-family reviews.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "share": 0.12
+  },
+  {
+   "id": "inactive",
+   "label": "Redditors with no prior activity",
+   "rate": 2,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "Claude Fable 5.2's attribution accuracy rises from 2% for inactive users.",
+    "src": "paper/sections/06_discussion.tex"
+   },
+   "share": 0.1
+  },
+  {
+   "id": "famous",
+   "label": "Famous writers",
+   "rate": 100,
+   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "t": {
+    "t": "The writer of all 15 stories by authors with >1M Goodreads ratings.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "share": 0.08
+  }
+ ],
+ "privacy": {
+  "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
+  "src": "paper/sections/05_rq3_human_vs_human.tex"
+ },
+ "lit": {
+  "name": "Joyce Carol Oates",
+  "confidence": 93,
+  "excerpt": {
+   "t": "Hurry, sweetie! God damn.",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  "explanation": {
+   "t": "The deciding factor is the combination of style and theme: fragmentary, subject-dropping sentences, sentence-initial “For”, and unquoted menacing speech.",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  "source": "Human story",
+  "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+ },
+ "names_prefix": {
+  "t": "Claude Fable 5.2 names",
+  "src": "paper/sections/02_introduction.tex"
+ },
+ "ui": [
+  "Move the circle over any print",
+  "named correctly",
+  "attributed to its own lab",
+  "Confidence",
+  "Claude Fable 5.2",
+  "Human",
+  "AI",
+  "Ideas",
+  "Prose",
+  "One text"
+ ]
+}

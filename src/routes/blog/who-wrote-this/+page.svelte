@@ -123,21 +123,26 @@
 
 		{#key art}{#if art === "print"}<PrintHero />{:else}<Levels {art} />{/if}{/key}
 
+		<!-- empty ground between scenes, so only one thing is on screen at a time -->
+		<div class="breath" aria-hidden="true"></div>
+
 		<div class="lede" data-lag="1">
 			{#each C.lede as s}{s.t + " "}{/each}
 		</div>
 
+		<div class="breath" aria-hidden="true"></div>
 		<Timeline />
-
+		<div class="breath" aria-hidden="true"></div>
 		<HumanOrAI section={C.sections[0]} />
-
+		<div class="breath" aria-hidden="true"></div>
 		<WhichAI />
-
+		<div class="breath" aria-hidden="true"></div>
 		<WhichHuman />
-
+		<div class="breath" aria-hidden="true"></div>
 		<Familiar />
-
+		<div class="breath" aria-hidden="true"></div>
 		<Anonymity />
+		<div class="breath" aria-hidden="true"></div>
 
 		<footer class="end">
 			<p class="closing" data-lag="1">{C.closing.t}</p>
@@ -215,7 +220,8 @@
 	.btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1.25px solid var(--ink); border-radius: 2px; font-size: 13px; font-weight: 500; text-decoration: none; transition: background-color .15s, color .15s; }
 	.btn:hover { background: var(--ink); color: var(--field); }
 	.links time { margin-left: 8px; font-size: 13px; color: var(--ink2); }
-	.lede { margin-top: 64px; max-width: 46rem; font-size: 19px; line-height: 1.6; }
+	.breath { height: 42vh; }
+	.lede { margin-top: 0; max-width: 46rem; font-size: 19px; line-height: 1.6; }
 	/* a book's drop cap: the opening "I" spans three lines */
 	.lede::first-letter { float: left; font-family: Georgia, "Times New Roman", serif !important; font-size: calc(19px * 1.6 * 3 * 0.86); line-height: .8; font-weight: 400; margin: 6px 12px 0 -2px; color: var(--ink); }
 	@supports (initial-letter: 3) { .lede::first-letter { float: none; initial-letter: 3; margin: 0 12px 0 0; font-size: inherit; line-height: inherit; } }
@@ -255,6 +261,7 @@
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }
 		.lede { font-size: 17px; }
+		.breath { height: 28vh; }
 		.lede::first-letter { font-size: calc(17px * 1.6 * 3 * 0.86); }
 		.top nav { gap: 14px; }
 	}

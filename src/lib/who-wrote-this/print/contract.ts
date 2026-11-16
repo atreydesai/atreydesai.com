@@ -25,6 +25,9 @@ export type PrintInput = {
 	/** 0..1: how far the section is pinned; fade in and out with it */
 	enter: number;
 	reduce: boolean;
+	/** the print the reader is inspecting (an anchor or hit id, "main" at level 0), or null: the renderer brings it
+	 * forward (full ink) and lets the others recede a little, so the lens reads as pointing at one thing */
+	focus?: string | null;
 };
 
 export type Anchor = {
@@ -38,6 +41,7 @@ export type Anchor = {
 	alpha: number;
 };
 
+/** "main" at level 0; "human" | "ai" | "lab:<name>" | "writer:<i>" | "lit" otherwise */
 export type Hit = { id: string } | null;
 
 export interface Print {
@@ -51,6 +55,9 @@ export interface Print {
 	/** true while anything is still moving (easing toward the level, inking in, baking, the lens following the pointer).
 	 * When false the host stops redrawing until the input changes, so an idle page costs nothing. */
 	busy?(): boolean;
+	/** where the lens is drawn this frame (viewport px, radius), or null when it is not shown; the host attaches its
+	 * information card to the lens's edge */
+	lens?(): { x: number; y: number; r: number } | null;
 }
 
 export type PrintOptions = {

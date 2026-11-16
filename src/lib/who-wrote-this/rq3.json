@@ -1,5 +1,5 @@
 {
- "_about": "RQ3 section strings and numbers, built by docs/launch_20261116/tools/build_rq3_data.py from the paper's figure data; do not edit by hand. Text is paper text ({t, src}); `edits` lists every grammatical change; `numbers` gives each displayed number's data file and the paper file that prints it. Tiles stand for counts, not individual texts: no reviewer, username or per-review result is included. UI words are listed in `ui`.",
+ "_about": "RQ3 section strings and numbers, built by docs/launch_20261116/tools/build_rq3_data.py from the paper's figure data; do not edit by hand. Paper text is {t, src}; `edits` lists every change to a paper sentence; `numbers` gives each displayed number's data file and the paper file that prints it. Tiles stand for counts, not individual texts: no reviewer, username or per-review result is included. Every string that is not paper text is in `ui` (labels and controls) or `demo` (the one illustrative example: a synthetic review, written for this page; the answer's name is a redaction bar, never a name).",
  "id": "which-human",
  "n": 3,
  "rq": 3,
@@ -15,43 +15,48 @@
   "t": "We provide no tools, web access, or candidate lists.",
   "src": "paper/sections/05_rq3_human_vs_human.tex"
  },
- "model": "Claude Fable 5.2",
+ "privacy": {
+  "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
+  "src": "paper/sections/05_rq3_human_vs_human.tex"
+ },
  "steps": [
+  {
+   "view": "review",
+   "t": "Naming the person behind a human-written text is an open-world task with countless possible outputs.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
+  },
+  {
+   "view": "prompt",
+   "t": "Given a single text, models return the human author's name, a list of supporting observations, and a confidence level.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
+  },
   {
    "view": "icml",
    "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
    "src": "paper/sections/01_abstract.tex",
-   "cap": "1 tile = 10 reviews",
-   "more": {
-    "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
-    "src": "paper/sections/05_rq3_human_vs_human.tex"
-   },
-   "alt": {
-    "t": "Claude Fable 5.2 names the reviewer of 50.1% of ICML reviews with exact match vs. 55.4% with the more lenient matching, and qualitative inspection shows few false matches in the latter setting.",
-    "src": "paper/sections/05_rq3_human_vs_human.tex"
-   }
-  },
-  {
-   "view": "models",
-   "t": "Fable 5.2, the best performing model in all domains, exhibits considerable gains over Opus 5.5, which was released less than two months prior.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex",
-   "cap": "1 tile = 10 reviews",
    "more": {
     "t": "On the ICML 2020 corpus, Fable 5.2 correctly identifies the author of 55.4% of the reviews, followed by Opus 5.5 (48.8%), Argon (37.7%), Sol (22.3%), and DeepSeek (5.4%).",
     "src": "paper/sections/05_rq3_human_vs_human.tex"
    }
   },
   {
+   "view": "models",
+   "t": "Fable 5.2, the best performing model in all domains, exhibits considerable gains over Opus 5.5, which was released less than two months prior.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
+  },
+  {
    "view": "domains",
    "t": "On texts published after its training cutoff, it also names the reviewer of 76% of Nature-family reviews, the writer of all 15 stories by authors with >1M Goodreads ratings, at least one author of 46% of arXiv papers, and the username behind 69% of comments made by active Redditors.",
-   "src": "paper/sections/02_introduction.tex",
-   "cap": "1 tile = 1 text"
+   "src": "paper/sections/02_introduction.tex"
   },
   {
    "view": "confidence",
+   "head": {
+    "t": "Confident answers are almost always right.",
+    "src": "paper/sections/05_rq3_human_vs_human.tex"
+   },
    "t": "When Fable 5.2's confidence is 25% or more (28% of responses), its predictions are 89% correct.",
    "src": "paper/sections/05_rq3_human_vs_human.tex",
-   "cap": "1 tile = 1 answer on public texts",
    "more": {
     "t": "Furthermore, confident mistakes are rare. Of all Fable 5.2 answers, 0.3% report both at least 80% confidence and name the wrong person.",
     "src": "paper/sections/05_rq3_human_vs_human.tex"
@@ -60,31 +65,51 @@
   {
    "view": "example",
    "t": "Generally, the explanations cover both the text's content as well as its writing style.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex",
-   "cap": ""
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
   }
  ],
+ "prompt": {
+  "task": [
+   {
+    "t": "TASK:",
+    "b": true
+   },
+   {
+    "t": " Judge which "
+   },
+   {
+    "t": "human author",
+    "b": true
+   },
+   {
+    "t": " wrote the attached piece of writing. Name the author as precisely as you can ("
+   },
+   {
+    "t": "the full name they publish under",
+    "b": true
+   },
+   {
+    "t": "). Give your best answer even when you are unsure […]"
+   }
+  ],
+  "task_src": "paper/figures/data/prompt_overview.tikz (Figure 3, figures/prompt_overview.tex, input by sections/03_rq1_ai_vs_human.tex)",
+  "fields": [
+   {
+    "k": "confidence:",
+    "v": "0 to 1",
+    "src": "paper/figures/data/prompt_overview.tikz (Figure 3, figures/prompt_overview.tex, input by sections/03_rq1_ai_vs_human.tex)"
+   },
+   {
+    "k": "author:",
+    "v": "the author's name",
+    "src": "paper/figures/data/prompt_overview_sources.json sources.rq3.excerpts ('author: <the author's name>', from experiments/E8_human_author_attribution/rq3_ready_20261101/prompts/holistic.txt)"
+   }
+  ]
+ },
  "icml": {
   "n": 15136,
   "per_tile": 10,
   "tiles": 1514,
-  "k": 8387,
-  "match": [
-   {
-    "id": "lenient",
-    "label": "Lenient match",
-    "pct": 55.4,
-    "k": 8387,
-    "lit": 839
-   },
-   {
-    "id": "exact",
-    "label": "Exact match",
-    "pct": 50.1,
-    "k": 7585,
-    "lit": 759
-   }
-  ],
   "src": "paper/figures/data/rq3_icml.json"
  },
  "models": [
@@ -101,6 +126,27 @@
    "short": "Opus 5.5",
    "pct": 48.8,
    "lit": 739
+  },
+  {
+   "id": "argon",
+   "name": "Gemini 4 Argon",
+   "short": "Argon",
+   "pct": 37.7,
+   "lit": 571
+  },
+  {
+   "id": "sol",
+   "name": "GPT-6.1 Sol",
+   "short": "Sol",
+   "pct": 22.3,
+   "lit": 338
+  },
+  {
+   "id": "deepseek",
+   "name": "DeepSeek V4.1 Flash",
+   "short": "DeepSeek",
+   "pct": 5.4,
+   "lit": 82
   }
  ],
  "domains": [
@@ -189,52 +235,34 @@
   }
  ],
  "confidence": {
+  "what": {
+   "t": "Each model's prediction includes a confidence level.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
+  },
   "groups": [
    {
     "id": "lo",
-    "label": "Under 25%",
+    "label": {
+     "t": "Fable 5.2 reports under 25% confidence",
+     "src": "ui (the complement of the intro's group)"
+    },
     "n": 1587,
     "k": 124
    },
    {
     "id": "hi",
-    "label": "25% or more",
+    "label": {
+     "t": "Fable 5.2 reports 25% or higher confidence",
+     "src": "paper/sections/02_introduction.tex"
+    },
     "n": 603,
     "k": 535,
     "pct": 89,
-    "share": 28
-   }
-  ],
-  "bins": [
-   {
-    "id": "b0",
-    "label": "0–25%",
-    "n": 1587,
-    "k": 124
-   },
-   {
-    "id": "b25",
-    "label": "25–50%",
-    "n": 290,
-    "k": 245
-   },
-   {
-    "id": "b50",
-    "label": "50–75%",
-    "n": 208,
-    "k": 192
-   },
-   {
-    "id": "b75",
-    "label": "75–90%",
-    "n": 57,
-    "k": 55
-   },
-   {
-    "id": "b90",
-    "label": "90–100%",
-    "n": 48,
-    "k": 43
+    "share": 28,
+    "says": {
+     "t": "It predicts the right author 89% of the time",
+     "src": "paper/sections/02_introduction.tex"
+    }
    }
   ],
   "src": "paper/figures/data/rq3_confidence.json sets.public.fable52"
@@ -321,41 +349,149 @@
   },
   "source": "paper/tables/data/minjoon_agent_attribution_examples/examples.json E-W006"
  },
- "legend": [
+ "demo": [
   {
-   "k": "yes",
-   "t": "Correct"
+   "id": "label",
+   "t": "Illustrative example"
   },
   {
-   "k": "no",
-   "t": "Incorrect"
+   "id": "label.sub",
+   "t": "written for this page, not a real review"
+  },
+  {
+   "id": "review.head",
+   "t": "Anonymous peer review"
+  },
+  {
+   "id": "review.k1",
+   "t": "Summary"
+  },
+  {
+   "id": "review.t1",
+   "t": "The paper proposes a simple regularizer for training under label noise and reports gains on three image benchmarks."
+  },
+  {
+   "id": "review.k2",
+   "t": "Strengths"
+  },
+  {
+   "id": "review.t2",
+   "t": "The idea is easy to follow, and the experiments are thorough."
+  },
+  {
+   "id": "review.k3",
+   "t": "Weaknesses"
+  },
+  {
+   "id": "review.t3",
+   "t": "It is unclear whether the gains come from the regularizer or from extra tuning. Results over more random seeds would help."
+  },
+  {
+   "id": "review.who",
+   "t": "Reviewer: anonymous"
+  },
+  {
+   "id": "prompt.head",
+   "t": "Prompt"
+  },
+  {
+   "id": "prompt.slot",
+   "t": "The review"
+  },
+  {
+   "id": "answer.hidden",
+   "t": "Name hidden"
+  },
+  {
+   "id": "answer.verdict",
+   "t": "Named correctly"
   }
  ],
  "ui": [
-  "Correct",
-  "Incorrect",
-  "Lenient match",
-  "Exact match",
-  "2 groups",
-  "5 bins",
-  "All",
-  "Explanation",
-  "Author",
-  "Confidence {n}%",
-  "Under 25%",
-  "25% or more",
-  "{lo}–{hi}%",
-  "ICML 2020 reviews",
-  "1 tile = 10 reviews",
-  "1 tile = 1 text",
-  "1 tile = 1 answer on public texts",
-  "{k} of {n} {unit}",
-  "{k} of {n} correct",
-  "{n} answers",
-  "{pct}% correct",
-  "{share}% of responses",
-  "{model or match} · {pct}%",
-  "Step {i} of {n}"
+  {
+   "id": "title.icml",
+   "t": "ICML 2020 reviews"
+  },
+  {
+   "id": "unit.icml",
+   "t": "1 tile = 10 reviews"
+  },
+  {
+   "id": "unit.text",
+   "t": "1 tile = 1 text"
+  },
+  {
+   "id": "unit.answer",
+   "t": "1 tile = 1 answer on public texts"
+  },
+  {
+   "id": "key.correct",
+   "t": "{model}: named correctly"
+  },
+  {
+   "id": "key.wrong",
+   "t": "Incorrect"
+  },
+  {
+   "id": "conf.lo",
+   "t": "Fable 5.2 reports under 25% confidence"
+  },
+  {
+   "id": "conf.share",
+   "t": "{share}% of responses"
+  },
+  {
+   "id": "explore",
+   "t": "Explore"
+  },
+  {
+   "id": "x.example",
+   "t": "Example"
+  },
+  {
+   "id": "x.icml",
+   "t": "ICML 2020"
+  },
+  {
+   "id": "x.domains",
+   "t": "Recent texts"
+  },
+  {
+   "id": "x.confidence",
+   "t": "Confidence"
+  },
+  {
+   "id": "x.aria",
+   "t": "Show"
+  },
+  {
+   "id": "x.models",
+   "t": "Model"
+  },
+  {
+   "id": "all",
+   "t": "All"
+  },
+  {
+   "id": "explain",
+   "t": "Explanation"
+  },
+  {
+   "id": "role",
+   "t": "Author"
+  },
+  {
+   "id": "conf",
+   "t": "Confidence {n}%"
+  },
+  {
+   "id": "step",
+   "t": "Step {i} of {n}"
+  },
+  {
+   "id": "pct",
+   "t": "{pct}%"
+  }
  ],
  "edits": [
   {
@@ -379,9 +515,26 @@
    "src": "paper/sections/06_discussion.tex"
   },
   {
+   "paper": "it predicts the right author 89% of the time",
+   "shown": "It predicts the right author 89% of the time",
+   "src": "paper/sections/02_introduction.tex"
+  },
+  {
    "paper": "In each row, a highlighted reason shares its color with the words in the text it describes.",
    "shown": "A highlighted reason shares its color with the words in the text it describes.",
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+  },
+  {
+   "paper": "[...] naming the person behind a human-written text is an open-world task with countless possible outputs [citations].",
+   "shown": "Naming the person behind a human-written text is an open-world task with countless possible outputs.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex",
+   "note": "the clause after 'While the space of plausible outputs in the model attribution task is just a few dozen models,' as its own sentence: capitalised, citations dropped"
+  },
+  {
+   "paper": "Given a single text and a minimally modified version of the prompt from previous sections, models return the human author's name (or username for Reddit), a list of supporting observations, and a confidence level.",
+   "shown": "Given a single text, models return the human author's name, a list of supporting observations, and a confidence level.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex",
+   "note": "abridged: two clauses dropped (not only grammar); the claim is unchanged"
   },
   {
    "paper": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public",
@@ -420,16 +573,9 @@
   {
    "key": "icml_fable_lenient",
    "value": 55.4,
-   "shown": "55% / 55.4%",
+   "shown": "55% (guided step) / 55.4% (Explore)",
    "data": "paper/figures/data/rq3_icml.json fable52.lenient (8,387 / 15,136)",
-   "text": "paper/sections/05_rq3_human_vs_human.tex"
-  },
-  {
-   "key": "icml_fable_exact",
-   "value": 50.1,
-   "shown": "50.1%",
-   "data": "paper/figures/data/rq3_icml.json fable52.exact (7,585 / 15,136)",
-   "text": "paper/sections/05_rq3_human_vs_human.tex (footnote)"
+   "text": "paper/sections/01_abstract.tex; paper/sections/05_rq3_human_vs_human.tex"
   },
   {
    "key": "icml_opus",
@@ -441,36 +587,36 @@
   {
    "key": "dom_famous",
    "value": 100,
-   "shown": "100% (15 of 15)",
-   "data": "paper/figures/data/rq3_sep22_remaining.json goodreads.models.fable52 >=1M (Figure 1's 'Famous writers' shows 100%); the k of n counts are not printed in text",
+   "shown": "100% (the tiles draw 15 of 15 lit; the counts are not shown as text)",
+   "data": "paper/figures/data/rq3_sep22_remaining.json goodreads.models.fable52 >=1M (Figure 1's 'Famous writers' shows 100%)",
    "text": "paper/sections/02_introduction.tex"
   },
   {
    "key": "dom_nature",
    "value": 76,
-   "shown": "76% (48 of 63)",
-   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Nature reviewers'; the k of n counts are not printed in text",
+   "shown": "76% (the tiles draw 48 of 63 lit; the counts are not shown as text)",
+   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Nature reviewers'",
    "text": "paper/sections/02_introduction.tex"
   },
   {
    "key": "dom_papers",
    "value": 46,
-   "shown": "46% (55 of 119)",
-   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Paper authors'; the k of n counts are not printed in text",
+   "shown": "46% (the tiles draw 55 of 119 lit; the counts are not shown as text)",
+   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Paper authors'",
    "text": "paper/sections/02_introduction.tex"
   },
   {
    "key": "dom_active",
    "value": 69,
-   "shown": "69% (113 of 164)",
-   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Redditors (active)' (activity over 500 posts in the prior 12 months); the k of n counts are not printed in text",
+   "shown": "69% (the tiles draw 113 of 164 lit; the counts are not shown as text)",
+   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Redditors (active)' (activity over 500 posts in the prior 12 months)",
    "text": "paper/sections/02_introduction.tex"
   },
   {
    "key": "dom_inactive",
    "value": 2,
-   "shown": "2% (1 of 47)",
-   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Redditors (no prior activity)'; the k of n counts are not printed in text",
+   "shown": "2% (the tiles draw 1 of 47 lit; the counts are not shown as text)",
+   "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Redditors (no prior activity)'",
    "text": "paper/sections/06_discussion.tex"
   },
   {
@@ -542,7 +688,7 @@
    "text": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
-   "key": "conf_counts_not_printed",
+   "key": "conf_counts_drawn_only",
    "value": {
     "under25": [
      124,
@@ -551,31 +697,9 @@
     "25plus": [
      535,
      603
-    ],
-    "bins": [
-     [
-      124,
-      1587
-     ],
-     [
-      245,
-      290
-     ],
-     [
-      192,
-      208
-     ],
-     [
-      55,
-      57
-     ],
-     [
-      43,
-      48
-     ]
     ]
    },
-   "shown": "124 of 1,587 / 535 of 603 / 1,587 answers / five 'k of n correct' bin labels",
+   "shown": "not shown as text: the two groups' tiles (124 of 1,587 lit; 535 of 603 lit)",
    "data": "paper/figures/data/rq3_confidence.json sets.public.fable52 (non-Nature public texts; the appendix figure now uses rq3_confidence_pooled_nature_20261116.json)",
    "text": "not printed in text"
   },

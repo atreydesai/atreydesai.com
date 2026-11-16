@@ -1,9 +1,14 @@
 <script lang="ts">
 	// Dev preview of section 3 (If human, which human?) on the launch page's field and base styles.
-	// ?step=N scrolls to scroll step N (0-based) on load, for screenshots; ?still settles every animation.
+	// ?step=N scrolls to scroll step N (0-based) on load, for screenshots; ?still settles this section's own animations
+	// (the shared field follows prefers-reduced-motion).
 	import { onMount } from "svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import WhichHuman from "$lib/who-wrote-this/WhichHuman.svelte";
+	import { startElastic } from "$lib/who-wrote-this/elastic";
+
+	// the page's scroll-speed spacing for [data-lag] blocks, as on the post
+	onMount(() => startElastic());
 
 	onMount(() => {
 		const n = new URLSearchParams(location.search).get("step");
