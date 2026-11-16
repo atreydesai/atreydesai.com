@@ -6,7 +6,7 @@
 
 	type Item = { g: number; key: string; t: string; href?: string };
 	let items = $state<Item[]>([]);
-	let tip = $state<{ x: number; y: number; t: string; href?: string; flip: boolean } | null>(null);
+	let tip = $state<{ x: number; y: number; w: number; up: boolean; t: string; href?: string } | null>(null);
 
 	const keyOf = (a: HTMLAnchorElement) => /#fn-(.+)$/.exec(a.getAttribute("data-key") ?? a.getAttribute("href") ?? "")?.[1] ?? "";
 
@@ -39,8 +39,9 @@
 			if (!a) return;
 			const it = items.find((i) => `#fn-${i.g}` === a.getAttribute("href"));
 			if (!it) return;
-			const r = a.getBoundingClientRect();
-			tip = { x: r.left + r.width / 2, y: r.bottom + 8, t: it.t, href: it.href, flip: r.left > innerWidth - 340 };
+			const r = a.getBoundingClientRect(), w = Math.min(320, innerWidth - 32), up = r.bottom > innerHeight * 0.62;
+			const x = Math.max(16 + w / 2, Math.min(innerWidth - 16 - w / 2, r.left + r.width / 2));
+			tip = { x, y: up ? r.top - 8 : r.bottom + 8, w, up, t: it.t, href: it.href };
 		};
 		const hide = (e: Event) => { if ((e.target as HTMLElement)?.closest?.(".wwt sup.fnref a")) tip = null; };
 		document.addEventListener("pointerover", show);
@@ -69,8 +70,8 @@
 	</section>
 {/if}
 {#if tip}
-	<div class="fn-tip" class:flip={tip.flip} style:left="{tip.x}px" style:top="{tip.y}px" role="tooltip">
-		{tip.t}{#if tip.href}{" "}<span class="h">{host(tip.href)}</span>{/if}
+	<div class="fn-tip" class:up={tip.up} style:left="{tip.x}px" style:top="{tip.y}px" style:width="{tip.w}px" role="tooltip">
+		<span class="tt">{tip.t}</span>{#if tip.href}<span class="h">{host(tip.href)}</span>{/if}
 	</div>
 {/if}
 
@@ -83,10 +84,11 @@
 	a { color: #14202D; }
 	.back { text-decoration: none; }
 	.fn-tip {
-		position: fixed; z-index: 30; max-width: 320px; transform: translateX(-50%); padding: 10px 12px; border-radius: 4px;
+		position: fixed; z-index: 30; display: grid; gap: 4px; transform: translateX(-50%); padding: 10px 12px; border-radius: 4px;
 		background: #14202D; color: #F3F3EF; font-size: 13px; line-height: 1.5; box-shadow: 0 10px 28px rgba(20, 32, 45, .25); pointer-events: none;
 	}
-	.fn-tip.flip { transform: translateX(calc(-100% + 16px)); }
+	.fn-tip.up { transform: translate(-50%, -100%); }
+	.fn-tip .tt { display: -webkit-box; -webkit-line-clamp: 9; line-clamp: 9; -webkit-box-orient: vertical; overflow: hidden; }
 	.fn-tip .h { color: rgba(243, 243, 239, .6); }
 	:global(.wwt sup.fnref) { font-size: .7em; margin-left: 1px; }
 	:global(.wwt sup.fnref a) { color: inherit; text-decoration: none; font-weight: 600; padding: 0 1px; border-radius: 2px; }

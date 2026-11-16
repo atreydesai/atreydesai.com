@@ -22,5 +22,7 @@
 	.kicker { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); margin: 2px 0 6px; }
 	.body { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
 	.body::-webkit-scrollbar { display: none; }
+	/* on a phone the row wraps: a sideways scroll with no scrollbar hid controls past the edge */
+	@media (max-width: 600px) { .body { flex-wrap: wrap; overflow: visible; } }
 	@media (prefers-reduced-motion: reduce) { .reveal { transition: none; } }
 </style>

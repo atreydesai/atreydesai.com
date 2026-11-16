@@ -12,8 +12,8 @@
 	let current = $state(-1);
 	let rail = $state(false); // the header has scrolled away: show the left rail
 	let home: HTMLElement;
-	const inlineEls: HTMLElement[] = [];
-	const railEls: HTMLElement[] = [];
+	const inlineEls: HTMLElement[] = $state([]);
+	const railEls: HTMLElement[] = $state([]);
 	const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 	const tops = () => stops.map((s) => { const e = document.getElementById(s.id); return e ? e.getBoundingClientRect().top + scrollY : Infinity; });
 	function go(i: number) {
@@ -110,7 +110,7 @@
 	.chev svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 	/* the rail, on the left */
-	.rail { position: fixed; left: 12px; top: 50%; transform: translateY(-50%); z-index: 15; display: grid; justify-items: center; gap: 2px; opacity: 0; pointer-events: none; transition: opacity .25s; }
+	.rail { position: fixed; left: 10px; top: 50%; transform: translateY(-50%); z-index: 15; display: grid; justify-items: center; gap: 2px; padding: 4px 1px; border-radius: 13px; background: rgba(243, 243, 239, .86); opacity: 0; pointer-events: none; transition: opacity .25s; }
 	.rail.on { opacity: .6; pointer-events: auto; }
 	.rail.on:hover, .rail.on:focus-within { opacity: 1; }
 	.dot { position: relative; display: grid; place-items: center; width: 22px; height: 16px; }
@@ -124,6 +124,10 @@
 		.sn ol { display: none; }
 		.rail { top: auto; bottom: 10px; transform: none; }
 		.rail .dot { display: none; }
+	}
+	/* phones: no rail; its arrows sat on the text (the keep-scrolling hint and the header's links remain) */
+	@media (max-width: 600px) {
+		.rail { display: none; }
 	}
 	@media (prefers-reduced-motion: reduce) { .sn, .rail, .dot i, .dot .tip { transition: none; } }
 </style>
