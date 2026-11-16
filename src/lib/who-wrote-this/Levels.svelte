@@ -1,10 +1,11 @@
 <script lang="ts">
 	// The hero: the paper's three levels, in the abstract's own words, played on the page-wide dot field.
 	// Level 1 divides the ground into human and model; level 2 gathers it into labs; level 3 lights one writer.
-	// The rows are buttons (replay a level) and each links to its section. Settled frame: all three rows, calm ground.
+	// The rows are buttons (replay a level) and each links to its section. Settled frame: each row has its level
+	// drawn small beside it, so the stage is never empty.
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
-	import { field } from "./field.svelte";
+	import { field, hero, labCenters } from "./field.svelte";
 	import ArtFingerprint from "./ArtFingerprint.svelte";
 	import ArtMosaic from "./ArtMosaic.svelte";
 	import C from "./content.json";
@@ -16,6 +17,10 @@
 	let active = $state(0); // 0 = all three settled
 	let stage: HTMLElement;
 	let root: HTMLElement;
+	const rowEls: HTMLElement[] = [];
+	let sw = $state(0), sh = $state(0); // stage size, for the labels over the dots
+	const labs = $derived(labCenters({ x: 0, y: 0, w: sw, h: sh }).slice(0, 3));
+	const LABS = [["anthropic", "Anthropic"], ["openai", "OpenAI"], ["google", "Google"]];
 	let timers: ReturnType<typeof setTimeout>[] = [];
 
 	function show(n: number) {
@@ -39,6 +44,15 @@
 		const track = () => {
 			const r = stage.getBoundingClientRect();
 			field.anchor = { x: r.left, y: r.top, w: r.width, h: r.height };
+			if (r.width !== sw) sw = r.width;
+			if (r.height !== sh) sh = r.height;
+			// settled bands: beside each row on wide screens, stacked in the stage on narrow ones
+			const beside = rowEls[0] && rowEls[0].getBoundingClientRect().right <= r.left;
+			hero.bands = rowEls.map((el, i) => {
+				if (!beside) return { x: r.left, y: r.top + (r.height * i) / 3, w: r.width, h: r.height / 3 };
+				const q = el.getBoundingClientRect();
+				return { x: r.left, y: q.top, w: r.width, h: q.height };
+			});
 			raf = requestAnimationFrame(track);
 		};
 		raf = requestAnimationFrame(track);
@@ -60,8 +74,8 @@
 	<div class="copy">
 		<p class="lead">{L.lead.t}:</p>
 		<ol>
-			{#each L.items as it}
-				<li class:on={active === 0 || active === it.n} class:now={active === it.n} data-rq={it.rq}>
+			{#each L.items as it, i}
+				<li bind:this={rowEls[i]} class:on={active === 0 || active === it.n} class:now={active === it.n} data-rq={it.rq}>
 					<button type="button" class="row" aria-pressed={active === it.n} onclick={() => pick(it.n)}>
 						<span class="n">{it.n}</span>
 						<span class="body">
@@ -81,6 +95,21 @@
 	</div>
 	<!-- the field draws the three levels into this box, or the art plays them -->
 	<div class="stage" class:art={!onField} bind:this={stage} aria-hidden="true">
+		{#if onField && sw}
+			<!-- a few words over the dots, so each level reads at a glance -->
+			{#key active}
+				{#if active === 1}
+					<span class="tag" style:--c="var(--rq1)" style:left="25%" style:top="50%"><Icon name="human" />Human</span>
+					<span class="tag" style:--c="var(--rq2)" style:left="75%" style:top="50%"><Icon name="ai" />AI</span>
+				{:else if active === 2}
+					{#each labs as c, i}
+						<span class="tag lab" style:left="{c.x}px" style:top="{c.y + c.r + 18}px"><Icon name={LABS[i][0]} />{LABS[i][1]}</span>
+					{/each}
+				{:else if active === 3}
+					<span class="tag" style:--c="var(--rq3)" style:left="62%" style:top="calc(50% - 40px)"><Icon name="human" /></span>
+				{/if}
+			{/key}
+		{/if}
 		{#if art === "fingerprint"}<ArtFingerprint level={active} />{/if}
 		{#if art === "mosaic"}<ArtMosaic level={active} onpick={pick} />{/if}
 	</div>
@@ -112,10 +141,18 @@
 	.replay:hover { color: var(--ink); }
 	.stage { min-height: 360px; border-radius: 4px; position: relative; }
 	.stage.art { min-height: 480px; }
+	.tag {
+		position: absolute; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+		border-radius: 3px; background: rgba(255, 255, 255, .92); color: var(--c, var(--ink)); font-size: 14px; font-weight: 600;
+		box-shadow: 0 4px 14px rgba(20, 32, 45, .12); pointer-events: none; animation: tag-in .5s .35s both;
+	}
+	.tag :global(svg) { width: 15px; height: 15px; }
+	.tag.lab { font-size: 13px; color: var(--ink); }
+	@keyframes tag-in { from { opacity: 0; transform: translate(-50%, -30%); } }
 	@media (max-width: 860px) {
 		.levels { grid-template-columns: 1fr; min-height: 0; }
 		.stage { min-height: 240px; order: -1; }
 		.stage.art { min-height: 380px; }
 	}
-	@media (prefers-reduced-motion: reduce) { li, .row { transition: none; } }
+	@media (prefers-reduced-motion: reduce) { li, .row { transition: none; } .tag { animation: none; } }
 </style>

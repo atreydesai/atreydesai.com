@@ -4,7 +4,7 @@
 	// the CSS ground and scroll with it, so the switch is seamless; near the pointer they swell like a lens.
 	// Sections drive it through `field`: the hero's three questions (levels), or marks and lines for a chart.
 	import { onMount } from "svelte";
-	import { field, chart } from "./field.svelte";
+	import { field, chart, hero, labCenters, type Box } from "./field.svelte";
 
 	const PITCH = 18;
 	const INK: RGB = [20, 32, 45];
@@ -13,7 +13,7 @@
 	const TEAL: RGB = [67, 126, 142];
 	const GRAY: RGB = [137, 137, 137];
 	type RGB = [number, number, number];
-	type Dot = { gx: number; gy: number; x: number; y: number; r: number; a: number; c: RGB; seed: number };
+	type Dot = { gx: number; gy: number; x: number; y: number; r: number; a: number; c: RGB; seed: number; s2: number; s3: number };
 	type Live = { x: number; y: number; r: number; a: number };
 
 	const hex = (h: string): RGB => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB;
@@ -42,7 +42,7 @@
 			dots = [];
 			for (let gy = -PITCH; gy < H + PITCH * 2; gy += PITCH)
 				for (let gx = 9; gx < W + PITCH; gx += PITCH)
-					dots.push({ gx, gy, x: gx, y: gy, r: 1.1, a: 0.07, c: INK, seed: Math.random() });
+					dots.push({ gx, gy, x: gx, y: gy, r: 1.1, a: 0.07, c: INK, seed: Math.random(), s2: Math.random(), s3: Math.random() });
 		}
 
 		// where each dot wants to be, how big, how dark and what colour, for the current mode
@@ -52,28 +52,46 @@
 			// mosaic: the ground is tesserae, a few of them in the three questions' colours
 			const tint = tile && d.seed < 0.05 ? [ROSE, AUB, TEAL][Math.floor(d.seed * 60) % 3] : null;
 			const base = { x, y, r: tile ? 1.5 : 1.1, a: (tint ? 0.22 : tile ? 0.06 : 0.07) * (1 - field.dim * 0.85), c: tint ?? INK };
-			if (field.mode !== "levels" || field.level === 0) return base;
-			const A = field.anchor;
-			if (field.level === 1) {
-				// human or AI: the ground divides, human on one side and model on the other, with a seam between
-				const t = smooth(0.42, 0.58, (x - A.x) / Math.max(1, A.w) + (d.seed - 0.5) * 0.18);
-				const inside = y > A.y - 40 && y < A.y + A.h + 40;
-				return { x, y, r: inside ? 1.9 : 1.3, a: inside ? 0.42 : 0.12, c: mix(ROSE, AUB, t) };
+			if (field.mode !== "levels") return base;
+			const inside = (B: Box) => x > B.x && x < B.x + B.w && y > B.y && y < B.y + B.h;
+			// settled: each row's band shows its level in small, beside the row it belongs to
+			if (field.level === 0) {
+				for (let i = 0; i < hero.bands.length; i++) if (inside(hero.bands[i])) return level(i + 1, hero.bands[i], d, x, y, true);
+				return base;
 			}
-			if (field.level === 2) {
-				// which AI: the dots inside the anchor gather into eleven labs, the big three in their own colours
-				if (!(y > A.y - 20 && y < A.y + A.h + 20 && x > A.x - 20 && x < A.x + A.w + 20)) return { ...base, a: 0.05 };
+			// one level: it fills the whole stage
+			return inside(field.anchor) ? level(field.level, field.anchor, d, x, y, false) : base;
+		}
+
+		// lab cluster centres per box, worked out once per frame
+		const cache = new Map<string, ReturnType<typeof labCenters>>();
+		const centers = (B: Box) => {
+			const key = `${B.x | 0},${B.y | 0},${B.w | 0},${B.h | 0}`;
+			let c = cache.get(key);
+			if (!c) { c = labCenters(B); cache.set(key, c); }
+			return c;
+		};
+
+		function level(n: number, B: Box, d: Dot, x: number, y: number, small: boolean) {
+			if (n === 1) {
+				// human or AI: the ground divides, human on one side and model on the other
+				const t = smooth(0.46, 0.54, (x - B.x) / B.w + (d.s2 - 0.5) * 0.1);
+				return { x, y, r: small ? 1.9 : 2.4, a: small ? 0.62 : 0.74, c: mix(ROSE, AUB, t) };
+			}
+			if (n === 2) {
+				// which AI: the dots gather into eleven labs, the big three in colour
 				const k = Math.floor(d.seed * 100);
 				const lab = k < 22 ? 0 : k < 44 ? 1 : k < 66 ? 2 : 3 + (k % 8);
-				const cols = 6, cw = A.w / cols, chh = A.h / 2;
-				const cx = A.x + cw * ((lab % cols) + 0.5), cy = A.y + chh * (Math.floor(lab / cols) + 0.5);
-				const ang = d.seed * 977, rad = (lab < 3 ? 0.42 : 0.22) * Math.min(cw, chh) * Math.sqrt((d.seed * 31) % 1);
-				const c = lab === 0 ? ROSE : lab === 1 ? AUB : lab === 2 ? TEAL : GRAY;
-				return { x: cx + Math.cos(ang) * rad, y: cy + Math.sin(ang) * rad, r: lab < 3 ? 2.2 : 1.6, a: lab < 3 ? 0.7 : 0.4, c };
+				const c = centers(B)[lab];
+				const ang = d.s2 * 6.2832, rad = c.r * Math.sqrt(d.s3);
+				const col = lab === 0 ? ROSE : lab === 1 ? TEAL : lab === 2 ? AUB : GRAY;
+				return { x: c.x + Math.cos(ang) * rad, y: c.y + Math.sin(ang) * rad, r: lab < 3 ? (small ? 1.8 : 2.3) : small ? 1.5 : 1.9, a: lab < 3 ? 0.78 : 0.58, c: col };
 			}
-			// which human: back on the grid, quiet; one dot is lit
-			const lit = Math.abs(x - (A.x + A.w * 0.62)) < PITCH / 2 && Math.abs(y - (A.y + A.h * 0.45)) < PITCH / 2;
-			return lit ? { x, y, r: 9, a: 1, c: TEAL } : { x, y, r: 1.2, a: 0.1, c: INK };
+			// which human: the ground goes quiet and one dot is lit
+			const dx = x - (B.x + B.w * 0.62), dy = y - (B.y + B.h * 0.5);
+			const lit = dx >= -PITCH / 2 && dx < PITCH / 2 && dy >= -PITCH / 2 && dy < PITCH / 2;
+			// everyone else is a quiet crowd of writers
+			return lit ? { x, y, r: small ? 6 : 11, a: 1, c: TEAL } : { x, y, r: small ? 1.6 : 2.1, a: small ? 0.26 : 0.34, c: INK };
 		}
 
 		function frame(now: number) {
@@ -81,6 +99,7 @@
 			last = now;
 			const k = reduce.matches ? 1 : 1 - Math.pow(0.0015, dt);
 			const oy = scrollY % PITCH;
+			cache.clear();
 			ctx.clearRect(0, 0, W, H);
 			const lens = !reduce.matches && field.mode !== "chart";
 			for (const d of dots) {
@@ -97,7 +116,7 @@
 				ctx.fillStyle = `rgba(${d.c[0] | 0},${d.c[1] | 0},${d.c[2] | 0},${a})`;
 				if (field.shape === "tile") ctx.fillRect(d.x - r, d.y - r, r * 2, r * 2);
 				else { ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, 6.2832); ctx.fill(); }
-				if (field.mode === "levels" && field.level === 3 && r > 6) {
+				if (field.mode === "levels" && r > 5) {
 					ctx.strokeStyle = `rgba(67,126,142,${0.35 + 0.25 * Math.sin(now / 300)})`; ctx.lineWidth = 2;
 					ctx.beginPath(); ctx.arc(d.x, d.y, r + 8 + 3 * Math.sin(now / 300), 0, 6.2832); ctx.stroke();
 				}

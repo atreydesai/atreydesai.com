@@ -30,3 +30,26 @@ export const field = $state({
 
 /** What a chart section draws. Plain (not reactive): rewritten every frame, read only by DotField's draw loop. */
 export const chart = { marks: [] as Mark[], paths: [] as Path[], texts: [] as Text[] };
+
+export type Box = { x: number; y: number; w: number; h: number };
+
+/** The hero's bands, one per level, lined up with its row (or stacked in the stage on narrow screens). Plain, per frame. */
+export const hero = { bands: [] as Box[] };
+
+/** Where the hero's eleven lab clusters sit in a box: in the full stage the three big labs on top and eight more below;
+ * in a band, one row with the big three first. Shared by the dot field and the labels over it. */
+export function labCenters(B: Box): { x: number; y: number; r: number }[] {
+	const out: { x: number; y: number; r: number }[] = [];
+	if (B.h >= 160) {
+		for (let i = 0; i < 3; i++) out.push({ x: B.x + (B.w * (2 * i + 1)) / 6, y: B.y + B.h * 0.36, r: Math.min(B.w / 6, B.h * 0.24) * 0.82 });
+		for (let i = 0; i < 8; i++) out.push({ x: B.x + (B.w * (i + 0.5)) / 8, y: B.y + B.h * 0.8, r: Math.min(B.w / 16, B.h * 0.1) * 0.8 });
+	} else {
+		let u = 0;
+		for (let i = 0; i < 11; i++) {
+			const span = i < 3 ? 2 : 1;
+			out.push({ x: B.x + (B.w * (u + span / 2)) / 14, y: B.y + B.h / 2, r: Math.min((B.w * span) / 28, B.h / 2) * (i < 3 ? 0.85 : 0.6) });
+			u += span;
+		}
+	}
+	return out;
+}
