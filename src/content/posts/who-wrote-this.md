@@ -6,7 +6,8 @@ tags: [research]
 excerpt: "Frontier models need only one text to unmask its human or AI author"
 seoTitle: "Who wrote this? Frontier models need only one text to unmask its human or AI author"
 seoDescription: "Given a single text and a simple zero-shot prompt, frontier models can answer who wrote this at three increasingly specific levels: whether an AI or human wrote it, if an AI, which lab, and if a human, often exactly who."
-published: false
+published: true
+unlisted: true
 ---
 
 The page itself is `src/routes/blog/who-wrote-this/+page.svelte` (its own route, chrome and theme).

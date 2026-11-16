@@ -89,7 +89,7 @@
 	published={post.date}
 	tags={post.tags}
 	{jsonLd}
-	noindex={post.published === false}
+	noindex={post.unlisted === true || post.published === false}
 />
 
 <svelte:head>
