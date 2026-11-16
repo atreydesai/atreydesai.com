@@ -167,7 +167,7 @@ function traceRidges(s: Spec, ds: number): Float32Array[] {
 
 type Glyphs = {
 	n: number;
-	x: Float32Array; y: Float32Array; c: Float32Array; s: Float32Array; a: Float32Array;
+	x: Float32Array; y: Float32Array; c: Float32Array; s: Float32Array; a: Float32Array; q: Uint8Array;
 	ch: string[];
 	start: Int32Array; // per ridge: first glyph, plus one past the end
 	box: Float32Array; // per ridge: minx, miny, maxx, maxy
@@ -186,11 +186,15 @@ function widthOf(ch: string) {
 	return w;
 }
 
+// Glyph angles snap to 3° steps: a rasteriser caches each letter per angle, so this is what makes setting type fast.
+const STEPS = 120;
+const COS = new Float32Array(STEPS), SIN = new Float32Array(STEPS);
+for (let i = 0; i < STEPS; i++) { COS[i] = Math.cos((i / STEPS) * TAU); SIN[i] = Math.sin((i / STEPS) * TAU); }
 const TYPE = 0.76; // type size as a share of the ridge gap
 
 function setType(ridges: Float32Array[], ds: number, text: string, offset: number, ink: (x: number, y: number) => number): Glyphs {
 	const f = ds * TYPE;
-	const X: number[] = [], Y: number[] = [], C: number[] = [], S: number[] = [], A: number[] = [], CH: string[] = [];
+	const X: number[] = [], Y: number[] = [], C: number[] = [], S: number[] = [], A: number[] = [], Q: number[] = [], CH: string[] = [];
 	const start = new Int32Array(ridges.length + 1), box = new Float32Array(ridges.length * 4);
 	let ti = offset % text.length;
 	ridges.forEach((r, ri) => {
@@ -212,14 +216,15 @@ function setType(ridges: Float32Array[], ds: number, text: string, offset: numbe
 				const u = (mid - segStart) / (segLen || 1);
 				const x0 = r[seg * 2], y0 = r[seg * 2 + 1], dx = r[seg * 2 + 2] - x0, dy = r[seg * 2 + 3] - y0, l = Math.hypot(dx, dy) || 1;
 				const x = x0 + dx * u, y = y0 + dy * u;
-				X.push(x); Y.push(y); C.push(dx / l); S.push(dy / l); A.push(ink(x, y)); CH.push(ch);
+				const q = ((Math.round((Math.atan2(dy, dx) / TAU) * STEPS) % STEPS) + STEPS) % STEPS;
+				X.push(x); Y.push(y); C.push(COS[q]); S.push(SIN[q]); Q.push(q); A.push(ink(x, y)); CH.push(ch);
 			}
 			at += adv;
 			ti = (ti + 1) % text.length;
 		}
 	});
 	start[ridges.length] = X.length;
-	return { n: X.length, x: Float32Array.from(X), y: Float32Array.from(Y), c: Float32Array.from(C), s: Float32Array.from(S), a: Float32Array.from(A), ch: CH, start, box };
+	return { n: X.length, x: Float32Array.from(X), y: Float32Array.from(Y), c: Float32Array.from(C), s: Float32Array.from(S), a: Float32Array.from(A), q: Uint8Array.from(Q), ch: CH, start, box };
 }
 
 // ───────────────────────────────────────────────────────────── the cast
@@ -242,7 +247,7 @@ type Item = {
 	glyphEpoch: number;
 	lines: boolean; // always drawn as ink lines, never type (the crowd)
 	sprite: (CanvasImageSource & { width: number; height: number }) | null;
-	spriteR: number; spriteKey: string;
+	spriteR: number; spriteDpr: number; spriteEpoch: number; // the size, scale and face the sprite was set at (spriteEpoch -1: still being set)
 	full: number; // the size it is drawn at when it is the subject
 	edge: number; // 0..1: fades a print that has been pushed off the stage
 	pose: Pose; // as drawn (with breathing)
@@ -275,7 +280,7 @@ function writerSpec(seed: number): Spec {
 }
 
 type Layout = {
-	key: string;
+	key: string; wide: boolean;
 	main: number[]; // x, y, r
 	human1: number[]; ai1: number[]; human2: number[];
 	lab2: number[][]; lab3: number[][];
@@ -295,7 +300,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 
 	const make = (id: string, sp: Spec, gap: number, color: string, text = body): Item => ({
 		id, spec: sp, gap, color, rgb: hexRgb(color), text, offset: Math.floor(R0() * text.length), phase: R0() * TAU,
-		lines: false, edge: 1, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteKey: "", full: 0,
+		lines: false, edge: 1, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
 		pose: { x: 0, y: 0, r: 0, rot: 0, a: 0 }, rest: { x: 0, y: 0, r: 0, rot: 0, a: 0 },
 	});
 
@@ -311,7 +316,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	let litIndex = -1;
 
 	let e = -1; // eased level
-	let fontEpoch = 0, fontAsked = false;
+	let fontEpoch = 0, fontAsked = false, fontReady = false, firstT = 0;
 	let scratch: HTMLCanvasElement | null = null, sg: CanvasRenderingContext2D | null = null;
 	let mask: HTMLCanvasElement | null = null, maskKey = "";
 	let L: Layout | null = null;
@@ -319,6 +324,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	let drawn: Item[] = [];
 	let lastView = { w: 0, h: 0, dpr: 1 };
 	let disposed = false;
+	let lastGoal = 0, leap: { from: number; to: number; t: number; dur: number } | null = null;
+	let movedT = -1; // when the stage last changed
 
 	// ── geometry and sprites, built on demand
 
@@ -330,7 +337,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		it.ds = q;
 		it.field = fieldOf(it.spec);
 		it.ridges = traceRidges(it.spec, q);
-		it.glyphs = null; (it.sprite as any)?.close?.(); it.sprite = null; splits.length = 0;
+		it.glyphs = null; splits.length = 0; // the old sprite stays up until the new one is whole
 	}
 	function glyphsOf(it: Item): Glyphs {
 		if (!it.glyphs || it.glyphEpoch !== fontEpoch) { it.glyphs = setType(it.ridges!, it.ds, it.text, it.offset, it.field!.ink); it.glyphEpoch = fontEpoch; }
@@ -338,17 +345,20 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	}
 	const typePx = (it: Item, r: number) => it.ds * TYPE * r;
 
-	function bake(it: Item, dpr: number) {
+	// Sprites are set a few ms at a time, so a large print inks in over several frames instead of stalling one.
+	type Job = { it: Item; cv: HTMLCanvasElement; g: CanvasRenderingContext2D; epoch: number; dpr: number; r: number; ox: number; oy: number; k: number; i: number; G: Glyphs | null };
+	let job: Job | null = null;
+
+	function begin(it: Item, dpr: number): Job {
 		geometry(it);
-		const r = it.full, key = `${Math.round(r * dpr)}|${fontEpoch}|${it.ds}`;
-		if (it.sprite && it.spriteKey === key) return;
+		const r = it.full;
 		const pad = 3, w = Math.ceil((2 * HW * r + pad * 2) * dpr), h = Math.ceil((2 * r + pad * 2) * dpr);
-		// an immutable bitmap where the browser has one: it blits faster than a live canvas
-		const off = typeof OffscreenCanvas !== "undefined";
-		const cv: any = off ? new OffscreenCanvas(w, h) : Object.assign(document.createElement("canvas"), { width: w, height: h });
-		const g = cv.getContext("2d") as CanvasRenderingContext2D;
+		const cv = document.createElement("canvas");
+		cv.width = w; cv.height = h;
+		const g = cv.getContext("2d")!;
 		const ox = (HW * r + pad) * dpr, oy = (r + pad) * dpr, k = r * dpr;
 		const fpx = typePx(it, r);
+		let G: Glyphs | null = null;
 		g.fillStyle = g.strokeStyle = it.color;
 		if (fpx >= 2.7 && !it.lines) {
 			// a hairline under the type keeps each ridge whole
@@ -356,14 +366,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			g.beginPath();
 			for (const rd of it.ridges!) { g.moveTo(ox + rd[0] * k, oy + rd[1] * k); for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k); }
 			g.stroke();
-			const G = glyphsOf(it);
+			G = glyphsOf(it);
 			g.font = `500 ${fpx * dpr}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
-			for (let i = 0; i < G.n; i++) {
-				g.globalAlpha = G.a[i];
-				g.setTransform(G.c[i], G.s[i], -G.s[i], G.c[i], ox + G.x[i] * k, oy + G.y[i] * k);
-				g.fillText(G.ch[i], 0, 0);
-			}
-			g.setTransform(1, 0, 0, 1, 0, 0);
 		} else {
 			// too small for type: the ridges as ink lines, pressed unevenly
 			g.lineCap = "round"; g.lineJoin = "round";
@@ -377,9 +381,37 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 				g.stroke();
 			}
 		}
-		g.globalAlpha = 1;
-		(it.sprite as any)?.close?.();
-		it.sprite = off ? cv.transferToImageBitmap() : cv; it.spriteR = r; it.spriteKey = key;
+		// a print with nothing to show yet shows its sprite as it is set; one being re-set keeps the old until the new is whole
+		if (!it.sprite) { it.sprite = cv; it.spriteR = r; it.spriteDpr = dpr; it.spriteEpoch = -1; }
+		return { it, cv, g, epoch: fontEpoch, dpr, r, ox, oy, k, i: 0, G };
+	}
+
+	/** set more of the job's type; true when the sprite is finished */
+	function step(j: Job, deadline: number): boolean {
+		const { g, G, ox, oy, k } = j;
+		if (G) {
+			while (j.i < G.n) {
+				for (const end = Math.min(G.n, j.i + 48); j.i < end; j.i++) {
+					const i = j.i;
+					g.globalAlpha = G.a[i];
+					g.setTransform(G.c[i], G.s[i], -G.s[i], G.c[i], ox + G.x[i] * k, oy + G.y[i] * k);
+					g.fillText(G.ch[i], 0, 0);
+				}
+				if (j.i < G.n && performance.now() > deadline) { g.setTransform(1, 0, 0, 1, 0, 0); return false; }
+			}
+			g.setTransform(1, 0, 0, 1, 0, 0);
+		}
+		const it = j.it;
+		if (it.sprite !== j.cv) (it.sprite as any)?.close?.();
+		// keep it as an immutable bitmap where the browser has one: it blits much faster than a live canvas
+		if (typeof OffscreenCanvas !== "undefined") {
+			const oc = new OffscreenCanvas(j.cv.width, j.cv.height);
+			oc.getContext("2d")!.drawImage(j.cv, 0, 0);
+			it.sprite = oc.transferToImageBitmap();
+			j.cv.width = j.cv.height = 0;
+		} else it.sprite = j.cv;
+		it.spriteR = j.r; it.spriteDpr = j.dpr; it.spriteEpoch = j.epoch;
+		return true;
 	}
 
 	// ── where everything sits at each level, from the stage alone
@@ -388,6 +420,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const key = `${S.x | 0},${S.y | 0},${S.w | 0},${S.h | 0}`;
 		if (L && L.key === key) return L;
 		const wide = S.w > S.h * 0.9;
+		if (L && (L.wide !== wide)) splits.length = 0;
 		const cx = S.x + S.w / 2, cy = S.y + S.h / 2;
 		const r0 = Math.min(S.h * 0.455, S.w * 0.55);
 		const r1 = Math.min(S.h * 0.33, S.w * 0.275);
@@ -406,22 +439,21 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const lab3 = labs.map((_, i) => [lerp(x0, x1, n > 1 ? i / (n - 1) : 0.5), S.y + S.h * 0.05, r3 * (i < 3 ? 1 : 0.82)]);
 		// the crowd: a loose hex packing under the row of labs
 		const K = { x: S.x + S.w * 0.01, y: S.y + S.h * 0.125, w: S.w * 0.98, h: S.h * 0.865 };
-		const pitch = Math.max(30, Math.min(66, Math.sqrt((K.w * K.h) / 165)));
+		const pitch = Math.max(30, Math.min(66, Math.sqrt((K.w * K.h) / (wide ? 165 : 84)))); // fewer, larger writers on a phone
 		const rowH = pitch * 0.96, cols = Math.max(2, Math.floor(K.w / pitch)), rws = Math.max(2, Math.floor(K.h / rowH));
 		const padX = (K.w - (cols - 0.5) * pitch) / 2, padY = (K.h - (rws - 1) * rowH) / 2;
 		const P = rng(seed + 8);
 		const pts: number[][] = [];
 		for (let j = 0; j < rws; j++) for (let i = 0; i < cols; i++) {
 			if (pts.length >= MAX_CROWD) break;
-			pts.push([K.x + padX + (i + (j % 2) * 0.5) * pitch + (P() - 0.5) * pitch * 0.2, K.y + padY + j * rowH + (P() - 0.5) * pitch * 0.2, pitch * (0.36 + P() * 0.09), (P() - 0.5) * 0.5]);
+			pts.push([K.x + padX + (i + (j % 2) * 0.5) * pitch + (P() - 0.5) * pitch * 0.14, K.y + padY + j * rowH + (P() - 0.5) * pitch * 0.14, pitch * (0.36 + P() * 0.09), (P() - 0.5) * 0.5]);
 		}
 		// the lit writer: the one nearest a point right of centre
 		const tx = K.x + K.w * (wide ? 0.56 : 0.5), ty = K.y + K.h * 0.47;
 		let best = 0, bd = 1e9;
 		pts.forEach((p, i) => { const d = (p[0] - tx) ** 2 + (p[1] - ty) ** 2; if (d < bd) { bd = d; best = i; } });
 		const litR = Math.min(K.h * 0.19, K.w * 0.23);
-		splits.length = 0;
-		L = { key, main: [cx, cy, r0], human1: [cx - S.w * 0.25, cy, r1], ai1: [cx + S.w * 0.25, cy, r1], human2, lab2, lab3, crowd: pts, lit: best, litR };
+		L = { key, wide, main: [cx, cy, r0], human1: [cx - S.w * 0.25, cy, r1], ai1: [cx + S.w * 0.25, cy, r1], human2, lab2, lab3, crowd: pts, lit: best, litR };
 		// full sizes decide ridge counts and sprite sizes
 		main.full = r0; human.full = r1; ai.full = r1;
 		labs.forEach((it, i) => (it.full = lab2[i][2]));
@@ -439,7 +471,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const p1 = clamp01(e), p2 = clamp01(e - 1), p3 = clamp01(e - 2);
 		const q1 = ease(p1), q2 = ease(p2);
 		// each division is drawn as threads (see Split); the cached prints only hold the two ends of it
-		const IN = (p: number) => ss(0.8, 1, p), OUT = (p: number) => 1 - ss(0, 0.16, p);
+		const IN = (p: number) => ss(0.86, 1, p), OUT = (p: number) => 1 - ss(0, 0.12, p);
 		set(main, l.main[0], l.main[1], l.main[2], 0, OUT(p1));
 		const hp = mix3(l.human1, l.human2, q2);
 		set(human, hp[0], hp[1], hp[2], 0, IN(p1) * lerp(1, 0.55, q2) * OUT(p3));
@@ -451,140 +483,171 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			set(it, p[0], p[1], p[2], 0, IN(p2) * lerp(1, 0.42, t3));
 		});
 		// 2 → 3: the lit writer grows and the rest make room
-		const grow = ease(clamp01((p3 - 0.5) / 0.5));
+		const grow = ease(clamp01((p3 - 0.55) / 0.45));
 		const lp = l.crowd[l.lit];
 		const push = (l.litR + lp[2]) * 1.02 * grow;
 		for (let i = 0; i < crowd.length; i++) {
 			const c = l.crowd[i], it = crowd[i];
 			if (!c) { it.rest.a = 0; continue; }
-			let x = c[0], y = c[1];
+			let x = c[0], y = c[1], room = 1;
 			if (i !== l.lit && push > 0) {
-				const dx = (x - lp[0]) / (HW * 1.12), dy = y - lp[1], d = Math.hypot(dx, dy) || 1, d2 = Math.sqrt(d * d + push * push);
+				// those it would cover step out; those beside it shift a little
+				const dx = (x - lp[0]) / (HW * 1.12), dy = y - lp[1], d = Math.hypot(dx, dy) || 1, d2 = Math.sqrt(d * d + push * push * 0.3);
 				x = lp[0] + (dx / d) * d2 * HW * 1.12; y = lp[1] + (dy / d) * d2;
+				room = 1 - grow * (1 - ss(0.86, 1.06, d2 / (l.litR + c[2])));
 			}
 			const out = Math.min(ss(S.x - c[2], S.x + c[2] * 0.5, x), 1 - ss(S.x + S.w - c[2] * 0.5, S.x + S.w + c[2], x), 1 - ss(S.y + S.h - c[2] * 0.4, S.y + S.h + c[2], y));
-			it.edge = out;
+			it.edge = out * room;
 			if (i === l.lit) {
 				set(it, x, y, lerp(c[2], l.litR, grow), c[3] * (1 - grow), IN(p3) * (1 - ss(0.25, 0.8, grow)));
 				set(lit, x, y, it.rest.r, it.rest.rot, ss(0.1, 0.7, grow));
-			} else set(it, x, y, c[2], c[3], IN(p3) * out * lerp(0.86, 0.6, grow));
+			} else set(it, x, y, c[2], c[3], IN(p3) * out * room * lerp(0.86, 0.62, grow));
 		}
 	}
 
 	// ── divisions: the parent's ridges, cut into threads, travel and re-form as the children's ridges
 
-	type Split = { parent: Item; kids: Item[]; first: Int32Array; off: Int32Array; src: Float32Array; dst: Float32Array; delay: Float32Array; bend: Float32Array };
+	type Split = {
+		parent: Item; kids: Item[];
+		first: Int32Array; // per child: its first thread
+		off: Int32Array; // per thread: its first point
+		src: Float32Array; dst: Float32Array; // the thread on the parent, and as the child's ridge (unit space of each)
+		cx: Float32Array; cy: Float32Array; cs: Float32Array; // per child: its piece of the parent (centre, and the scale that fits it to the child)
+		kd: Float32Array; // per child: when it leaves
+		td: Float32Array; // per thread: when it re-forms
+	};
 	const splits: (Split | null)[] = [];
 
+	/** Cut the parent into one compact piece per child, laid out the way the children will sit, and pair every child
+	 * ridge with a stretch of parent ridge from its piece. */
 	function buildSplit(parent: Item, kids: Item[], home: number[], homes: number[][]): Split | null {
 		if (!parent.ridges || kids.some((k) => !k.ridges)) return null;
-		const R = rng(seed + 31 + kids.length);
-		// the parent's ridges in short pieces, each with a bearing from the centre
-		const hp = parent.ds * 0.3, M = Math.max(6, Math.round(0.5 / hp));
-		const pieces: { r: Float32Array; i0: number; i1: number; ang: number; len: number }[] = [];
+		const R = rng(seed + 31 + kids.length), nk = kids.length;
+		// where each child's piece is centred inside the parent: the children's own arrangement, shrunk to fit
+		let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+		for (const h of homes) { x0 = Math.min(x0, h[0]); x1 = Math.max(x1, h[0]); y0 = Math.min(y0, h[1]); y1 = Math.max(y1, h[1]); }
+		const seedX = new Float32Array(nk), seedY = new Float32Array(nk);
+		for (let k = 0; k < nk; k++) {
+			let u = x1 > x0 ? ((homes[k][0] - x0) / (x1 - x0)) * 2 - 1 : 0, v = y1 > y0 ? ((homes[k][1] - y0) / (y1 - y0)) * 2 - 1 : 0;
+			// a square of seats into the oval
+			const sq = Math.sqrt(Math.max(1e-6, u * u + v * v - u * u * v * v)) / Math.max(1e-6, Math.hypot(u, v));
+			u *= sq; v *= sq;
+			seedX[k] = u * HW * 0.8; seedY[k] = v * 0.82;
+		}
+		// the parent's ridges in short runs, each given to the nearest seat
+		const hp = parent.ds * 0.3, cell = Math.sqrt((HW * 4) / nk);
+		const M = Math.max(4, Math.round(Math.max(0.09, Math.min(0.6, cell * 0.8)) / hp));
+		type Run = { r: Float32Array; i0: number; i1: number; x: number; y: number };
+		const share: Run[][] = kids.map(() => []), runs: Run[] = [];
 		for (const r of parent.ridges) {
 			const n = r.length / 2;
-			for (let i0 = 0; i0 < n - 1; i0 += M) {
+			for (let i0 = 0; i0 < n - 2; i0 += M) {
 				const i1 = Math.min(n - 1, i0 + M), m = (i0 + i1) >> 1;
-				if (i1 - i0 < 2) continue;
-				pieces.push({ r, i0, i1, ang: Math.atan2(r[m * 2 + 1], r[m * 2] / HW), len: (i1 - i0) * hp });
+				const run = { r, i0, i1, x: r[m * 2], y: r[m * 2 + 1] };
+				let best = 0, bd = 1e9;
+				for (let k = 0; k < nk; k++) { const d = (run.x - seedX[k]) ** 2 + (run.y - seedY[k]) ** 2; if (d < bd) { bd = d; best = k; } }
+				share[best].push(run); runs.push(run);
 			}
 		}
-		// children take pie slices of the parent, in the order they sit around it
-		const bearing = kids.map((_, i) => Math.atan2(homes[i][1] - home[1], homes[i][0] - home[0]));
-		const sorted = [...bearing].sort((a, b) => a - b);
-		let cut = sorted[0] - 0.01, gap = 0;
-		for (let i = 0; i < sorted.length; i++) {
-			const nx = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + TAU;
-			if (nx - sorted[i] > gap) { gap = nx - sorted[i]; cut = sorted[i] + gap / 2; }
-		}
-		const turn = (a: number) => (((a - cut) % TAU) + TAU) % TAU;
-		pieces.sort((a, b) => turn(a.ang) - turn(b.ang));
-		const order = kids.map((_, i) => i).sort((a, b) => turn(bearing[a]) - turn(bearing[b]));
-		const need = kids.map((k) => { let t = 0; for (const r of k.ridges!) t += r.length; return t * k.ds * Math.max(1, k.full); });
-		const total = need.reduce((a, b) => a + b, 0), all = pieces.reduce((a, b) => a + b.len, 0);
-		const share: (typeof pieces)[] = kids.map(() => []);
-		let pi = 0, acc = 0, goal = 0;
-		for (const k of order) {
-			goal += (need[k] / total) * all;
-			while (pi < pieces.length && (acc + pieces[pi].len / 2 <= goal || share[k].length === 0)) { share[k].push(pieces[pi]); acc += pieces[pi].len; pi++; }
-			if (!share[k].length) share[k].push(pieces[Math.min(pieces.length - 1, Math.floor(R() * pieces.length))]);
-		}
+		const cx = new Float32Array(nk), cy = new Float32Array(nk), cs = new Float32Array(nk), kd = new Float32Array(nk);
 		let far = 1;
-		const dist = kids.map((_, i) => Math.hypot(homes[i][0] - home[0], homes[i][1] - home[1]));
+		const dist = homes.map((h) => Math.hypot(h[0] - home[0], h[1] - home[1]));
 		for (const d of dist) far = Math.max(far, d);
-		const first = new Int32Array(kids.length + 1), off: number[] = [0], src: number[] = [], dst: number[] = [], delay: number[] = [], bend: number[] = [];
+		const first = new Int32Array(nk + 1), off: number[] = [0], src: number[] = [], dst: number[] = [], td: number[] = [];
 		kids.forEach((kid, ki) => {
 			first[ki] = off.length - 1;
-			const nr = kid.ridges!.length, mine = share[ki], kr = Math.max(1, kid.full), swing = (R() - 0.5) * 0.3;
-			kid.ridges!.forEach((r, j) => {
-				const n = r.length / 2, N = Math.max(2, Math.round(n / 3));
-				const pc = mine[Math.min(mine.length - 1, Math.floor(((j + R()) / nr) * mine.length))];
+			const mine = share[ki];
+			if (!mine.length) { // a seat no run fell in: borrow the nearest one
+				let best = runs[0], bd = 1e9;
+				for (const run of runs) { const d = (run.x - seedX[ki]) ** 2 + (run.y - seedY[ki]) ** 2; if (d < bd) { bd = d; best = run; } }
+				mine.push(best);
+			}
+			mine.sort((a, b) => a.y - b.y);
+			let sx = 0, sy = 0, np = 0, rad = 0.02;
+			for (const run of mine) for (let i = run.i0; i <= run.i1; i++) { sx += run.r[i * 2]; sy += run.r[i * 2 + 1]; np++; }
+			cx[ki] = sx / np; cy[ki] = sy / np;
+			for (const run of mine) for (let i = run.i0; i <= run.i1; i += 2) rad = Math.max(rad, Math.hypot((run.r[i * 2] - cx[ki]) / HW, run.r[i * 2 + 1] - cy[ki]));
+			cs[ki] = 0.92 / rad;
+			kd[ki] = clamp01((dist[ki] / far) * 0.75 + R() * 0.25);
+			// the child's ridges top to bottom take the piece's runs top to bottom
+			const rs = kid.ridges!, nr = rs.length;
+			const order = rs.map((r, j) => [r[((r.length >> 2) << 1) + 1], j]).sort((a, b) => a[0] - b[0]);
+			order.forEach(([, j], rank) => {
+				const r = rs[j], n = r.length / 2, N = Math.max(2, Math.round(n / 3));
+				const run = mine[Math.min(mine.length - 1, Math.floor(((rank + 0.5) / nr) * mine.length))];
 				const at = dst.length;
 				for (let q = 0; q < N; q++) { const i = Math.round((q / (N - 1)) * (n - 1)); dst.push(r[i * 2], r[i * 2 + 1]); }
 				const s0 = src.length;
 				for (let q = 0; q < N; q++) {
-					const u = pc.i0 + (q / (N - 1)) * (pc.i1 - pc.i0), i = Math.min(pc.i1 - 1, Math.floor(u)), f = u - i;
-					src.push(lerp(pc.r[i * 2], pc.r[i * 2 + 2], f), lerp(pc.r[i * 2 + 1], pc.r[i * 2 + 3], f));
+					const u = run.i0 + (q / (N - 1)) * (run.i1 - run.i0), i = Math.min(run.i1 - 1, Math.floor(u)), f = u - i;
+					src.push(lerp(run.r[i * 2], run.r[i * 2 + 2], f), lerp(run.r[i * 2 + 1], run.r[i * 2 + 3], f));
 				}
 				// run the thread the way that twists least
-				const ax = home[0] + src[s0] * parent.full, ay = home[1] + src[s0 + 1] * parent.full, bx = home[0] + src[s0 + N * 2 - 2] * parent.full, by = home[1] + src[s0 + N * 2 - 1] * parent.full;
-				const cx = homes[ki][0] + dst[at] * kr, cy = homes[ki][1] + dst[at + 1] * kr, ex = homes[ki][0] + dst[at + N * 2 - 2] * kr, ey = homes[ki][1] + dst[at + N * 2 - 1] * kr;
-				if ((ax - cx) ** 2 + (ay - cy) ** 2 + (bx - ex) ** 2 + (by - ey) ** 2 > (ax - ex) ** 2 + (ay - ey) ** 2 + (bx - cx) ** 2 + (by - cy) ** 2)
+				const e0 = s0 + N * 2 - 2, e1 = at + N * 2 - 2, k = cs[ki];
+				const ax = (src[s0] - cx[ki]) * k, ay = (src[s0 + 1] - cy[ki]) * k, bx = (src[e0] - cx[ki]) * k, by = (src[e0 + 1] - cy[ki]) * k;
+				if ((ax - dst[at]) ** 2 + (ay - dst[at + 1]) ** 2 + (bx - dst[e1]) ** 2 + (by - dst[e1 + 1]) ** 2 > (ax - dst[e1]) ** 2 + (ay - dst[e1 + 1]) ** 2 + (bx - dst[at]) ** 2 + (by - dst[at + 1]) ** 2)
 					for (let a = 0, b = N - 1; a < b; a++, b--) for (let c = 0; c < 2; c++) { const t = src[s0 + a * 2 + c]; src[s0 + a * 2 + c] = src[s0 + b * 2 + c]; src[s0 + b * 2 + c] = t; }
 				off.push(dst.length / 2);
-				// nearer children go first, and within one the ridges follow each other
-				delay.push(clamp01((dist[ki] / far) * 0.5 + (j / nr) * 0.38 + R() * 0.12));
-				bend.push(swing + (R() - 0.5) * 0.1);
+				td.push(clamp01((rank / nr) * 0.9 + R() * 0.1));
 			});
 		});
-		first[kids.length] = off.length - 1;
-		return { parent, kids, first, off: Int32Array.from(off), src: Float32Array.from(src), dst: Float32Array.from(dst), delay: Float32Array.from(delay), bend: Float32Array.from(bend) };
+		first[nk] = off.length - 1;
+		return { parent, kids, first, off: Int32Array.from(off), src: Float32Array.from(src), dst: Float32Array.from(dst), cx, cy, cs, kd, td: Float32Array.from(td) };
 	}
 
-	const BINS = 6;
-	/** the threads of one division at progress p; `lod` thins the points when the pieces are tiny */
-	function weave(g: CanvasRenderingContext2D, sp: Split, p: number, aFrom: number) {
-		const env = ss(0, 0.14, p) * (1 - ss(0.86, 1, p));
+	const BINS = 5;
+	/** One division at progress p. The parent comes apart into its pieces, each piece travels to its child's place,
+	 * and there its threads re-form, top to bottom, into the child's own ridges. */
+	function weave(g: CanvasRenderingContext2D, sp: Split, p: number, aFrom: number, dashed: boolean) {
+		const env = ss(0, 0.1, p) * (1 - ss(0.9, 1, p));
 		if (env < 0.01) return;
-		const P = sp.parent.rest, wp = sp.parent.ds * P.r * 0.3;
-		g.lineCap = "round"; g.lineJoin = "round";
+		const P = sp.parent.rest, wp = sp.parent.ds * P.r * 0.27;
+		g.lineCap = "butt"; g.lineJoin = "round";
 		for (let ki = 0; ki < sp.kids.length; ki++) {
 			const kid = sp.kids[ki], K = kid.rest, edge = kid.edge;
 			if (K.r < 0.5 || edge < 0.01) continue;
 			const c = Math.cos(K.rot) * K.r, sn = Math.sin(K.rot) * K.r;
-			const mx = K.x - P.x, my = K.y - P.y;
-			const wk = kid.ds * K.r * (kid.lines ? 0.4 : 0.3), aTo = kid.lines ? 0.8 : 0.9;
+			const d = sp.kd[ki] * 0.16;
+			const m = ease((p - 0.02 - d) / 0.38); // the piece travels
+			// the piece at rest in the parent, and carried to the child (grown or shrunk to the child's size)
+			const k0 = lerp(P.r, K.r * sp.cs[ki], m), ox = lerp(P.x, K.x - sp.cx[ki] * k0, m), oy = lerp(P.y, K.y - sp.cy[ki] * k0, m);
+			const wk = kid.ds * K.r * (kid.lines ? 0.4 : 0.27), aTo = kid.lines ? 0.85 : 0.8;
+			const hue = mixRgb(sp.parent.rgb, kid.rgb, ss(0.1, 0.8, m));
 			for (let b = 0; b < BINS; b++) {
 				let any = false;
 				for (let th = sp.first[ki], end = sp.first[ki + 1]; th < end; th++) {
-					const t = ease((p - 0.07 - sp.delay[th] * 0.36) / 0.46);
-					if (Math.min(BINS - 1, Math.floor(t * BINS)) !== b) continue;
+					const f = ease((p - 0.3 - d - sp.td[th] * 0.3) / 0.14); // the thread re-forms, one after another down the print
+					if (Math.min(BINS - 1, Math.floor(f * BINS)) !== b) continue;
 					if (!any) { any = true; g.beginPath(); }
-					const sw = Math.sin(Math.PI * t) * sp.bend[th], ox = -my * sw, oy = mx * sw, u = 1 - t;
+					const u = 1 - f;
 					for (let i = sp.off[th], e2 = sp.off[th + 1], i0 = i; i < e2; i++) {
-						const x = u * (P.x + sp.src[i * 2] * P.r) + t * (K.x + sp.dst[i * 2] * c - sp.dst[i * 2 + 1] * sn) + ox;
-						const y = u * (P.y + sp.src[i * 2 + 1] * P.r) + t * (K.y + sp.dst[i * 2] * sn + sp.dst[i * 2 + 1] * c) + oy;
+						const sx = sp.src[i * 2], sy = sp.src[i * 2 + 1], dx = sp.dst[i * 2], dy = sp.dst[i * 2 + 1];
+						const x = u * (ox + sx * k0) + f * (K.x + dx * c - dy * sn);
+						const y = u * (oy + sy * k0) + f * (K.y + dx * sn + dy * c);
 						if (i === i0) g.moveTo(x, y); else g.lineTo(x, y);
 					}
 				}
 				if (!any) continue;
-				const tb = b / (BINS - 1);
-				g.strokeStyle = mixRgb(sp.parent.rgb, kid.rgb, ss(0.05, 0.75, tb));
-				g.lineWidth = Math.max(0.35, lerp(wp, wk, tb));
-				g.globalAlpha = env * lerp(aFrom, aTo * edge, tb);
+				const tb = b / (BINS - 1), mix = (m + tb) / 2;
+				const lw = Math.max(0.4, lerp(lerp(wp, wk, m * 0.5), wk, tb));
+				g.strokeStyle = hue;
+				g.lineWidth = lw;
+				if (dashed) g.setLineDash([lw * 9, lw * 1.6, lw * 4, lw * 1.6, lw * 13, lw * 2.2]);
+				g.globalAlpha = env * lerp(aFrom, aTo * edge, mix);
 				g.stroke();
 			}
 		}
+		if (dashed) g.setLineDash([]);
 		g.globalAlpha = 1;
 	}
 
 	function weaveAll(g: CanvasRenderingContext2D, l: Layout) {
 		const p1 = clamp01(e), p2 = clamp01(e - 1), p3 = clamp01(e - 2);
 		const live = l.crowd.length;
-		if (p1 > 0 && p1 < 1) { splits[0] ??= buildSplit(main, [human, ai], l.main, [l.human1, l.ai1]); if (splits[0]) weave(g, splits[0], p1, 0.85); }
-		if (p2 > 0 && p2 < 1) { splits[1] ??= buildSplit(ai, labs, l.ai1, l.lab2); if (splits[1]) weave(g, splits[1], p2, 0.85); }
-		if (p3 > 0 && p3 < 1) { splits[2] ??= buildSplit(human, crowd.slice(0, live), l.human2, l.crowd); if (splits[2]) weave(g, splits[2], p3, 0.5); }
+		if (splits[2] && splits[2].kids.length !== live) splits[2] = null;
+		if (p1 > 0 && p1 < 1) { splits[0] ??= buildSplit(main, [human, ai], l.main, [l.human1, l.ai1]); if (splits[0]) weave(g, splits[0], p1, 0.8, true); }
+		if (p2 > 0 && p2 < 1) { splits[1] ??= buildSplit(ai, labs, l.ai1, l.lab2); if (splits[1]) weave(g, splits[1], p2, 0.8, true); }
+		if (p3 > 0 && p3 < 1) { splits[2] ??= buildSplit(human, crowd.slice(0, live), l.human2, l.crowd); if (splits[2]) weave(g, splits[2], p3, 0.5, false); }
 	}
 
 	// ── drawing
@@ -592,7 +655,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	function stamp(g: CanvasRenderingContext2D, it: Item, dpr: number) {
 		const p = it.pose;
 		if (p.a < 0.004 || !it.sprite) return;
-		const k = p.r / it.spriteR, w = it.sprite.width / dpr, h = it.sprite.height / dpr;
+		const k = p.r / it.spriteR, w = it.sprite.width / it.spriteDpr, h = it.sprite.height / it.spriteDpr;
 		g.globalAlpha = p.a;
 		if (p.rot) {
 			const c = Math.cos(p.rot) * k * dpr, s = Math.sin(p.rot) * k * dpr;
@@ -613,7 +676,9 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		if (Math.abs(ux) > HW + ru || Math.abs(uy) > 1 + ru) return;
 		const G = glyphsOf(it), ru2 = ru * ru, k = p.r * mag;
 		g.fillStyle = it.color;
-		g.font = `500 ${f * k * dpr}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
+		// whole half-pixel sizes and snapped angles, so the glass reuses cached letters while prints breathe
+		g.font = `500 ${Math.round(f * it.rest.r * mag * dpr * 2) / (2 * dpr)}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
+		const rq = Math.round((p.rot / TAU) * STEPS) + STEPS * 4;
 		const nr = it.ridges.length;
 		for (let ri = 0; ri < nr; ri++) {
 			const b = ri * 4;
@@ -621,7 +686,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			for (let i = G.start[ri], end = G.start[ri + 1]; i < end; i++) {
 				const ex = G.x[i] - ux, ey = G.y[i] - uy;
 				if (ex * ex + ey * ey > ru2) continue;
-				const c = G.c[i] * cr - G.s[i] * sr, s = G.s[i] * cr + G.c[i] * sr;
+				const qi = (G.q[i] + rq) % STEPS, c = COS[qi], s = SIN[qi];
 				g.globalAlpha = Math.min(1, p.a * (0.35 + 0.75 * G.a[i]));
 				g.setTransform(c * dpr, s * dpr, -s * dpr, c * dpr, (px + (ex * cr - ey * sr) * k) * dpr, (py + (ex * sr + ey * cr) * k) * dpr);
 				g.fillText(G.ch[i], 0, 0);
@@ -665,22 +730,32 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const { view, stage } = s, dpr = view.dpr;
 		lastView = view;
 		if (!fontAsked) {
-			fontAsked = true;
-			const refresh = () => { widths = new Map(); fontEpoch++; };
-			document.fonts?.load(`500 12px ${FONT}`).then(refresh, () => {});
+			// type is set once the page's face has loaded (or has had its chance), so it is not set twice
+			fontAsked = true; firstT = s.t;
+			const ready = () => { fontReady = true; widths = new Map(); fontEpoch++; };
+			if (document.fonts?.load) document.fonts.load(`500 12px ${FONT}`).then(ready, ready); else ready();
 		}
-		// the one piece of state: the eased level
 		const goal = Math.max(0, Math.min(3, s.level));
 		if (s.reduce) e = Math.round(goal);
 		else if (e < 0) e = goal;
 		else {
-			// close to the scroll when it scrubs (about 120 ms of smoothing); a jump is paced to take a second or two
-			const d = goal - e, dt = Math.min(0.05, Math.max(0, s.dt));
-			const cap = (0.85 + 0.55 * Math.max(0, Math.abs(d) - 1)) * dt;
-			e = Math.abs(d) < 0.0005 ? goal : e + Math.max(-cap, Math.min(cap, d * (1 - Math.exp(-dt / 0.12))));
+			const dt = Math.min(0.05, Math.max(0, s.dt));
+			// a level that slides (scroll) is followed closely, with about 120 ms of smoothing; one that leaps (a click,
+			// a key) is paced over 1.2 to 1.8 s so every division on the way plays
+			if (Math.abs(goal - lastGoal) > 0.2) leap = { from: e, to: goal, t: 0, dur: Math.max(1.2, Math.min(1.8, 0.9 + 0.3 * Math.abs(goal - e))) };
+			else if (leap) leap.to = goal;
+			if (leap) {
+				leap.t += dt;
+				const u = Math.min(1, leap.t / leap.dur);
+				e = lerp(leap.from, leap.to, 0.5 * u + 0.5 * u * u * (3 - 2 * u));
+				if (u >= 1) leap = null;
+			} else e = Math.abs(goal - e) < 0.0005 ? goal : e + (goal - e) * (1 - Math.exp(-dt / 0.12));
 		}
+		lastGoal = goal;
+		const before = L?.key;
 		pose(stage);
 		const l = L!;
+		if (l.key !== before) movedT = s.t;
 
 		// who is on stage, back to front
 		drawn = [];
@@ -693,18 +768,38 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		for (let i = 0; i < l.crowd.length; i++) if (crowd[i].rest.a > 0.004) drawn.push(crowd[i]);
 		if (lit.rest.a > 0.004) drawn.push(lit);
 
-		// build what is missing, a few ms a frame: what is on stage first, then the rest of the cast, so that every
-		// division has its threads ready (everything on stage at once when motion is reduced)
-		const t0 = performance.now(), budget = s.reduce ? 4000 : 6;
-		let first = true;
-		const need = (it: Item) => {
-			if (it.full <= 0) return;
-			if (it.sprite && it.spriteKey.startsWith(`${Math.round(it.full * dpr)}|${fontEpoch}|`)) return;
-			if (!first && performance.now() - t0 > budget) return;
-			bake(it, dpr); first = false;
+		// set what is missing, a few ms a frame: what is on stage first, then the rest of the cast, so that every
+		// division has its threads ready (when motion is reduced: what is on stage, at once)
+		if (!fontReady && s.t - firstT > 1.2) fontReady = true;
+		const soon = performance.now() + 2.5, deadline = soon + 5;
+		// a sprite is kept (and scaled) while the stage is moving, and set again at its true size once it has been still
+		const still = s.t - movedT > 0.2;
+		const stale = (it: Item) => {
+			if (it.full <= 0 || !(it.lines || fontReady)) return false;
+			if (!it.sprite) return true;
+			if (it.spriteEpoch < 0) return false;
+			const ratio = (it.full * dpr) / (it.spriteR * it.spriteDpr);
+			return still ? Math.abs(ratio - 1) > 0.04 || (!it.lines && it.spriteEpoch !== fontEpoch) : ratio > 1.6 || ratio < 0.4;
 		};
-		for (const it of drawn) need(it);
-		if (!s.reduce) { need(main); need(human); need(ai); need(lit); for (const it of labs) need(it); for (let i = 0; i < l.crowd.length; i++) need(crowd[i]); }
+		const cast = [main, human, ai, lit, ...labs];
+		if (!s.reduce) {
+			// ridges first, for the whole cast: the divisions need them, and they are quick to trace
+			for (const it of cast) if (!it.ridges && it.full > 0) { geometry(it); if (performance.now() > soon) break; }
+			for (let i = 0; i < l.crowd.length && performance.now() <= soon; i++) if (!crowd[i].ridges && crowd[i].full > 0) geometry(crowd[i]);
+		}
+		for (;;) {
+			if (!job) {
+				let next = drawn.find(stale);
+				if (!next && !s.reduce) next = cast.find(stale) ?? crowd.find((it, i) => i < l.crowd.length && stale(it));
+				if (!next) break;
+				job = begin(next, dpr);
+			}
+			// with motion reduced there is no inking in: a print with nothing to show yet is set at once
+			const first = job.it.sprite === job.cv;
+			if (!step(job, s.reduce && first ? Infinity : deadline)) break;
+			job = null;
+			if (performance.now() > deadline) break;
+		}
 
 		// breathing: each print drifts a hair on its own clock
 		for (const it of drawn) {
@@ -732,7 +827,17 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		if (ptr && want) { lensX = ptr.x; lensY = ptr.y; }
 		if (lensA > 0.01) {
 			const rad = Math.min(92, Math.max(58, Math.min(stage.w, stage.h) * 0.13)) * (0.9 + 0.1 * lensA);
-			const top = under(lensX, lensY);
+			// magnify for the print under the glass, or failing that the nearest one it touches
+			let top = under(lensX, lensY);
+			if (!top) {
+				let bd = 1e9;
+				for (const it of drawn) {
+					const p = it.rest;
+					if (p.a < 0.12) continue;
+					const d = Math.hypot((lensX - p.x) / HW, lensY - p.y) - p.r;
+					if (d < rad * 0.6 && d < bd) { bd = d; top = it; }
+				}
+			}
 			const target = top ? Math.min(6.5, Math.max(2.1, 11 / Math.max(0.5, typePx(top, top.rest.r)))) : lensMag;
 			lensMag = s.reduce ? target : lensMag + (target - lensMag) * Math.min(1, s.dt * 9);
 			g.save();

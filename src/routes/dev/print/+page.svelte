@@ -11,7 +11,7 @@
 		...C.lede.map((s) => s.t),
 		C.levels.lead.t,
 		...C.levels.items.flatMap((i) => [i.t + ".", i.fact]),
-		C.sections[0].example.text.map((s) => s.t).join(""),
+		(C.sections[0].example?.text ?? []).map((s) => s.t).join(""),
 		...C.timeline.steps.map((s) => s.t),
 		...C.which_ai.steps.map((s) => s.t),
 		...C.art.decipher.map((d) => d.excerpt.t),
