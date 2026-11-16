@@ -8,6 +8,7 @@
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
 	import Emblem from "./Emblem.svelte";
+	import PrintMark from "./PrintMark.svelte";
 	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
 	import { FABLE, KIND, LAB } from "./palette";
@@ -133,6 +134,8 @@
 				<div class="verdicts" data-lag="1">
 					{#each E.judgments as j}
 						<div class="verdict {j.id} {card(j.id)}">
+							<!-- the verdict's print: the AI's for ideas, the human's for prose (the hero's two prints) -->
+							<span class="v-print"><PrintMark family={j.verdict === "AI" ? "ai" : "human"} color={j.verdict === "AI" ? "#461E47" : "#C85A82"} px={44} /></span>
 							<p class="v-head">
 								<span class="kind {j.id}"><Icon name={j.icon} /></span>
 								<span class="v-l">{j.label}</span>
@@ -190,6 +193,8 @@
 
 	<!-- one model's showcase: Claude Fable 5.2 -->
 	<aside class="showcase" aria-labelledby="s1-fable">
+		<!-- Fable's print, set in the paper's text, behind its numbers -->
+		<div class="f-print" aria-hidden="true"><PrintMark family="lab" index={0} color={FABLE.strong} px={300} text /></div>
 		<header class="f-head">
 			<p class="f-kick">Model showcase</p>
 			<h3 id="s1-fable"><Icon name="anthropic" />{S.stats_model}</h3>
@@ -315,7 +320,11 @@
 	.case-d { font-size: 14px; line-height: 1.5; color: var(--ink2); }
 
 	/* Claude Fable 5.2 showcase: the full content width, in Fable's clay */
-	.showcase { margin-top: 28px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 22px 48px; padding: 26px 30px 22px; background: var(--f-tint); border-radius: 3px; border-top: 3px solid var(--f-strong); }
+	.verdict { position: relative; }
+	.v-print { position: absolute; top: 10px; right: 12px; opacity: .9; pointer-events: none; }
+	.f-print { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); opacity: .2; pointer-events: none; }
+	.showcase > :not(.f-print) { position: relative; }
+	.showcase { position: relative; overflow: hidden; margin-top: 28px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 22px 48px; padding: 26px 30px 22px; background: var(--f-tint); border-radius: 3px; border-top: 3px solid var(--f-strong); }
 	.f-head { grid-column: 1 / -1; }
 	.f-kick { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--f-ink); }
 	.f-head h3 { margin: 4px 0 0; display: flex; align-items: center; gap: 10px; font-size: clamp(24px, 2.6vw, 32px); line-height: 1.1; font-weight: 600; letter-spacing: -0.025em; color: var(--f-ink); }

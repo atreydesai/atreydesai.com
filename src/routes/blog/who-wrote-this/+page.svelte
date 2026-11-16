@@ -9,6 +9,7 @@
 	import Icon from "$lib/who-wrote-this/Icon.svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import SideNav from "$lib/who-wrote-this/SideNav.svelte";
+	import PrintMark from "$lib/who-wrote-this/PrintMark.svelte";
 	import { startElastic } from "$lib/who-wrote-this/elastic";
 	import { field } from "$lib/who-wrote-this/field.svelte";
 	import Levels from "$lib/who-wrote-this/Levels.svelte";
@@ -145,7 +146,11 @@
 		<div class="breath" aria-hidden="true"></div>
 
 		<footer class="end">
-			<p class="closing" data-lag="1">{C.closing.t}</p>
+			<div class="close-row">
+				<!-- the one print again: the page ends where it began -->
+				<PrintMark family="main" color="#14202D" px={132} text />
+				<p class="closing" data-lag="1">{C.closing.t}</p>
+			</div>
 			<p class="byline small">
 				{#each C.meta.authors as a, i}<span>{a.name}{#if a.equal}*{/if}{#if i < C.meta.authors.length - 1}{", "}{/if}</span>{/each}
 			</p>
@@ -243,6 +248,7 @@
 	.todo { margin-top: 28px; height: 180px; display: grid; place-items: center; border: 1.5px dashed var(--axis); border-radius: 3px; color: var(--ink2); font-size: 13px; }
 
 	.end { padding-block: 72px 32px; border-top: 1px solid var(--rule); }
+	.close-row { display: flex; align-items: center; gap: 28px; }
 	.closing { max-width: 30ch; font-size: clamp(24px, 3vw, 34px); line-height: 1.2; font-weight: 600; letter-spacing: -0.025em; text-wrap: balance; }
 	.byline.small { font-size: 13px; color: var(--ink2); margin-top: 24px; max-width: 52rem; }
 	.art-switch { position: fixed; left: 16px; bottom: 16px; z-index: 20; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 4px; background: rgba(20, 32, 45, .92); font-size: 12.5px; box-shadow: 0 6px 20px rgba(20, 32, 45, .25); }
