@@ -20,6 +20,11 @@
    "t": "Claude Fable 5.2 bases each decision on concrete evidence",
    "src": "paper/tables/minjoon-agent_attribution_examples.tex"
   },
+  "from": {
+   "t": "Story from TwiceTold",
+   "title": "lantern and firefly",
+   "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1, Task cell: “Story from TwiceTold: lantern and firefly”, the title in italics); the quotation's source line"
+  },
   "text": [
    {
     "t": "The most meaningful light is that which is provided in moments of need.",
