@@ -216,6 +216,9 @@
 	.btn:hover { background: var(--ink); color: var(--field); }
 	.links time { margin-left: 8px; font-size: 13px; color: var(--ink2); }
 	.lede { margin-top: 64px; max-width: 46rem; font-size: 19px; line-height: 1.6; }
+	/* a book's drop cap: the opening "I" spans three lines */
+	.lede::first-letter { float: left; font-family: Georgia, "Times New Roman", serif !important; font-size: calc(19px * 1.6 * 3 * 0.86); line-height: .8; font-weight: 400; margin: 6px 12px 0 -2px; color: var(--ink); }
+	@supports (initial-letter: 3) { .lede::first-letter { float: none; initial-letter: 3; margin: 0 12px 0 0; font-size: inherit; line-height: inherit; } }
 
 	/* body: contents rail beside the sections on wide screens */
 	.body { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 40px; margin-top: 24px; }
@@ -262,6 +265,7 @@
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }
 		.lede { font-size: 17px; }
+		.lede::first-letter { font-size: calc(17px * 1.6 * 3 * 0.86); }
 		.top nav { gap: 14px; }
 	}
 </style>
