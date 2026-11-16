@@ -39,6 +39,11 @@
 	svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; animation: bob 1.3s ease-in-out infinite; }
 	@keyframes rise { from { opacity: 0; transform: translate(-50%, 14px); } }
 	@keyframes bob { 50% { transform: translateY(3px); } }
-	@media (max-width: 860px) { .hint { bottom: 84px; } }
+	/* on a phone the pill would sit on text: a small round arrow at the right edge instead */
+	@media (max-width: 860px) {
+		.hint { left: auto; right: 12px; bottom: 76px; width: 40px; height: 40px; padding: 0; justify-content: center; font-size: 0; gap: 0; transform: none; animation-name: rise-r; }
+		svg { width: 14px; height: 14px; }
+	}
+	@keyframes rise-r { from { opacity: 0; transform: translateY(14px); } }
 	@media (prefers-reduced-motion: reduce) { .hint, svg { animation: none; } }
 </style>

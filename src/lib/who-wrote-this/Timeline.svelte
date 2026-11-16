@@ -9,8 +9,10 @@
 	// weights, a labs menu, date window: one row, no heading) slide in under the card and the plot starts under them.
 	// Guided scroll, one or two paper sentences per step: the closed-weights frontier traces in, then the open-weights
 	// frontier, then the trained detectors join (prose, then ideas). Each line is named at its end as soon as it is
-	// drawn. The step comes from the scroll position (no gaps: every position maps to one step, each step ~95vh);
-	// the dashes on the card are buttons that scroll to their step. Hover any model.
+	// drawn (on a phone, in a band right over the plot's end, so the names never sit on a dot or a line). The step
+	// comes from the scroll position (no gaps: every position maps to one step, each step 75vh, as every step traces a
+	// line); a fast scroll still shows each step in turn, for at least HOLD_MS, and the current dash fills as the reader
+	// scrolls through it. The dashes on the card are buttons that scroll to their step. Hover any model.
 	//
 	// Exact marks: every mark snaps (DotField moves it at once, only its alpha eases), and the lines are built from the
 	// marks' own coordinates, so a ring always sits on its corner of the dashed line. A ring's radius is shortened by
@@ -54,7 +56,8 @@
 	const REF_DASH = [3, 4], GRID_DASH = [1, 5];
 	const TRACE_S = 1.3; // seconds for a line to trace in
 	const SIDE_S = 0.6; // seconds for the plot to move over when Explore opens
-	const STEP_VH = 0.95, LEAD_VH = 0.55, TRIG = 0.5; // scroll per step, where step 0 starts, the trigger line (viewport heights)
+	const STEP_VH = 0.75, LEAD_VH = 0.55, TRIG = 0.5; // scroll per step, where step 0 starts, the trigger line (viewport heights)
+	const HOLD_MS = 350; // a fast scroll moves the shown step one at a time, holding each at least this long
 	const R_FRONT = 6, R_DOT = 4.5, R_FOCUS = 2.5; // outer radii: a frontier model, any other model, extra for a named one
 	const RING_W = 1.8; // DotField's ring stroke: a ring is drawn at r - RING_W / 2 so its outer edge is r
 	const LINE_W = 2.2, CASE_W = 6.5; // a line, and the ground-coloured casing under it
@@ -90,6 +93,7 @@
 	let lab = $state<string | null>(null);
 	let wa = $state(0), wb = $state(N); // the date window, in days from START
 	let step = $state(-1); // -1: the headline alone, before the first step
+	let progress = $state(0); // how far the scroll is through the shown step, 0..1 (fills the next dash)
 	let active = $state(false);
 	let stage: HTMLElement, root: HTMLElement, head: HTMLElement, col: HTMLElement, card: HTMLElement, bar: HTMLElement, track: HTMLElement;
 	const explore = $derived(step >= LAST);
@@ -287,6 +291,18 @@
 		{ ...tg, x: x - 2, y: y + 62, at: "left" },
 	];
 	const rect = (d: DOMRect, p = 0): B => ({ x: d.left - p, y: d.top - p, w: d.width + 2 * p, h: d.height + 2 * p });
+	/** Phones: the lines' names side by side, right-aligned at `right`, the first at the end; a new row where the next
+	 * would pass `left`. Each slot's right edge and row. */
+	function bandSlots(tgs: Tag[], right: number, left: number) {
+		let xr = right, row = 0;
+		return tgs.map((tg) => {
+			const w = boxOf(tg).w;
+			if (xr - w < left && xr < right) { xr = right; row++; }
+			const s = { xr, row };
+			xr -= w + 6;
+			return s;
+		});
+	}
 
 	// ---- the chart: rebuilt only when an input changed or a line is tracing ----------------------------------------
 	const pos = new Map<string, { x: number; y: number }>();
@@ -294,11 +310,33 @@
 	type Geo = { r: DOMRect; hb: DOMRect; cr: DOMRect; cl: DOMRect; foot: number; narrow: boolean };
 	function layout({ r, hb, cr, cl, foot, narrow }: Geo) {
 		const W = innerWidth;
+		const t0 = START + wa * DAY, t1 = START + wb * DAY;
+		// frontier lines inside the window: they start afresh from the models released in it
+		const lines = frontier(metric, t0, t1);
+		const showLine = (l: Line) => weights === "all" || weights === l;
+		// a line's name, with its best model and score (placed at its end once the line is drawn)
+		const endTag = (l: Line): Tag => {
+			const b = lines[l][lines[l].length - 1];
+			return { id: "line-" + l, x: 0, y: 0, at: "left", t: U["weights." + l], sub: `${b.name}, ${Math.round(b[metric])}%`, color: COLOR[l], swatch: l === "closed" ? "line" : "dash", strong: !narrow, alpha: trace[l] >= 1 ? 1 : 0 };
+		};
+		const ref = metric === "both" ? null : D.refs[metric];
+		const refTag: Tag | null = ref && { id: "ref", x: 0, y: 0, at: "right", t: ref.t, sub: `${U.trained}, ${Math.round(ref.v)}%`, color: GRAY.strong, swatch: "dash", alpha: trace.ref >= 1 ? 1 : 0 };
+		const lo = lowOf(metric, t0, t1);
 		let box: Box;
+		const band = foot + 6; // narrow screens: the top of the band that holds the lines' names
+		let refBand = false; // narrow screens: the trained detector's name sits in the band too
 		if (narrow) {
 			// stacked: the plot under the column, sized for the column's final height (so Explore opening does not
-			// re-lay the chart out on every frame of its slide)
-			box = { x0: r.left + 34, x1: r.right - 6, y0: foot + 44, y1: r.bottom - 56 };
+			// re-lay the chart out on every frame of its slide). Between the column and the plot, a band for the lines'
+			// names (bandSlots), kept clear of the largest dot at 100% by the tags' gap (P), so a name never sits on a
+			// dot or a line; a second row only where one does not fit. The trained detector's name joins the band where
+			// its line runs so near the plot's top (Pangram 4 on prose) that the name has no room over it.
+			const bh = boxOf({ id: "", x: 0, y: 0, t: "", sub: " ", color: COLOR.closed }).h; // a name's height (any text)
+			const gap = R_FRONT + R_FOCUS + 5, y0 = band + bh + gap, y1 = r.bottom - 56;
+			refBand = !!ref && ((100 - ref.v) / (100 - lo)) * (y1 - y0) < bh + 6 + gap;
+			const all = [...LINES.filter((l) => lines[l].length).map(endTag), ...(refBand && refTag ? [refTag] : [])];
+			const rows = all.length ? Math.max(...bandSlots(all, r.right - 6, r.left).map((s) => s.row)) + 1 : 1;
+			box = { x0: r.left + 34, x1: r.right - 6, y0: y0 + (rows - 1) * (bh + 6), y1 };
 			sideGoal = 0; side = 0; downGoal = 0; down = 0;
 		} else {
 			const over: Box = { x0: r.left + AX, x1: Math.min(r.right - 24, W - 196), y0: hb.bottom + 44, y1: r.bottom - 64 }; // room on the right for the line labels, clear of the page's side rail
@@ -308,16 +346,10 @@
 			box = { ...over, x0: over.x0 + (cl.right + 52 - over.x0) * ease(side), y0: over.y0 + (foot + 34 - over.y0) * ease(down) };
 		}
 		laidW = W;
-		const t0 = START + wa * DAY, t1 = START + wb * DAY;
 		const inWin = (m: Model) => m.t >= t0 && m.t <= t1;
-		const ref = metric === "both" ? null : D.refs[metric];
-		const lo = lowOf(metric, t0, t1);
 		const y = (v: number) => box.y1 - ((v - lo) / (100 - lo)) * (box.y1 - box.y0);
 		const x = (t: number) => box.x0 + ((t - t0) / (t1 - t0)) * (box.x1 - box.x0);
 
-		// frontier lines inside the window: they start afresh from the models released in it
-		const lines = frontier(metric, t0, t1);
-		const showLine = (l: Line) => weights === "all" || weights === l;
 		const off = (m: Model) => (weights !== "all" && m.line !== weights) || (lab !== null && m.lab !== lab);
 		const front = new Set([...lines.closed, ...lines.open].map((m) => m.model));
 		const focus = step < 0 || explore ? NONE : FOCUS[step];
@@ -394,7 +426,8 @@
 		const span = (t1 - t0) / (30.44 * DAY), most = narrow ? 5 : 7;
 		const every = [1, 2, 3, 6, 12].find((k) => span / k <= most) ?? 12;
 		for (const mo of MONTHS) if (mo.t >= t0 && mo.t <= t1 && mo.m % every === 0) texts.push({ x: x(mo.t), y: box.y1 + 18, t: mo.s, color: ink2, size: 11.5, align: "center" });
-		texts.push({ x: box.x1, y: box.y1 + 40, t: U.x_label, color: ink2, size: 11.5, align: "right" });
+		// the x axis's title, set larger and in ink so the dates read as the models' release dates at a glance
+		texts.push({ x: box.x1, y: box.y1 + 40, t: U.x_label, color: INK.ink, size: 13, weight: 600, align: "right" });
 
 		// the trained detector's line, under the frontiers; it starts past the card where it would run behind it
 		const segs: number[][] = [];
@@ -429,8 +462,8 @@
 		for (const l of LINES) {
 			const f = lines[l];
 			if (!f.length || !showLine(l)) continue;
-			const b = f[f.length - 1], yb = pos.get(b.model)!.y;
-			ends.push({ l, y: yb, tg: { id: "line-" + l, x: box.x1 + 2, y: yb, at: "right", t: U["weights." + l], sub: `${b.name}, ${Math.round(b[metric])}%`, color: COLOR[l], swatch: l === "closed" ? "line" : "dash", strong: !narrow, alpha: trace[l] >= 1 ? 1 : 0 } });
+			const yb = pos.get(f[f.length - 1].model)!.y;
+			ends.push({ l, y: yb, tg: { ...endTag(l), x: box.x1 + 2, y: yb, at: "right" } });
 		}
 		const shownEnds = ends.filter((e) => e.tg.alpha);
 		if (!narrow) {
@@ -453,29 +486,28 @@
 				if (Math.abs(c.cy - c.e.y) > 3) paths.push({ pts: [[box.x1 + 1, c.e.y], [box.x1 + 11, c.cy]], color: COLOR[c.e.l], width: 1.2, progress: 1 });
 			}
 		} else {
-			// narrow screens: right-aligned at the end of the line, just above it (clear of its last dot) or below it
-			const g = R_FRONT + 3, n0 = S.placed.length;
-			for (const e of shownEnds) {
-				const h = boxOf(e.tg).h;
-				const at = (dy: number): Tag => ({ ...e.tg, x: box.x1 + 10, y: e.y + dy, at: "left" });
-				Object.assign(e.tg, place([at(-h / 2 - g), at(h / 2 + g), at(-h / 2 - g - 20), at(h / 2 + g + 20), at(-h / 2 - g - 44), at(h / 2 + g + 44)], null, S));
-			}
-			// two line ends close together (prose): their tags never overlap each other; the lower one moves down
-			const stack = shownEnds.map((e) => e.tg).sort((a, b) => boxOf(a).y - boxOf(b).y);
-			for (let i = 1; i < stack.length; i++) { const a = boxOf(stack[i - 1]), b = boxOf(stack[i]), need = a.y + a.h + 6 - b.y; if (need > 0) stack[i].y += need; }
-			S.placed.splice(n0, S.placed.length - n0, ...stack.map(boxOf));
+			// narrow screens: in the band over the plot, right-aligned at the lines' end, the closed line's last (so it
+			// keeps its place when the open line joins), then the trained detector's where it joins the band; every slot
+			// is fixed whether or not its line has finished tracing
+			const inBand = [...ends.map((e) => e.tg), ...(refBand && refTag ? [refTag] : [])];
+			const slots = bandSlots(inBand, box.x1, r.left);
+			inBand.forEach((tg, i) => {
+				const h = boxOf(tg).h;
+				Object.assign(tg, { x: slots[i].xr + 10, y: band + slots[i].row * (h + 6) + h / 2, at: "left" });
+				if (tg.alpha) S.placed.push(boxOf(tg));
+			});
 		}
 		items.push(...ends.map((e) => e.tg));
 
-		// the trained detector's line, named where it starts
-		if (ref) {
-			const yr = y(ref.v);
-			const tg: Tag = { id: "ref", x: rx - 4, y: yr, at: "right", t: ref.t, sub: `${U.trained}, ${Math.round(ref.v)}%`, color: GRAY.strong, swatch: "dash", alpha: trace.ref >= 1 ? 1 : 0 };
-			if (tg.alpha) {
+		// the trained detector's line, named where it starts (on a phone, 6px clear of it, as every name keeps 5px)
+		if (ref && refTag) {
+			const yr = y(ref.v), g = narrow ? 6 : 4;
+			const tg: Tag = refBand ? refTag : { ...refTag, x: rx - 4, y: yr, at: "right" };
+			if (tg.alpha && !refBand) {
 				const h = boxOf(tg).h;
 				Object.assign(tg, place([
-					{ ...tg, x: rx - 4, y: yr - h / 2 - 4, at: "right" }, { ...tg, x: rx - 4, y: yr + h / 2 + 4, at: "right" },
-					{ ...tg, x: box.x1 + 10, y: yr - h / 2 - 4, at: "left" }, { ...tg, x: box.x1 + 10, y: yr + h / 2 + 4, at: "left" },
+					{ ...tg, x: rx - 4, y: yr - h / 2 - g, at: "right" }, { ...tg, x: rx - 4, y: yr + h / 2 + g, at: "right" },
+					{ ...tg, x: box.x1 + 10, y: yr - h / 2 - g, at: "left" }, { ...tg, x: box.x1 + 10, y: yr + h / 2 + g, at: "left" },
 				], null, S));
 			}
 			items.push(tg);
@@ -560,10 +592,26 @@
 		// the guided steps always show the whole picture
 		if (s < LAST) { weights = "all"; lab = null; wa = 0; wb = N; }
 	}
+	// While the section is on screen the shown step walks toward the scroll's step one at a time, holding each for
+	// HOLD_MS (a timer, not a frame loop); off screen, or on arriving from off screen, it jumps there at once.
+	let since = 0, hold = 0, seen = false; // when the shown step last changed
 	function follow() {
 		const r = root.getBoundingClientRect(), H = innerHeight;
-		if (r.bottom < -H || r.top > 2 * H) return;
-		setStep(Math.max(-1, Math.min(LAST, Math.floor((TRIG * H - r.top - LEAD_VH * H) / (STEP_VH * H)))));
+		if (r.bottom < -H || r.top > 2 * H) { seen = false; return; }
+		const q = (TRIG * H - r.top - LEAD_VH * H) / (STEP_VH * H);
+		const goal = Math.max(-1, Math.min(LAST, Math.floor(q)));
+		const vis = r.bottom > 0 && r.top < H, now = performance.now();
+		if (!vis || !seen) {
+			clearTimeout(hold); hold = 0;
+			if (goal !== step) { setStep(goal); since = now; }
+		} else if (goal !== step && !hold) {
+			const wait = since + HOLD_MS - now;
+			if (wait <= 0) { setStep(step + Math.sign(goal - step)); since = now; }
+			if (goal !== step) hold = window.setTimeout(() => { hold = 0; follow(); }, wait > 0 ? wait : HOLD_MS);
+		}
+		seen = vis;
+		const p = Math.max(0, Math.min(1, q - step));
+		if (p !== progress) progress = p;
 	}
 	// a dash scrolls to the middle of its step
 	function go(i: number) {
@@ -620,6 +668,7 @@
 		document.fonts?.ready.then(() => { widths.clear(); dirty = true; kick(); });
 		return () => {
 			cancelAnimationFrame(raf); raf = 0;
+			clearTimeout(hold); hold = 0;
 			io.disconnect(); ro.disconnect();
 			removeEventListener("scroll", onScroll); removeEventListener("resize", onScroll);
 			document.removeEventListener("transitionend", settle); document.removeEventListener("animationend", settle);
@@ -633,7 +682,7 @@
 			<h2 bind:this={head}>{T.title.t}</h2>
 			<div class="col" bind:this={col}>
 				<div class="say" class:on={step >= 0} bind:this={card} aria-live="polite">
-					<StepDashes count={T.steps.length} current={step} {go} label={U.step} />
+					<StepDashes count={T.steps.length} current={step} {progress} {go} label={U.step} />
 					{#key step}<p class="say-t">{T.steps[Math.max(0, step)].t}</p>{/key}
 				</div>
 			</div>

@@ -13,6 +13,9 @@
 	// private llm-detectors repo by docs/launch_20261116/tools/build_familiarity_anonymity_data.py); `ui` lists the rest.
 	// The refusal count's provenance and the paraphrasing method are footnotes.
 	//
+	// Pacing: each step takes 75vh of scroll where it animates and 60vh where it does not (Atrey, 16 Nov); a fast scroll
+	// still shows each step in turn, for at least HOLD_MS, and the current dash fills as the reader scrolls through it.
+	//
 	// Performance: the step comes from one passive scroll listener; nothing runs per frame while idle. The canvas is
 	// rebuilt only when an input changes and, while a tween moves, on animation frames that stop when it ends. Marks
 	// are pooled; the geometry depends on the size only, so tiles never re-lay out on scroll.
@@ -36,13 +39,24 @@
 	const INK = INKS.ink, INK2 = INKS.ink2, OFF = GRAY.unlit;
 	const STEPS = A.steps as Step[];
 	const LAST = STEPS.length - 1;
-	const STEP_VH = 1; // scroll per step, in viewport heights: an ordinary scroll never skips one
+	// scroll per step, in viewport heights: 75vh where the step animates (the groups filling, the refusals lighting up,
+	// the paraphrasing sweep), 60vh where it does not
+	const STEP_VH = STEPS.map((s) => (s.view === "rewrite" || s.view === "defenses" ? 0.6 : 0.75));
+	// where each step's stretch starts, in viewport heights from the pinned stage's top: step 0 is centred on 0 (the
+	// stage just pinned), so AT[0] < 0; step i runs from AT[i] to AT[i + 1]
+	const AT = STEP_VH.reduce((a, v, i) => [...a, a[i] + v], [-STEP_VH[0] / 2]);
+	const SPAN_VH = STEP_VH.reduce((a, v) => a + v, 0);
+	const HOLD_MS = 350; // a fast scroll moves the shown step one at a time, holding each at least this long
 	const BINS = A.data.bins.domains as Record<string, Record<string, Bin[]>>;
 	const R = A.data.refusals;
 	const L = A.labels;
 	const DOMS = L.domains as Record<string, string>;
 	const MODELS = L.models as Record<string, string>;
 	const GROUPS = L.groups as { bin: string; t: string }[];
+	// a phone's third of the width is too narrow for "Moderately familiar" on one line: the less familiar groups' names
+	// break before their last word there (the tags keep the break; see the style)
+	const NAME2 = GROUPS.map((g) => g.t.replace(/ (?=\S+$)/, "\n"));
+	const NAME2_H = 6 + 2 * 12.5 * 1.6; // such a name's height: the tag's padding and two lines of its 12.5px type
 	const NOTES = A.notes as Note[];
 	const col = (name: string) => MODEL[name] ?? GRAY.strong;
 	const CLAY = col(L.fable), REWRITER = col(L.rewriter);
@@ -70,6 +84,7 @@
 	const RANK = new Map(ORDER.map((p, j) => [p, j]));
 
 	let step = $state(0);
+	let progress = $state(0); // how far the scroll is through the shown step, 0..1 (fills the next dash)
 	let active = $state(false);
 	let owned = $state(false);
 	let dom = $state("reddit");
@@ -79,6 +94,8 @@
 	let sel = $state<number | null>(null);
 	let swept = $state(false); // the paraphrased look is showing (for the numbers and the key)
 	let W = $state(0), H = $state(0), capMax = $state(0);
+	let ctlH = $state(0); // the controls' natural height: on a phone they wrap to three rows
+	let cap: HTMLElement;
 	let ox = $state(0), oy = $state(0); // the stage's viewport offset
 	let reduce = $state(false);
 	// the opener's prints arrive once mounted: SectionOpener sizes them for a wide screen on its first render, and on a
@@ -106,7 +123,9 @@
 			slot: { x: 0, y: 0, w: 0, h: 0 }, smallNumSize: 20 };
 		if (!W || !H) return o;
 		// the band: its tallest text, plus the dashes, gaps and padding around it, plus Explore's rows under it
-		const exploreH = narrow ? 50 : 50, capFull = (capMax || (narrow ? 170 : 110)) + (narrow ? 54 : 58);
+		// (on a phone, the controls' measured rows and the band's gap above them, so the key under the groups clears the
+		// band once Explore opens)
+		const exploreH = narrow ? Math.max(50, ctlH + 10) : 50, capFull = (capMax || (narrow ? 170 : 110)) + (narrow ? 54 : 58);
 		const zT = narrow ? 60 : 76, zB = H - 16 - capFull - exploreH - (narrow ? 8 : 20), zh = zB - zT;
 		if (!narrow) {
 			// left: the giant numeral over the less familiar groups; right: the very familiar group, large
@@ -123,7 +142,7 @@
 			o.slot = { x: x0, y: hy + gh - gs, w: LW, h: gs };
 		} else {
 			// row 1: the numeral | the very familiar group; row 2: the three less familiar groups; row 3: the key
-			const keysH = 62, row2 = 32 + 70 + 30;
+			const names = 8 + NAME2_H + 3, keysH = 62, row2 = 32 + 70 + names; // the groups' numbers, tiles and names
 			const ph = Math.floor(Math.max(10, Math.min(21, (W - 140) / 10, (zh - 34 - row2 - keysH) / 10))), gh = 10 * ph;
 			const hx = W - gh, hy = zT;
 			g.length = 0;
@@ -132,7 +151,7 @@
 			g.push({ x: hx, y: hy, cx: hx + gh / 2, p: ph, gw: gh });
 			o.numSize = 52; o.smallNumSize = 13;
 			o.num = { x: 0, y: hy + 4, w: W - gh - 12 };
-			o.stackKeys = false; o.keyY = sy + gs + 30 + 18;
+			o.stackKeys = false; o.keyY = sy + gs + names + 18;
 			o.wall = { x: 140, y: hy, w: W - 140, h: gh + 34 + 32 + gs };
 			o.slot = { x: 0, y: sy, w: W, h: gs };
 		}
@@ -146,7 +165,7 @@
 		const X = (x: number) => ox + x, Y = (y: number) => oy + y;
 		geo.g.forEach((g, i) => {
 			if (i === FOCUS ? !showHuge : !showSmall) return;
-			t.push({ id: `g${i}`, x: X(g.cx), y: Y(g.y + g.gw), t: narrow && i !== FOCUS ? GROUPS[i].bin : GROUPS[i].t, at: "below" });
+			t.push({ id: `g${i}`, x: X(g.cx), y: Y(g.y + g.gw), t: narrow && i !== FOCUS ? NAME2[i] : GROUPS[i].t, at: "below" });
 		});
 		if (view === "rewrite") t.push({ id: "rw", x: X(diag.c), y: Y(diag.cy + diag.av / 2 + 2), t: L.rewriter, color: REWRITER, at: "below" });
 		const key: { t: string; color: string; sub?: string }[] = [];
@@ -321,18 +340,33 @@
 	}
 	function go(i: number) {
 		const top = root.getBoundingClientRect().top + scrollY;
-		scrollTo({ top: top + i * innerHeight * STEP_VH, behavior: reduce ? "instant" : "smooth" });
+		scrollTo({ top: top + (AT[i] + STEP_VH[i] / 2) * innerHeight, behavior: reduce ? "instant" : "smooth" });
 	}
 
 	onMount(() => {
 		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).has("still");
 		ready = true;
+		// While the stage is on screen the shown step walks toward the scroll's step one at a time, holding each for
+		// HOLD_MS (a timer, not a frame loop); off screen, or on arriving from off screen, it jumps there at once.
+		let since = 0, hold = 0, seen = false; // when the shown step last changed
 		const update = () => {
-			const r = root.getBoundingClientRect();
-			if (r.bottom < -innerHeight || r.top > innerHeight * 2) return;
-			const q = -r.top / (innerHeight * STEP_VH);
-			const s = Math.max(0, Math.min(LAST, Math.floor(q + 0.5)));
-			if (s !== step) step = s;
+			const r = root.getBoundingClientRect(), H = innerHeight;
+			if (r.bottom < -H || r.top > H * 2) { seen = false; return; }
+			const y = -r.top / H;
+			let goal = 0;
+			while (goal < LAST && y >= AT[goal + 1]) goal++;
+			const vis = r.bottom > 0 && r.top < H, now = performance.now();
+			if (!vis || !seen) {
+				clearTimeout(hold); hold = 0;
+				if (goal !== step) { step = goal; since = now; }
+			} else if (goal !== step && !hold) {
+				const wait = since + HOLD_MS - now;
+				if (wait <= 0) { step += Math.sign(goal - step); since = now; }
+				if (goal !== step) hold = window.setTimeout(() => { hold = 0; update(); }, wait > 0 ? wait : HOLD_MS);
+			}
+			seen = vis;
+			const p = Math.max(0, Math.min(1, (y - AT[step]) / STEP_VH[step]));
+			if (p !== progress) progress = p;
 		};
 		const onScroll = () => {
 			update();
@@ -350,7 +384,13 @@
 			else if (field.mode === "chart" && field.owner === OWNER) { field.mode = "ground"; field.dim = 0; field.interactive = false; chart.marks = []; chart.paths = []; chart.texts = []; }
 		}), { rootMargin: "-35% 0px -35% 0px" });
 		io.observe(root);
-		return () => { cancelAnimationFrame(raf); io.disconnect(); removeEventListener("scroll", onScroll); removeEventListener("resize", onScroll); document.removeEventListener("click", back); };
+		// the controls' natural height (Reveal holds them collapsed until Explore), measured once laid out and on resize
+		const body = cap.querySelector<HTMLElement>(".reveal .inner");
+		const measure = () => { const h = body?.scrollHeight ?? 0; if (h !== ctlH) ctlH = h; };
+		const ro = new ResizeObserver(measure);
+		if (body?.firstElementChild) ro.observe(body.firstElementChild);
+		measure();
+		return () => { cancelAnimationFrame(raf); clearTimeout(hold); io.disconnect(); ro.disconnect(); removeEventListener("scroll", onScroll); removeEventListener("resize", onScroll); document.removeEventListener("click", back); };
 	});
 
 	const hitIdx = $derived(view === "refusals" ? [] : showSmall ? [0, 1, 2, 3] : [FOCUS]);
@@ -378,7 +418,7 @@
 <section class="an" id={A.id} data-rq="0" data-step={step}>
 	<SectionOpener n={A.n} title={A.title.t} takeaway={A.takeaway.t} context={A.context.t} accent={GRAY.mid} prints={ready ? OPENER : []} />
 
-	<div class="scrolly" class:still={reduce} bind:this={root} style="--steps:{STEPS.length}; --step-vh:{STEP_VH * 100}vh">
+	<div class="scrolly" class:still={reduce} bind:this={root} style="--span:{SPAN_VH * 100}vh">
 		<div class="stick" bind:this={stage} bind:clientWidth={W} bind:clientHeight={H}>
 			<!-- the giant numeral: the one number each frame is about -->
 			<div class="num" style="left:{geo.num.x}px; top:{geo.num.y}px; width:{geo.num.w}px; --size:{geo.numSize}px" aria-hidden="true">
@@ -424,8 +464,8 @@
 			{/if}
 
 			<!-- the narration: a caption band along the bottom; the dashes jump to a step; the controls open inside it -->
-			<div class="cap">
-				<StepDashes count={STEPS.length} current={step} {go} />
+			<div class="cap" bind:this={cap}>
+				<StepDashes count={STEPS.length} current={step} {progress} {go} />
 				<div class="say" aria-live="polite" bind:clientHeight={capMax}>
 					{#each STEPS as s, i}
 						<div class="say-in" class:on={i === step} aria-hidden={i !== step} data-i={i}>
@@ -460,7 +500,7 @@
 
 <style>
 	.an { position: relative; }
-	.scrolly { position: relative; height: calc(var(--steps) * var(--step-vh) + 100vh); }
+	.scrolly { position: relative; height: calc(var(--span) + 100vh); }
 	.stick { position: sticky; top: 0; height: 100vh; pointer-events: none; }
 
 	/* the caption band, along the bottom */
@@ -497,6 +537,9 @@
 	.av { position: absolute; display: grid; place-items: center; border-radius: 50%; background: #fff; box-shadow: 0 2px 14px rgba(20, 32, 45, .1); font-size: 24px; }
 	.lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 	.lines path { fill: none; stroke: var(--ink2); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+	/* a group's name on a phone keeps its line break (NAME2), centred under the group; one-line tags are unchanged */
+	.an :global(.tags .tag.at-below .t) { white-space: pre; text-align: center; }
 
 	.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 	.hits { position: absolute; inset: 0; pointer-events: none; }
