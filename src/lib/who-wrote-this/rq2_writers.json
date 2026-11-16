@@ -1,0 +1,381 @@
+{
+"source": "paper/figures/data/rq2_distill.json (judge: Claude Fable 5.2)",
+"writers": [
+{
+"writer": "Qwen2.5 72B",
+"lab": "Alibaba",
+"release": "2024-09-19",
+"own": 65,
+"anthropic": 0,
+"openai": 8,
+"other": 2,
+"n": 75
+},
+{
+"writer": "Qwen3 235B (2507)",
+"lab": "Alibaba",
+"release": "2025-07-21",
+"own": 60,
+"anthropic": 0,
+"openai": 13,
+"other": 2,
+"n": 75
+},
+{
+"writer": "Qwen3.6 27B",
+"lab": "Alibaba",
+"release": "2026-04-27",
+"own": 67,
+"anthropic": 0,
+"openai": 1,
+"other": 7,
+"n": 75
+},
+{
+"writer": "Qwen3.8 27B",
+"lab": "Alibaba",
+"release": "2026-08-14",
+"own": 1,
+"anthropic": 0,
+"openai": 64,
+"other": 10,
+"n": 75
+},
+{
+"writer": "Qwen Max",
+"lab": "Alibaba",
+"release": "2026-09-03",
+"own": 0,
+"anthropic": 0,
+"openai": 71,
+"other": 4,
+"n": 75
+},
+{
+"writer": "Claude Sonnet 4.6",
+"lab": "Anthropic",
+"release": "2026-02-17",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "Claude Opus 5",
+"lab": "Anthropic",
+"release": "2026-07-24",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "Claude Fable 5.1",
+"lab": "Anthropic",
+"release": "2026-09-01",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "Claude Opus 5.5",
+"lab": "Anthropic",
+"release": "2026-09-22",
+"own": 72,
+"anthropic": 0,
+"openai": 2,
+"other": 0,
+"n": 74
+},
+{
+"writer": "Command A",
+"lab": "Cohere",
+"release": "2025-03-13",
+"own": 16,
+"anthropic": 8,
+"openai": 9,
+"other": 42,
+"n": 75
+},
+{
+"writer": "DeepSeek V3.2",
+"lab": "DeepSeek",
+"release": "2025-12-01",
+"own": 50,
+"anthropic": 0,
+"openai": 25,
+"other": 0,
+"n": 75
+},
+{
+"writer": "DeepSeek V4.1 Flash",
+"lab": "DeepSeek",
+"release": "2026-09-10",
+"own": 11,
+"anthropic": 7,
+"openai": 27,
+"other": 30,
+"n": 75
+},
+{
+"writer": "Gemma 3 27B",
+"lab": "Google",
+"release": "2025-03-12",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "Gemini 3 Flash",
+"lab": "Google",
+"release": "2025-12-17",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "Gemma 4 31B",
+"lab": "Google",
+"release": "2026-04-02",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "Gemini 3.8",
+"lab": "Google",
+"release": "2026-09-02",
+"own": 74,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 74
+},
+{
+"writer": "Gemini 4 Argon",
+"lab": "Google",
+"release": "2026-10-13",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "MiniMax M2.5",
+"lab": "MiniMax",
+"release": "2026-02-12",
+"own": 5,
+"anthropic": 35,
+"openai": 22,
+"other": 9,
+"n": 71
+},
+{
+"writer": "MiniMax M3",
+"lab": "MiniMax",
+"release": "2026-05-31",
+"own": 0,
+"anthropic": 1,
+"openai": 72,
+"other": 2,
+"n": 75
+},
+{
+"writer": "MiniMax M3.1 Flash",
+"lab": "MiniMax",
+"release": "2026-10-18",
+"own": 0,
+"anthropic": 0,
+"openai": 74,
+"other": 1,
+"n": 75
+},
+{
+"writer": "Mistral Large 3",
+"lab": "Mistral",
+"release": "2025-12-01",
+"own": 67,
+"anthropic": 0,
+"openai": 0,
+"other": 6,
+"n": 73
+},
+{
+"writer": "Kimi K2 (0905)",
+"lab": "Moonshot",
+"release": "2025-09-04",
+"own": 43,
+"anthropic": 26,
+"openai": 3,
+"other": 3,
+"n": 75
+},
+{
+"writer": "Kimi K2.5",
+"lab": "Moonshot",
+"release": "2026-01-27",
+"own": 70,
+"anthropic": 1,
+"openai": 2,
+"other": 2,
+"n": 75
+},
+{
+"writer": "Kimi K2.6",
+"lab": "Moonshot",
+"release": "2026-04-20",
+"own": 58,
+"anthropic": 0,
+"openai": 6,
+"other": 11,
+"n": 75
+},
+{
+"writer": "Kimi K3",
+"lab": "Moonshot",
+"release": "2026-07-16",
+"own": 0,
+"anthropic": 73,
+"openai": 2,
+"other": 0,
+"n": 75
+},
+{
+"writer": "GPT-5.4",
+"lab": "OpenAI",
+"release": "2026-03-05",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "GPT-5.6 Sol",
+"lab": "OpenAI",
+"release": "2026-07-09",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "GPT-6 Astra",
+"lab": "OpenAI",
+"release": "2026-09-04",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "GPT-6.1 Sol",
+"lab": "OpenAI",
+"release": "2026-09-29",
+"own": 75,
+"anthropic": 0,
+"openai": 0,
+"other": 0,
+"n": 75
+},
+{
+"writer": "GLM-4.5",
+"lab": "Zhipu",
+"release": "2025-07-25",
+"own": 4,
+"anthropic": 30,
+"openai": 0,
+"other": 40,
+"n": 74
+},
+{
+"writer": "GLM-4.7",
+"lab": "Zhipu",
+"release": "2025-12-22",
+"own": 19,
+"anthropic": 13,
+"openai": 1,
+"other": 39,
+"n": 72
+},
+{
+"writer": "GLM-5.1",
+"lab": "Zhipu",
+"release": "2026-04-07",
+"own": 8,
+"anthropic": 25,
+"openai": 0,
+"other": 40,
+"n": 73
+},
+{
+"writer": "GLM-5.3",
+"lab": "Zhipu",
+"release": "2026-08-18",
+"own": 0,
+"anthropic": 70,
+"openai": 4,
+"other": 1,
+"n": 75
+},
+{
+"writer": "Grok 4.7",
+"lab": "xAI",
+"release": "2026-09-21",
+"own": 4,
+"anthropic": 1,
+"openai": 70,
+"other": 0,
+"n": 75
+}
+],
+"events": [
+{
+"name": "OpenAI memo",
+"date": "2026-02-12",
+"labs": [
+"DeepSeek"
+]
+},
+{
+"name": "Anthropic",
+"date": "2026-02-23",
+"labs": [
+"DeepSeek",
+"Moonshot",
+"MiniMax"
+]
+},
+{
+"name": "Musk testimony",
+"date": "2026-04-30",
+"labs": [
+"xAI"
+]
+},
+{
+"name": "Anthropic (Sep)",
+"date": "2026-09",
+"labs": [
+"Moonshot",
+"Zhipu",
+"Alibaba",
+"DeepSeek",
+"MiniMax"
+]
+}
+]
+}

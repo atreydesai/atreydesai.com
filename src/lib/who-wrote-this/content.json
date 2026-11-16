@@ -1,0 +1,763 @@
+{
+ "_about": "Strings for the redesigned page (native site route). Text is paper text; src is the paper file it comes from. Examples are the Claude Fable 5.2 rows of paper/tables/minjoon-agent_attribution_examples.tex; the Nature review row is left out because it names a reviewer. Control labels that are not paper text are listed in ui_exempt.",
+ "meta": {
+  "title": {
+   "t": "Who wrote this?",
+   "src": "paper/sections/01_abstract.tex"
+  },
+  "deck": {
+   "t": "Frontier models need only one text to unmask its human or AI author",
+   "src": "paper/main.tex"
+  },
+  "date": "2026-11-16",
+  "authors": [
+   {
+    "name": "Atrey Desai",
+    "aff": [
+     "umd"
+    ],
+    "equal": true
+   },
+   {
+    "name": "Deniz Bölöni-Turgut",
+    "aff": [
+     "umd"
+    ],
+    "equal": true,
+    "corresponding": true
+   },
+   {
+    "name": "Ty Brassington",
+    "aff": [
+     "sfu"
+    ],
+    "equal": true
+   },
+   {
+    "name": "Minjoon Choi",
+    "aff": [
+     "umd"
+    ],
+    "equal": true
+   },
+   {
+    "name": "Jenna Russell",
+    "aff": [
+     "umd"
+    ],
+    "equal": true
+   },
+   {
+    "name": "Rishanth Rajendhran",
+    "aff": [
+     "umd"
+    ],
+    "equal": true
+   },
+   {
+    "name": "Bradley Emi",
+    "aff": [
+     "pangram"
+    ]
+   },
+   {
+    "name": "Hila Gonen",
+    "aff": [
+     "ubc"
+    ]
+   },
+   {
+    "name": "Hal Daumé III",
+    "aff": [
+     "umd"
+    ]
+   },
+   {
+    "name": "John Wieting",
+    "aff": [
+     "gdm"
+    ]
+   },
+   {
+    "name": "Marzena Karpinska",
+    "aff": [
+     "sfu"
+    ]
+   },
+   {
+    "name": "Mohit Iyyer",
+    "aff": [
+     "umd"
+    ],
+    "corresponding": true
+   }
+  ],
+  "authors_src": "paper/main.tex icmlauthorlist (order, equal marks, affiliations, corresponding authors)",
+  "affiliations": [
+   {
+    "key": "umd",
+    "t": "University of Maryland"
+   },
+   {
+    "key": "sfu",
+    "t": "Simon Fraser University"
+   },
+   {
+    "key": "pangram",
+    "t": "Pangram Labs"
+   },
+   {
+    "key": "ubc",
+    "t": "University of British Columbia and Canada CIFAR AI Chair, Amii"
+   },
+   {
+    "key": "gdm",
+    "t": "Google DeepMind"
+   }
+  ],
+  "equal_note": "Equal contribution",
+  "corresponding_note": "Corresponding authors",
+  "links": [
+   {
+    "id": "paper",
+    "t": "Paper",
+    "href": "#PAPER_URL",
+    "icon": "paper"
+   },
+   {
+    "id": "code",
+    "t": "Code",
+    "href": "https://github.com/denizbt/unmasking_authors",
+    "icon": "github"
+   },
+   {
+    "id": "thread",
+    "t": "Thread",
+    "href": "#THREAD_URL",
+    "icon": "x"
+   }
+  ]
+ },
+ "lede": [
+  {
+   "t": "In May 2026, the eventual winner of the Commonwealth Short Story Prize was accused of using AI to write their story.",
+   "src": "paper/sections/02_introduction.tex"
+  },
+  {
+   "t": "Granta, the literary magazine that published the story, was widely mocked for the naivety of its investigation: it simply asked Claude whether AI had written the story.",
+   "src": "paper/sections/02_introduction.tex"
+  },
+  {
+   "t": "In this paper, we show that Granta was not naive, but just a few months early.",
+   "src": "paper/sections/02_introduction.tex"
+  },
+  {
+   "t": "Frontier models now identify AI text as well as specialized detectors like Pangram, and they go much further: given a single text, with no web search or list of candidates, they can often name the lab behind an AI-generated text, or even the specific person who wrote a human one.",
+   "src": "paper/sections/02_introduction.tex"
+  }
+ ],
+ "hero": {
+  "ask": "Who wrote this?",
+  "model": "Claude Fable 5.2",
+  "without": [
+   {
+    "icon": "web",
+    "t": "No web access"
+   },
+   {
+    "icon": "tools",
+    "t": "No tools"
+   },
+   {
+    "icon": "list",
+    "t": "No candidate lists"
+   },
+   {
+    "icon": "files",
+    "t": "No writing samples"
+   }
+  ],
+  "without_line": {
+   "t": "No web access, tools, candidate lists, or writing samples",
+   "src": "paper/sections/01_abstract.tex"
+  },
+  "caption": {
+   "t": "Frontier models can answer “who wrote this?” at three increasingly specific levels",
+   "src": "paper/sections/01_abstract.tex"
+  },
+  "columns": [
+   {
+    "rq": 1,
+    "target": "human-or-ai",
+    "title": "Human or AI?",
+    "source": "Story from TwiceTold",
+    "answers": [
+     {
+      "icon": "bulb",
+      "label": "Ideas",
+      "verdict": "AI",
+      "note": "90% AI"
+     },
+     {
+      "icon": "pen",
+      "label": "Prose",
+      "verdict": "Human",
+      "note": "10% AI"
+     }
+    ],
+    "stats": [
+     {
+      "v": "97%",
+      "t": "Who had the ideas"
+     },
+     {
+      "v": "94%",
+      "t": "Who wrote the prose"
+     }
+    ],
+    "stat_note": "860-document sample",
+    "src": "paper/tables/minjoon-agent_attribution_examples.tex (example); paper/figures/data/figure1.json (97, 94)"
+   },
+   {
+    "rq": 2,
+    "target": "which-ai",
+    "title": "If AI, which AI?",
+    "source": "AI story from StoryScope",
+    "answers": [
+     {
+      "icon": "google",
+      "label": "Developer",
+      "verdict": "Google"
+     },
+     {
+      "icon": "ai",
+      "label": "Model",
+      "verdict": "Gemini 3 Flash",
+      "note": "Confidence 40%"
+     }
+    ],
+    "stats": [
+     {
+      "v": "99–100%",
+      "t": "names the correct lab",
+      "logos": [
+       "anthropic",
+       "google",
+       "openai"
+      ]
+     }
+    ],
+    "src": "paper/tables/minjoon-agent_attribution_examples.tex (example, confidence 40%); paper/figures/data/figure1.json (Anthropic 99, Google 100, OpenAI 100: correct lab); 'name the correct lab' from paper/sections/02_introduction.tex"
+   },
+   {
+    "rq": 3,
+    "target": "which-human",
+    "title": "If human, which human?",
+    "source": "Human story: Lost Child",
+    "answers": [
+     {
+      "icon": "human",
+      "label": "Author",
+      "verdict": "Joyce Carol Oates",
+      "note": "Confidence 93%"
+     }
+    ],
+    "stats": [
+     {
+      "v": "100%",
+      "t": "stories by authors with over 10k ratings"
+     }
+    ],
+    "src": "paper/tables/minjoon-agent_attribution_examples.tex (example); paper/sections/06_discussion.tex (Fable 5.2 identifies 100% by authors with over 10k ratings); Oates: 538,780 Goodreads ratings in paper/figures/data/rq3_goodreads_authors.csv"
+   }
+  ],
+  "punchline": {
+   "v": "55%",
+   "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public",
+   "src": "paper/sections/01_abstract.tex"
+  },
+  "steps": [
+   {
+    "id": "text",
+    "t": "One text"
+   },
+   {
+    "id": "rq1",
+    "t": "Human or AI?"
+   },
+   {
+    "id": "rq2",
+    "t": "If AI, which AI?"
+   },
+   {
+    "id": "rq3",
+    "t": "If human, which human?"
+   }
+  ]
+ },
+ "sections": [
+  {
+   "id": "human-or-ai",
+   "n": 1,
+   "rq": 1,
+   "title": "Human or AI?",
+   "takeaway": {
+    "t": "Frontier models can detect AI prose and ideas",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "context": [
+    {
+     "t": "We define a document's ideas as what its author decided to say (e.g., its claims, events, and organization), as opposed to the words used to say it (its prose).",
+     "src": "paper/sections/03_rq1_ai_vs_human.tex"
+    }
+   ],
+   "example": {
+    "source": "A person wrote, in their own words, from a model's ideas",
+    "caption": {
+     "t": "Claude Fable 5.2 bases each decision on concrete evidence",
+     "src": "paper/tables/minjoon-agent_attribution_examples.tex"
+    },
+    "text": [
+     {
+      "t": "The most meaningful light is that which is provided in moments of need.",
+      "cue": "rose"
+     },
+     {
+      "t": " […] "
+     },
+     {
+      "t": "From that day on,",
+      "cue": "teal"
+     },
+     {
+      "t": " travelers to the forest always saw two lights […] the lantern never again "
+     },
+     {
+      "t": "mistook greatness with size",
+      "cue": "clay"
+     },
+     {
+      "t": "."
+     }
+    ],
+    "judgments": [
+     {
+      "id": "ideas",
+      "icon": "bulb",
+      "label": "Ideas",
+      "verdict": "AI",
+      "share": "90% AI",
+      "cues": [
+       "rose",
+       "teal"
+      ],
+      "explanation": [
+       {
+        "t": "The deciding factor is the concentration of stock choices: […] and the "
+       },
+       {
+        "t": "stated moral",
+        "cue": "rose"
+       },
+       {
+        "t": " with a "
+       },
+       {
+        "t": "“from that day on” coda",
+        "cue": "teal"
+       },
+       {
+        "t": "."
+       }
+      ]
+     },
+     {
+      "id": "prose",
+      "icon": "pen",
+      "label": "Prose",
+      "verdict": "Human",
+      "share": "10% AI",
+      "cues": [
+       "clay"
+      ],
+      "explanation": [
+       {
+        "t": "The deciding factors are the "
+       },
+       {
+        "t": "non-idiomatic and ungrammatical slips: “mistook greatness with size”",
+        "cue": "clay"
+       }
+      ]
+     }
+    ],
+    "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1)"
+   },
+   "cases_intro": {
+    "t": "A document's prose and ideas can each come from a person or an AI model, giving the following four cases:",
+    "src": "paper/sections/03_rq1_ai_vs_human.tex"
+   },
+   "cases": [
+    {
+     "ideas": "human",
+     "prose": "human",
+     "t": "Fully human",
+     "def": "A person wrote the prose and came up with the ideas.",
+     "ideas_v": 100,
+     "prose_v": 100
+    },
+    {
+     "ideas": "ai",
+     "prose": "human",
+     "t": "AI ideas, human prose",
+     "def": "A person wrote, in their own words, from a model's ideas.",
+     "ideas_v": 98,
+     "prose_v": 100,
+     "example": true
+    },
+    {
+     "ideas": "ai",
+     "prose": "ai",
+     "t": "Fully AI",
+     "def": "A model wrote the prose and came up with the ideas.",
+     "ideas_v": 89,
+     "prose_v": 97
+    },
+    {
+     "ideas": "human",
+     "prose": "ai",
+     "t": "Human ideas, AI prose",
+     "def": "A person came up with the ideas, and a model wrote, rewrote, or polished the prose.",
+     "ideas_v": 99,
+     "prose_v": 81
+    }
+   ],
+   "cases_src": "definitions: paper/sections/03_rq1_ai_vs_human.tex itemize; values: paper/tables/rq1_quadrants.tex (Claude Fable 5.2 row; exact counts in paper/figures/data/figure1_fable_sources.json)",
+   "stats_model": "Claude Fable 5.2",
+   "stats_note": "860-document sample, the mean over all four combinations",
+   "stats": [
+    {
+     "v": 97,
+     "t": "Who had the ideas",
+     "icon": "bulb"
+    },
+    {
+     "v": 94,
+     "t": "Who wrote the prose",
+     "icon": "pen"
+    },
+    {
+     "v": 91,
+     "t": "Both correct",
+     "icon": "check2"
+    }
+   ],
+   "climb_title": {
+    "t": "Model accuracy has improved over time.",
+    "src": "paper/sections/03_rq1_ai_vs_human.tex"
+   },
+   "climb": [
+    {
+     "t": "GPT-4o",
+     "year": "2024",
+     "v": 27
+    },
+    {
+     "t": "GPT-5.2",
+     "year": "2025",
+     "v": 59
+    },
+    {
+     "t": "Claude Fable 5.2",
+     "year": "2026",
+     "v": 91
+    }
+   ],
+   "climb_label": "Accuracy on both labels",
+   "detectors": {
+    "t": "On 38K documents from 24 benchmark datasets, Gemini 4 Carbon detects 97% of fully AI-generated texts vs. 96% for Pangram 4, at the same false positive rate (0.01% of English human texts).",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "case_note": "Claude Fable 5.2, 860-document sample"
+  },
+  {
+   "id": "which-ai",
+   "n": 2,
+   "rq": 2,
+   "title": "If AI, which AI?",
+   "takeaway": {
+    "t": "Frontier models can name the lab behind an AI-generated text",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "pending": true
+  },
+  {
+   "id": "which-human",
+   "n": 3,
+   "rq": 3,
+   "title": "If human, which human?",
+   "takeaway": {
+    "t": "Frontier models can name the person who wrote a text",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "pending": true
+  },
+  {
+   "id": "who-can-be-identified",
+   "n": 4,
+   "rq": 0,
+   "title": "Who can be identified?",
+   "takeaway": {
+    "t": "Familiarity with the writer predicts accuracy",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "pending": true
+  },
+  {
+   "id": "anonymity",
+   "n": 5,
+   "rq": 0,
+   "title": "Implications for anonymity",
+   "takeaway": {
+    "t": "Defenses are limited",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   "pending": true
+  }
+ ],
+ "closing": {
+  "t": "Anyone who has published enough writing online can no longer assume that an unsigned text keeps them anonymous.",
+  "src": "paper/sections/08_conclusion.tex"
+ },
+ "ui_exempt": [
+  "Ideas",
+  "Prose",
+  "Both",
+  "Replay",
+  "Steps",
+  "Paper",
+  "Code",
+  "Thread",
+  "Back to blog",
+  "Contents",
+  "All",
+  "2026",
+  "All dates"
+ ],
+ "levels": {
+  "lead": {
+   "t": "Given a single text and a simple zero-shot prompt, frontier models can answer “who wrote this?” at three increasingly specific levels",
+   "src": "paper/sections/01_abstract.tex"
+  },
+  "items": [
+   {
+    "n": 1,
+    "rq": 1,
+    "target": "human-or-ai",
+    "icon": "ai",
+    "t": "Whether an AI or human wrote it",
+    "fact": "The latest models match trained detectors like Pangram while also explaining their predictions in natural language.",
+    "src": "paper/sections/01_abstract.tex"
+   },
+   {
+    "n": 2,
+    "rq": 2,
+    "target": "which-ai",
+    "icon": "openai",
+    "t": "If an AI, which lab",
+    "v": "98%",
+    "fact": "Opus 5.5 names the correct lab for 98% of texts generated by models from Anthropic, OpenAI, and Google.",
+    "src": "paper/sections/01_abstract.tex"
+   },
+   {
+    "n": 3,
+    "rq": 3,
+    "target": "which-human",
+    "icon": "human",
+    "t": "If a human, often exactly who",
+    "v": "55%",
+    "fact": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
+    "src": "paper/sections/01_abstract.tex"
+   }
+  ]
+ },
+ "timeline": {
+  "id": "recent",
+  "title": {
+   "t": "Model accuracy has improved over time.",
+   "src": "paper/sections/03_rq1_ai_vs_human.tex"
+  },
+  "steps": [
+   {
+    "metric": "both",
+    "weights": "all",
+    "draw": [
+     "closed"
+    ],
+    "focus": [
+     "Claude Fable 5.2",
+     "GPT-4o (2024-08-06)",
+     "GPT-5.2"
+    ],
+    "t": "Accuracy on both labels climbed from 27% for GPT-4o in 2024 and 59% for GPT-5.2 in 2025 to 91% for present-day frontier models.",
+    "src": "paper/sections/03_rq1_ai_vs_human.tex"
+   },
+   {
+    "metric": "both",
+    "weights": "all",
+    "draw": [
+     "closed",
+     "open"
+    ],
+    "focus": [
+     "Kimi K3.1 Pro"
+    ],
+    "t": "The best open-weight models still trail, with Kimi K3.1 Pro reaching 63%.",
+    "src": "paper/sections/03_rq1_ai_vs_human.tex"
+   },
+   {
+    "metric": "prose",
+    "weights": "all",
+    "draw": [
+     "closed",
+     "open",
+     "ref"
+    ],
+    "focus": [],
+    "t": "Frontier models are competitive with trained detectors such as Pangram 4 at prose detection.",
+    "src": "paper/sections/03_rq1_ai_vs_human.tex"
+   },
+   {
+    "metric": "ideas",
+    "weights": "all",
+    "draw": [
+     "closed",
+     "open",
+     "ref"
+    ],
+    "focus": [],
+    "t": "On idea detection, they exceed the accuracy of IdeaLens, the only existing state-of-the-art idea detector.",
+    "src": "paper/sections/03_rq1_ai_vs_human.tex"
+   }
+  ],
+  "metrics": [
+   {
+    "id": "both",
+    "t": "Both correct"
+   },
+   {
+    "id": "ideas",
+    "t": "Who had the ideas"
+   },
+   {
+    "id": "prose",
+    "t": "Who wrote the prose"
+   }
+  ],
+  "weights": [
+   {
+    "id": "all",
+    "t": "All"
+   },
+   {
+    "id": "closed",
+    "t": "Closed weights"
+   },
+   {
+    "id": "open",
+    "t": "Open weights"
+   }
+  ],
+  "x_label": "Detector release date",
+  "y_label": "Accuracy (%)",
+  "caption": {
+   "t": "Lines step up at each new best model.",
+   "src": "paper/sections/03_rq1_ai_vs_human.tex (Figure 2 caption)"
+  }
+ },
+ "which_ai": {
+  "id": "which-ai",
+  "n": 2,
+  "rq": 2,
+  "title": "If AI, which AI?",
+  "takeaway": {
+   "t": "Frontier models can name the lab behind an AI-generated text",
+   "src": "paper/sections/02_introduction.tex"
+  },
+  "model": "Claude Fable 5.2",
+  "steps": [
+   {
+    "layout": "labs",
+    "color": false,
+    "t": "We create a dataset of short stories, news articles, and op-eds generated by 34 models from 11 labs.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   {
+    "layout": "labs",
+    "color": true,
+    "t": "Fable 5.2, Opus 5.5 and Argon can identify text from OpenAI, Anthropic, and Google with 98% accuracy or more.",
+    "src": "paper/sections/04_rq2_ai_vs_ai.tex"
+   },
+   {
+    "layout": "labs",
+    "color": true,
+    "focus": [
+     "Kimi K3",
+     "GLM-5.3",
+     "Qwen3.8 27B",
+     "Qwen Max",
+     "MiniMax M3",
+     "MiniMax M3.1 Flash",
+     "Grok 4.7"
+    ],
+    "t": "Moonshot's Kimi K3 is usually mistaken for Claude, and Alibaba's Qwen3.8 models for GPT.",
+    "src": "paper/sections/02_introduction.tex"
+   },
+   {
+    "layout": "time",
+    "color": true,
+    "t": "Later reports name Kimi K3 and GLM-5.3, and date campaigns against Claude shortly before their release.",
+    "src": "paper/sections/09_appendix.tex (app:md_distill)"
+   }
+  ],
+  "legend": [
+   {
+    "k": "own",
+    "t": "Writer's own lab"
+   },
+   {
+    "k": "anthropic",
+    "t": "Anthropic"
+   },
+   {
+    "k": "openai",
+    "t": "OpenAI"
+   },
+   {
+    "k": "other",
+    "t": "Other lab"
+   }
+  ],
+  "legend_src": "paper/figures/ty_rq2_distill_fable.pdf legend",
+  "caption": {
+   "t": "Claude Fable 5.2 recognizes most texts from earlier Kimi and Qwen releases, but attributes nearly every Kimi K3 and GLM-5.3 text to Claude and most Qwen3.8 27B and Grok 4.7 texts to GPT.",
+   "src": "paper/sections/09_appendix.tex (fig:md_distill_cols caption)"
+  },
+  "profiles": {
+   "OpenAI": {
+    "name": "GPT",
+    "t": "GPT hedges its claims, flags gaps instead of inventing specifics, and leans on aphorisms."
+   },
+   "Anthropic": {
+    "name": "Claude",
+    "t": "Claude treats opposing views charitably, writes with dry wit, and ends quietly."
+   },
+   "Google": {
+    "name": "Gemini",
+    "t": "Gemini stacks adjectives and piles on intensifiers and stock clichés, and invents named sources and quotes in its news articles."
+   }
+  },
+  "profiles_src": "paper/sections/04_rq2_ai_vs_ai.tex",
+  "x_label": "Release date"
+ }
+}

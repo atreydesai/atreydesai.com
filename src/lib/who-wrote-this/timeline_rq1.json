@@ -1,0 +1,628 @@
+{
+"source": "paper/figures/data/rq1_points.json via Figure 2's filter (results_figures.rq1_points)",
+"sample": "860-document sample",
+"refs": {
+"prose": {
+"t": "Pangram 4",
+"v": 97.7
+},
+"ideas": {
+"t": "IdeaLens",
+"v": 86.3
+}
+},
+"models": [
+{
+"model": "Llama 3.1 70B Instruct",
+"lab": "Meta",
+"line": "open",
+"release": "2024-07-23",
+"prose": 39.9,
+"ideas": 49.0,
+"both": 19.5
+},
+{
+"model": "Mistral Large 2 (2407)",
+"lab": "Mistral",
+"line": "open",
+"release": "2024-07-24",
+"prose": 50.5,
+"ideas": 51.6,
+"both": 25.0
+},
+{
+"model": "GPT-4o (2024-08-06)",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2024-08-06",
+"prose": 55.1,
+"ideas": 53.8,
+"both": 27.2
+},
+{
+"model": "Hermes 3 405B",
+"lab": "Meta",
+"line": "open",
+"release": "2024-08-15",
+"prose": 46.2,
+"ideas": 51.1,
+"both": 23.6
+},
+{
+"model": "Qwen2.5-72B Instruct",
+"lab": "Qwen",
+"line": "open",
+"release": "2024-09-19",
+"prose": 48.0,
+"ideas": 50.1,
+"both": 24.4
+},
+{
+"model": "QwQ-32B-Preview",
+"lab": "Qwen",
+"line": "open",
+"release": "2024-11-27",
+"prose": 33.6,
+"ideas": 37.7,
+"both": 20.3
+},
+{
+"model": "DeepSeek V3",
+"lab": "DeepSeek",
+"line": "open",
+"release": "2024-12-26",
+"prose": 57.5,
+"ideas": 49.9,
+"both": 27.8
+},
+{
+"model": "o3",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2025-04-16",
+"prose": 89.7,
+"ideas": 78.8,
+"both": 54.0
+},
+{
+"model": "Qwen3 32B",
+"lab": "Qwen",
+"line": "open",
+"release": "2025-04-29",
+"prose": 56.1,
+"ideas": 53.5,
+"both": 31.0
+},
+{
+"model": "DeepSeek R1-0528",
+"lab": "DeepSeek",
+"line": "open",
+"release": "2025-05-28",
+"prose": 66.3,
+"ideas": 57.7,
+"both": 37.8
+},
+{
+"model": "Gemini 2.5 Pro",
+"lab": "Google",
+"line": "closed",
+"release": "2025-06-17",
+"prose": 83.8,
+"ideas": 69.3,
+"both": 45.7
+},
+{
+"model": "Kimi K2 (0711)",
+"lab": "Moonshot",
+"line": "open",
+"release": "2025-07-12",
+"prose": 79.3,
+"ideas": 64.5,
+"both": 39.8
+},
+{
+"model": "Qwen3-235B-A22B Thinking 2507",
+"lab": "Qwen",
+"line": "open",
+"release": "2025-07-25",
+"prose": 52.1,
+"ideas": 53.9,
+"both": 30.1
+},
+{
+"model": "GPT-5",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2025-08-07",
+"prose": 87.5,
+"ideas": 68.9,
+"both": 51.4
+},
+{
+"model": "Claude Sonnet 4.5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2025-09-29",
+"prose": 89.7,
+"ideas": 75.0,
+"both": 53.9
+},
+{
+"model": "GLM-4.6",
+"lab": "Z.ai",
+"line": "open",
+"release": "2025-09-30",
+"prose": 87.5,
+"ideas": 77.0,
+"both": 51.9
+},
+{
+"model": "Claude Haiku 4.5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2025-10-15",
+"prose": 75.8,
+"ideas": 61.4,
+"both": 40.7
+},
+{
+"model": "GPT-5.1",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2025-11-13",
+"prose": 88.9,
+"ideas": 70.9,
+"both": 50.8
+},
+{
+"model": "Claude Opus 4.5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2025-11-24",
+"prose": 90.3,
+"ideas": 72.3,
+"both": 51.5
+},
+{
+"model": "GPT-5.2",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2025-12-11",
+"prose": 92.1,
+"ideas": 80.0,
+"both": 58.6
+},
+{
+"model": "Gemini 3 Flash",
+"lab": "Google",
+"line": "closed",
+"release": "2025-12-17",
+"prose": 95.3,
+"ideas": 79.2,
+"both": 54.3
+},
+{
+"model": "GLM-4.7",
+"lab": "Z.ai",
+"line": "open",
+"release": "2025-12-22",
+"prose": 88.4,
+"ideas": 76.5,
+"both": 52.3
+},
+{
+"model": "Claude Opus 4.6",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-02-05",
+"prose": 94.9,
+"ideas": 70.3,
+"both": 58.8
+},
+{
+"model": "GLM-5",
+"lab": "Z.ai",
+"line": "open",
+"release": "2026-02-11",
+"prose": 91.8,
+"ideas": 82.8,
+"both": 55.5
+},
+{
+"model": "Qwen3.5 397B-A17B",
+"lab": "Qwen",
+"line": "open",
+"release": "2026-02-16",
+"prose": 89.9,
+"ideas": 82.5,
+"both": 49.5
+},
+{
+"model": "Claude Sonnet 4.6",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-02-17",
+"prose": 95.5,
+"ideas": 75.3,
+"both": 60.2
+},
+{
+"model": "Gemini 3.1 Pro",
+"lab": "Google",
+"line": "closed",
+"release": "2026-02-19",
+"prose": 94.4,
+"ideas": 76.3,
+"both": 60.7
+},
+{
+"model": "Qwen3.5 27B",
+"lab": "Qwen",
+"line": "open",
+"release": "2026-02-24",
+"prose": 87.8,
+"ideas": 75.3,
+"both": 48.5
+},
+{
+"model": "GPT-5.4",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-03-05",
+"prose": 93.6,
+"ideas": 80.1,
+"both": 61.4
+},
+{
+"model": "GLM-5.1",
+"lab": "Z.ai",
+"line": "open",
+"release": "2026-04-07",
+"prose": 91.5,
+"ideas": 79.5,
+"both": 54.1
+},
+{
+"model": "Qwen3.6 27B",
+"lab": "Qwen",
+"line": "open",
+"release": "2026-04-15",
+"prose": 87.7,
+"ideas": 74.0,
+"both": 49.3
+},
+{
+"model": "Claude Opus 4.7",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-04-16",
+"prose": 94.9,
+"ideas": 73.3,
+"both": 62.4
+},
+{
+"model": "GPT-5.5",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-04-24",
+"prose": 97.1,
+"ideas": 83.1,
+"both": 67.5
+},
+{
+"model": "Gemini 3.1 Flash-Lite",
+"lab": "Google",
+"line": "closed",
+"release": "2026-05-07",
+"prose": 77.9,
+"ideas": 74.2,
+"both": 40.0
+},
+{
+"model": "Claude Opus 4.8",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-05-28",
+"prose": 94.9,
+"ideas": 72.6,
+"both": 59.7
+},
+{
+"model": "MiniMax M3",
+"lab": "MiniMax",
+"line": "open",
+"release": "2026-06-01",
+"prose": 94.4,
+"ideas": 82.4,
+"both": 54.8
+},
+{
+"model": "Claude Fable 5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-06-09",
+"prose": 97.8,
+"ideas": 81.0,
+"both": 74.9
+},
+{
+"model": "Claude Sonnet 5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-06-30",
+"prose": 96.4,
+"ideas": 78.5,
+"both": 58.4
+},
+{
+"model": "GPT-5.6 Sol",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-07-09",
+"prose": 98.2,
+"ideas": 86.3,
+"both": 67.2
+},
+{
+"model": "GPT-5.6 Terra",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-07-09",
+"prose": 97.2,
+"ideas": 78.5,
+"both": 60.0
+},
+{
+"model": "GPT-5.6 Luna",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-07-09",
+"prose": 94.9,
+"ideas": 77.8,
+"both": 53.4
+},
+{
+"model": "Gemini 3.6 Flash",
+"lab": "Google",
+"line": "closed",
+"release": "2026-07-21",
+"prose": 95.6,
+"ideas": 75.5,
+"both": 54.2
+},
+{
+"model": "Gemini 3.5 Flash-Lite",
+"lab": "Google",
+"line": "closed",
+"release": "2026-07-21",
+"prose": 84.8,
+"ideas": 73.8,
+"both": 42.7
+},
+{
+"model": "Claude Opus 5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-07-24",
+"prose": 97.4,
+"ideas": 75.2,
+"both": 69.1
+},
+{
+"model": "DeepSeek V4 Flash 0731",
+"lab": "DeepSeek",
+"line": "open",
+"release": "2026-07-31",
+"prose": 87.4,
+"ideas": 72.2,
+"both": 51.9
+},
+{
+"model": "Meta Muse Spark 1.2 Contributor",
+"lab": "Meta",
+"line": "closed",
+"release": "2026-08-05",
+"prose": 93.2,
+"ideas": 78.1,
+"both": 61.1
+},
+{
+"model": "Qwen3.8 2.4T-A95B",
+"lab": "Qwen",
+"line": "open",
+"release": "2026-08-12",
+"prose": 93.7,
+"ideas": 72.5,
+"both": 54.4
+},
+{
+"model": "DeepSeek V4 Pro 0813",
+"lab": "DeepSeek",
+"line": "open",
+"release": "2026-08-13",
+"prose": 94.4,
+"ideas": 77.0,
+"both": 57.6
+},
+{
+"model": "Qwen3.8 27B xhigh",
+"lab": "Qwen",
+"line": "open",
+"release": "2026-08-14",
+"prose": 94.6,
+"ideas": 73.4,
+"both": 56.0
+},
+{
+"model": "GLM-5.3",
+"lab": "Z.ai",
+"line": "open",
+"release": "2026-08-18",
+"prose": 95.9,
+"ideas": 76.2,
+"both": 59.9
+},
+{
+"model": "Claude Fable 5.1",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-09-01",
+"prose": 98.2,
+"ideas": 84.7,
+"both": 78.7
+},
+{
+"model": "Gemini 3.8 Flash",
+"lab": "Google",
+"line": "closed",
+"release": "2026-09-02",
+"prose": 95.1,
+"ideas": 70.3,
+"both": 51.8
+},
+{
+"model": "Meta Muse Spark 1.3",
+"lab": "Meta",
+"line": "closed",
+"release": "2026-09-02",
+"prose": 91.9,
+"ideas": 74.9,
+"both": 56.1
+},
+{
+"model": "GPT-6 Astra",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-09-03",
+"prose": 98.9,
+"ideas": 91.5,
+"both": 85.9
+},
+{
+"model": "DeepSeek V4.1 Flash (Sept build)",
+"lab": "DeepSeek",
+"line": "open",
+"release": "2026-09-09",
+"prose": 94.2,
+"ideas": 78.2,
+"both": 57.6
+},
+{
+"model": "Claude Opus 5.5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-09-22",
+"prose": 97.9,
+"ideas": 87.0,
+"both": 81.1
+},
+{
+"model": "GPT-6 Luna",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-09-22",
+"prose": 95.7,
+"ideas": 83.0,
+"both": 60.0
+},
+{
+"model": "Claude Sonnet 5.5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-09-28",
+"prose": 95.9,
+"ideas": 78.3,
+"both": 69.1
+},
+{
+"model": "GPT-6.1 Sol",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-09-29",
+"prose": 99.1,
+"ideas": 90.0,
+"both": 83.7
+},
+{
+"model": "Claude Haiku 5.5",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-10-07",
+"prose": 92.4,
+"ideas": 71.2,
+"both": 53.5
+},
+{
+"model": "Gemini 4 Argon",
+"lab": "Google",
+"line": "closed",
+"release": "2026-10-13",
+"prose": 98.2,
+"ideas": 79.5,
+"both": 73.5
+},
+{
+"model": "Kimi K3.1 Pro",
+"lab": "Moonshot",
+"line": "open",
+"release": "2026-10-15",
+"prose": 96.9,
+"ideas": 78.6,
+"both": 62.9
+},
+{
+"model": "Nemotron 3.5",
+"lab": "NVIDIA",
+"line": "open",
+"release": "2026-10-15",
+"prose": 78.4,
+"ideas": 56.5,
+"both": 34.9
+},
+{
+"model": "Beam 1.0 (501B-A23B)",
+"lab": "Reflection",
+"line": "open",
+"release": "2026-10-16",
+"prose": 91.9,
+"ideas": 77.9,
+"both": 62.1
+},
+{
+"model": "DeepSeek V4.1 Flash 1017",
+"lab": "DeepSeek",
+"line": "open",
+"release": "2026-10-17",
+"prose": 87.6,
+"ideas": 72.9,
+"both": 55.5
+},
+{
+"model": "GPT-6.1 Terra",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-10-26",
+"prose": 98.0,
+"ideas": 81.4,
+"both": 73.7
+},
+{
+"model": "Claude Fable 5.2",
+"lab": "Anthropic",
+"line": "closed",
+"release": "2026-11-09",
+"prose": 98.3,
+"ideas": 96.6,
+"both": 91.4
+},
+{
+"model": "Gemini 4 Carbon",
+"lab": "Google",
+"line": "closed",
+"release": "2026-11-10",
+"prose": 98.0,
+"ideas": 88.3,
+"both": 82.4
+}
+]
+}

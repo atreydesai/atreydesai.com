@@ -48,6 +48,8 @@
   // Transitions are a desktop-pointer nicety; on touch they compete with the
   // platform's own back-swipe animation.
   $: animatePages = PAGE_TRANSITIONS_ENABLED && !isTouch && !reducedMotion;
+  // Feature pages that bring their own chrome and theme (the paper launch page) hide the site header and footer.
+  $: takeover = data.pathname?.startsWith("/blog/who-wrote-this/");
 
   // A shared run links straight into its game (?play=stack): the arcade
   // opens on it, and the link tidies itself out of the address bar so a
@@ -182,7 +184,7 @@
     Skip to content
   </a>
 
-  <Header />
+  {#if !takeover}<Header />{/if}
 
   <!-- One stable <main> landmark holds the skip-link target; only the layer
        inside it is keyed on the route. The two layers overlap in a single
@@ -213,7 +215,7 @@
     {/if}
   </main>
 
-  <Footer />
+  {#if !takeover}<Footer />{/if}
 </div>
 
 <!-- The boba arcade: the homepage boba opens its menu, Konami opens catch. -->
