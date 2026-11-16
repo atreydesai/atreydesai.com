@@ -14,6 +14,7 @@
 	import { field, chart, type Mark, type Path } from "./field.svelte";
 	import { LAB, GRAY } from "./palette";
 	import S from "./which_ai.json";
+	import { printSprite, printAspect } from "./print/sprites";
 	import R from "./rq2_writers.json";
 
 	type W = (typeof R.writers)[number];
@@ -97,10 +98,21 @@
 		for (const q of STACK) { if (q === k) n = Math.max(0, a + w[q] - Math.max(a, from)); a += w[q]; }
 		return n * 2 > w.n - from;
 	}
+	// each tile is a small fingerprint (the hero's own patterns): before colour, the text's true lab's print in gray;
+	// with colour, the print of the lab Claude Fable 5.2 named, in that lab's colour, the fingerprint Fable saw
+	const HERO_LABS = ["Anthropic", "OpenAI", "Google", "Alibaba", "DeepSeek", "Moonshot", "Zhipu", "MiniMax", "Mistral", "xAI", "Cohere"];
+	const ASPECT = printAspect();
+	function tileSprite(w: W, k: K, color: boolean, px: number) {
+		const lab = !color || k === "own" ? w.lab : k === "anthropic" ? "Anthropic" : k === "openai" ? "OpenAI" : null;
+		const ink = color ? COL[k] : UNLIT;
+		const sprite = lab ? printSprite({ family: "lab", index: Math.max(0, HERO_LABS.indexOf(lab)), color: ink, px }) : printSprite({ family: "main", color: ink, px });
+		return { sprite, spriteKey: `${lab ?? "other"}|${ink}|${px}` };
+	}
 	function tiles(marks: Mark[], p: Pile, color: boolean, alpha: number) {
 		let i = 0;
+		const px = Math.max(6, Math.round(p.s * 0.94));
 		for (const k of STACK) for (let j = 0; j < p.w[k]; j++, i++)
-			marks.push({ id: `${p.w.writer}#${i}`, group: p.w.writer, square: true, x: p.left + (i % p.c) * p.s + p.s / 2, y: p.bottom - Math.floor(i / p.c) * p.s - p.s / 2, r: p.s * 0.42, color: color ? COL[k] : UNLIT, alpha });
+			marks.push({ id: `${p.w.writer}#${i}`, group: p.w.writer, square: true, ...tileSprite(p.w, k, color, px), aspect: ASPECT, backing: color ? 0.34 : 0.22, x: p.left + (i % p.c) * p.s + p.s / 2, y: p.bottom - Math.floor(i / p.c) * p.s - p.s / 2, r: px / 2, color: color ? COL[k] : UNLIT, alpha });
 	}
 	const pileRect = (p: Pile): Rect => { const h = Math.ceil(p.w.n / p.c) * p.s; return { x: p.left, y: p.bottom - h, w: p.c * p.s, h }; };
 	const labelRect = (l: Label, font: string, lh: number): Rect => {

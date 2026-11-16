@@ -253,6 +253,7 @@ type Item = {
 	cap: number; // the tallest its sprite may be, device px
 	lensPx: number; lensFont: string; // the last face set for it in the lens
 	hit: { id: string };
+	fo: number; // 0..1: how far it has come forward as the print being inspected
 	rest: Pose; // where it sits and how present it is, for the frame just drawn
 };
 
@@ -317,7 +318,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 
 	const make = (id: string, sp: Spec, gap: number, color: string, text = body): Item => ({
 		id, spec: sp, gap, color, rgb: hexRgb(color), text, offset: Math.floor(R0() * text.length), phase: R0() * TAU,
-		lines: false, edge: 1, cap: 2600, lensPx: 0, lensFont: "", hit: { id }, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
+		lines: false, edge: 1, cap: 2600, lensPx: 0, lensFont: "", hit: { id }, fo: 0, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
 		rest: { x: 0, y: 0, r: 0, rot: 0, a: 0 },
 	});
 
@@ -331,6 +332,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	const lit = make("lit", patternSpec("lit", 0, seed), 5.8, C.lit, litBody);
 	lit.offset = 0;
 	const cast = [main, human, ai, lit, ...labs];
+	const byId = new Map<string, Item>();
+	for (const it of [...cast, ...crowd]) byId.set(it.id, it);
 	let litIndex = -1;
 
 	let e = -1; // eased level
@@ -341,13 +344,19 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	const drawn: Item[] = [];
 	let poseE = NaN, poseL: Layout | null = null;
 	let active = true, dirty = false; // busy(): something is still moving; something changed between frames
-	let lastPX = NaN, lastPY = NaN;
+	let lastPX = NaN, lastPY = NaN, anyFo = false;
+	let aimX = 0, aimY = 0; // where the glass looks, relative to where it sits
 	let stillNow = true, dprNow = 1;
 	// breathing: each print drifts a hair on its own clock. The clock ticks 20 times a second, so when breathing is the
 	// only motion two frames in three have nothing new to draw; it stops when the art is off stage or motion is reduced.
 	const BREATH_HZ = 20;
 	let breathTick = 0, bt = 0, breathing = false;
-	const swell = (it: Item) => (breathing ? 1 + 0.007 * Math.sin(bt * 0.55 + it.phase) : 1);
+	const swell = (it: Item) => (breathing ? 1 + 0.007 * Math.sin(bt * 0.55 + it.phase) : 1) * (1 + 0.04 * it.fo);
+	// inspection: the print under the lens comes forward to full ink and lifts a little, the others step back
+	let focusItem: Item | null = null, focusTwin: Item | null = null, dim = 0;
+	const RECEDE = 0.6;
+	const inkOf = (it: Item) => { const a = it.rest.a; return a * lerp(1 - (1 - RECEDE) * dim, 1, it.fo) + it.fo * (1 - a) * ss(0.1, 0.4, a); };
+	let lensR = 0, lensShown = false;
 	const sway = (it: Item) => (breathing ? 0.008 * Math.sin(bt * 0.37 + it.phase * 1.7) : 0);
 	let disposed = false;
 	let lastGoal = 0, leap: { from: number; to: number; t: number; dur: number } | null = null;
@@ -360,7 +369,9 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		// the ridge gap is fixed in px, so smaller prints have fewer, bolder ridges; quantised so a resize rarely retraces
 		const want = it.gap / Math.max(8, it.full);
 		const q = Math.pow(1.18, Math.round(Math.log(want) / Math.log(1.18)));
-		if (it.ridges && it.ds === q) return;
+		// ridges already traced are kept unless the print's size has changed a good deal (two steps): a stage that settles
+		// a little larger or smaller re-sets the sprite from the same ridges
+		if (it.ridges && Math.abs(Math.log(q / it.ds)) < 0.36) return;
 		it.ds = q;
 		it.field = fieldOf(it.spec);
 		it.ridges = traceRidges(it.spec, q);
@@ -728,8 +739,9 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		return false;
 	};
 
-	/** One print's ridges as live type, magnified about (px, py): only the glyphs under the glass. */
-	function decipher(g: CanvasRenderingContext2D, it: Item, px: number, py: number, mag: number, rad: number, dpr: number, gain: number) {
+	/** One print's ridges as live type: what lies around (px, py), magnified and drawn around (lx, ly). Only the glyphs
+	 * under the glass are set. */
+	function decipher(g: CanvasRenderingContext2D, it: Item, px: number, py: number, mag: number, rad: number, dpr: number, gain: number, lx: number, ly: number) {
 		const p = it.rest;
 		if (p.a < 0.02 || !it.ridges) return;
 		const pr = p.r * swell(it), prot = p.rot + sway(it);
@@ -740,12 +752,12 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		if (Math.abs(ux) > HW + ru || Math.abs(uy) > 1 + ru) return;
 		const G = glyphsOf(it), ru2 = ru * ru, k = pr * mag;
 		g.fillStyle = it.color;
-		// whole half-pixel sizes (from the resting size) and snapped angles, so the glass reuses cached letters while prints breathe
-		const size = Math.round(f * p.r * mag * dpr * 2) / (2 * dpr);
+		// sizes from the resting size, and snapped angles, so the glass reuses cached letters while prints breathe
+		const size = Math.max(1, Math.round(f * p.r * mag * dpr)) / dpr; // whole device px: few distinct sizes while things grow or the glass refocuses
 		if (size !== it.lensPx) { it.lensPx = size; it.lensFont = `500 ${size}px ${FONT}`; }
 		g.font = it.lensFont; g.textAlign = "center"; g.textBaseline = "middle";
 		const rq = Math.round((prot / TAU) * STEPS) + STEPS * 4;
-		const nr = it.ridges.length, pa = p.a * gain;
+		const nr = it.ridges.length, pa = inkOf(it) * gain;
 		for (let ri = 0; ri < nr; ri++) {
 			const b = ri * 4;
 			if (G.box[b] > ux + ru || G.box[b + 2] < ux - ru || G.box[b + 1] > uy + ru || G.box[b + 3] < uy - ru) continue;
@@ -754,7 +766,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 				if (ex * ex + ey * ey > ru2) continue;
 				const qi = (G.q[i] + rq) % STEPS, c = COS[qi], s = SIN[qi];
 				g.globalAlpha = Math.min(1, pa * (0.35 + 0.75 * G.a[i]));
-				g.setTransform(c * dpr, s * dpr, -s * dpr, c * dpr, (px + (ex * cr - ey * sr) * k) * dpr, (py + (ex * sr + ey * cr) * k) * dpr);
+				g.setTransform(c * dpr, s * dpr, -s * dpr, c * dpr, (lx + (ex * cr - ey * sr) * k) * dpr, (ly + (ex * sr + ey * cr) * k) * dpr);
 				g.fillText(G.ch[i], 0, 0);
 			}
 		}
@@ -773,13 +785,27 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		return null;
 	}
 
+	/** the print a point is on, or failing that the nearest one within reach (the lens is never quite between prints) */
+	function nearest(x: number, y: number, reach: number): Item | null {
+		const on = under(x, y);
+		if (on) return on;
+		let best: Item | null = null, bd = reach;
+		for (let i = 0; i < drawn.length; i++) {
+			const p = drawn[i].rest;
+			if (p.a < 0.12 || p.r < 1) continue;
+			const n = Math.hypot((x - p.x) / (p.r * HW), (y - p.y) / p.r), d = (n - 1) * p.r * (n > 0 ? Math.hypot(x - p.x, y - p.y) / (n * p.r) : 1);
+			if (d < bd) { bd = d; best = drawn[i]; }
+		}
+		return best;
+	}
+
 	// a sprite is kept (and scaled) while the stage is moving, and set again at its true size once it has been still
 	function stale(it: Item) {
 		if (it.full <= 0 || !(it.lines || fontReady)) return false;
 		if (!it.sprite) return true;
 		if (it.spriteEpoch < 0) return false;
 		const ratio = (it.full * scaleOf(it, dprNow)) / (it.spriteR * it.spriteDpr);
-		return stillNow ? Math.abs(ratio - 1) > 0.04 || (!it.lines && it.spriteEpoch !== fontEpoch) : ratio > 1.6 || ratio < 0.4;
+		return stillNow ? Math.abs(ratio - 1) > 0.08 || (!it.lines && it.spriteEpoch !== fontEpoch) : ratio > 1.6 || ratio < 0.4;
 	}
 	function nextStale(l: Layout, all: boolean): Item | null {
 		for (let i = 0; i < drawn.length; i++) if (stale(drawn[i])) return drawn[i];
@@ -858,26 +884,40 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			if (performance.now() > deadline) { pending = true; break; }
 		}
 
-		// the lens: where it is and how strongly it magnifies
+		// the lens: where it is and how strongly it magnifies. It follows the pointer (on touch, the last tap); with no
+		// pointer, or with the pointer over the panel's copy, it rests on the most telling print of the level
 		const ptr = s.pointer;
-		let want = ptr ? 1 : 0;
-		if (ptr) for (let i = 0; i < quiet.length; i++) { const q = quiet[i]; if (ptr.x > q.x && ptr.x < q.x + q.w && ptr.y > q.y && ptr.y < q.y + q.h) want = 0; }
+		let free = ptr !== null;
+		if (ptr) for (let i = 0; i < quiet.length; i++) { const q = quiet[i]; if (ptr.x > q.x && ptr.x < q.x + q.w && ptr.y > q.y && ptr.y < q.y + q.h) free = false; }
+		const lv = Math.round(e);
+		const rest = lv <= 0 ? main : lv === 1 ? ai : lv === 2 ? labs[0] : lit;
+		const want = (free || rest.rest.r > 4) && stage.w > 40 && stage.h > 40 ? 1 : 0;
+		const tx = free ? ptr!.x : rest.rest.x + rest.rest.r * HW * 0.36, ty = free ? ptr!.y : rest.rest.y + rest.rest.r * 0.34;
+		let lensMoving = false;
+		if (s.reduce || free || lensA < 0.02) { lensX = tx; lensY = ty; }
+		else {
+			// gliding to rest, or with the print it rests on as the level changes
+			const k = 1 - Math.exp(-Math.min(0.05, s.dt) / 0.09);
+			lensX += (tx - lensX) * k; lensY += (ty - lensY) * k;
+			if (Math.abs(tx - lensX) + Math.abs(ty - lensY) < 0.3) { lensX = tx; lensY = ty; } else lensMoving = true;
+		}
 		lensA = s.reduce ? want : lensA + (want - lensA) * Math.min(1, s.dt * 10);
 		if (Math.abs(want - lensA) < 0.004) lensA = want;
-		if (ptr && want) { lensX = ptr.x; lensY = ptr.y; }
 		const rad = Math.min(92, Math.max(58, Math.min(stage.w, stage.h) * 0.13)) * (0.9 + 0.1 * lensA);
-		let lensMoving = lensA !== want;
+		if (lensA !== want) lensMoving = true;
 		if (lensA > 0.01) {
-			// magnify for the print under the glass, or failing that the nearest one it touches
-			let top = under(lensX, lensY);
-			if (!top) {
-				let bd = 1e9;
-				for (let i = 0; i < drawn.length; i++) {
-					const p = drawn[i].rest;
-					if (p.a < 0.12) continue;
-					const d = Math.hypot((lensX - p.x) / HW, lensY - p.y) - p.r;
-					if (d < rad * 0.6 && d < bd) { bd = d; top = drawn[i]; }
-				}
+			// magnify the print under the glass; between prints, look at the edge of the nearest one within reach
+			const top = nearest(lensX, lensY, rad * 0.6);
+			let ax = 0, ay = 0;
+			if (top && !within(top, lensX, lensY)) {
+				const p = top.rest, n = Math.hypot((lensX - p.x) / (p.r * HW), (lensY - p.y) / p.r) || 1;
+				ax = (lensX - p.x) * (0.8 / n - 1); ay = (lensY - p.y) * (0.8 / n - 1);
+			}
+			if (s.reduce) { aimX = ax; aimY = ay; }
+			else if (aimX !== ax || aimY !== ay) {
+				const k = 1 - Math.exp(-Math.min(0.05, s.dt) / 0.05);
+				aimX += (ax - aimX) * k; aimY += (ay - aimY) * k;
+				if (Math.abs(ax - aimX) + Math.abs(ay - aimY) < 0.3) { aimX = ax; aimY = ay; } else lensMoving = true;
 			}
 			const target = top ? Math.min(6.5, Math.max(2.1, 11 / Math.max(0.5, typePx(top, top.rest.r)))) : lensMag;
 			lensMag = s.reduce || Math.abs(target - lensMag) < 0.004 ? target : lensMag + (target - lensMag) * Math.min(1, s.dt * 9);
@@ -887,18 +927,41 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		if (px !== lastPX && !(px !== px && lastPX !== lastPX)) lensMoving = true;
 		if (py !== lastPY && !(py !== py && lastPY !== lastPY)) lensMoving = true;
 		lastPX = px; lastPY = py;
+		lensR = rad;
+
+		// inspection: ease the inspected print forward and the rest back, over about 200 ms
+		const fid = s.focus ?? null;
+		const next = fid ? (byId.get(fid) ?? null) : null;
+		if (next !== focusItem) {
+			focusItem = next;
+			// the lit writer is two prints in one place: the crowd's own, and the one that grows
+			focusTwin = next === lit && litIndex >= 0 ? crowd[litIndex] : litIndex >= 0 && next === crowd[litIndex] ? lit : null;
+		}
+		const fk = s.reduce ? 1 : 1 - Math.exp(-Math.min(0.05, s.dt) / 0.06);
+		const dimTo = focusItem && focusItem.rest.a > 0.1 ? 1 : 0;
+		let focusMoving = false;
+		if (dim !== dimTo) { dim += (dimTo - dim) * fk; if (Math.abs(dimTo - dim) < 0.01) dim = dimTo; else focusMoving = true; }
+		if (focusMoving || dim > 0 || anyFo) {
+			anyFo = false;
+			for (let i = 0; i < drawn.length; i++) {
+				const it = drawn[i], to = it === focusItem || it === focusTwin ? 1 : 0;
+				if (it.fo !== to) { it.fo += (to - it.fo) * fk; if (Math.abs(to - it.fo) < 0.01) it.fo = to; else focusMoving = true; }
+				if (it.fo > 0) anyFo = true;
+			}
+		}
 
 		const gain = clamp01(s.enter);
 		breathing = !s.reduce && gain >= 0.003;
 		breathTick = Math.floor(s.t * BREATH_HZ); bt = breathTick / BREATH_HZ;
 		// nothing below changes state: the same inputs give the same frame, whenever the host asks for it
-		active = e !== goal || leap !== null || pending || job !== null || !fontReady || !stillNow || lensMoving;
+		active = e !== goal || leap !== null || pending || job !== null || !fontReady || !stillNow || lensMoving || focusMoving;
+		lensShown = lensA > 0.01 && gain >= 0.003;
 		if (gain < 0.003) return;
 		ctx.save();
 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 		ctx.globalCompositeOperation = "source-over";
 		for (let i = 0; i < drawn.length; i++) {
-			const it = drawn[i], a = it.rest.a * gain;
+			const it = drawn[i], a = inkOf(it) * gain;
 			if (a < 0.004 || !it.sprite) continue;
 			if (quiet.length && touches(it, quiet)) stampFaded(ctx, it, quiet, dpr, a);
 			else stamp(ctx, it, dpr, 0, 0, a);
@@ -924,9 +987,9 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			ctx.beginPath(); ctx.arc(lensX, lensY, rad, 0, TAU);
 			ctx.fillStyle = "#F4F4F0"; ctx.fill();
 			ctx.clip();
-			for (let i = 0; i < drawn.length; i++) decipher(ctx, drawn[i], lensX, lensY, lensMag, rad, dpr, gain);
+			for (let i = 0; i < drawn.length; i++) decipher(ctx, drawn[i], lensX + aimX, lensY + aimY, lensMag, rad, dpr, gain, lensX, lensY);
 			if (weaving) {
-				ctx.setTransform(dpr * lensMag, 0, 0, dpr * lensMag, dpr * lensX * (1 - lensMag), dpr * lensY * (1 - lensMag));
+				ctx.setTransform(dpr * lensMag, 0, 0, dpr * lensMag, dpr * (lensX - (lensX + aimX) * lensMag), dpr * (lensY - (lensY + aimY) * lensMag));
 				weaveAll(ctx, l, gain);
 				ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			}
@@ -959,8 +1022,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 
 	const LIT_HIT = { id: "lit" };
 	function hit(x: number, y: number): Hit {
-		const it = under(x, y);
-		if (!it || it === main) return null;
+		const it = nearest(x, y, lensR * 0.6);
+		if (!it) return null;
 		if (litIndex >= 0 && it === crowd[litIndex]) return LIT_HIT;
 		return it.hit;
 	}
@@ -971,5 +1034,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		tile = null; tg = null; job = null; splits.length = 0;
 	}
 
-	return { draw, anchors, hit, dispose, busy };
+	/** where the lens is this frame, for the host's card; null when it is not shown */
+	function lens() { return lensShown ? { x: lensX, y: lensY, r: lensR } : null; }
+
+	return { draw, anchors, hit, dispose, busy, lens };
 };

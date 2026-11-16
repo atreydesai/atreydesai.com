@@ -15,6 +15,7 @@ export type Mark = {
 	sprite?: CanvasImageSource;
 	spriteKey?: string; // identifies the sprite, so a changed sprite redraws the chart
 	aspect?: number; // sprite width / height (default 0.8)
+	backing?: number; // with a sprite: a square of the mark's colour behind the print, at this share of its alpha
 };
 
 export type Path = { pts: [number, number][]; color: string; width: number; dash?: number[]; progress: number };

@@ -28,6 +28,7 @@
 	let hover = $state("");
 	let quiet = $state<Box>({ x: 0, y: 0, w: 0, h: 0 });
 	let narrow = $state(false);
+	let card = $state<{ x: number; y: number; r: number; id: string } | null>(null);
 	let gallery = $state(false);
 	let shelf: HTMLDivElement | undefined = $state();
 	let built = $state("");
@@ -74,7 +75,8 @@
 		}
 		level = Math.max(0, Math.min(3, +(q.get("level") ?? 0)));
 		const still = q.has("still") || matchMedia("(prefers-reduced-motion: reduce)").matches;
-		const forced = +(q.get("dpr") ?? 0), nobusy = q.has("nobusy");
+		const forced = +(q.get("dpr") ?? 0), nobusy = q.has("nobusy"), nofocus = q.has("nofocus");
+		let focus: string | null = null;
 		const parked = q.get("lens")?.split(",").map(Number);
 		const print = createPrint({
 			text, labs, litText,
@@ -108,15 +110,19 @@
 			const dt = (now - last) / 1000; last = now;
 			raf = requestAnimationFrame(frame);
 			// the way the host drives it: redraw only while the renderer is busy or an input changed
-			const input = `${level}|${pointer?.x}|${pointer?.y}|${W}|${H}`;
+			const input = `${level}|${pointer?.x}|${pointer?.y}|${W}|${H}|${focus}`;
 			total++;
 			if (!nobusy && input === seen && print.busy && !print.busy()) { skipped++; (window as any).__skip = skipped / total; return; }
 			seen = input;
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			ctx.clearRect(0, 0, W, H);
 			const t0 = performance.now();
-			print.draw(ctx, { level, t: now / 1000, dt, view: { w: W, h: H, dpr }, stage, quiet: [quiet], pointer, enter: 1, reduce: still });
+			print.draw(ctx, { level, t: now / 1000, dt, view: { w: W, h: H, dpr }, stage, quiet: [quiet], pointer, enter: 1, reduce: still, focus });
 			const c = performance.now() - t0;
+			// the inspector, the way the host will do it: whatever is under the lens is the focus, and gets a card (?nofocus: off)
+			const ln = print.lens?.() ?? null;
+			const under = ln && !nofocus ? (print.hit(ln.x, ln.y)?.id ?? null) : null;
+			if (under !== focus || (ln ? !card || card.x !== ln.x || card.y !== ln.y : !!card)) { focus = under; card = ln && under ? { ...ln, id: under } : null; }
 			cpu += c; gap += dt * 1000; worst = Math.max(worst, c); n++;
 			if (now - tick > 500) {
 				ms = `draw ${(cpu / n).toFixed(2)} ms (worst ${worst.toFixed(1)}) · ${(n * 2)} draws/s · dpr ${dpr}`;
@@ -160,6 +166,7 @@
 			<span class="tag" class:small={a.r < 40} style="left:{a.x}px; top:{a.y + a.r + (narrow ? 2 : 5)}px; opacity:{a.alpha}">{label(a.id)}</span>
 		{/if}
 	{/each}
+	{#if card}<div class="card" style="left:{card.x + card.r + 10}px; top:{card.y}px">{card.id}</div>{/if}
 	<div class="bar">
 		{#each [0, 1, 2, 3] as n}<button class:on={level === n} onclick={() => (level = n)}>{n}</button>{/each}
 		<span>{ms}</span>
@@ -182,4 +189,5 @@
 	.bar button { width: 26px; height: 26px; border: 1px solid #14202D; background: #F3F3EF; border-radius: 2px; font: inherit; font-weight: 600; cursor: pointer; }
 	.bar button.on { background: #14202D; color: #fff; }
 	.bar b { font-weight: 600; }
+	.card { position: absolute; transform: translateY(-50%); padding: 6px 10px; background: #fff; border-radius: 3px; box-shadow: 0 6px 20px rgba(20, 32, 45, 0.14); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; }
 </style>

@@ -16,6 +16,7 @@
 	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
 	import { FABLE, GRAY, INK as TONE, modelColor } from "./palette";
 	import S from "./rq3.json";
+	import { printSprite, printAspect } from "./print/sprites";
 
 	type View = "review" | "prompt" | "icml" | "models" | "domains" | "confidence" | "example";
 	type XView = "example" | "icml" | "domains" | "confidence";
@@ -108,6 +109,7 @@
 	// a Tag's width (padding, swatch and words), to set tags side by side
 	const tagW = (t: string) => 16 + 16 + tw(t, 12.5, 600);
 
+	const ASPECT = printAspect();
 	function place(b: Block, base: number): Entry {
 		const cur = anim[b.id] ?? (reduce ? b.k : 0);
 		anim[b.id] = cur;
@@ -115,7 +117,13 @@
 		const on = Math.round(cur), rows = Math.ceil(b.n / b.cols);
 		for (let i = 0; i < b.n; i++) {
 			const c = b.order === "row" ? i % b.cols : Math.floor(i / rows), r = b.order === "row" ? Math.floor(i / b.cols) : i % rows;
-			G.marks.push({ id: `t${base + i}`, square: true, x: b.x + c * b.s + b.s / 2, y: b.y + r * b.s + b.s / 2, r: b.s * 0.36, color: i < on ? b.color : UNLIT, alpha: b.alpha });
+			// each tile is a writer's print: crisp in the model's colour when it was named, smudged gray when not
+			const lit = i < on, px = Math.max(6, Math.round(b.s * 0.9)), wi = (base + i) % 64;
+			const ink = lit ? b.color : UNLIT;
+			G.marks.push({
+				id: `t${base + i}`, square: true, x: b.x + c * b.s + b.s / 2, y: b.y + r * b.s + b.s / 2, r: px / 2, color: ink, alpha: b.alpha,
+				sprite: printSprite({ family: "writer", index: wi, color: ink, px, clarity: lit ? 1 : 0.35 }), spriteKey: `w${wi}|${ink}|${px}|${lit ? 1 : 0}`, aspect: ASPECT, backing: lit ? 0.34 : 0.2,
+			});
 		}
 		const e = { b, base, on };
 		G.blocks.push(e);

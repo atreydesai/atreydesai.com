@@ -157,6 +157,7 @@
 				const c = m.color;
 				s += m.x * 1.13 + m.y * 2.71 + m.r * 3.3 + (m.alpha ?? 1) * 5.9 + (m.ring ? 11 : 0) + (m.square ? 13 : 0)
 					+ c.charCodeAt(1) + c.charCodeAt(3) * 3 + c.charCodeAt(5) * 7;
+				if (m.backing) s += m.backing * 23;
 				if (m.spriteKey) { const q = m.spriteKey; s += q.length * 17 + q.charCodeAt(0) + q.charCodeAt(q.length - 1) * 5 + q.charCodeAt(q.length >> 1) * 9; }
 			}
 			for (const p of chart.paths) {
@@ -204,8 +205,9 @@
 				l.x += ex * k; l.y += ey * k; l.r += er * k; l.a += ea * k;
 				ctx.globalAlpha = l.a;
 				ctx.fillStyle = m.color;
-				if (m.sprite) { // a small fingerprint
+				if (m.sprite) { // a small fingerprint, on a square of its colour so the tile keeps its weight
 					const h = l.r * 2, w = h * (m.aspect ?? 0.8);
+					if (m.backing) { ctx.globalAlpha = l.a * m.backing; ctx.fillRect(l.x - h / 2, l.y - h / 2, h, h); ctx.globalAlpha = l.a; }
 					ctx.drawImage(m.sprite, l.x - w / 2, l.y - h / 2, w, h);
 					if (hov) { ctx.strokeStyle = m.color; ctx.lineWidth = 1.5; ctx.strokeRect(l.x - w / 2 - 3, l.y - h / 2 - 3, w + 6, h + 6); }
 					continue;
