@@ -248,6 +248,7 @@ type Item = {
 	glyphs: Glyphs | null;
 	glyphEpoch: number;
 	lines: boolean; // always drawn as ink lines, never type (the crowd)
+	solid?: boolean; // with lines: every ridge at full ink and a little heavier (PrintOptions.litLines)
 	sprite: (CanvasImageSource & { width: number; height: number }) | null;
 	spriteR: number; spriteDpr: number; spriteEpoch: number; // the size, scale and face the sprite was set at (spriteEpoch -1: still being set)
 	full: number; // the size it is drawn at when it is the subject
@@ -339,6 +340,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	for (let i = 0; i < MAX_CROWD; i++) { const it = make(`writer:${i}`, patternSpec("writer", i, seed), 3.7, C.human, writerText[i % writerText.length]); it.lines = true; it.cap = 200; crowd.push(it); }
 	const lit = make("lit", patternSpec("lit", 0, seed), 5.8, C.lit, litBody);
 	lit.offset = 0;
+	if (opts.litLines) { lit.lines = true; lit.solid = true; } // opt-in (the launch video): the found writer as solid ink
 	const cast = [main, human, ai, lit, ...labs];
 	const byId = new Map<string, Item>();
 	for (const it of [...cast, ...crowd]) byId.set(it.id, it);
@@ -424,8 +426,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			const lw = it.ds * k * 0.4;
 			for (const rd of it.ridges!) {
 				const mid = (rd.length >> 2) << 1;
-				g.globalAlpha = 0.55 + 0.4 * it.field!.ink(rd[mid], rd[mid + 1]);
-				g.lineWidth = lw * (0.8 + 0.4 * it.field!.ink(rd[0], rd[1]));
+				g.globalAlpha = it.solid ? 1 : 0.55 + 0.4 * it.field!.ink(rd[mid], rd[mid + 1]);
+				g.lineWidth = lw * (it.solid ? 1.3 : 0.8 + 0.4 * it.field!.ink(rd[0], rd[1]));
 				g.beginPath(); g.moveTo(ox + rd[0] * k, oy + rd[1] * k);
 				for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k);
 				g.stroke();

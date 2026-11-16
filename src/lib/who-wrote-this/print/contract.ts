@@ -78,6 +78,9 @@ export type PrintOptions = {
 	crowdBands?: { to: number; color: string }[];
 	/** the lit writer's ridge text in level 3 (readable in the lens) */
 	litText: string;
+	/** level 3: draw the lit writer as solid ink lines at full strength instead of ridges set as text, so the found writer
+	 * reads as one dark print at small sizes (the launch video). Off by default: the page sets its ridges as text. */
+	litLines?: boolean;
 	seed?: number;
 };
 
