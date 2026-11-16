@@ -17,8 +17,9 @@ export type Path = { pts: [number, number][]; color: string; width: number; dash
 export type Text = { x: number; y: number; t: string; color: string; size: number; align?: CanvasTextAlign; weight?: number };
 
 export const field = $state({
-	/** ground: the dotted page; levels: the hero's three questions; chart: marks, paths and labels drawn by a section */
-	mode: "ground" as "ground" | "levels" | "chart",
+	/** ground: the dotted page; levels: the hero's three questions on the dots; chart: marks, paths and labels drawn by a
+	 * section; paint: a section paints its own art over the ground (the hero's fingerprint) */
+	mode: "ground" as "ground" | "levels" | "chart" | "paint",
 	level: 0, // 1 human or AI, 2 which AI, 3 which human
 	hover: null as string | null,
 	interactive: false, // the canvas takes pointer events (hover on marks)
@@ -29,7 +30,8 @@ export const field = $state({
 });
 
 /** What a chart section draws. Plain (not reactive): rewritten every frame, read only by DotField's draw loop. */
-export const chart = { marks: [] as Mark[], paths: [] as Path[], texts: [] as Text[] };
+export type Paint = (ctx: CanvasRenderingContext2D, f: { now: number; dt: number; w: number; h: number; dpr: number }) => void;
+export const chart = { marks: [] as Mark[], paths: [] as Path[], texts: [] as Text[], paint: null as Paint | null };
 
 export type Box = { x: number; y: number; w: number; h: number };
 

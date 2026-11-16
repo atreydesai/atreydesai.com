@@ -7,7 +7,7 @@ import type { PageLoad } from "./$types";
 export const load: PageLoad = ({ url }) => {
     const post = [...posts, ...unlistedPosts, ...draftPosts].find((p) => p.id === "who-wrote-this");
     if (!post) throw error(404, "Post not found");
-    // hero art variant while the art direction is open: dots (default), fingerprint or mosaic (filler images)
-    const art = ["fingerprint", "mosaic"].includes(url.searchParams.get("art") ?? "") ? url.searchParams.get("art")! : "dots";
+    // print (default): the scroll-driven fingerprint hero; dots, fingerprint, mosaic: the earlier hero variants
+    const art = ["dots", "fingerprint", "mosaic"].includes(url.searchParams.get("art") ?? "") ? url.searchParams.get("art")! : "print";
     return { post, art };
 };

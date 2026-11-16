@@ -101,7 +101,7 @@
 			const oy = scrollY % PITCH;
 			cache.clear();
 			ctx.clearRect(0, 0, W, H);
-			const lens = !reduce.matches && field.mode !== "chart";
+			const lens = !reduce.matches && field.mode !== "chart" && field.mode !== "paint";
 			for (const d of dots) {
 				const t = target(d, oy);
 				d.x += (t.x - d.x) * k; d.y += (t.y - d.y) * k;
@@ -122,6 +122,7 @@
 				}
 			}
 			if (field.mode === "chart") drawChart(k, now);
+			if (field.mode === "paint" && chart.paint) chart.paint(ctx, { now, dt, w: W, h: H, dpr });
 			raf = requestAnimationFrame(frame);
 		}
 
@@ -196,7 +197,7 @@
 			document.removeEventListener("pointerleave", onLeave);
 			canvas.remove();
 			document.documentElement.classList.remove("wwt-field-on");
-			field.mode = "ground"; chart.marks = []; chart.paths = []; chart.texts = []; field.hover = null;
+			field.mode = "ground"; chart.marks = []; chart.paths = []; chart.texts = []; chart.paint = null; field.hover = null;
 		};
 	});
 </script>

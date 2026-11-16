@@ -10,6 +10,7 @@
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
 	import { field } from "$lib/who-wrote-this/field.svelte";
 	import Levels from "$lib/who-wrote-this/Levels.svelte";
+	import PrintHero from "$lib/who-wrote-this/PrintHero.svelte";
 	import Timeline from "$lib/who-wrote-this/Timeline.svelte";
 	import HumanOrAI from "$lib/who-wrote-this/HumanOrAI.svelte";
 	import WhichAI from "$lib/who-wrote-this/WhichAI.svelte";
@@ -117,7 +118,7 @@
 			</div>
 		</header>
 
-		{#key art}<Levels {art} />{/key}
+		{#key art}{#if art === "print"}<PrintHero />{:else}<Levels {art} />{/if}{/key}
 
 		<div class="lede">
 			{#each C.lede as s}{s.t + " "}{/each}
@@ -156,7 +157,7 @@
 		<!-- art direction preview (development only): the hero art variants, with filler images -->
 		<nav class="art-switch" aria-label="Art">
 			<span>Art</span>
-			{#each [["dots", "Dots"], ["fingerprint", "Fingerprint"], ["mosaic", "Mosaic"]] as [k, label]}
+			{#each [["print", "Print"], ["dots", "Dots"], ["fingerprint", "Fingerprint"], ["mosaic", "Mosaic"]] as [k, label]}
 				<a href="?art={k}" data-sveltekit-noscroll aria-current={art === k ? "page" : undefined}>{label}</a>
 			{/each}
 		</nav>
