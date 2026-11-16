@@ -6,8 +6,8 @@
 // as vectors, large enough to read.
 import type { Anchor, Box, CreatePrint, Hit, Print, PrintInput, PrintOptions } from "./contract";
 
-const FONT = '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif';
-const HW = 0.8; // a print's half-width when its half-height is 1
+export const FONT = '"Inter", system-ui, -apple-system, "Segoe UI", sans-serif';
+export const HW = 0.8; // a print's half-width when its half-height is 1
 const TAU = Math.PI * 2;
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -17,7 +17,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const hexRgb = (h: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
 const mixRgb = (p: number[], q: number[], t: number) => `rgb(${Math.round(lerp(p[0], q[0], t))},${Math.round(lerp(p[1], q[1], t))},${Math.round(lerp(p[2], q[2], t))})`;
 
-function rng(seed: number) {
+export function rng(seed: number) {
 	let a = seed >>> 0;
 	return () => {
 		a = (a + 0x6d2b79f5) | 0;
@@ -30,7 +30,7 @@ function rng(seed: number) {
 // ───────────────────────────────────────────────────────────── pattern
 
 /** A ridge-flow field in unit space: x in [-HW, HW], y in [-1, 1], y down. */
-type Spec = {
+export type Spec = {
 	seed: number;
 	cores: number[]; // flat xy; each turns the flow by +half a turn
 	deltas: number[]; // flat xy; each by -half a turn
@@ -42,7 +42,7 @@ type Spec = {
 };
 const spec = (seed: number, p: Partial<Spec>): Spec => ({ seed, cores: [], deltas: [], twist: 0, arch: 0, archW: 0.5, archY: 0, wob: 0.08, tilt: 0, sq: 2.25, ...p });
 
-function fieldOf(s: Spec) {
+export function fieldOf(s: Spec) {
 	const R = rng(s.seed * 2654435761 + 17);
 	const p1 = R() * TAU, p2 = R() * TAU, p3 = R() * TAU, p4 = R() * TAU;
 	const e1 = 0.018 + R() * 0.02, e2 = 0.012 + R() * 0.014;
@@ -72,7 +72,7 @@ function fieldOf(s: Spec) {
 }
 
 /** Evenly spaced streamlines (Jobard and Lefer): a ridge stops where it would crowd another, which is where real ridges end. */
-function traceRidges(s: Spec, ds: number): Float32Array[] {
+export function traceRidges(s: Spec, ds: number): Float32Array[] {
 	const { theta, edge } = fieldOf(s);
 	const h = ds * 0.3, dtest = ds * 0.6, guard = Math.ceil(dtest / h) + 3;
 	const gx0 = -HW - ds * 3, gy0 = -1 - ds * 3;
@@ -165,7 +165,7 @@ function traceRidges(s: Spec, ds: number): Float32Array[] {
 
 // ───────────────────────────────────────────────────────────── type on the ridges
 
-type Glyphs = {
+export type Glyphs = {
 	n: number;
 	x: Float32Array; y: Float32Array; c: Float32Array; s: Float32Array; a: Float32Array; q: Uint8Array;
 	ch: string[];
@@ -190,9 +190,9 @@ function widthOf(ch: string) {
 const STEPS = 120;
 const COS = new Float32Array(STEPS), SIN = new Float32Array(STEPS);
 for (let i = 0; i < STEPS; i++) { COS[i] = Math.cos((i / STEPS) * TAU); SIN[i] = Math.sin((i / STEPS) * TAU); }
-const TYPE = 0.76; // type size as a share of the ridge gap
+export const TYPE = 0.76; // type size as a share of the ridge gap
 
-function setType(ridges: Float32Array[], ds: number, text: string, offset: number, ink: (x: number, y: number) => number): Glyphs {
+export function setType(ridges: Float32Array[], ds: number, text: string, offset: number, ink: (x: number, y: number) => number): Glyphs {
 	const f = ds * TYPE;
 	const X: number[] = [], Y: number[] = [], C: number[] = [], S: number[] = [], A: number[] = [], Q: number[] = [], CH: string[] = [];
 	const start = new Int32Array(ridges.length + 1), box = new Float32Array(ridges.length * 4);
@@ -250,8 +250,10 @@ type Item = {
 	spriteR: number; spriteDpr: number; spriteEpoch: number; // the size, scale and face the sprite was set at (spriteEpoch -1: still being set)
 	full: number; // the size it is drawn at when it is the subject
 	edge: number; // 0..1: fades a print that has been pushed off the stage
-	pose: Pose; // as drawn (with breathing)
-	rest: Pose; // without
+	cap: number; // the tallest its sprite may be, device px
+	lensPx: number; lensFont: string; // the last face set for it in the lens
+	hit: { id: string };
+	rest: Pose; // where it sits and how present it is, for the frame just drawn
 };
 
 const LAB_SPECS: Partial<Spec>[] = [
@@ -279,8 +281,23 @@ function writerSpec(seed: number): Spec {
 	return spec(seed, { ...base, cores: [-0.22 * side, -0.2, 0.22 * side, 0.2], deltas: [-0.62, 0.66, 0.62, 0.66] });
 }
 
+/** the hero's ridge text, once a hero exists (sprites.ts falls back to it) */
+export let sharedText = "";
+export const DEFAULT_SEED = 20261116, MAX_CROWD = 220;
+/** The one source of patterns: the hero's cast and the small prints elsewhere on the page (sprites.ts) both ask here,
+ * so lab 2 is the same print wherever it appears. */
+export function patternSpec(family: "main" | "human" | "ai" | "lab" | "writer" | "lit", index = 0, seed = DEFAULT_SEED): Spec {
+	if (family === "main") return spec(seed + 1, { cores: [-0.05, -0.2, 0.06, 0.08], deltas: [-0.58, 0.52, 0.52, 0.62], twist: 0.22, wob: 0.09 });
+	if (family === "human") return spec(seed + 2, { cores: [-0.05, -0.18], deltas: [0.47, 0.46], wob: 0.13, tilt: 0.06 });
+	if (family === "ai") return spec(seed + 3, { cores: [0, -0.08, 0, -0.02], deltas: [-0.58, 0.62, 0.58, 0.62], wob: 0, sq: 2.6 });
+	if (family === "lit") return spec(seed + 99, { cores: [0.03, -0.14], deltas: [-0.45, 0.42], wob: 0.11, tilt: -0.08 });
+	if (family === "lab") { const i = ((index % LAB_SPECS.length) + LAB_SPECS.length) % LAB_SPECS.length; return spec(seed + 10 + index, { ...LAB_SPECS[i], sq: 2.1 + ((index * 7) % 5) * 0.14 }); }
+	const i = ((index % MAX_CROWD) + MAX_CROWD) % MAX_CROWD;
+	return writerSpec(seed + 100 + i);
+}
+
 type Layout = {
-	key: string; wide: boolean;
+	key: string; sx: number; sy: number; sw: number; sh: number; wide: boolean;
 	main: number[]; // x, y, r
 	human1: number[]; ai1: number[]; human2: number[];
 	lab2: number[][]; lab3: number[][];
@@ -291,41 +308,51 @@ type Layout = {
 // ───────────────────────────────────────────────────────────── renderer
 
 export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
-	const seed = opts.seed ?? 20261116;
+	const seed = opts.seed ?? DEFAULT_SEED;
 	const body = opts.text.join("   ") + "   ";
+	sharedText = body; // the small prints elsewhere on the page set the same text
 	const litBody = opts.litText + "   ";
 	const C = opts.colors;
-	const inkRgb = hexRgb(C.ink), humanRgb = hexRgb(C.human), aiRgb = hexRgb(C.ai), litRgb = hexRgb(C.lit);
 	const R0 = rng(seed);
 
 	const make = (id: string, sp: Spec, gap: number, color: string, text = body): Item => ({
 		id, spec: sp, gap, color, rgb: hexRgb(color), text, offset: Math.floor(R0() * text.length), phase: R0() * TAU,
-		lines: false, edge: 1, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
-		pose: { x: 0, y: 0, r: 0, rot: 0, a: 0 }, rest: { x: 0, y: 0, r: 0, rot: 0, a: 0 },
+		lines: false, edge: 1, cap: 2600, lensPx: 0, lensFont: "", hit: { id }, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
+		rest: { x: 0, y: 0, r: 0, rot: 0, a: 0 },
 	});
 
-	const main = make("main", spec(seed + 1, { cores: [-0.05, -0.2, 0.06, 0.08], deltas: [-0.58, 0.52, 0.52, 0.62], twist: 0.22, wob: 0.09 }), 7.4, C.ink);
-	const human = make("human", spec(seed + 2, { cores: [-0.05, -0.18], deltas: [0.47, 0.46], wob: 0.13, tilt: 0.06 }), 6.6, C.human);
-	const ai = make("ai", spec(seed + 3, { cores: [0, -0.08, 0, -0.02], deltas: [-0.58, 0.62, 0.58, 0.62], wob: 0, sq: 2.6 }), 6.6, C.ai);
-	const labs = opts.labs.map((name, i) => make(`lab:${name}`, spec(seed + 10 + i, { ...LAB_SPECS[i % LAB_SPECS.length], sq: 2.1 + ((i * 7) % 5) * 0.14 }), i < 3 ? 5.2 : 4.6, C.labs[i] ?? C.other));
-	const MAX_CROWD = 220;
+	const main = make("main", patternSpec("main", 0, seed), 7.4, C.ink);
+	const human = make("human", patternSpec("human", 0, seed), 6.6, C.human);
+	const ai = make("ai", patternSpec("ai", 0, seed), 6.6, C.ai);
+	const labs = opts.labs.map((name, i) => make(`lab:${name}`, patternSpec("lab", i, seed), i < 3 ? 5.2 : 4.6, C.labs[i] ?? C.other));
+	for (const it of labs) it.cap = 640;
 	const crowd: Item[] = [];
-	for (let i = 0; i < MAX_CROWD; i++) { const it = make(`writer:${i}`, writerSpec(seed + 100 + i), 3.7, C.human); it.lines = true; crowd.push(it); }
-	const lit = make("lit", spec(seed + 99, { cores: [0.03, -0.14], deltas: [-0.45, 0.42], wob: 0.11, tilt: -0.08 }), 5.8, C.lit, litBody);
+	for (let i = 0; i < MAX_CROWD; i++) { const it = make(`writer:${i}`, patternSpec("writer", i, seed), 3.7, C.human); it.lines = true; it.cap = 200; crowd.push(it); }
+	const lit = make("lit", patternSpec("lit", 0, seed), 5.8, C.lit, litBody);
 	lit.offset = 0;
+	const cast = [main, human, ai, lit, ...labs];
 	let litIndex = -1;
 
 	let e = -1; // eased level
 	let fontEpoch = 0, fontAsked = false, fontReady = false, firstT = 0;
-	let scratch: HTMLCanvasElement | null = null, sg: CanvasRenderingContext2D | null = null;
-	let mask: HTMLCanvasElement | null = null, maskKey = "";
+	let tile: HTMLCanvasElement | null = null, tg: CanvasRenderingContext2D | null = null; // for the few prints that touch a quiet box
 	let L: Layout | null = null;
 	let lensMag = 3, lensA = 0, lensX = 0, lensY = 0;
-	let drawn: Item[] = [];
-	let lastView = { w: 0, h: 0, dpr: 1 };
+	const drawn: Item[] = [];
+	let poseE = NaN, poseL: Layout | null = null;
+	let active = true, dirty = false; // busy(): something is still moving; something changed between frames
+	let lastPX = NaN, lastPY = NaN;
+	let stillNow = true, dprNow = 1;
+	// breathing: each print drifts a hair on its own clock. The clock ticks 20 times a second, so when breathing is the
+	// only motion two frames in three have nothing new to draw; it stops when the art is off stage or motion is reduced.
+	const BREATH_HZ = 20;
+	let breathTick = 0, bt = 0, breathing = false;
+	const swell = (it: Item) => (breathing ? 1 + 0.007 * Math.sin(bt * 0.55 + it.phase) : 1);
+	const sway = (it: Item) => (breathing ? 0.008 * Math.sin(bt * 0.37 + it.phase * 1.7) : 0);
 	let disposed = false;
 	let lastGoal = 0, leap: { from: number; to: number; t: number; dur: number } | null = null;
 	let movedT = -1; // when the stage last changed
+	let traced = false; // every print on the cast has its ridges
 
 	// ── geometry and sprites, built on demand
 
@@ -337,7 +364,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		it.ds = q;
 		it.field = fieldOf(it.spec);
 		it.ridges = traceRidges(it.spec, q);
-		it.glyphs = null; splits.length = 0; // the old sprite stays up until the new one is whole
+		it.glyphs = null; it.lensPx = 0; splits.length = 0; // the old sprite stays up until the new one is whole
 	}
 	function glyphsOf(it: Item): Glyphs {
 		if (!it.glyphs || it.glyphEpoch !== fontEpoch) { it.glyphs = setType(it.ridges!, it.ds, it.text, it.offset, it.field!.ink); it.glyphEpoch = fontEpoch; }
@@ -349,9 +376,12 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	type Job = { it: Item; cv: HTMLCanvasElement; g: CanvasRenderingContext2D; epoch: number; dpr: number; r: number; ox: number; oy: number; k: number; i: number; G: Glyphs | null };
 	let job: Job | null = null;
 
-	function begin(it: Item, dpr: number): Job {
+	/** sprite pixels per px: the screen's, but never above 2, nor past the print's cap */
+	const scaleOf = (it: Item, dpr: number) => Math.min(dpr, 2, it.cap / (2 * it.full + 6));
+
+	function begin(it: Item, screenDpr: number): Job {
 		geometry(it);
-		const r = it.full;
+		const r = it.full, dpr = scaleOf(it, screenDpr);
 		const pad = 3, w = Math.ceil((2 * HW * r + pad * 2) * dpr), h = Math.ceil((2 * r + pad * 2) * dpr);
 		const cv = document.createElement("canvas");
 		cv.width = w; cv.height = h;
@@ -417,8 +447,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	// ── where everything sits at each level, from the stage alone
 
 	function layout(S: Box): Layout {
+		if (L && L.sx === (S.x | 0) && L.sy === (S.y | 0) && L.sw === (S.w | 0) && L.sh === (S.h | 0)) return L;
 		const key = `${S.x | 0},${S.y | 0},${S.w | 0},${S.h | 0}`;
-		if (L && L.key === key) return L;
 		const wide = S.w > S.h * 0.9;
 		if (L && (L.wide !== wide)) splits.length = 0;
 		const cx = S.x + S.w / 2, cy = S.y + S.h / 2;
@@ -453,21 +483,21 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		let best = 0, bd = 1e9;
 		pts.forEach((p, i) => { const d = (p[0] - tx) ** 2 + (p[1] - ty) ** 2; if (d < bd) { bd = d; best = i; } });
 		const litR = Math.min(K.h * 0.19, K.w * 0.23);
-		L = { key, wide, main: [cx, cy, r0], human1: [cx - S.w * 0.25, cy, r1], ai1: [cx + S.w * 0.25, cy, r1], human2, lab2, lab3, crowd: pts, lit: best, litR };
+		L = { key, sx: S.x | 0, sy: S.y | 0, sw: S.w | 0, sh: S.h | 0, wide, main: [cx, cy, r0], human1: [cx - S.w * 0.25, cy, r1], ai1: [cx + S.w * 0.25, cy, r1], human2, lab2, lab3, crowd: pts, lit: best, litR };
 		// full sizes decide ridge counts and sprite sizes
 		main.full = r0; human.full = r1; ai.full = r1;
 		labs.forEach((it, i) => (it.full = lab2[i][2]));
 		crowd.forEach((it, i) => (it.full = pts[i] ? pts[i][2] : 0));
 		lit.full = litR;
-		litIndex = best;
+		litIndex = best; traced = false;
 		return L;
 	}
 
 	const set = (it: Item, x: number, y: number, r: number, rot: number, a: number) => { const p = it.rest; p.x = x; p.y = y; p.r = r; p.rot = rot; p.a = a; };
-	const mix3 = (a: number[], b: number[], t: number) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+	const M3 = [0, 0, 0];
+	const mix3 = (a: number[], b: number[], t: number) => { M3[0] = lerp(a[0], b[0], t); M3[1] = lerp(a[1], b[1], t); M3[2] = lerp(a[2], b[2], t); return M3; };
 
-	function pose(S: Box) {
-		const l = layout(S);
+	function pose(l: Layout, S: Box) {
 		const p1 = clamp01(e), p2 = clamp01(e - 1), p3 = clamp01(e - 2);
 		const q1 = ease(p1), q2 = ease(p2);
 		// each division is drawn as threads (see Split); the cached prints only hold the two ends of it
@@ -512,6 +542,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		first: Int32Array; // per child: its first thread
 		off: Int32Array; // per thread: its first point
 		src: Float32Array; dst: Float32Array; // the thread on the parent, and as the child's ridge (unit space of each)
+		hue: string[][]; // per child: the colours from the parent's to its own
 		cx: Float32Array; cy: Float32Array; cs: Float32Array; // per child: its piece of the parent (centre, and the scale that fits it to the child)
 		kd: Float32Array; // per child: when it leaves
 		td: Float32Array; // per thread: when it re-forms
@@ -592,14 +623,16 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			});
 		});
 		first[nk] = off.length - 1;
-		return { parent, kids, first, off: Int32Array.from(off), src: Float32Array.from(src), dst: Float32Array.from(dst), cx, cy, cs, kd, td: Float32Array.from(td) };
+		const hue = kids.map((k) => Array.from({ length: HUES }, (_, i) => mixRgb(parent.rgb, k.rgb, i / (HUES - 1))));
+		return { parent, kids, hue, first, off: Int32Array.from(off), src: Float32Array.from(src), dst: Float32Array.from(dst), cx, cy, cs, kd, td: Float32Array.from(td) };
 	}
 
-	const BINS = 5;
+	const BINS = 5, HUES = 12;
+	const DASH = [0, 0, 0, 0, 0, 0], SOLID: number[] = [];
 	/** One division at progress p. The parent comes apart into its pieces, each piece travels to its child's place,
 	 * and there its threads re-form, top to bottom, into the child's own ridges. */
-	function weave(g: CanvasRenderingContext2D, sp: Split, p: number, aFrom: number, dashed: boolean) {
-		const env = ss(0, 0.1, p) * (1 - ss(0.9, 1, p));
+	function weave(g: CanvasRenderingContext2D, sp: Split, p: number, aFrom: number, dashed: boolean, gain: number) {
+		const env = ss(0, 0.1, p) * (1 - ss(0.9, 1, p)) * gain;
 		if (env < 0.01) return;
 		const P = sp.parent.rest, wp = sp.parent.ds * P.r * 0.27;
 		g.lineCap = "butt"; g.lineJoin = "round";
@@ -612,7 +645,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			// the piece at rest in the parent, and carried to the child (grown or shrunk to the child's size)
 			const k0 = lerp(P.r, K.r * sp.cs[ki], m), ox = lerp(P.x, K.x - sp.cx[ki] * k0, m), oy = lerp(P.y, K.y - sp.cy[ki] * k0, m);
 			const wk = kid.ds * K.r * (kid.lines ? 0.4 : 0.27), aTo = kid.lines ? 0.85 : 0.8;
-			const hue = mixRgb(sp.parent.rgb, kid.rgb, ss(0.1, 0.8, m));
+			const hue = sp.hue[ki][Math.round(ss(0.1, 0.8, m) * (HUES - 1))];
 			for (let b = 0; b < BINS; b++) {
 				let any = false;
 				for (let th = sp.first[ki], end = sp.first[ki + 1]; th < end; th++) {
@@ -632,54 +665,87 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 				const lw = Math.max(0.4, lerp(lerp(wp, wk, m * 0.5), wk, tb));
 				g.strokeStyle = hue;
 				g.lineWidth = lw;
-				if (dashed) g.setLineDash([lw * 9, lw * 1.6, lw * 4, lw * 1.6, lw * 13, lw * 2.2]);
+				if (dashed) { DASH[0] = lw * 9; DASH[1] = lw * 1.6; DASH[2] = lw * 4; DASH[3] = lw * 1.6; DASH[4] = lw * 13; DASH[5] = lw * 2.2; g.setLineDash(DASH); }
 				g.globalAlpha = env * lerp(aFrom, aTo * edge, mix);
 				g.stroke();
 			}
 		}
-		if (dashed) g.setLineDash([]);
+		if (dashed) g.setLineDash(SOLID);
 		g.globalAlpha = 1;
 	}
 
-	function weaveAll(g: CanvasRenderingContext2D, l: Layout) {
+	function weaveAll(g: CanvasRenderingContext2D, l: Layout, gain: number) {
 		const p1 = clamp01(e), p2 = clamp01(e - 1), p3 = clamp01(e - 2);
 		const live = l.crowd.length;
 		if (splits[2] && splits[2].kids.length !== live) splits[2] = null;
-		if (p1 > 0 && p1 < 1) { splits[0] ??= buildSplit(main, [human, ai], l.main, [l.human1, l.ai1]); if (splits[0]) weave(g, splits[0], p1, 0.8, true); }
-		if (p2 > 0 && p2 < 1) { splits[1] ??= buildSplit(ai, labs, l.ai1, l.lab2); if (splits[1]) weave(g, splits[1], p2, 0.8, true); }
-		if (p3 > 0 && p3 < 1) { splits[2] ??= buildSplit(human, crowd.slice(0, live), l.human2, l.crowd); if (splits[2]) weave(g, splits[2], p3, 0.5, false); }
+		if (p1 > 0 && p1 < 1) { splits[0] ??= buildSplit(main, [human, ai], l.main, [l.human1, l.ai1]); if (splits[0]) weave(g, splits[0], p1, 0.8, true, gain); }
+		if (p2 > 0 && p2 < 1) { splits[1] ??= buildSplit(ai, labs, l.ai1, l.lab2); if (splits[1]) weave(g, splits[1], p2, 0.8, true, gain); }
+		if (p3 > 0 && p3 < 1) { splits[2] ??= buildSplit(human, crowd.slice(0, live), l.human2, l.crowd); if (splits[2]) weave(g, splits[2], p3, 0.5, false, gain); }
 	}
 
 	// ── drawing
 
-	function stamp(g: CanvasRenderingContext2D, it: Item, dpr: number) {
-		const p = it.pose;
-		if (p.a < 0.004 || !it.sprite) return;
-		const k = p.r / it.spriteR, w = it.sprite.width / it.spriteDpr, h = it.sprite.height / it.spriteDpr;
-		g.globalAlpha = p.a;
-		if (p.rot) {
-			const c = Math.cos(p.rot) * k * dpr, s = Math.sin(p.rot) * k * dpr;
-			g.setTransform(c, s, -s, c, p.x * dpr, p.y * dpr);
-			g.drawImage(it.sprite, -w / 2, -h / 2, w, h);
-			g.setTransform(dpr, 0, 0, dpr, 0, 0);
-		} else g.drawImage(it.sprite, p.x - (w * k) / 2, p.y - (h * k) / 2, w * k, h * k);
+	/** a cached print, straight onto the page's canvas; (ox, oy) shifts it and `a` is its opacity */
+	function stamp(g: CanvasRenderingContext2D, it: Item, sc: number, ox: number, oy: number, a: number) {
+		const p = it.rest, sp = it.sprite!, rot = p.rot + sway(it);
+		const k = (p.r * swell(it)) / it.spriteR, w = sp.width / it.spriteDpr, h = sp.height / it.spriteDpr;
+		g.globalAlpha = a;
+		if (rot) {
+			const c = Math.cos(rot) * k * sc, s = Math.sin(rot) * k * sc;
+			g.setTransform(c, s, -s, c, (p.x - ox) * sc, (p.y - oy) * sc);
+			g.drawImage(sp, -w / 2, -h / 2, w, h);
+			g.setTransform(sc, 0, 0, sc, -ox * sc, -oy * sc);
+		} else g.drawImage(sp, p.x - (w * k) / 2, p.y - (h * k) / 2, w * k, h * k);
 	}
 
+	const FEATHER = 44;
+	/** Ink fades to near nothing inside the quiet boxes, softly at their edges. Almost every print is clear of them and
+	 * is stamped directly; one that touches a box is stamped onto a tile its own size, faded there, and that is placed. */
+	function stampFaded(ctx: CanvasRenderingContext2D, it: Item, quiet: Box[], dpr: number, a: number) {
+		const p = it.rest, bw = p.r * HW * 2.3, bh = p.r * 2.3, bx = p.x - bw / 2, by = p.y - bh / 2;
+		const sc = Math.min(dpr, 2), pw = Math.ceil(bw * sc), ph = Math.ceil(bh * sc);
+		if (!tile) { tile = document.createElement("canvas"); tg = tile.getContext("2d")!; }
+		if (tile.width < pw || tile.height < ph) { tile.width = Math.max(tile.width, pw); tile.height = Math.max(tile.height, ph); }
+		const g = tg!;
+		g.setTransform(1, 0, 0, 1, 0, 0);
+		g.globalCompositeOperation = "source-over";
+		g.clearRect(0, 0, pw, ph);
+		g.setTransform(sc, 0, 0, sc, -bx * sc, -by * sc);
+		stamp(g, it, sc, bx, by, 1);
+		g.globalCompositeOperation = "destination-out";
+		g.globalAlpha = 0.2; g.fillStyle = "#000";
+		// feathered by stacking insets: soft on every side, no filters
+		for (let qi = 0; qi < quiet.length; qi++) {
+			const q = quiet[qi];
+			for (let i = 0; i < 12; i++) { const o = FEATHER * (1 - i / 11); g.fillRect(q.x - o, q.y - o, q.w + o * 2, q.h + o * 2); }
+		}
+		ctx.globalAlpha = a;
+		ctx.drawImage(tile, 0, 0, pw, ph, bx, by, pw / sc, ph / sc);
+	}
+	const touches = (it: Item, quiet: Box[]) => {
+		const p = it.rest, hw = p.r * HW * 1.15 + FEATHER, hh = p.r * 1.15 + FEATHER;
+		for (let i = 0; i < quiet.length; i++) { const q = quiet[i]; if (p.x + hw > q.x && p.x - hw < q.x + q.w && p.y + hh > q.y && p.y - hh < q.y + q.h) return true; }
+		return false;
+	};
+
 	/** One print's ridges as live type, magnified about (px, py): only the glyphs under the glass. */
-	function decipher(g: CanvasRenderingContext2D, it: Item, px: number, py: number, mag: number, rad: number, dpr: number) {
-		const p = it.pose;
+	function decipher(g: CanvasRenderingContext2D, it: Item, px: number, py: number, mag: number, rad: number, dpr: number, gain: number) {
+		const p = it.rest;
 		if (p.a < 0.02 || !it.ridges) return;
-		const cr = Math.cos(p.rot), sr = Math.sin(p.rot);
-		const dx = (px - p.x) / p.r, dy = (py - p.y) / p.r;
+		const pr = p.r * swell(it), prot = p.rot + sway(it);
+		const cr = Math.cos(prot), sr = Math.sin(prot);
+		const dx = (px - p.x) / pr, dy = (py - p.y) / pr;
 		const ux = dx * cr + dy * sr, uy = -dx * sr + dy * cr;
-		const f = it.ds * TYPE, ru = rad / mag / p.r + f;
+		const f = it.ds * TYPE, ru = rad / mag / pr + f;
 		if (Math.abs(ux) > HW + ru || Math.abs(uy) > 1 + ru) return;
-		const G = glyphsOf(it), ru2 = ru * ru, k = p.r * mag;
+		const G = glyphsOf(it), ru2 = ru * ru, k = pr * mag;
 		g.fillStyle = it.color;
-		// whole half-pixel sizes and snapped angles, so the glass reuses cached letters while prints breathe
-		g.font = `500 ${Math.round(f * it.rest.r * mag * dpr * 2) / (2 * dpr)}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
-		const rq = Math.round((p.rot / TAU) * STEPS) + STEPS * 4;
-		const nr = it.ridges.length;
+		// whole half-pixel sizes (from the resting size) and snapped angles, so the glass reuses cached letters while prints breathe
+		const size = Math.round(f * p.r * mag * dpr * 2) / (2 * dpr);
+		if (size !== it.lensPx) { it.lensPx = size; it.lensFont = `500 ${size}px ${FONT}`; }
+		g.font = it.lensFont; g.textAlign = "center"; g.textBaseline = "middle";
+		const rq = Math.round((prot / TAU) * STEPS) + STEPS * 4;
+		const nr = it.ridges.length, pa = p.a * gain;
 		for (let ri = 0; ri < nr; ri++) {
 			const b = ri * 4;
 			if (G.box[b] > ux + ru || G.box[b + 2] < ux - ru || G.box[b + 1] > uy + ru || G.box[b + 3] < uy - ru) continue;
@@ -687,7 +753,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 				const ex = G.x[i] - ux, ey = G.y[i] - uy;
 				if (ex * ex + ey * ey > ru2) continue;
 				const qi = (G.q[i] + rq) % STEPS, c = COS[qi], s = SIN[qi];
-				g.globalAlpha = Math.min(1, p.a * (0.35 + 0.75 * G.a[i]));
+				g.globalAlpha = Math.min(1, pa * (0.35 + 0.75 * G.a[i]));
 				g.setTransform(c * dpr, s * dpr, -s * dpr, c * dpr, (px + (ex * cr - ey * sr) * k) * dpr, (py + (ex * sr + ey * cr) * k) * dpr);
 				g.fillText(G.ch[i], 0, 0);
 			}
@@ -696,10 +762,10 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		g.globalAlpha = 1;
 	}
 
-	const within = (it: Item, x: number, y: number, slack = 1) => {
+	const within = (it: Item, x: number, y: number) => {
 		const p = it.rest;
 		if (p.a < 0.12 || p.r < 1) return false;
-		const dx = (x - p.x) / (p.r * HW * slack), dy = (y - p.y) / (p.r * slack);
+		const dx = (x - p.x) / (p.r * HW), dy = (y - p.y) / p.r;
 		return dx * dx + dy * dy < 1;
 	};
 	function under(x: number, y: number): Item | null {
@@ -707,37 +773,34 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		return null;
 	}
 
-	function quietMask(view: PrintInput["view"], quiet: Box[]) {
-		const key = `${view.w}x${view.h}|` + quiet.map((q) => `${q.x | 0},${q.y | 0},${q.w | 0},${q.h | 0}`).join(";");
-		if (mask && maskKey === key) return mask;
-		maskKey = key;
-		mask ??= document.createElement("canvas");
-		const sc = 0.25, feather = 44;
-		mask.width = Math.ceil(view.w * sc); mask.height = Math.ceil(view.h * sc);
-		const m = mask.getContext("2d")!;
-		m.setTransform(sc, 0, 0, sc, 0, 0);
-		// feathered by stacking insets: soft on every side, no filters
-		for (const q of quiet) for (let i = 0; i < 12; i++) {
-			const o = feather * (1 - i / 11);
-			m.fillStyle = `rgba(0,0,0,${0.2})`;
-			m.fillRect(q.x - o, q.y - o, q.w + o * 2, q.h + o * 2);
-		}
-		return mask;
+	// a sprite is kept (and scaled) while the stage is moving, and set again at its true size once it has been still
+	function stale(it: Item) {
+		if (it.full <= 0 || !(it.lines || fontReady)) return false;
+		if (!it.sprite) return true;
+		if (it.spriteEpoch < 0) return false;
+		const ratio = (it.full * scaleOf(it, dprNow)) / (it.spriteR * it.spriteDpr);
+		return stillNow ? Math.abs(ratio - 1) > 0.04 || (!it.lines && it.spriteEpoch !== fontEpoch) : ratio > 1.6 || ratio < 0.4;
+	}
+	function nextStale(l: Layout, all: boolean): Item | null {
+		for (let i = 0; i < drawn.length; i++) if (stale(drawn[i])) return drawn[i];
+		if (!all) return null;
+		for (let i = 0; i < cast.length; i++) if (stale(cast[i])) return cast[i];
+		for (let i = 0; i < l.crowd.length; i++) if (stale(crowd[i])) return crowd[i];
+		return null;
 	}
 
 	function draw(ctx: CanvasRenderingContext2D, s: PrintInput) {
 		if (disposed) return;
-		const { view, stage } = s, dpr = view.dpr;
-		lastView = view;
+		const { view, stage, quiet } = s, dpr = view.dpr;
+		dirty = false;
 		if (!fontAsked) {
 			// type is set once the page's face has loaded (or has had its chance), so it is not set twice
 			fontAsked = true; firstT = s.t;
-			const ready = () => { fontReady = true; widths = new Map(); fontEpoch++; };
+			const ready = () => { fontReady = true; widths = new Map(); fontEpoch++; dirty = true; };
 			if (document.fonts?.load) document.fonts.load(`500 12px ${FONT}`).then(ready, ready); else ready();
 		}
-		const goal = Math.max(0, Math.min(3, s.level));
-		if (s.reduce) e = Math.round(goal);
-		else if (e < 0) e = goal;
+		const goal = Math.max(0, Math.min(3, s.reduce ? Math.round(s.level) : s.level));
+		if (s.reduce || e < 0) e = goal;
 		else {
 			const dt = Math.min(0.05, Math.max(0, s.dt));
 			// a level that slides (scroll) is followed closely, with about 120 ms of smoothing; one that leaps (a click,
@@ -752,132 +815,136 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			} else e = Math.abs(goal - e) < 0.0005 ? goal : e + (goal - e) * (1 - Math.exp(-dt / 0.12));
 		}
 		lastGoal = goal;
-		const before = L?.key;
-		pose(stage);
-		const l = L!;
-		if (l.key !== before) movedT = s.t;
-
-		// who is on stage, back to front
-		drawn = [];
-		const p3 = clamp01(e - 2);
-		if (main.rest.a > 0.004) drawn.push(main);
-		if (p3 > 0.5) for (const it of labs) if (it.rest.a > 0.004) drawn.push(it);
-		if (human.rest.a > 0.004) drawn.push(human);
-		if (ai.rest.a > 0.004) drawn.push(ai);
-		if (p3 <= 0.5) for (const it of labs) if (it.rest.a > 0.004) drawn.push(it);
-		for (let i = 0; i < l.crowd.length; i++) if (crowd[i].rest.a > 0.004) drawn.push(crowd[i]);
-		if (lit.rest.a > 0.004) drawn.push(lit);
+		const l = layout(stage);
+		if (l !== poseL) movedT = s.t;
+		if (l !== poseL || e !== poseE) {
+			poseL = l; poseE = e;
+			pose(l, stage);
+			// who is on stage, back to front
+			drawn.length = 0;
+			const p3 = clamp01(e - 2);
+			if (main.rest.a > 0.004) drawn.push(main);
+			if (p3 > 0.5) for (const it of labs) if (it.rest.a > 0.004) drawn.push(it);
+			if (human.rest.a > 0.004) drawn.push(human);
+			if (ai.rest.a > 0.004) drawn.push(ai);
+			if (p3 <= 0.5) for (const it of labs) if (it.rest.a > 0.004) drawn.push(it);
+			for (let i = 0; i < l.crowd.length; i++) if (crowd[i].rest.a > 0.004) drawn.push(crowd[i]);
+			if (lit.rest.a > 0.004) drawn.push(lit);
+		}
 
 		// set what is missing, a few ms a frame: what is on stage first, then the rest of the cast, so that every
 		// division has its threads ready (when motion is reduced: what is on stage, at once)
 		if (!fontReady && s.t - firstT > 1.2) fontReady = true;
-		const soon = performance.now() + 2.5, deadline = soon + 5;
-		// a sprite is kept (and scaled) while the stage is moving, and set again at its true size once it has been still
-		const still = s.t - movedT > 0.2;
-		const stale = (it: Item) => {
-			if (it.full <= 0 || !(it.lines || fontReady)) return false;
-			if (!it.sprite) return true;
-			if (it.spriteEpoch < 0) return false;
-			const ratio = (it.full * dpr) / (it.spriteR * it.spriteDpr);
-			return still ? Math.abs(ratio - 1) > 0.04 || (!it.lines && it.spriteEpoch !== fontEpoch) : ratio > 1.6 || ratio < 0.4;
-		};
-		const cast = [main, human, ai, lit, ...labs];
-		if (!s.reduce) {
+		const soon = performance.now() + 1.5, deadline = soon + 3; // wall-clock, so a slow machine does less per frame, not longer frames
+		stillNow = s.t - movedT > 0.2; dprNow = dpr;
+		let pending = false;
+		if (!s.reduce && !traced) {
 			// ridges first, for the whole cast: the divisions need them, and they are quick to trace
-			for (const it of cast) if (!it.ridges && it.full > 0) { geometry(it); if (performance.now() > soon) break; }
-			for (let i = 0; i < l.crowd.length && performance.now() <= soon; i++) if (!crowd[i].ridges && crowd[i].full > 0) geometry(crowd[i]);
+			traced = true;
+			for (let i = 0; i < cast.length && traced; i++) if (!cast[i].ridges && cast[i].full > 0) { geometry(cast[i]); if (performance.now() > soon) traced = false; }
+			for (let i = 0; i < l.crowd.length && traced; i++) if (!crowd[i].ridges && crowd[i].full > 0) { geometry(crowd[i]); if (performance.now() > soon) traced = false; }
+			pending = !traced;
 		}
 		for (;;) {
 			if (!job) {
-				let next = drawn.find(stale);
-				if (!next && !s.reduce) next = cast.find(stale) ?? crowd.find((it, i) => i < l.crowd.length && stale(it));
+				const next = nextStale(l, !s.reduce);
 				if (!next) break;
 				job = begin(next, dpr);
 			}
 			// with motion reduced there is no inking in: a print with nothing to show yet is set at once
 			const first = job.it.sprite === job.cv;
-			if (!step(job, s.reduce && first ? Infinity : deadline)) break;
+			if (!step(job, s.reduce && first ? Infinity : deadline)) { pending = true; break; }
 			job = null;
-			if (performance.now() > deadline) break;
+			if (performance.now() > deadline) { pending = true; break; }
 		}
 
-		// breathing: each print drifts a hair on its own clock
-		for (const it of drawn) {
-			const p = it.pose, r = it.rest, live = s.reduce ? 0 : 1;
-			p.x = r.x; p.y = r.y; p.a = r.a;
-			p.r = r.r * (1 + live * 0.007 * Math.sin(s.t * 0.55 + it.phase));
-			p.rot = r.rot + live * 0.008 * Math.sin(s.t * 0.37 + it.phase * 1.7);
-		}
-
-		const sw = Math.round(view.w * dpr), sh = Math.round(view.h * dpr);
-		if (!scratch) { scratch = document.createElement("canvas"); sg = scratch.getContext("2d")!; }
-		if (scratch.width !== sw || scratch.height !== sh) { scratch.width = sw; scratch.height = sh; }
-		const g = sg!;
-		g.setTransform(dpr, 0, 0, dpr, 0, 0);
-		g.clearRect(0, 0, view.w, view.h);
-		for (const it of drawn) stamp(g, it, dpr);
-		g.globalAlpha = 1;
-		if (!s.reduce) weaveAll(g, l);
-
-		// the lens
+		// the lens: where it is and how strongly it magnifies
 		const ptr = s.pointer;
-		const inQuiet = ptr ? s.quiet.some((q) => ptr.x > q.x && ptr.x < q.x + q.w && ptr.y > q.y && ptr.y < q.y + q.h) : false;
-		const want = ptr && !inQuiet ? 1 : 0;
+		let want = ptr ? 1 : 0;
+		if (ptr) for (let i = 0; i < quiet.length; i++) { const q = quiet[i]; if (ptr.x > q.x && ptr.x < q.x + q.w && ptr.y > q.y && ptr.y < q.y + q.h) want = 0; }
 		lensA = s.reduce ? want : lensA + (want - lensA) * Math.min(1, s.dt * 10);
+		if (Math.abs(want - lensA) < 0.004) lensA = want;
 		if (ptr && want) { lensX = ptr.x; lensY = ptr.y; }
+		const rad = Math.min(92, Math.max(58, Math.min(stage.w, stage.h) * 0.13)) * (0.9 + 0.1 * lensA);
+		let lensMoving = lensA !== want;
 		if (lensA > 0.01) {
-			const rad = Math.min(92, Math.max(58, Math.min(stage.w, stage.h) * 0.13)) * (0.9 + 0.1 * lensA);
 			// magnify for the print under the glass, or failing that the nearest one it touches
 			let top = under(lensX, lensY);
 			if (!top) {
 				let bd = 1e9;
-				for (const it of drawn) {
-					const p = it.rest;
+				for (let i = 0; i < drawn.length; i++) {
+					const p = drawn[i].rest;
 					if (p.a < 0.12) continue;
 					const d = Math.hypot((lensX - p.x) / HW, lensY - p.y) - p.r;
-					if (d < rad * 0.6 && d < bd) { bd = d; top = it; }
+					if (d < rad * 0.6 && d < bd) { bd = d; top = drawn[i]; }
 				}
 			}
 			const target = top ? Math.min(6.5, Math.max(2.1, 11 / Math.max(0.5, typePx(top, top.rest.r)))) : lensMag;
-			lensMag = s.reduce ? target : lensMag + (target - lensMag) * Math.min(1, s.dt * 9);
-			g.save();
-			g.globalAlpha = lensA;
-			g.beginPath(); g.arc(lensX, lensY, rad, 0, TAU);
-			g.fillStyle = "#F4F4F0"; g.fill();
-			g.clip();
-			for (const it of drawn) decipher(g, it, lensX, lensY, lensMag, rad, dpr);
-			if (!s.reduce) {
-				g.setTransform(dpr * lensMag, 0, 0, dpr * lensMag, dpr * lensX * (1 - lensMag), dpr * lensY * (1 - lensMag));
-				weaveAll(g, l);
-				g.setTransform(dpr, 0, 0, dpr, 0, 0);
-				g.globalAlpha = lensA;
-			}
-			g.restore();
-			// the glass: a fine rim, a hairline inside it, four ticks
-			g.globalAlpha = lensA; g.strokeStyle = C.ink;
-			g.lineWidth = 1.6; g.beginPath(); g.arc(lensX, lensY, rad, 0, TAU); g.stroke();
-			g.lineWidth = 0.5; g.globalAlpha = lensA * 0.45; g.beginPath(); g.arc(lensX, lensY, rad - 4, 0, TAU); g.stroke();
-			g.globalAlpha = lensA * 0.8; g.lineWidth = 1; g.beginPath();
-			for (let i = 0; i < 4; i++) { const a = (i * TAU) / 4, c = Math.cos(a), sn = Math.sin(a); g.moveTo(lensX + c * (rad - 4), lensY + sn * (rad - 4)); g.lineTo(lensX + c * (rad + 5), lensY + sn * (rad + 5)); }
-			g.stroke();
-			g.globalAlpha = 1;
+			lensMag = s.reduce || Math.abs(target - lensMag) < 0.004 ? target : lensMag + (target - lensMag) * Math.min(1, s.dt * 9);
+			if (lensMag !== target) lensMoving = true;
+		}
+		const px = ptr ? ptr.x : NaN, py = ptr ? ptr.y : NaN;
+		if (px !== lastPX && !(px !== px && lastPX !== lastPX)) lensMoving = true;
+		if (py !== lastPY && !(py !== py && lastPY !== lastPY)) lensMoving = true;
+		lastPX = px; lastPY = py;
+
+		const gain = clamp01(s.enter);
+		breathing = !s.reduce && gain >= 0.003;
+		breathTick = Math.floor(s.t * BREATH_HZ); bt = breathTick / BREATH_HZ;
+		// nothing below changes state: the same inputs give the same frame, whenever the host asks for it
+		active = e !== goal || leap !== null || pending || job !== null || !fontReady || !stillNow || lensMoving;
+		if (gain < 0.003) return;
+		ctx.save();
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		ctx.globalCompositeOperation = "source-over";
+		for (let i = 0; i < drawn.length; i++) {
+			const it = drawn[i], a = it.rest.a * gain;
+			if (a < 0.004 || !it.sprite) continue;
+			if (quiet.length && touches(it, quiet)) stampFaded(ctx, it, quiet, dpr, a);
+			else stamp(ctx, it, dpr, 0, 0, a);
+		}
+		ctx.globalAlpha = 1;
+		const weaving = !s.reduce && e > 0 && e < 3 && e !== Math.round(e);
+		if (weaving) {
+			if (quiet.length) {
+				// threads stay out of the quiet boxes
+				ctx.save();
+				ctx.beginPath(); ctx.rect(0, 0, view.w, view.h);
+				for (let i = 0; i < quiet.length; i++) { const q = quiet[i]; ctx.rect(q.x, q.y, q.w, q.h); }
+				ctx.clip("evenodd");
+				weaveAll(ctx, l, gain);
+				ctx.restore();
+			} else weaveAll(ctx, l, gain);
 		}
 
-		// keep the panel's copy clear
-		if (s.quiet.length) {
-			g.globalCompositeOperation = "destination-out";
-			g.drawImage(quietMask(view, s.quiet), 0, 0, view.w, view.h);
-			g.globalCompositeOperation = "source-over";
-		}
-
-		const a = clamp01(s.enter);
-		if (a > 0.003) {
+		if (lensA > 0.01) {
+			const la = lensA * gain;
 			ctx.save();
-			ctx.globalAlpha *= a;
-			ctx.drawImage(scratch, 0, 0, view.w, view.h);
+			ctx.globalAlpha = la;
+			ctx.beginPath(); ctx.arc(lensX, lensY, rad, 0, TAU);
+			ctx.fillStyle = "#F4F4F0"; ctx.fill();
+			ctx.clip();
+			for (let i = 0; i < drawn.length; i++) decipher(ctx, drawn[i], lensX, lensY, lensMag, rad, dpr, gain);
+			if (weaving) {
+				ctx.setTransform(dpr * lensMag, 0, 0, dpr * lensMag, dpr * lensX * (1 - lensMag), dpr * lensY * (1 - lensMag));
+				weaveAll(ctx, l, gain);
+				ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			}
 			ctx.restore();
+			// the glass: a fine rim, a hairline inside it, four ticks
+			ctx.globalAlpha = la; ctx.strokeStyle = C.ink; ctx.setLineDash(SOLID); ctx.lineCap = "butt";
+			ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(lensX, lensY, rad, 0, TAU); ctx.stroke();
+			ctx.lineWidth = 0.5; ctx.globalAlpha = la * 0.45; ctx.beginPath(); ctx.arc(lensX, lensY, rad - 4, 0, TAU); ctx.stroke();
+			ctx.globalAlpha = la * 0.8; ctx.lineWidth = 1; ctx.beginPath();
+			for (let i = 0; i < 4; i++) { const a = (i * TAU) / 4, c = Math.cos(a), sn = Math.sin(a); ctx.moveTo(lensX + c * (rad - 4), lensY + sn * (rad - 4)); ctx.lineTo(lensX + c * (rad + 5), lensY + sn * (rad + 5)); }
+			ctx.stroke();
 		}
+		ctx.restore();
 	}
+
+	/** true while anything is still moving or being set, or a breath is due; when false, a redraw would give the frame
+	 * already on the canvas */
+	function busy() { return active || dirty || (breathing && Math.floor((performance.now() / 1000) * BREATH_HZ) !== breathTick); }
 
 	function anchors(): Anchor[] {
 		const out: Anchor[] = [];
@@ -890,19 +957,19 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		return out;
 	}
 
+	const LIT_HIT = { id: "lit" };
 	function hit(x: number, y: number): Hit {
 		const it = under(x, y);
 		if (!it || it === main) return null;
-		if (litIndex >= 0 && it === crowd[litIndex]) return { id: "lit" };
-		return { id: it.id };
+		if (litIndex >= 0 && it === crowd[litIndex]) return LIT_HIT;
+		return it.hit;
 	}
 
 	function dispose() {
 		disposed = true;
-		for (const it of [main, human, ai, lit, ...labs, ...crowd]) { it.sprite = null; it.ridges = null; it.glyphs = null; }
-		scratch = null; sg = null; mask = null;
-		void lastView; void inkRgb; void humanRgb; void aiRgb; void litRgb;
+		for (const it of [...cast, ...crowd]) { (it.sprite as any)?.close?.(); it.sprite = null; it.ridges = null; it.glyphs = null; }
+		tile = null; tg = null; job = null; splits.length = 0;
 	}
 
-	return { draw, anchors, hit, dispose };
+	return { draw, anchors, hit, dispose, busy };
 };

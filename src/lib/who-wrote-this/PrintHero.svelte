@@ -53,7 +53,7 @@
 		const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).has("still");
 		const text = [
 			...C.lede.map((s) => s.t), L.lead.t, ...L.items.flatMap((i) => [i.t, i.fact]),
-			C.sections[0].example.text.map((s) => s.t).join(""), ...C.timeline.steps.map((s) => s.t), ...C.art.decipher.map((d) => d.excerpt.t), C.closing.t,
+			(C.sections[0].example?.text ?? []).map((s) => s.t).join(""), ...C.timeline.steps.map((s) => s.t), ...C.art.decipher.map((d) => d.excerpt.t), C.closing.t,
 		];
 		print = createPrint({
 			text, labs: LABS, litText: LIT.excerpt.t,

@@ -6,6 +6,7 @@
 	import C from "$lib/who-wrote-this/content.json";
 	import { createPrint } from "$lib/who-wrote-this/print/fingerprint";
 	import type { Anchor, Box } from "$lib/who-wrote-this/print/contract";
+	import { printSprite, printAspect, setSpriteText, type SpriteOpts } from "$lib/who-wrote-this/print/sprites";
 
 	const text: string[] = [
 		...C.lede.map((s) => s.t),
@@ -27,12 +28,53 @@
 	let hover = $state("");
 	let quiet = $state<Box>({ x: 0, y: 0, w: 0, h: 0 });
 	let narrow = $state(false);
+	let gallery = $state(false);
+	let shelf: HTMLDivElement | undefined = $state();
+	let built = $state("");
 
 	onMount(() => {
 		const q = new URLSearchParams(location.search);
+		if (q.has("gallery")) {
+			// ?gallery: the small prints the other sections reuse (print/sprites.ts), with cold build times
+			gallery = true;
+			setSpriteText(text);
+			const LAB = ["#C85A82", "#437E8E", "#461E47"], times: Record<string, number[]> = {};
+			const row = (title: string, items: SpriteOpts[]) => {
+				const d = document.createElement("div"); d.className = "row";
+				const h = document.createElement("span"); h.textContent = title; d.append(h);
+				for (const o of items) {
+					const t0 = performance.now(), src = printSprite(o);
+					(times[`${o.px}px${o.text ? " text" : ""}`] ??= []).push(performance.now() - t0);
+					// a copy for the page: the cached canvas itself may appear in more than one row
+					const cv = document.createElement("canvas"); cv.width = src.width; cv.height = src.height; cv.getContext("2d")!.drawImage(src, 0, 0);
+					cv.style.width = `${o.px * printAspect()}px`; cv.style.height = `${o.px}px`;
+					d.append(cv);
+				}
+				shelf!.append(d);
+			};
+			const go = () => {
+				shelf!.replaceChildren();
+				const CL = [0, 0.25, 0.5, 0.75, 1];
+				for (const px of [16, 32]) {
+					row(`labs ${px}`, labs.map((_, i) => ({ family: "lab", index: i, color: LAB[i] ?? "#8A8F98", px })));
+					row(`writers ${px}`, Array.from({ length: 12 }, (_, i) => ({ family: "writer", index: i, color: "#C85A82", px })));
+					for (const [fam, idx, col] of [["writer", 3, "#C85A82"], ["lab", 0, "#14202D"], ["lab", 2, "#461E47"]] as const)
+						row(`clarity 0 to 1, ${fam} ${idx}, ${px}`, CL.flatMap((c) => [0, 1, 2].map((k) => ({ family: fam, index: idx + (fam === "writer" ? k : 0), color: col, px, clarity: c }))));
+				}
+				row("main, human, ai 64", [{ family: "main", color: "#14202D", px: 64 }, { family: "human", color: "#C85A82", px: 64 }, { family: "ai", color: "#461E47", px: 64 }]);
+				row("labs 120 text", labs.map((_, i) => ({ family: "lab", index: i, color: LAB[i] ?? "#8A8F98", px: 120, text: true })));
+				row("writers 120 text", Array.from({ length: 12 }, (_, i) => ({ family: "writer", index: i, color: "#C85A82", px: 120, text: true })));
+				row("clarity 0 to 1, 120 text", CL.map((c) => ({ family: "writer", index: 3, color: "#437E8E", px: 120, text: true, clarity: c })));
+				row("clarity 0 to 1, 120 lines", CL.map((c) => ({ family: "lab", index: 2, color: "#14202D", px: 120, clarity: c })));
+				built = Object.entries(times).map(([k, v]) => `${k}: ${(v.reduce((a, b) => a + b, 0) / v.length).toFixed(2)} ms avg, ${Math.max(...v).toFixed(1)} worst (${v.length})`).join(" · ");
+				(window as any).__sprites = built;
+			};
+			(document.fonts?.load ? document.fonts.load('500 12px "Inter"') : Promise.resolve()).then(go, go);
+			return;
+		}
 		level = Math.max(0, Math.min(3, +(q.get("level") ?? 0)));
 		const still = q.has("still") || matchMedia("(prefers-reduced-motion: reduce)").matches;
-		const forced = +(q.get("dpr") ?? 0);
+		const forced = +(q.get("dpr") ?? 0), nobusy = q.has("nobusy");
 		const parked = q.get("lens")?.split(",").map(Number);
 		const print = createPrint({
 			text, labs, litText,
@@ -61,8 +103,15 @@
 		document.documentElement.addEventListener("pointerleave", leave);
 
 		let raf = 0, last = performance.now(), cpu = 0, gap = 0, worst = 0, n = 0, tick = 0;
+		let seen = "", skipped = 0, total = 0;
 		function frame(now: number) {
 			const dt = (now - last) / 1000; last = now;
+			raf = requestAnimationFrame(frame);
+			// the way the host drives it: redraw only while the renderer is busy or an input changed
+			const input = `${level}|${pointer?.x}|${pointer?.y}|${W}|${H}`;
+			total++;
+			if (!nobusy && input === seen && print.busy && !print.busy()) { skipped++; (window as any).__skip = skipped / total; return; }
+			seen = input;
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			ctx.clearRect(0, 0, W, H);
 			const t0 = performance.now();
@@ -70,13 +119,12 @@
 			const c = performance.now() - t0;
 			cpu += c; gap += dt * 1000; worst = Math.max(worst, c); n++;
 			if (now - tick > 500) {
-				ms = `draw ${(cpu / n).toFixed(2)} ms (worst ${worst.toFixed(1)}) · frame ${(gap / n).toFixed(1)} ms · dpr ${dpr}`;
-				(window as any).__print = { draw: cpu / n, worst, frame: gap / n, dpr };
+				ms = `draw ${(cpu / n).toFixed(2)} ms (worst ${worst.toFixed(1)}) · ${(n * 2)} draws/s · dpr ${dpr}`;
+				(window as any).__print = { draw: cpu / n, worst, drawsPerSec: n * 2, dpr };
 				cpu = gap = worst = n = 0; tick = now;
-			}
-			anchors = print.anchors();
+				anchors = print.anchors();
+			} else if (print.busy?.()) anchors = print.anchors();
 			hover = pointer ? (print.hit(pointer.x, pointer.y)?.id ?? "") : "";
-			raf = requestAnimationFrame(frame);
 		}
 		raf = requestAnimationFrame(frame);
 		return () => {
@@ -94,9 +142,16 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400;1,14..32,500&display=swap" />
-	{@html `<style>html,body{margin:0;overflow:hidden;height:100%}html body{background-color:#E8E8E3;background-image:radial-gradient(rgba(20,32,45,.07) 1px,transparent 1.2px);background-size:18px 18px}</style>`}
+	{@html `<style>
+	.shelf { position: fixed; inset: 0; z-index: 1000; overflow: auto; padding: 14px 18px; background: #E8E8E3 radial-gradient(rgba(20, 32, 45, 0.07) 1px, transparent 1.2px) 0 0 / 18px 18px; font: 11px Inter, system-ui, sans-serif; color: #14202D; }
+	.shelf p { margin: 0 0 8px; }
+	.shelf :global(.row) { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+	.shelf :global(.row span) { width: 150px; flex: none; color: #5A6270; }html,body{margin:0;overflow:hidden;height:100%}html body{background-color:#E8E8E3;background-image:radial-gradient(rgba(20,32,45,.07) 1px,transparent 1.2px);background-size:18px 18px}</style>`}
 </svelte:head>
 
+{#if gallery}
+	<div class="shelf"><p>{built}</p><div bind:this={shelf}></div></div>
+{:else}
 <div class="root">
 	<canvas bind:this={canvas}></canvas>
 	<div class="quiet" style="left:{quiet.x}px; top:{quiet.y}px; width:{quiet.w}px; height:{quiet.h}px">quiet</div>
@@ -111,8 +166,13 @@
 		{#if hover}<b>{hover}</b>{/if}
 	</div>
 </div>
+{/if}
 
 <style>
+	.shelf { position: fixed; inset: 0; z-index: 1000; overflow: auto; padding: 14px 18px; background: #E8E8E3 radial-gradient(rgba(20, 32, 45, 0.07) 1px, transparent 1.2px) 0 0 / 18px 18px; font: 11px Inter, system-ui, sans-serif; color: #14202D; }
+	.shelf p { margin: 0 0 8px; }
+	.shelf :global(.row) { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+	.shelf :global(.row span) { width: 150px; flex: none; color: #5A6270; }
 	.root { position: fixed; inset: 0; z-index: 1000; background: #E8E8E3 radial-gradient(rgba(20, 32, 45, 0.07) 1px, transparent 1.2px) 0 0 / 18px 18px; font-family: Inter, system-ui, sans-serif; color: #14202D; cursor: crosshair; }
 	canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 	.quiet { position: absolute; box-sizing: border-box; border: 1px dashed rgba(20, 32, 45, 0.25); font-size: 11px; padding: 6px; color: rgba(20, 32, 45, 0.45); pointer-events: none; }
