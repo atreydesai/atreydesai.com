@@ -466,7 +466,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const r0 = Math.min(S.h * 0.455, S.w * 0.55);
 		const r1 = Math.min(S.h * 0.33, S.w * 0.275);
 		const human2 = wide ? [S.x + S.w * 0.095, cy, Math.min(S.h, S.w) * 0.115] : [S.x + S.w * 0.12, S.y + S.h * 0.925, S.h * 0.065];
-		const G = wide ? { x: S.x + S.w * 0.21, y: S.y + S.h * 0.045, w: S.w * 0.77, h: S.h * 0.9 } : { x: S.x + S.w * 0.02, y: S.y, w: S.w * 0.96, h: S.h * 0.84 };
+		// level 2 shows the labs alone (the human print has gone), so they take the whole stage, centred
+		const G = wide ? { x: S.x + S.w * 0.03, y: S.y + S.h * 0.045, w: S.w * 0.94, h: S.h * 0.9 } : { x: S.x + S.w * 0.02, y: S.y, w: S.w * 0.96, h: S.h * 0.84 };
 		const rBig = Math.min(G.h * 0.2, G.w / 6.1), rSmall = Math.min(G.h * 0.105, G.w / 10.2);
 		const J = rng(seed + 7);
 		const lab2 = labs.map((_, i) => {
@@ -621,8 +622,12 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 				const at = dst.length;
 				for (let q = 0; q < N; q++) { const i = Math.round((q / (N - 1)) * (n - 1)); dst.push(r[i * 2], r[i * 2 + 1]); }
 				const s0 = src.length;
+				// take only as much parent ridge as the child ridge is long (at the piece's scale): a short child ridge
+				// stretched over a whole run drew a long straight chord across the print mid-division (Atrey, 16 Nov)
+				const span = Math.max(1, Math.min(run.i1 - run.i0, ((n - 1) * kid.ds) / (cs[ki] * parent.ds)));
+				const a0 = run.i0 + (run.i1 - run.i0 - span) * R();
 				for (let q = 0; q < N; q++) {
-					const u = run.i0 + (q / (N - 1)) * (run.i1 - run.i0), i = Math.min(run.i1 - 1, Math.floor(u)), f = u - i;
+					const u = a0 + (q / (N - 1)) * span, i = Math.min(run.i1 - 1, Math.floor(u)), f = u - i;
 					src.push(lerp(run.r[i * 2], run.r[i * 2 + 2], f), lerp(run.r[i * 2 + 1], run.r[i * 2 + 3], f));
 				}
 				// run the thread the way that twists least
