@@ -15,9 +15,10 @@
 	//      sentence, and the three sets' extra sentences. There is no Explore: every view is in the scroll.
 	// Tiles are drawn on the page's field and stand for the paper's aggregate counts only, never individual texts,
 	// reviewers or per-review results. Lit tiles fill from the bottom (from the left on a phone) in the colour of the
-	// model whose result they show; every colour is named on the picture with Tags. The step comes from the scroll
-	// position (a passive listener), so no step is skipped; each step has a screen or more of scroll. Strings and
-	// numbers come from rq3.json, built in the private llm-detectors repo by docs/launch_20261116/tools/build_rq3_data.py.
+	// model whose result they show; every colour is named on the picture with Tags. The step follows the scroll position
+	// (a passive listener) one step at a time, each shown at least 350 ms, so no step is skipped however fast the scroll;
+	// each step has about 60vh of scroll (75vh when it animates). Strings and numbers come from rq3.json, built in the
+	// private llm-detectors repo by docs/launch_20261116/tools/build_rq3_data.py.
 	import { onMount } from "svelte";
 	import { fade } from "svelte/transition";
 	import Icon from "./Icon.svelte";
@@ -54,12 +55,16 @@
 	];
 	const STEPS = S.steps as Step[];
 	const LAST = STEPS.length - 1;
-	// scroll per step, in vh: a screen or more each; the demo's prompt step (the prompt closes around the review, then
-	// the answer arrives) gets more, and the last step a little more before the stage leaves
-	const VH = [110, 180, 100, 100, 100, 100, 110];
+	// scroll per step, in vh (Atrey, 16 Nov: neither too fast for a fast scroller nor a long still stretch for a slow
+	// one): about 60vh a step, 75vh for a step that animates (the tiles ease in); the demo's prompt step has two moves
+	// (the prompt closes around the review, then the answer arrives), 75vh each
+	const VH = [60, 150, 75, 75, 75, 75, 60];
 	const LEN = VH.reduce((a, v) => a + v, 0);
-	const ANSWER_AT = 0.5; // share of the prompt step scrolled before the answer arrives (90vh of the prompt alone)
-	const LAND = [0.5, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5]; // where a dash click lands in its step
+	const ANSWER_AT = 0.5; // share of the prompt step scrolled before the answer arrives
+	const LAND = [0.5, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5]; // where a dash click or a footnote's ↩ lands in its step
+	const HOLD = 350; // ms: the least time a step is shown when a fast scroll crosses several
+	// the beats the stage walks through, in order: each step once, the prompt step twice (before and after its answer)
+	const beatOf = (s: number, p: number) => (s === 0 ? 0 : s === 1 ? (p >= ANSWER_AT ? 2 : 1) : s + 1);
 	const LAYOUTS = [[["famous", "nature", "papers"], ["active", "inactive"]], [["famous", "nature"], ["papers", "inactive"], ["active"]]];
 	const ICON: Record<string, string> = { famous: "book", nature: "nature", papers: "arxiv", active: "reddit", inactive: "reddit" };
 	const U: Record<string, string> = Object.fromEntries(S.ui.map((u) => [u.id, u.t]));
@@ -436,9 +441,18 @@
 	// inputs: the view and its controls, the section coming into view, and the canvas changing hands
 	$effect(() => { void [view, active, field.mode, field.owner]; kick(); });
 
-	// --- scroll: the step is a function of how far the track has scrolled, so no step can be skipped ----------------
+	// --- scroll: the stage follows the scroll one beat at a time -------------------------------------------------
+	// The scroll position names a beat (want). The shown beat walks to it one beat at a time and holds each at least
+	// HOLD, so a fast scroll never skips a step and a slow one sees each step arrive where its stretch starts. Off
+	// screen, or back on screen after being off (a jump), the stage takes the right beat at once. A dash click or a
+	// footnote's ↩ shows its step at once and holds it while the page scrolls there (pin).
 	let starts: number[] = [];
 	let end = 0;
+	let y = 0; // how far the track has scrolled, px
+	let prog = $state(0); // 0 to 1 through the shown step's stretch (StepDashes fills the next dash with it)
+	let shown = 0, want = 0, since = -1e9, away = true, pin = -1;
+	let timer: ReturnType<typeof setTimeout> | undefined, pinT: ReturnType<typeof setTimeout> | undefined, endT: ReturnType<typeof setTimeout> | undefined;
+	let moved = 0; // when the page last scrolled
 	function measure() {
 		const els = [...track.querySelectorAll<HTMLElement>(".step")];
 		starts = els.map((e) => e.offsetTop);
@@ -446,20 +460,58 @@
 		const cs = getComputedStyle(stick);
 		padT = parseFloat(cs.paddingTop) || 0; padB = parseFloat(cs.paddingBottom) || 0;
 	}
-	function onScroll() {
-		const y = -track.getBoundingClientRect().top;
+	// the beat the scroll position names; true while the track is off screen
+	function read() {
+		const r = track.getBoundingClientRect();
+		y = -r.top;
 		let s = 0;
 		for (let i = 1; i <= LAST; i++) if (y >= starts[i]) s = i;
-		const a = starts[s], b = s < LAST ? starts[s + 1] : end;
-		const p = (y - a) / (b - a);
+		want = beatOf(s, (y - starts[s]) / ((s < LAST ? starts[s + 1] : end) - starts[s]));
+		return r.bottom <= 0 || r.top >= innerHeight;
+	}
+	function fillDash() {
+		const a = starts[step], b = step < LAST ? starts[step + 1] : end;
+		const p = Math.round(Math.max(0, Math.min(1, (y - a) / (b - a))) * 1000) / 1000;
+		if (p !== prog) prog = p;
+	}
+	function show(b: number) {
+		shown = b; since = performance.now();
+		const s = b <= 1 ? b : b - 1, an = b >= 2;
 		if (s !== step) step = s;
-		const an = s > 1 || (s === 1 && p >= ANSWER_AT);
 		if (an !== ans) ans = an;
+		fillDash();
 		if (active) kick();
 	}
-	// a dash scrolls to the middle of its step (the inverse of onScroll; the dev route's ?step=N does the same)
+	// one beat toward the goal once the shown one has had its time, then wait for the next
+	function pump() {
+		clearTimeout(timer); timer = undefined;
+		const goal = pin >= 0 ? pin : want;
+		if (shown === goal) return;
+		const wait = since + HOLD - performance.now();
+		if (wait > 0) { timer = setTimeout(pump, wait); return; }
+		show(shown + Math.sign(goal - shown));
+		if (shown !== goal) timer = setTimeout(pump, HOLD);
+	}
+	function unpin() { if (pin < 0) return; pin = -1; clearTimeout(pinT); pump(); }
+	function hold(b: number) {
+		pin = b; clearTimeout(pinT); pinT = setTimeout(unpin, 2500); clearTimeout(timer);
+		if (b !== shown) show(b);
+		if (want === b) unpin();
+	}
+	function onScroll() {
+		moved = performance.now();
+		const off = read(), snap = off || away || still;
+		away = off;
+		if (pin >= 0 && want === pin) { pin = -1; clearTimeout(pinT); }
+		if (snap) { clearTimeout(timer); const goal = pin >= 0 ? pin : want; if (goal !== shown) show(goal); }
+		else pump();
+		fillDash();
+		if (active) kick();
+	}
+	// a dash scrolls to the middle of its step (the dev route's ?step=N does the same), showing that step at once
 	function go(i: number) {
 		const a = starts[i], b = i < LAST ? starts[i + 1] : end;
+		hold(beatOf(i, LAND[i]));
 		scrollTo({ top: track.getBoundingClientRect().top + scrollY + a + (b - a) * LAND[i], behavior: reduce ? "instant" : "smooth" });
 	}
 
@@ -469,7 +521,8 @@
 		meter = document.createElement("canvas").getContext("2d");
 		last = performance.now();
 		measure();
-		onScroll();
+		away = read();
+		show(want);
 		const release = () => {
 			if (field.owner !== OWNER) return;
 			if (field.mode === "chart") field.mode = "ground";
@@ -501,10 +554,27 @@
 		const fo = new MutationObserver(back);
 		fo.observe(root, { subtree: true, attributes: true, attributeFilter: ["href"] });
 		back();
+		// a ↩ to one of those anchors: show its step at once and hold it while the page scrolls there (the link itself
+		// does the scrolling)
+		const onBack = (e: MouseEvent) => {
+			const a = (e.target as HTMLElement)?.closest?.("a.back");
+			const at = a ? document.getElementById(a.getAttribute("href")?.slice(1) ?? "") : null;
+			if (!at?.classList.contains("fnback") || !track.contains(at)) return;
+			const i = FN_STEP[Number(at.dataset.n)];
+			if (i >= 0) hold(beatOf(i, LAND[i]));
+		};
+		document.addEventListener("click", onBack);
+		// the page coming to rest lets a held step go (also when the reader's own scroll cut the jump short); a wheel
+		// tick mid-jump ends its own scroll while the jump goes on, so only a page that has stopped moving counts
+		const ended = () => { clearTimeout(endT); endT = setTimeout(() => { if (performance.now() - moved > 90) unpin(); }, 120); };
+		addEventListener("scrollend", ended, { passive: true });
 		return () => {
 			cancelAnimationFrame(raf); raf = 0;
+			clearTimeout(timer); clearTimeout(pinT);
 			io.disconnect(); ro.disconnect(); fo.disconnect();
 			removeEventListener("scroll", onScroll); removeEventListener("resize", onResize);
+			document.removeEventListener("click", onBack);
+			removeEventListener("scrollend", ended); clearTimeout(endT);
 			release(); if (field.owner === OWNER) field.owner = "";
 		};
 	});
@@ -585,7 +655,7 @@
 			<!-- the caption band: the narration card, its step dashes on top -->
 			<div class="band" bind:this={band}>
 				<div class="card" bind:this={card}>
-					<StepDashes count={STEPS.length} current={step} {go} />
+					<StepDashes count={STEPS.length} current={step} {go} progress={prog} />
 					<div class="says" bind:this={says}>
 						<!-- every sentence stays mounted (only the current one shown), so its footnote marks keep their page numbers -->
 						<div aria-live="polite">

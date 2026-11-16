@@ -19,6 +19,8 @@
 	// `notes_ours` list the rest. The full prompt and the demo's provenance are footnotes.
 	//
 	// The scale's steps are drawn on the canvas (under the tiles), so the writer's texts are never hidden behind them.
+	// Pacing: each step has 75vh of scroll (every step here animates in); the shown step follows the scroll one step at a
+	// time, each shown at least 350 ms, so a fast scroll never skips one; off screen it takes the right step at once.
 	// Performance: the step comes from one passive scroll listener; nothing runs per frame while idle. The canvas is
 	// rebuilt only when an input changes (step, a control, hover, size, the stage's position while it scrolls in or out)
 	// and, while a tween moves, on animation frames that stop when it ends. Marks are pooled and placed exactly (snap),
@@ -55,7 +57,11 @@
 	const STEP_GRAY = GRAY.light; // the scale's steps, before any text fills them
 	const STEPS = F.steps as Step[];
 	const LAST = STEPS.length - 1;
-	const STEP_VH = 1; // scroll per step, in viewport heights: an ordinary scroll never skips one
+	// scroll per step, in viewport heights (Atrey, 16 Nov: neither too fast for a fast scroller nor a long still stretch
+	// for a slow one): about 60vh a step, 75vh for a step that animates, and every step here plays an entrance
+	const STEP_VH = 0.75;
+	const LAND = 0.5; // where a dash click or a footnote's ↩ lands in its step
+	const HOLD = 350; // ms: the least time a step is shown when a fast scroll crosses several
 	const BINS = F.data.bins.domains as Record<string, Record<string, Bin[]>>;
 	const EFF = F.data.effort.models as Record<string, EM>;
 	const L = F.labels;
@@ -434,10 +440,63 @@
 		if (r.left !== ox) ox = r.left;
 		if (r.top !== oy) oy = r.top;
 	}
-	// a dash click scrolls to the middle of that step's stretch of the pinned stage
+	// --- scroll: the stage follows the scroll one step at a time ---------------------------------------------------
+	// The scroll position names a step (want). The shown step walks to it one step at a time and holds each at least
+	// HOLD, so a fast scroll never skips one and a slow one sees each step arrive where its stretch starts. Off screen,
+	// or back on screen after being off (a jump), the stage takes the right step at once. A dash click or a footnote's
+	// ↩ shows its step at once and holds it while the page scrolls there (pin).
+	let y = 0; // how far the pinned part has scrolled, in viewport heights
+	let vhPx = 1; // one viewport height in px, as the CSS lays the track out
+	let prog = $state(0); // 0 to 1 through the shown step's stretch (StepDashes fills the next dash with it)
+	let want = 0, since = -1e9, away = true, pin = -1, still = false;
+	let timer: ReturnType<typeof setTimeout> | undefined, pinT: ReturnType<typeof setTimeout> | undefined, endT: ReturnType<typeof setTimeout> | undefined;
+	let moved = 0; // when the page last scrolled
+	// the step the scroll position names; true while the pinned part is off screen
+	function read() {
+		const r = root.getBoundingClientRect();
+		y = -r.top / vhPx;
+		want = Math.max(0, Math.min(LAST, Math.floor(y / STEP_VH)));
+		return r.bottom <= 0 || r.top >= innerHeight;
+	}
+	function fillDash() {
+		const p = Math.round(Math.max(0, Math.min(1, y / STEP_VH - step)) * 1000) / 1000;
+		if (p !== prog) prog = p;
+	}
+	function show(s: number) {
+		since = performance.now();
+		if (s !== step) step = s;
+		fillDash();
+	}
+	// one step toward the goal once the shown one has had its time, then wait for the next
+	function pump() {
+		clearTimeout(timer); timer = undefined;
+		const goal = pin >= 0 ? pin : want;
+		if (step === goal) return;
+		const wait = since + HOLD - performance.now();
+		if (wait > 0) { timer = setTimeout(pump, wait); return; }
+		show(step + Math.sign(goal - step));
+		if (step !== goal) timer = setTimeout(pump, HOLD);
+	}
+	function unpin() { if (pin < 0) return; pin = -1; clearTimeout(pinT); pump(); }
+	function hold(s: number) {
+		pin = s; clearTimeout(pinT); pinT = setTimeout(unpin, 2500); clearTimeout(timer);
+		if (s !== step) show(s);
+		if (want === s) unpin();
+	}
+	function sync() {
+		moved = performance.now();
+		const off = read(), snap = off || away || still;
+		away = off;
+		if (pin >= 0 && want === pin) { pin = -1; clearTimeout(pinT); }
+		if (snap) { clearTimeout(timer); const goal = pin >= 0 ? pin : want; if (goal !== step) show(goal); }
+		else pump();
+		fillDash();
+	}
+	// a dash click scrolls to the middle of that step's stretch of the pinned stage, showing that step at once
 	function go(i: number) {
+		hold(i);
 		const top = root.getBoundingClientRect().top + scrollY;
-		scrollTo({ top: top + i * innerHeight * STEP_VH, behavior: reduce ? "instant" : "smooth" });
+		scrollTo({ top: top + (i + LAND) * STEP_VH * vhPx, behavior: reduce ? "instant" : "smooth" });
 	}
 	// a footnote's ↩ (the page's list): the citing words live in the pinned stage, so go to the step that cites the note
 	function back(e: MouseEvent) {
@@ -452,35 +511,38 @@
 	}
 
 	onMount(() => {
-		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).has("still");
-		const size = () => { opx = innerWidth >= 980 ? 236 : 150; };
+		still = new URLSearchParams(location.search).has("still");
+		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || still;
+		const size = () => { opx = innerWidth >= 980 ? 236 : 150; vhPx = root.offsetHeight / (STEPS.length * STEP_VH + 1); };
 		size();
 		ready = true;
-		const update = () => {
-			const r = root.getBoundingClientRect();
-			if (r.bottom < -innerHeight || r.top > innerHeight * 2) return;
-			const q = -r.top / (innerHeight * STEP_VH);
-			const s = Math.max(0, Math.min(LAST, Math.floor(q + 0.5)));
-			if (s !== step) step = s;
-		};
 		const onScroll = () => {
-			update();
+			sync();
 			if (!active) return;
 			if (active && field.mode === "ground") { field.mode = "chart"; field.owner = OWNER; field.dim = 0.75; field.interactive = false; }
 			place();
 		};
 		const onResize = () => { size(); onScroll(); };
-		update();
+		away = read();
+		show(want);
 		addEventListener("scroll", onScroll, { passive: true });
 		addEventListener("resize", onResize, { passive: true });
 		document.addEventListener("click", back);
+		// the page coming to rest lets a held step go (also when the reader's own scroll cut the jump short); a wheel
+		// tick mid-jump ends its own scroll while the jump goes on, so only a page that has stopped moving counts
+		const ended = () => { clearTimeout(endT); endT = setTimeout(() => { if (performance.now() - moved > 90) unpin(); }, 120); };
+		addEventListener("scrollend", ended, { passive: true });
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
 			if (active) { field.mode = "chart"; field.owner = OWNER; field.dim = 0.75; field.interactive = false; place(); }
 			else if (field.mode === "chart" && field.owner === OWNER) { field.mode = "ground"; field.dim = 0; field.interactive = false; chart.marks = []; chart.paths = []; chart.texts = []; }
 		}), { rootMargin: "-35% 0px -35% 0px" });
 		io.observe(root);
-		return () => { cancelAnimationFrame(raf); cancelAnimationFrame(praf); io.disconnect(); removeEventListener("scroll", onScroll); removeEventListener("resize", onResize); document.removeEventListener("click", back); };
+		return () => {
+			cancelAnimationFrame(raf); cancelAnimationFrame(praf); clearTimeout(timer); clearTimeout(pinT); io.disconnect();
+			removeEventListener("scroll", onScroll); removeEventListener("resize", onResize); document.removeEventListener("click", back);
+			removeEventListener("scrollend", ended); clearTimeout(endT);
+		};
 	});
 
 	const hitsOn = $derived(mode === "light" || mode === "takeaway" || mode === "effort");
@@ -526,7 +588,7 @@
 			<!-- the narration: a caption band on top; the dashes jump to a step; the controls open under it at the end -->
 			<div class="cap" class:unsized={!W} style="left:{geo.cap.x}px; top:{geo.cap.y}px; width:{geo.cap.w}px">
 				<div bind:clientHeight={capH}>
-					<StepDashes count={STEPS.length} current={step} {go} />
+					<StepDashes count={STEPS.length} current={step} {go} progress={prog} />
 					<div class="say" aria-live="polite">
 						{#each SAYS as t, i}
 							{@const fn = STEPS[i]?.fn}
