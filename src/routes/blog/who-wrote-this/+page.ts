@@ -9,7 +9,5 @@ export const load: PageLoad = ({ url }) => {
     if (!post) throw error(404, "Post not found");
     // print (default): the scroll-driven fingerprint hero; dots, fingerprint, mosaic: the earlier hero variants
     const art = ["dots", "fingerprint", "mosaic"].includes(url.searchParams.get("art") ?? "") ? url.searchParams.get("art")! : "print";
-    // composition mocks (development review only): ?mock=s1 shows the restructured section 1
-    const mock = url.searchParams.get("mock") ?? "";
-    return { post, art, mock };
+    return { post, art };
 };
