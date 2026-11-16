@@ -157,6 +157,7 @@
 				const c = m.color;
 				s += m.x * 1.13 + m.y * 2.71 + m.r * 3.3 + (m.alpha ?? 1) * 5.9 + (m.ring ? 11 : 0) + (m.square ? 13 : 0)
 					+ c.charCodeAt(1) + c.charCodeAt(3) * 3 + c.charCodeAt(5) * 7;
+				if (m.spriteKey) { const q = m.spriteKey; s += q.length * 17 + q.charCodeAt(0) + q.charCodeAt(q.length - 1) * 5 + q.charCodeAt(q.length >> 1) * 9; }
 			}
 			for (const p of chart.paths) {
 				const n = p.pts.length;
@@ -203,6 +204,12 @@
 				l.x += ex * k; l.y += ey * k; l.r += er * k; l.a += ea * k;
 				ctx.globalAlpha = l.a;
 				ctx.fillStyle = m.color;
+				if (m.sprite) { // a small fingerprint
+					const h = l.r * 2, w = h * (m.aspect ?? 0.8);
+					ctx.drawImage(m.sprite, l.x - w / 2, l.y - h / 2, w, h);
+					if (hov) { ctx.strokeStyle = m.color; ctx.lineWidth = 1.5; ctx.strokeRect(l.x - w / 2 - 3, l.y - h / 2 - 3, w + 6, h + 6); }
+					continue;
+				}
 				if (m.square) { ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2); continue; }
 				ctx.beginPath(); ctx.arc(l.x, l.y, l.r, 0, 6.2832);
 				if (m.ring) { ctx.fillStyle = "#E8E8E3"; ctx.fill(); ctx.strokeStyle = m.color; ctx.lineWidth = 1.8; ctx.stroke(); }

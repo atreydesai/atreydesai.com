@@ -8,6 +8,8 @@
 	import { SITE_URL } from "$lib/seo";
 	import Icon from "$lib/who-wrote-this/Icon.svelte";
 	import DotField from "$lib/who-wrote-this/DotField.svelte";
+	import SideNav from "$lib/who-wrote-this/SideNav.svelte";
+	import { startElastic } from "$lib/who-wrote-this/elastic";
 	import { field } from "$lib/who-wrote-this/field.svelte";
 	import Levels from "$lib/who-wrote-this/Levels.svelte";
 	import PrintHero from "$lib/who-wrote-this/PrintHero.svelte";
@@ -33,16 +35,13 @@
 		{ name: "about", href: "/about/" },
 	];
 
-	// contents rail: the section in view is marked
-	let current = $state(C.sections[0].id);
-	onMount(() => {
-		const io = new IntersectionObserver(
-			(entries) => entries.forEach((e) => { if (e.isIntersecting) current = e.target.id; }),
-			{ rootMargin: "-45% 0px -50% 0px" },
-		);
-		C.sections.forEach((s) => { const el = document.getElementById(s.id); if (el) io.observe(el); });
-		return () => io.disconnect();
-	});
+	// the side rail's stops, and the scroll-speed spacing (elastic.ts) for every [data-lag] block on the page
+	const stops = [
+		{ id: "levels", label: C.meta.title.t },
+		{ id: C.timeline.id, label: C.timeline.title.t.replace(/\.$/, "") },
+		...C.sections.map((s) => ({ id: s.id, label: s.title })),
+	];
+	onMount(() => startElastic(document));
 
 	const jsonLd = [
 		{
@@ -91,6 +90,7 @@
 <DotField />
 
 <div class="wwt" data-justify="off">
+	<SideNav {stops} />
 	<header class="top">
 		<a class="brand" href="/">Atrey Desai</a>
 		<nav aria-label="Site">
@@ -102,18 +102,18 @@
 		<header class="mast">
 			<a class="back" href="/blog/"><Icon name="back" /> Back to blog</a>
 			<h1>{C.meta.title.t}</h1>
-			<p class="deck">{C.meta.deck.t}</p>
-			<p class="byline">
+			<p class="deck" data-lag="1">{C.meta.deck.t}</p>
+			<p class="byline" data-lag="2">
 				{#each C.meta.authors as a, i}
 					<span class="author">{a.name}<sup>{#each a.aff as k}{affIndex[k]}{/each}{#if a.equal}*{/if}{#if a.corresponding}†{/if}</sup>{#if i < C.meta.authors.length - 1}{", "}{/if}</span>
 				{/each}
 			</p>
-			<p class="affs">
+			<p class="affs" data-lag="2">
 				{#each C.meta.affiliations as aff, i}<span><sup>{i + 1}</sup>{aff.t}</span>{/each}
 				<span><sup>*</sup>{C.meta.equal_note}</span>
 				<span><sup>†</sup>{C.meta.corresponding_note}</span>
 			</p>
-			<div class="links">
+			<div class="links" data-lag="3">
 				{#each C.meta.links as l}
 					<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>
 				{/each}
@@ -123,7 +123,7 @@
 
 		{#key art}{#if art === "print"}<PrintHero />{:else}<Levels {art} />{/if}{/key}
 
-		<div class="lede">
+		<div class="lede" data-lag="1">
 			{#each C.lede as s}{s.t + " "}{/each}
 		</div>
 
@@ -140,7 +140,7 @@
 		<Anonymity />
 
 		<footer class="end">
-			<p class="closing">{C.closing.t}</p>
+			<p class="closing" data-lag="1">{C.closing.t}</p>
 			<p class="byline small">
 				{#each C.meta.authors as a, i}<span>{a.name}{#if a.equal}*{/if}{#if i < C.meta.authors.length - 1}{", "}{/if}</span>{/each}
 			</p>
@@ -220,16 +220,7 @@
 	.lede::first-letter { float: left; font-family: Georgia, "Times New Roman", serif !important; font-size: calc(19px * 1.6 * 3 * 0.86); line-height: .8; font-weight: 400; margin: 6px 12px 0 -2px; color: var(--ink); }
 	@supports (initial-letter: 3) { .lede::first-letter { float: none; initial-letter: 3; margin: 0 12px 0 0; font-size: inherit; line-height: inherit; } }
 
-	/* body: contents rail beside the sections on wide screens */
 	.body { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 40px; margin-top: 24px; }
-	.rail { position: relative; }
-	.rail ol { position: sticky; top: 24px; display: grid; gap: 2px; padding-top: 72px; }
-	.rail a { display: flex; align-items: baseline; gap: 10px; padding: 6px 8px; font-size: 13px; line-height: 1.35; color: var(--ink2); text-decoration: none; border-radius: 2px; }
-	.rail a:hover { color: var(--ink); }
-	.rail .n { flex: none; display: inline-grid; place-items: center; width: 18px; height: 18px; font-size: 11px; font-weight: 600; color: #fff; background: var(--axis); border-radius: 2px; }
-	.rail a.on { color: var(--ink); font-weight: 500; background: var(--field); }
-	.rail a[data-rq="1"].on .n { background: var(--rq1); } .rail a[data-rq="2"].on .n { background: var(--rq2); }
-	.rail a[data-rq="3"].on .n { background: var(--rq3); } .rail a[data-rq="0"].on .n { background: var(--ink); }
 
 	.sections { display: grid; gap: 0; min-width: 0; }
 	/* shared section rhythm: read (question, finding, context), see (the example), explore (numbers + one control) */
@@ -260,7 +251,6 @@
 
 	@media (max-width: 1100px) {
 		.body { grid-template-columns: minmax(0, 1fr); }
-		.rail { display: none; }
 	}
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }

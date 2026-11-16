@@ -11,6 +11,10 @@ export type Mark = {
 	label?: string;
 	group?: string; // hover reports the group (e.g. a writer's pile) instead of the single mark
 	square?: boolean; // a tessera instead of a round dot
+	/** a small fingerprint image (print/sprites.ts printSprite) drawn instead of a dot: height 2r, width 2r × aspect */
+	sprite?: CanvasImageSource;
+	spriteKey?: string; // identifies the sprite, so a changed sprite redraws the chart
+	aspect?: number; // sprite width / height (default 0.8)
 };
 
 export type Path = { pts: [number, number][]; color: string; width: number; dash?: number[]; progress: number };
