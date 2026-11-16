@@ -1,5 +1,5 @@
 {
- "_about": "Section 5 of the launch page, built by docs/launch_20261116/tools/build_familiarity_anonymity_data.py from the paper only. Strings are paper text (src gives the file); `ui` lists control and chart words and `demo` the demo's own words. Numbers carry the paper file they come from.",
+ "_about": "Section 5 of the launch page, built by docs/launch_20261116/tools/build_familiarity_anonymity_data.py from the paper only. Strings are paper text (src gives the file); `ui` lists control and chart words. Numbers carry the paper file they come from.",
  "id": "anonymity",
  "n": 5,
  "title": {
@@ -9,6 +9,10 @@
  "takeaway": {
   "t": "Defenses are limited",
   "src": "paper/sections/02_introduction.tex"
+ },
+ "context": {
+  "t": "Anyone who has published enough writing online can no longer assume that an unsigned text keeps them anonymous.",
+  "src": "paper/sections/08_conclusion.tex"
  },
  "steps": [
   {
@@ -22,6 +26,7 @@
   },
   {
    "view": "refusals",
+   "fn": 1,
    "t": "Refusals are rare.",
    "src": "paper/sections/06_discussion.tex",
    "more": {
@@ -30,13 +35,15 @@
    }
   },
   {
+   "view": "rewrite",
+   "fn": 2,
+   "t": "We test paraphrasing as a defense against author identification, using Argon at medium effort to revise texts.",
+   "src": "paper/sections/06_discussion.tex"
+  },
+  {
    "view": "para",
    "t": "Paraphrasing lowers accuracy, though more familiar authors remain easier to identify.",
-   "src": "paper/sections/06_discussion.tex",
-   "more": {
-    "t": "We test paraphrasing as a defense against author identification, using Argon at medium effort to revise texts.",
-    "src": "paper/sections/06_discussion.tex"
-   }
+   "src": "paper/sections/06_discussion.tex"
   },
   {
    "view": "defenses",
@@ -61,13 +68,15 @@
    ]
   }
  ],
- "details": [
+ "notes": [
   {
-   "t": "The prompt asks it to make the author's style less identifiable while preserving content and meaning, a form of authorship obfuscation.",
+   "n": 1,
+   "t": "Refusals are far rarer through the Anthropic API than through Claude Code. Claude Fable 5.2 returns a written refusal on 323 of 1,258 Reddit posts through Claude Code but only 3 (0.2%) through the batch API, which our results use.",
    "src": "paper/sections/06_discussion.tex"
   },
   {
-   "t": "We rewrite each text twice, run author attribution on both rewrites with Opus 5.5 and Argon, and average the two accuracies.",
+   "n": 2,
+   "t": "The prompt asks it to make the author's style less identifiable while preserving content and meaning, a form of authorship obfuscation. We rewrite each text twice, run author attribution on both rewrites with Opus 5.5 and Argon, and average the two accuracies.",
    "src": "paper/sections/06_discussion.tex"
   }
  ],
@@ -75,19 +84,19 @@
   "groups": [
    {
     "bin": "0",
-    "t": "Don't recognize it"
+    "t": "Unfamiliar"
    },
    {
     "bin": "0.5–1",
-    "t": "Vaguely familiar"
+    "t": "A little familiar"
    },
    {
     "bin": "1.5–2",
-    "t": "Know roughly what it posts"
+    "t": "Moderately familiar"
    },
    {
     "bin": "2.5–3",
-    "t": "Know it well"
+    "t": "Very familiar"
    }
   ],
   "domains": {
@@ -109,7 +118,6 @@
   "original": "Original",
   "paraphrased": "Paraphrased",
   "replay": "Replay",
-  "details": "Details",
   "rewriting": "Rewriting",
   "domain": "Domain",
   "model": "Model",
@@ -121,6 +129,7 @@
   "unit": "1 tile = 1% of texts",
   "post_unit": "1 tile = 1 Reddit post",
   "fable": "Fable 5.2",
+  "rewriter": "Gemini 4 Argon",
   "refused": "refused",
   "answered": "Answered",
   "posts": "posts",
@@ -131,7 +140,6 @@
   "Original",
   "Paraphrased",
   "Replay",
-  "Details",
   "Rewriting",
   "Domain",
   "Model",
@@ -154,12 +162,7 @@
   "posts",
   "<1%"
  ],
- "demo": [
-  "Don't recognize it",
-  "Vaguely familiar",
-  "Know roughly what it posts",
-  "Know it well"
- ],
+ "demo": [],
  "data": {
   "bins": {
    "source": [
