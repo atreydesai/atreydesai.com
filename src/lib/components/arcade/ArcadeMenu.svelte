@@ -107,6 +107,7 @@
   role="dialog"
   aria-modal="true"
   aria-labelledby="boba-menu-title"
+  tabindex="-1"
   on:click={(event) => {
     if (event.target === event.currentTarget) dispatch("close");
   }}

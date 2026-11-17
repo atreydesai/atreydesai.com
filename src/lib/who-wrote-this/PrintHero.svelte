@@ -51,7 +51,7 @@
 	// what the inspector lens is on: the print's id (writers also get their kind), and the lens circle in viewport px
 	let insp = $state<{ id: string; kind: number; x: number; y: number; r: number } | null>(null);
 	let vw = $state(1440), vh = $state(900);
-	let print: Print;
+	let print = $state.raw() as Print;
 
 	const level = $derived(Math.round(lv)); // the level the copy and controls point at
 	const step = $derived(Math.max(0, Math.min(STEPS.length - 1, Math.floor(pos))));
@@ -307,9 +307,6 @@
 	.struck { position: relative; display: inline-flex; }
 	.struck svg { position: absolute; inset: -2px; width: calc(100% + 4px); height: calc(100% + 4px); }
 	.struck line { stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; }
-	.say-n { display: flex; gap: 5px; margin-top: 4px; }
-	.say-n i { position: relative; width: 22px; height: 3px; border-radius: 2px; background: var(--rule); overflow: hidden; }
-	.say-n b { position: absolute; inset: 0 auto 0 0; background: var(--ink); }
 	.tags { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
 	.tpos { position: fixed; left: 0; top: 0; }
 	.tag {
@@ -321,7 +318,6 @@
 	.tag[data-k="human"] { color: var(--rq1); } .tag[data-k="ai"] { color: var(--rq2); }
 	.tag.small { font-size: 11.5px; font-weight: 500; padding: 2px 7px; color: var(--ink2); }
 	.tag.lit { flex-direction: column; align-items: flex-start; gap: 3px; padding: 8px 12px; color: var(--rq3); font-size: 14px; animation: lit-in .6s .2s both; }
-	.tag.lit .q { font-weight: 400; font-style: italic; color: var(--ink2); font-size: 13px; }
 	.tag.lit .who { display: inline-flex; align-items: center; gap: 6px; color: #046B55; }
 	.tag.lit b { color: var(--ink); }
 	@keyframes lit-in { from { opacity: 0; transform: translate(-50%, 8px); } }
@@ -345,9 +341,6 @@
 	.insp .stat b { font-size: 34px; line-height: 1; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 	.insp .stat span { font-size: 12.5px; line-height: 1.3; color: var(--ink2); }
 	.insp .stat em { font-style: normal; font-weight: 600; color: #B4501C; }
-	.insp .qs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-	.insp .qs li { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--ink); }
-	.insp .qs span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 2px; background: var(--c); color: #fff; font-size: 11px; }
 	.insp .reads { margin: 0; font-size: 14.5px; line-height: 1.45; font-style: italic; color: var(--ink); }
 	.insp .models { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 	.insp .models li { display: grid; grid-template-columns: 9.5em 1fr 2.6em; align-items: center; gap: 8px; font-size: 12px; color: var(--ink); white-space: nowrap; }

@@ -25,7 +25,7 @@
 	import type { PageData } from "./$types";
 
 	let { data }: { data: PageData } = $props();
-	const post = data.post;
+	const post = $derived(data.post);
 	const art = $derived(data.art);
 	setContext("wwt-art", () => data.art);
 	$effect(() => { field.shape = art === "mosaic" ? "tile" : "dot"; });
@@ -65,7 +65,7 @@
 	})();
 
 
-	const jsonLd = [
+	const jsonLd = $derived([
 		{
 			"@type": "BlogPosting",
 			"@id": `${url}#article`,
@@ -75,7 +75,7 @@
 			inLanguage: "en-US",
 			author: C.meta.authors.map((a) => ({ "@type": "Person", name: a.name })),
 		},
-	];
+	]);
 </script>
 
 <Seo
@@ -257,9 +257,6 @@
 	.lede::first-letter { float: left; font-family: Georgia, "Times New Roman", serif !important; font-size: calc(22px * 1.6 * 3 * 0.86); line-height: .8; font-weight: 400; margin: 6px 12px 0 -2px; color: var(--ink); }
 	@supports (initial-letter: 3) { .lede::first-letter { float: none; initial-letter: 3; margin: 0 12px 0 0; font-size: inherit; line-height: inherit; } }
 
-	.body { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 40px; margin-top: 24px; }
-
-	.sections { display: grid; gap: 0; min-width: 0; }
 	/* shared section rhythm: read (question, finding, context), see (the example), explore (numbers + one control) */
 	.wwt :global(.section) { padding-block: 72px 24px; border-top: 1px solid var(--rule); scroll-margin-top: 16px; }
 	.wwt :global(.section:first-child) { border-top: 0; }
@@ -271,7 +268,6 @@
 	.wwt :global(.s-head h2) { font-size: 15px; font-weight: 600; letter-spacing: 0.01em; color: var(--ink2); }
 	.wwt :global(.finding) { margin-top: 10px; font-size: clamp(26px, 3.2vw, 36px); line-height: 1.12; font-weight: 600; letter-spacing: -0.025em; max-width: 24ch; text-wrap: balance; }
 	.wwt :global(.context) { margin-top: 14px; max-width: 44rem; font-size: 17px; line-height: 1.6; color: var(--ink); }
-	.todo { margin-top: 28px; height: 180px; display: grid; place-items: center; border: 1.5px dashed var(--axis); border-radius: 3px; color: var(--ink2); font-size: 13px; }
 
 	/* the finale: full bleed and dark, the closing line at chapter size with the one print */
 	.finale { width: 100vw; margin-left: calc(50% - 50vw); height: calc(175 * var(--vh, 1vh)); background: #14202D; color: #fff; }
@@ -290,9 +286,6 @@
 	.site-foot a { text-decoration: none; }
 	.site-foot a:hover { color: var(--ink); }
 
-	@media (max-width: 1100px) {
-		.body { grid-template-columns: minmax(0, 1fr); }
-	}
 	@media (max-width: 760px) {
 		.finale { height: calc(160 * var(--vh, 1vh)); }
 		.finale-in { grid-template-columns: 1fr; align-content: center; gap: calc(6 * var(--vh, 1vh)); padding-block: calc(10 * var(--vh, 1vh)); }

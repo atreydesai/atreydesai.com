@@ -12,7 +12,7 @@
 
 	// art: "dots" plays the levels on the page-wide dot field; "fingerprint" and "mosaic" play them in the hero art
 	let { art = "dots" }: { art?: string } = $props();
-	const onField = art === "dots";
+	const onField = $derived(art === "dots");
 	const L = C.levels;
 	let active = $state(0); // 0 = all three settled
 	let stage: HTMLElement;

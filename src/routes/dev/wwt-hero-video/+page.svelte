@@ -67,7 +67,7 @@
 	const SEAM = 0.5; // the last 0.5 s: the dark band gives way to beat 1's first frame
 	const FPS = 30;
 
-	let canvas: HTMLCanvasElement;
+	let canvas = $state() as HTMLCanvasElement;
 	// the results cut
 	let cut = $state(""), frameW = $state(1080), frameH = $state(1080), dark = $state(0);
 	const plate = $derived(Math.min(frameW, frameH));

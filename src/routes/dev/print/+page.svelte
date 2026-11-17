@@ -22,7 +22,7 @@
 	const labs = ["Anthropic", "OpenAI", "Google", "Alibaba", "DeepSeek", "Moonshot", "Zhipu", "MiniMax", "Mistral", "xAI", "Cohere"];
 	const litText = C.art.decipher[2].excerpt.t;
 
-	let canvas: HTMLCanvasElement;
+	let canvas = $state() as HTMLCanvasElement;
 	let level = $state(0);
 	let anchors = $state<Anchor[]>([]);
 	let ms = $state("");
