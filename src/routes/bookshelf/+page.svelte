@@ -571,7 +571,8 @@
         // the router's own entry state and break back/forward. Only the URL
         // changes; page.state (shallow-routing state) is passed through.
         if (nextUrl !== currentUrl) {
-            goto(nextUrl, { shallow: true, replace: true, state: page.state });
+            // goto rejects if the router isn't ready yet; the filters still apply.
+            goto(nextUrl, { shallow: true, replace: true, state: page.state }).catch(() => {});
         }
     }
 

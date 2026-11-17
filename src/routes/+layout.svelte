@@ -5,7 +5,7 @@
   import { onMount } from "svelte";
 
   import { inject } from "@vercel/analytics";
-  import { injectSpeedInsights } from "@vercel/speed-insights/sveltekit";
+  import { injectSpeedInsights } from "@vercel/speed-insights";
 
   import { fly } from "svelte/transition";
 
@@ -84,12 +84,18 @@
     if (game) openArcade(game.id as GameId);
     url.searchParams.delete("play");
     setTimeout(() => {
-        try {
-          goto(url, { shallow: true, replace: true, state: page.state });
-        } catch {
-          // The router still isn't ready: leave the address as it is.
-        }
+      goto(url, { shallow: true, replace: true, state: page.state }).catch(() => {
+        // The router still isn't ready: leave the address as it is.
+      });
     }, 0);
+  });
+
+  // Speed Insights' SvelteKit entry still reads $app/stores, which SvelteKit 3
+  // removed, so this wires the generic entry the same way: the route ID at
+  // load, then on every navigation.
+  let speedInsights: ReturnType<typeof injectSpeedInsights> = null;
+  afterNavigate(() => {
+    if (page.route.id) speedInsights?.setRoute(page.route.id);
   });
 
   onMount(() => {
@@ -130,7 +136,10 @@
       if ("requestIdleCallback" in window) (window as any).requestIdleCallback(warm, { timeout: 4000 });
       else setTimeout(warm, 2000);
     }
-    injectSpeedInsights();
+    speedInsights = injectSpeedInsights(
+      { route: page.route.id ?? undefined, framework: "sveltekit" },
+      import.meta.env.VITE_VERCEL_OBSERVABILITY_CLIENT_CONFIG,
+    );
 
     // Easter egg #1: a greeting for anyone who cracks open the console.
     console.log("%c👋 hey, you found the console.", "color:#E85D4C;font-size:14px;font-weight:700");
