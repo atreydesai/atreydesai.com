@@ -2,8 +2,8 @@
 	// The paper launch page. It brings its own chrome and theme (the llm-detectors house style: warm gray
 	// dotted ground, Inter, Figure 1's question colours) in place of the site's header, footer and palette.
 	// All copy is paper text, from content.json (built in the private llm-detectors repo, docs/launch_20261116).
-	import { onMount, setContext, tick } from "svelte";
-	import { browser, dev } from "$app/environment";
+	import { onMount, setContext } from "svelte";
+	import { dev } from "$app/environment";
 	import Seo from "$lib/components/Seo.svelte";
 	import { SITE_URL } from "$lib/seo";
 	import Icon from "$lib/who-wrote-this/Icon.svelte";
@@ -12,9 +12,7 @@
 	import FootnoteList from "$lib/who-wrote-this/FootnoteList.svelte";
 	import PrintMark from "$lib/who-wrote-this/PrintMark.svelte";
 	import ScrollHint from "$lib/who-wrote-this/ScrollHint.svelte";
-	import { field, chart } from "$lib/who-wrote-this/field.svelte";
-	import PhoneStatic from "$lib/who-wrote-this/PhoneStatic.svelte";
-	import P from "$lib/who-wrote-this/phone_slides.json";
+	import { field } from "$lib/who-wrote-this/field.svelte";
 	import Levels from "$lib/who-wrote-this/Levels.svelte";
 	import PrintHero from "$lib/who-wrote-this/PrintHero.svelte";
 	import Timeline from "$lib/who-wrote-this/Timeline.svelte";
@@ -67,74 +65,6 @@
 	})();
 
 
-	// Phones (screens up to 600 px wide) get the static page: the summary video for the hero and each section as still
-	// slides (PhoneStatic, phone_slides.json), in plain native scroll. None of the live sections or the field canvas is
-	// mounted there, so none of their script runs (Atrey, 16 Nov, after coauthors found the pinned sections janky on
-	// phones: hover cards opening under a scrolling thumb, one section's chart over another in a fast flick, pins jumping
-	// with the address bar). ?live forces the live page at any width (the slides are shot from it).
-	// The head script below sets html[data-phone] before first paint, so the server-rendered live page never shows on a
-	// phone; the component reads the same test (a client-side navigation here does not run head scripts) and swaps
-	// versions when a resize or rotation crosses 600 px.
-	const PHONE_MQ = "(max-width: 600px)";
-	const wantPhone = () => matchMedia(PHONE_MQ).matches && !new URLSearchParams(location.search).has("live");
-	const phoneAtLoad = browser ? wantPhone() : false;
-	let phone = $state(phoneAtLoad);
-	if (browser) document.documentElement.toggleAttribute("data-phone", phoneAtLoad);
-	const PHONE_HEAD = `<script>(function(){try{if(matchMedia(${JSON.stringify(PHONE_MQ)}).matches&&!new URLSearchParams(location.search).has("live"))document.documentElement.setAttribute("data-phone","")}catch(e){}})()<\/script>`;
-	// the video's name: the paper's three levels, as the video shows them
-	const heroLabel = `${C.levels.lead.t}: ${C.levels.items.map((l) => l.t).join("; ")}.`;
-	let heroVideo = $state<HTMLVideoElement>();
-	let heroPaused = $state(false);
-	$effect(() => {
-		const v = heroVideo;
-		if (!v) return;
-		// muted as a property too (autoplay needs it), and no autoplay for readers who asked for less motion
-		v.muted = true;
-		if (matchMedia("(prefers-reduced-motion: reduce)").matches) { v.removeAttribute("autoplay"); v.pause(); heroPaused = true; }
-		else v.play().catch(() => (heroPaused = true));
-	});
-	const toggleHero = () => {
-		if (!heroVideo) return;
-		if (heroVideo.paused) { heroVideo.play().catch(() => {}); heroPaused = false; } else { heroVideo.pause(); heroPaused = true; }
-	};
-
-	onMount(() => {
-		const mq = matchMedia(PHONE_MQ);
-		// where the reader is (a section and how far through it), kept as they scroll: by the time a rotation reports
-		// the new width, the page has already been laid out at it
-		let spot: { id: string; f: number } | null = null, raf = 0;
-		const where = () => {
-			spot = null;
-			for (const s of stops) {
-				const r = document.getElementById(s.id)?.getBoundingClientRect();
-				if (r && r.top <= innerHeight * 0.4) spot = { id: s.id, f: Math.max(0, Math.min(1, -r.top / Math.max(1, r.height))) };
-			}
-		};
-		const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; where(); }); };
-		const swap = async () => {
-			const next = wantPhone();
-			if (next === phone) return;
-			const here = spot;
-			phone = next;
-			document.documentElement.toggleAttribute("data-phone", next);
-			await tick();
-			// the live sections are gone: leave the shared field clean for the next time they mount
-			if (next) { field.mode = "ground"; field.dim = 0; field.interactive = false; field.owner = ""; field.hover = null; chart.marks = []; chart.paths = []; chart.texts = []; chart.paint = null; }
-			const el = here && document.getElementById(here.id);
-			if (el) { const r = el.getBoundingClientRect(); scrollTo({ top: r.top + scrollY + here.f * r.height - (here.f ? 0 : 4), behavior: "instant" }); }
-		};
-		// a link to a section or a note (#which-ai, #fn-5): on a phone its target is only drawn now, after the browser
-		// looked for it, so go there once
-		if (phone && location.hash.length > 1) {
-			const el = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-			if (el) scrollTo({ top: el.getBoundingClientRect().top + scrollY - (el.matches("li") ? 24 : 4), behavior: "instant" });
-		}
-		where();
-		addEventListener("scroll", onScroll, { passive: true });
-		mq.addEventListener("change", swap);
-		return () => { cancelAnimationFrame(raf); removeEventListener("scroll", onScroll); mq.removeEventListener("change", swap); document.documentElement.removeAttribute("data-phone"); };
-	});
-
 	const jsonLd = [
 		{
 			"@type": "BlogPosting",
@@ -177,13 +107,10 @@
 		}
 		html.wwt-field-on body, html.wwt-field-on.dark body { background-image: none; }
 		html ::selection { background: rgb(126, 34, 62); color: #fff; }
-		html[data-phone] .wwt-live { display: none !important; }
 	</style>`}
-	<!-- phone or live, decided before first paint -->
-	{@html PHONE_HEAD}
 </svelte:head>
 
-{#if !phone}<DotField />{/if}
+<DotField />
 
 <div class="wwt" data-justify="off">
 	<header class="top">
@@ -217,20 +144,7 @@
 			</div>
 		</header>
 
-		<!-- on phones the summary video; its box is kept from first paint (shown by html[data-phone]), so the lede does not move -->
-		<div class="phone-hero">
-			{#if phone && P.hero}
-				<figure id="levels" class="ph-video">
-					<video bind:this={heroVideo} src={P.hero.src} poster={P.hero.poster} width={P.hero.w} height={P.hero.h} autoplay muted loop playsinline preload="metadata" aria-label={heroLabel}></video>
-					<button type="button" class="ph-play" onclick={toggleHero} aria-label={heroPaused ? "Play the video" : "Pause the video"}>
-						{#if heroPaused}<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 2.2v7.6L9.8 6z" /></svg>{:else}<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.2 2.2h1.9v7.6H3.2zM6.9 2.2h1.9v7.6H6.9z" /></svg>{/if}
-					</button>
-				</figure>
-			{/if}
-		</div>
-		{#if !phone}
-			<div class="wwt-live">{#key art}{#if art === "print"}<PrintHero />{:else}<Levels {art} />{/if}{/key}</div>
-		{/if}
+		{#key art}{#if art === "print"}<PrintHero />{:else}<Levels {art} />{/if}{/key}
 
 		<!-- empty ground between scenes, so only one thing is on screen at a time -->
 		<div class="breath" aria-hidden="true"></div>
@@ -240,25 +154,17 @@
 		</div>
 
 		<div class="breath" aria-hidden="true"></div>
-		{#if phone}
-			<div class="phone-sections">
-				{#each P.sections as s, i (s.id)}<PhoneStatic id={s.id} title={s.title} slides={s.slides} eager={i === 0} />{/each}
-			</div>
-		{:else}
-			<div class="wwt-live">
-				<Timeline />
-				<div class="breath" aria-hidden="true"></div>
-				<HumanOrAIB />
-				<div class="breath" aria-hidden="true"></div>
-				<WhichAI />
-				<div class="breath" aria-hidden="true"></div>
-				<WhichHuman />
-				<div class="breath" aria-hidden="true"></div>
-				<Familiar />
-				<div class="breath" aria-hidden="true"></div>
-				<Anonymity />
-			</div>
-		{/if}
+		<Timeline />
+		<div class="breath" aria-hidden="true"></div>
+		<HumanOrAIB />
+		<div class="breath" aria-hidden="true"></div>
+		<WhichAI />
+		<div class="breath" aria-hidden="true"></div>
+		<WhichHuman />
+		<div class="breath" aria-hidden="true"></div>
+		<Familiar />
+		<div class="breath" aria-hidden="true"></div>
+		<Anonymity />
 		<div class="breath" aria-hidden="true"></div>
 
 		<!-- the last word: the paper's closing line, as the page's final chapter -->
@@ -277,16 +183,11 @@
 			<div class="links">
 				{#each C.meta.links as l}<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>{/each}
 			</div>
-			{#if phone}
-				<!-- the live page's notes list, as the slides' build saved it (the marks are in the pictures) -->
-				{#if P.notes}<section class="fns-phone" aria-label="Notes">{@html P.notes}</section>{/if}
-			{:else}
-				<FootnoteList />
-			{/if}
+			<FootnoteList />
 		</footer>
 	</article>
 
-	{#if !phone}<ScrollHint />{/if}
+	<ScrollHint />
 	<footer class="site-foot">
 		<a href="/">Atrey Desai</a>
 		<span>{#each nav as link}<a href={link.href}>{link.name}</a>{/each}</span>
@@ -384,25 +285,6 @@
 	.site-foot span { display: flex; gap: 16px; }
 	.site-foot a { text-decoration: none; }
 	.site-foot a:hover { color: var(--ink); }
-
-	/* the live sections' wrapper adds no box (on a phone the head style hides it until the swap) */
-	.wwt-live { display: contents; }
-	/* phones: the summary video in the hero's place, full bleed and square, with a pause button (it loops) */
-	.phone-hero { display: none; }
-	:global(html[data-phone]) .phone-hero { display: block; width: 100vw; margin: 28px 0 0 calc(50% - 50vw); aspect-ratio: 1; }
-	.ph-video { position: relative; margin: 0; height: 100%; scroll-margin-top: 0; }
-	.ph-video video { display: block; width: 100%; height: 100%; object-fit: cover; }
-	.ph-play { position: absolute; right: 12px; bottom: 12px; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(20, 32, 45, .7); color: #fff; }
-	.ph-play svg { width: 12px; height: 12px; fill: currentColor; }
-	.phone-sections { display: grid; gap: 12vh; }
-	/* phones: the live page's notes, as the slides' build saved them (FootnoteList's look, without the back links) */
-	.fns-phone { max-width: 46rem; margin: 10vh 0 0; padding-top: 18px; border-top: 1px solid #C9C9C9; }
-	.fns-phone :global(h2) { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); margin: 0 0 12px; }
-	.fns-phone :global(ol) { display: grid; gap: 8px; }
-	.fns-phone :global(li) { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 6px; font-size: 13px; line-height: 1.55; color: var(--ink2); scroll-margin-top: 24px; border-radius: 2px; }
-	.fns-phone :global(li:target) { background: rgba(126, 34, 62, .08); }
-	.fns-phone :global(.n) { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
-	.fns-phone :global(a) { color: var(--ink); overflow-wrap: anywhere; }
 
 	@media (max-width: 1100px) {
 		.body { grid-template-columns: minmax(0, 1fr); }
