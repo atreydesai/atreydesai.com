@@ -23,10 +23,8 @@
   function isActive(href: string, pathname: string): boolean {
     const normalizedHref = href === "/" ? href : href.replace(/\/$/, "");
     const normalizedPath = pathname === "/" ? pathname : pathname.replace(/\/$/, "");
-    return (
-      normalizedPath === normalizedHref ||
-      normalizedPath.startsWith(`${normalizedHref}/`)
-    );
+
+    return normalizedPath === normalizedHref || normalizedPath.startsWith(`${normalizedHref}/`);
   }
 
   // The wordmark spells the full name at the top of every page and morphs
@@ -66,7 +64,12 @@
   let reduceMotion = false;
   // Tracked by hand: a legacy `$:` statement does not see page changes.
   let pathname = page.url.pathname;
-  afterNavigate(() => (pathname = page.url.pathname));
+
+  afterNavigate(({ shallow, type }) => {
+    if (shallow && type === 'goto') return;
+
+    return pathname = page.url.pathname;
+  });
 
   $: collapsed = pathname === "/" || phoneCollapsed || scrollY > COLLAPSE_AT_PX;
   $: if (timeline) play(collapsed);
@@ -91,51 +94,47 @@
     // starts collapsed.
     Promise.all([import("gsap"), import("gsap/MorphSVGPlugin")]).then(
       ([{ gsap }, { MorphSVGPlugin }]) => {
-        if (disposed) return;
-        gsap.registerPlugin(MorphSVGPlugin);
+      if (disposed) return;
+      gsap.registerPlugin(MorphSVGPlugin);
         const letters = [...svgEl.querySelectorAll<SVGPathElement>(".wordmark-letter")];
-        const marks = [...svgEl.querySelectorAll<SVGPathElement>(".wordmark-mark")];
-        const centre = (el: SVGGraphicsElement) => {
-          const box = el.getBBox();
-          return box.x + box.width / 2;
-        };
-        const targets = marks.map(centre);
-        const morph = { duration: MORPH_S, ease: "power3.inOut" };
-        const tl = gsap.timeline({ paused: true });
-        letters.forEach((letter, i) => {
-          const word = i < WORDMARK_SPLIT ? 0 : 1;
-          if (i === A_INDEX || i === D_INDEX) {
-            tl.to(
-              letter,
+      const marks = [...svgEl.querySelectorAll<SVGPathElement>(".wordmark-mark")];
+      const centre = (el: SVGGraphicsElement) => {
+        const box = el.getBBox();
+        return box.x + box.width / 2;
+      };
+      const targets = marks.map(centre);
+      const morph = { duration: MORPH_S, ease: "power3.inOut" };
+      const tl = gsap.timeline({ paused: true });
+      letters.forEach((letter, i) => {
+        const word = i < WORDMARK_SPLIT ? 0 : 1;
+        if (i === A_INDEX || i === D_INDEX) {
+          tl.to(
+            letter,
               { morphSVG: { shape: marks[word], shapeIndex: "auto" }, ...morph },
               MORPH_DELAY_S,
-            );
-          } else {
-            // Travel in lockstep with the anchor (same timing and curve), so
-            // these letters ride into the a or the d rather than overtaking
-            // it, and squeeze out before they arrive.
-            tl.to(
-              letter,
-              { x: targets[word] - centre(letter), ...morph },
-              MORPH_DELAY_S,
-            ).to(
-              letter,
-              {
-                scaleX: 0,
-                scaleY: 0.6,
-                transformOrigin: "50% 70%",
-                duration: MORPH_S * SQUEEZE_SHARE,
+          );
+        } else {
+          // Travel in lockstep with the anchor (same timing and curve), so
+          // these letters ride into the a or the d rather than overtaking
+          // it, and squeeze out before they arrive.
+          tl.to(letter, { x: targets[word] - centre(letter), ...morph }, MORPH_DELAY_S).to(
+            letter,
+            {
+              scaleX: 0,
+              scaleY: 0.6,
+              transformOrigin: "50% 70%",
+              duration: MORPH_S * SQUEEZE_SHARE,
                 ease: "power2.in",
-              },
+            },
               MORPH_DELAY_S,
-            );
-          }
-        });
-        tl.to(svgEl, { "--mark-drop": 1, ...morph }, MORPH_DELAY_S);
-        tl.set(letters, { autoAlpha: 0 }).set(marks, { autoAlpha: 1 }, "<");
-        timeline = tl;
-        // A page that loads already scrolled starts collapsed, without playing.
-        if (collapsed) tl.progress(1);
+          );
+        }
+      });
+      tl.to(svgEl, { "--mark-drop": 1, ...morph }, MORPH_DELAY_S);
+      tl.set(letters, { autoAlpha: 0 }).set(marks, { autoAlpha: 1 }, "<");
+      timeline = tl;
+      // A page that loads already scrolled starts collapsed, without playing.
+      if (collapsed) tl.progress(1);
       },
     );
 
@@ -144,7 +143,7 @@
     const syncPhone = () => {
       clearTimeout(timer);
       if (phone.matches) {
-        timer = setTimeout(() => (phoneCollapsed = true), PHONE_COLLAPSE_DELAY_MS);
+        timer = setTimeout(() => phoneCollapsed = true, PHONE_COLLAPSE_DELAY_MS);
       } else {
         phoneCollapsed = false;
       }
@@ -160,7 +159,7 @@
   });
 </script>
 
-<svelte:window bind:scrollY />
+<svelte:window bind:scrollY></svelte:window>
 
 <!-- Full-width so the sticky band covers wide pages too; the inner shell keeps
      the usual measure. Sticky only from md up: on phones the nav wraps under
@@ -191,17 +190,21 @@
         >
           <g class="wordmark-letters">
             {#each WORDMARK_LETTERS as d}
-              <path class="wordmark-letter" {d} />
+              <path class="wordmark-letter" d={d}></path>
             {/each}
           </g>
-          <path class="wordmark-mark" d={MONOGRAM_A} />
-          <path class="wordmark-mark" d={MONOGRAM_D} />
+          <path class="wordmark-mark" d={MONOGRAM_A}></path>
+          <path class="wordmark-mark" d={MONOGRAM_D}></path>
           <!-- The monogram before GSAP arrives, for a header that starts
                collapsed (the home page). Kept apart from the morph's own paths
                so the timeline reads their true resting state. -->
-          <g class="wordmark-still" transform="translate(0 {MARK_DROP})">
-            <path d={MONOGRAM_A} />
-            <path d={MONOGRAM_D} />
+
+          <g
+            class="wordmark-still"
+            transform="translate(0 {MARK_DROP})"
+          >
+            <path d={MONOGRAM_A}></path>
+            <path d={MONOGRAM_D}></path>
           </g>
         </svg>
       </a>

@@ -67,7 +67,9 @@
         }
     }
 
-    afterNavigate(async () => {
+    afterNavigate(async ({ shallow, type }) => {
+        if (shallow && type === 'goto') return;
+
         const hash = window.location.hash.slice(1);
 
         if (!hash) return;
@@ -84,14 +86,14 @@
         // Leave one frame of scheduling margin after the outgoing page transition
         // before measuring the deep-link target.
         scrollTimer = setTimeout(() => {
-            const el = document.getElementById(hash);
-            if (el) {
-                el.scrollIntoView({ behavior: "auto", block: "start" });
-            }
+                const el = document.getElementById(hash);
+                if (el) {
+                    el.scrollIntoView({ behavior: "auto", block: "start" });
+                }
         }, PAGE_TRANSITION_DURATION_MS + PAGE_TRANSITION_SCROLL_BUFFER_MS);
 
         highlightTimer = setTimeout(() => {
-            highlightedPaperId = null;
+                highlightedPaperId = null;
         }, 3000);
     });
 
@@ -139,29 +141,26 @@
         {} as Record<number, typeof papers>,
     );
 
-    $: sortedYears = Object.keys(papersByYear)
-        .map(Number)
-        .sort((a, b) => (sortOrder === "year-asc" ? a - b : b - a));
-
+    $: sortedYears = Object.keys(papersByYear).map(Number).sort((a, b) => sortOrder === "year-asc" ? a - b : b - a);
     $: activeFilters = selectedYear !== "all" || selectedTag !== "all";
     $: groupedTalks = Object.values(
         talks.reduce(
-            (acc, talk) => {
-                const title = canonicalizeTalkTitle(talk.title);
-                const existing = acc[title];
+        (acc, talk) => {
+            const title = canonicalizeTalkTitle(talk.title);
+            const existing = acc[title];
 
-                if (!existing) {
+            if (!existing) {
                     acc[title] = {
                         title,
                         type: talk.type,
                         appearances: [talk],
                     };
-                } else {
-                    existing.appearances.push(talk);
-                }
+            } else {
+                existing.appearances.push(talk);
+            }
 
-                return acc;
-            },
+            return acc;
+        },
             {} as Record<
                 string,
                 {
@@ -173,7 +172,7 @@
         ),
     )
         .map((group) => ({
-            ...group,
+        ...group,
             appearances: [...group.appearances].sort(
                 (a, b) =>
                     new Date(b.date).getTime() - new Date(a.date).getTime(),
@@ -278,7 +277,7 @@
                         <div class="space-y-3">
                             {#each papersByYear[year] as paper (paper.id)}
                                 <ResearchCard
-                                    {paper}
+                                    paper={paper}
                                     variant="full"
                                     highlighted={paper.id === highlightedPaperId}
                                 />
@@ -290,7 +289,7 @@
                 <div class="space-y-3">
                     {#each published as paper (paper.id)}
                         <ResearchCard
-                            {paper}
+                            paper={paper}
                             variant="full"
                             highlighted={paper.id === highlightedPaperId}
                         />
@@ -310,7 +309,7 @@
             <div class="space-y-3">
                 {#each classProjects as paper (paper.id)}
                     <ResearchCard
-                        {paper}
+                        paper={paper}
                         variant="full"
                         highlighted={paper.id === highlightedPaperId}
                     />

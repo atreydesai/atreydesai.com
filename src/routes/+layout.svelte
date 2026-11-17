@@ -14,7 +14,7 @@
   import CustomCursor from "$lib/components/CustomCursor.svelte";
   import { startJustify } from "$lib/justify";
   import { startClickTracking } from "$lib/analytics";
-  import { afterNavigate, beforeNavigate, preloadCode, replaceState } from "$app/navigation";
+  import { afterNavigate, beforeNavigate, goto, preloadCode } from "$app/navigation";
   import { page } from "$app/state";
 
   import {
@@ -74,7 +74,9 @@
   // reload is an ordinary visit. A game this device can't play opens the
   // menu instead (openArcade decides). The address is rewritten a tick
   // later: the first afterNavigate runs while the router is still starting.
-  afterNavigate(() => {
+  afterNavigate(({ shallow, type }) => {
+    if (shallow && type === 'goto') return;
+
     const url = new URL(window.location.href);
     const play = url.searchParams.get("play");
     if (play === null) return;
@@ -82,11 +84,11 @@
     if (game) openArcade(game.id as GameId);
     url.searchParams.delete("play");
     setTimeout(() => {
-      try {
-        replaceState(url, page.state);
-      } catch {
-        // The router still isn't ready: leave the address as it is.
-      }
+        try {
+          goto(url, { shallow: true, replace: true, state: page.state });
+        } catch {
+          // The router still isn't ready: leave the address as it is.
+        }
     }, 0);
   });
 

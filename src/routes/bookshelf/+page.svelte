@@ -1,6 +1,6 @@
 <script lang="ts">
     import { browser } from '$app/env';
-    import { afterNavigate, replaceState } from "$app/navigation";
+    import { afterNavigate, goto } from "$app/navigation";
     import { page } from "$app/state";
     import { onMount } from "svelte";
     import { fade, fly } from "svelte/transition";
@@ -363,7 +363,8 @@
     // while SvelteKit is still mounting the app, and its replaceState() fails
     // until the router has started. A link to this same page (the header's
     // bookshelf link) doesn't remount it, so that URL is read here instead.
-    afterNavigate(({ from, to }) => {
+    afterNavigate(({ from, to, shallow, type }) => {
+        if (shallow && type === 'goto') return;
         if (from?.route.id === to?.route.id) readStateFromUrl();
         urlReady = true;
     });
@@ -570,7 +571,7 @@
         // the router's own entry state and break back/forward. Only the URL
         // changes; page.state (shallow-routing state) is passed through.
         if (nextUrl !== currentUrl) {
-            replaceState(nextUrl, page.state);
+            goto(nextUrl, { shallow: true, replace: true, state: page.state });
         }
     }
 
