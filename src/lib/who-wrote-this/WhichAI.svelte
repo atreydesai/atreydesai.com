@@ -7,7 +7,8 @@
 	//      row per lab along a model release date axis, with the number above every bar; the narration is a caption band
 	//      above, with the headline 98% at chapter size on its step;
 	//   3. a thread map: the models the steps name, pinned, a thread from each to the lab Fable mistakes it for (thicker
-	//      for a larger share, the share on the thread), and the four reports pinned beside them as evidence, one a step.
+	//      for a larger share, the share on the thread), then a step that says what the reports are (paper text), and the
+	//      four reports pinned beside them as evidence, one a step (the three reports labelled as such).
 	// DOM and SVG inside sticky stages, so nothing follows the scroll in script. Geometry depends on the size and fonts
 	// only, never the step; steps change colour, opacity and which labels show. The shown step follows the scroll one
 	// step at a time, each held at least HOLD ms, and snaps when the section is off screen or a dash is clicked.
@@ -322,6 +323,13 @@
 		const stopScroll = onPageScroll(onScroll);
 		addEventListener("wheel", own, { passive: true });
 		addEventListener("touchstart", own, { passive: true });
+		// a mouse leaving the page (or the window losing focus) closes a bar's details: the bar's own pointerleave
+		// does not always fire when the pointer exits the window
+		const unhover = () => (hov = null);
+		const outOfPage = (e: MouseEvent) => { if (!e.relatedTarget) hov = null; };
+		document.addEventListener("mouseout", outOfPage);
+		addEventListener("blur", unhover);
+		document.documentElement.addEventListener("mouseleave", unhover);
 		document.fonts?.ready.then(() => { widths.clear(); fontsV++; });
 		// the canvas is this section's while it is on screen (the dimmed ground behind its pictures)
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
@@ -351,6 +359,7 @@
 		if (import.meta.env.DEV) (window as unknown as { __wa: () => unknown }).__wa = () => ({ step, want, goal, prog });
 		return () => {
 			stopScroll(); removeEventListener("wheel", own); removeEventListener("touchstart", own);
+			document.removeEventListener("mouseout", outOfPage); removeEventListener("blur", unhover); document.documentElement.removeEventListener("mouseleave", unhover);
 			io.disconnect(); root.removeEventListener("wa-go", onGo); document.removeEventListener("click", onBack); clearTimeout(holdT); clearTimeout(goalT);
 		};
 	});
@@ -484,6 +493,7 @@
 								{@const sr = e.src}
 								{@const st = evState(i)}
 								<article class="ev {st}" data-i={e.step} inert={st === "hide" || (narrow && st !== "on")}>
+									{#if e.kind}<p class="c-k">{u(e.kind)}</p>{/if}
 									<p class="c-h"><i class="ln" class:dash={e.dash} style:--c={e.col}></i>{#if e.icon}<Icon name={e.icon} />{/if}<b>{u(e.label)}</b><span>{dateLabel(e.date)}</span></p>
 									<div class="c-m" class:has-ph={!sr.url}>
 										{#if !sr.url}<figure class="ph photo"><img src="/images/who-wrote-this/musk_royal_society.webp" alt={u("Elon Musk (photo: Debbie Rowe / The Royal Society, CC BY-SA 3.0)")} width="420" height="556" loading="lazy" /><sup class="fnref"><a href="#fn-wa-5" id="fnref-wa-5">5</a></sup></figure>{/if}
@@ -598,6 +608,9 @@
 	.ev.past { pointer-events: auto; opacity: .55; }
 	.ev.past .c-m { display: none; }
 	.ev.hide { opacity: 0; visibility: hidden; transform: translateY(6px); transition: opacity .35s, transform .4s var(--ease), visibility 0s .35s; }
+	/* what the card is (the three reports): a small label over its header */
+	.c-k { margin-bottom: -2px; font-size: 11px; line-height: 1.2; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); }
+	.ev.past .c-k { display: none; }
 	.c-h { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink2); }
 	.c-h b { font-size: 14.5px; font-weight: 600; color: var(--ink); }
 	.c-h span { margin-left: auto; font-variant-numeric: tabular-nums; }

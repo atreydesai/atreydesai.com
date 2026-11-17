@@ -56,6 +56,55 @@
 		scrollTo({ top: r.top + scrollY + t, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 	}
 	const NOTES = [{ n: 1, t: "The example is the paper's first table entry: a story whose ideas came from a model and whose prose a person wrote." }];
+	// every displayed string that is not paper text is listed in s1.json's ui (an entry may carry a note in brackets)
+	const u = (t: string) => (S.ui.some((x) => x === t || x.startsWith(t + " (")) ? t : (console.warn("s1: ui string not listed:", t), t));
+	// the slip Fable's prose explanation cites ("mistook greatness with size"): the word is marked in the story, and our
+	// gloss (not the model's words) says why
+	const SLIP = E.text.find((s) => s.slip)?.slip ?? "";
+	const GLOSS = u("The idiom is “mistook … for”, not “with”.").split(`“${SLIP}”`);
+	// the full story (TwiceTold, s1.json sources): its paragraphs, with the excerpt's cue spans found and marked
+	const CUES = E.text.filter((s) => s.cue);
+	type Seg = { t: string; cue?: string; slip?: string };
+	function marked(p: string): Seg[] {
+		const out: Seg[] = [];
+		let rest = p;
+		while (rest) {
+			let best: { i: number; c: (typeof CUES)[number] } | null = null;
+			for (const c of CUES) { const i = rest.indexOf(c.t); if (i >= 0 && (!best || i < best.i)) best = { i, c }; }
+			if (!best) { out.push({ t: rest }); break; }
+			if (best.i) out.push({ t: rest.slice(0, best.i) });
+			out.push({ t: best.c.t, cue: best.c.cue, slip: best.c.slip });
+			rest = rest.slice(best.i + best.c.t.length);
+		}
+		return out;
+	}
+	const FULL = E.full.text.trim().split(/\n\s*\n/).map(marked);
+	let dlg: HTMLDialogElement, opener: HTMLButtonElement, fullBody: HTMLElement;
+	let lock = { overflow: "", gutter: "" };
+	function openStory() {
+		// the page stays put under the dialog: no scroll, so the pinned steps hold (the gutter keeps the width)
+		const h = document.documentElement.style;
+		lock = { overflow: h.overflow, gutter: h.scrollbarGutter };
+		h.scrollbarGutter = "stable"; h.overflow = "hidden";
+		dlg.showModal();
+		fullBody.scrollTop = 0;
+		fullBody.focus({ preventScroll: true });
+	}
+	function closedStory() {
+		const h = document.documentElement.style;
+		h.overflow = lock.overflow; h.scrollbarGutter = lock.gutter;
+		opener?.focus({ preventScroll: true });
+	}
+	// keys stay with the dialog: the page's step keys (SectionNav: arrows, J/K, [ ]) must not move the page behind it;
+	// Tab and Shift+Tab stay inside the dialog (the page behind it is inert while it is open)
+	function trap(e: KeyboardEvent) {
+		e.stopPropagation();
+		if (e.key !== "Tab") return;
+		const f = [...dlg.querySelectorAll<HTMLElement>("button, [tabindex='0']")];
+		const i = f.indexOf(document.activeElement as HTMLElement), n = f.length;
+		e.preventDefault();
+		f[(i + (e.shiftKey ? -1 : 1) + n) % n]?.focus();
+	}
 	const lit = (c: string) => view === "both" || kindOf[c] === view;
 	const noteOn = (k: Kind) => view === "both" || view === k;
 	const noteSeen = (k: Kind) => STEPS.indexOf(view) >= STEPS.indexOf(k);
@@ -120,6 +169,8 @@
 	$effect(() => { void step; requestFrame(measure); });
 </script>
 
+{#snippet cueText(seg: Seg)}{#if seg.slip}{@const k = seg.t.indexOf(seg.slip)}{seg.t.slice(0, k)}<span class="slip">{seg.slip}</span>{seg.t.slice(k + seg.slip.length)}{:else}{seg.t}{/if}{/snippet}
+
 <section class="hb" id={S.id} data-rq={S.rq}>
 	<!-- 1. the opener: dark, full bleed, the question at chapter size (shared SectionOpener) -->
 	<SectionOpener n={S.n} title={S.title} takeaway={S.takeaway.t} context={S.context[0].t} accent="#C85A82" marks={["its author decided to say", "words used to say it"]}
@@ -132,14 +183,17 @@
 				<p class="n-k"><span class="kind"><Icon name="pen" /></span>{J.prose.label}</p>
 				<p class="n-v"><Icon name="check" />{J.prose.verdict}</p>
 				<p class="n-x">“{#each J.prose.explanation as seg}{#if seg.cue}<span class="ref" style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</p>
+				<p class="n-by"><Icon name="anthropic" />{S.stats_model}</p>
+				<p class="n-g" style:--c={CUE.clay}><span class="n-gk">{u("Our note")}</span> {GLOSS[0]}{#if GLOSS.length > 1}<span class="slip">“{SLIP}”</span>{GLOSS[1]}{/if}</p>
 			</aside>
 
 			<div class="page" bind:this={page}>
 				<StepDashes count={STEPS.length} current={step} progress={fill} {go} />
 				<p class="p-cap"><Icon name="anthropic" />{E.caption.t}</p>
 				<figure class="quote">
-					<blockquote class="story"><span class="qm" aria-hidden="true">“</span>{#each E.text as seg}{#if seg.cue}<span class="cue {kindOf[seg.cue]}" data-cue={seg.cue} class:lit={lit(seg.cue)} style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</blockquote>
-					<figcaption class="from">— {E.from.t}: <i>{E.from.title}</i><sup class="fnref"><a href="#fn-s1-1" id="fnref-s1-1">1</a></sup></figcaption>
+					<blockquote class="story"><span class="qm" aria-hidden="true">“</span>{#each E.text as seg}{#if seg.cue}<span class="cue {kindOf[seg.cue]}" data-cue={seg.cue} class:lit={lit(seg.cue)} style:--c={CUE[seg.cue]}>{@render cueText(seg)}</span>{:else}{seg.t}{/if}{/each}”</blockquote>
+					<figcaption class="from"><span>— {E.from.t}: <i>{E.from.title}</i><sup class="fnref"><a href="#fn-s1-1" id="fnref-s1-1">1</a></sup></span>
+						<button type="button" class="more" aria-haspopup="dialog" bind:this={opener} onclick={openStory}><Icon name="book" />{u("Read the full story")}</button></figcaption>
 				</figure>
 				<p class="concl" class:on={view === "both"}>
 					<span class="pair"><span class="kind fill"><Icon name="bulb" /></span><Icon name="ai" /><span class="kind"><Icon name="pen" /></span><Icon name="human" /></span>
@@ -151,6 +205,7 @@
 				<p class="n-k"><span class="kind fill"><Icon name="bulb" /></span>{J.ideas.label}</p>
 				<p class="n-v"><Icon name="check" />{J.ideas.verdict}</p>
 				<p class="n-x">“{#each J.ideas.explanation as seg}{#if seg.cue}<span class="ref" style:--c={CUE[seg.cue]}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</p>
+				<p class="n-by"><Icon name="anthropic" />{S.stats_model}</p>
 			</aside>
 
 			{#if wide}
@@ -178,6 +233,26 @@
 	</aside>
 
 	<Footnotes id="s1" notes={NOTES} />
+
+	<!-- the full story, from the source line: a modal dialog (Esc or the button closes it; Tab stays inside) -->
+	<dialog class="full" bind:this={dlg} aria-labelledby="hb-full-t" onclose={closedStory} onkeydown={trap}>
+		<div class="f-in">
+			<header class="f-h">
+				<div class="f-t">
+					<p class="f-k"><span class="pair"><span class="kind fill"><Icon name="bulb" /></span><Icon name="ai" /><span class="kind"><Icon name="pen" /></span><Icon name="human" /></span>{E.source}.</p>
+					<h2 id="hb-full-t">{E.from.t}: <i>{E.from.title}</i></h2>
+				</div>
+				<button type="button" class="f-x" aria-label={u("Close the story")} onclick={() => dlg.close()}><Icon name="x" /><span>{u("Close")}</span></button>
+			</header>
+			<!-- a scrolling region takes focus so the keyboard can scroll it (and it is where the dialog opens) -->
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+			<div class="f-body" tabindex="0" role="region" aria-labelledby="hb-full-t" bind:this={fullBody}>
+				{#each FULL as par}
+					<p>{#each par as seg}{#if seg.cue}<span class="cue lit {kindOf[seg.cue]}" style:--c={CUE[seg.cue]}>{@render cueText(seg)}</span>{:else}{seg.t}{/if}{/each}</p>
+				{/each}
+			</div>
+		</div>
+	</dialog>
 </section>
 
 <style>
@@ -193,8 +268,15 @@
 	.quote { margin: 0; display: grid; gap: 14px; }
 	.story { position: relative; margin: 0; font-size: clamp(26px, 2.7vw, 40px); line-height: 1.5; letter-spacing: -0.014em; color: var(--ink); }
 	.qm { position: absolute; right: 100%; top: -.05em; margin-right: .08em; font-family: Georgia, "Times New Roman", serif !important; font-size: 2em; line-height: 1; font-weight: 400; color: color-mix(in srgb, var(--ink) 26%, transparent); pointer-events: none; user-select: none; }
-	.from { font-size: 14px; line-height: 1.4; color: var(--ink2); }
+	.from { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; font-size: 14px; line-height: 1.4; color: var(--ink2); }
 	.from i { font-style: italic; }
+	/* the full story's control: a small text button after the source line */
+	.more { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ink) 35%, transparent); text-underline-offset: 3px; }
+	.more:hover { text-decoration-color: var(--ink); }
+	.more :global(svg) { color: var(--f); }
+	/* the slip Fable cites: the one word ringed, in the cue's colour, once the cue is lit */
+	.slip { padding: 0 .1em; border-radius: 3px; transition: box-shadow .45s; }
+	.cue.lit .slip, .n-g .slip { box-shadow: 0 0 0 2px var(--c); }
 	.cue { padding: 0 2px; border-radius: 2px; transition: background-color .45s, color .45s, box-shadow .45s; box-shadow: inset 0 -2px 0 rgba(20, 32, 45, .14); }
 	.cue.lit.ideas { background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -2.5px 0 var(--c); }
 	.cue.lit.prose { background: color-mix(in srgb, var(--c) 24%, transparent); box-shadow: inset 0 -2.5px 0 var(--c); }
@@ -210,6 +292,29 @@
 	.n-v { display: inline-flex; align-items: baseline; gap: 8px; font-size: clamp(30px, 3vw, 44px); line-height: 1; font-weight: 600; letter-spacing: -0.03em; color: var(--ink); }
 	.n-v :global(svg) { width: .6em; height: .6em; color: #046B55; align-self: center; }
 	.n-x { max-width: 30ch; font-size: 14.5px; line-height: 1.5; color: var(--ink2); }
+	/* whose words: the quotation is the model's; our gloss is set apart under a rule, labelled as ours */
+	.n-by { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--ink2); }
+	.n-by :global(svg) { color: var(--f); }
+	.n-g { max-width: 30ch; margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--rule); font-size: 13.5px; line-height: 1.5; color: var(--ink); text-wrap: balance; }
+	.n-gk { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); }
+	.n-g .slip { margin: 0 .12em; }
+
+	/* the full story: a modal sheet, its text scrolling inside */
+	.full { box-sizing: border-box; width: min(42rem, calc(100vw - 32px)); max-height: min(86vh, 900px); padding: 0; border: 0; border-radius: 4px; background: var(--field); color: var(--ink); box-shadow: 0 24px 60px rgba(20, 32, 45, .28); overflow: hidden; }
+	.full[open] { display: flex; }
+	.full::backdrop { background: rgba(20, 32, 45, .5); }
+	.f-in { display: flex; flex-direction: column; min-height: 0; width: 100%; }
+	.f-h { flex: none; display: flex; align-items: flex-start; gap: 16px; padding: 18px 18px 14px 24px; border-bottom: 1px solid var(--rule); }
+	.f-t { display: grid; gap: 6px; min-width: 0; flex: 1; }
+	.f-k { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; color: var(--ink2); }
+	.f-k .pair { font-size: 15px; }
+	.f-k .kind { width: 19px; height: 19px; font-size: 10px; }
+	.f-h h2 { font-size: 21px; line-height: 1.25; font-weight: 600; letter-spacing: -0.015em; color: var(--ink); }
+	.f-h h2 i { font-style: italic; }
+	.f-x { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1.25px solid var(--ink); border-radius: 2px; font-size: 13px; font-weight: 500; }
+	.f-x:hover { background: var(--ink); color: var(--field); }
+	.f-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 24px 26px; display: grid; gap: 14px; font-size: 17px; line-height: 1.6; }
+	.f-body:focus-visible { outline-offset: -4px; }
 	.ref { color: var(--ink); background: color-mix(in srgb, var(--c) 22%, transparent); padding: 0 2px; border-radius: 2px; }
 	.ref.hollow { background: none; box-shadow: inset 0 0 0 1.5px var(--c); }
 	.kind { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--ink); color: var(--ink); font-size: 12px; }
@@ -243,7 +348,17 @@
 		.note.right { grid-column: 2; }
 		.n-v { font-size: 28px; }
 		.n-x { font-size: 13.5px; }
+		.n-g { font-size: 12.5px; margin-top: 2px; padding-top: 7px; }
+		.n-by { font-size: 11.5px; }
+		.from { gap: 2px 14px; font-size: 13px; }
+		.more { font-size: 13px; }
 		.sc-nums { grid-template-columns: 1fr; gap: 28px; }
+		.full { width: calc(100vw - 24px); max-height: calc(100 * var(--svh, 1vh) - 48px); }
+		.f-h { padding: 14px 12px 12px 18px; gap: 10px; }
+		.f-h h2 { font-size: 18px; }
+		.f-x span { display: none; }
+		.f-x { padding: 8px; }
+		.f-body { padding: 14px 18px 22px; font-size: 16px; }
 	}
-	@media (prefers-reduced-motion: reduce) { .cue, .note, .concl, .leaders path { transition: none; } }
+	@media (prefers-reduced-motion: reduce) { .cue, .note, .concl, .leaders path, .slip { transition: none; } }
 </style>

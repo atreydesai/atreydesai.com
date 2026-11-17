@@ -1,5 +1,5 @@
 {
- "_about": "Section 1 (Human or AI?) strings for HumanOrAI.svelte, copied from content.json sections[0] on 16 Nov 2026 and cut per Atrey's feedback: no sample size, micro-averages, 'mean over all four combinations' or per-case numbers (those stay in the paper). Paper strings carry src; every other displayed word is in ui. The site copy (atreydesai.com src/lib/who-wrote-this/s1.json) is byte-identical. The climb's chart keeps only its label: its paper sentence (“Model accuracy has improved over time.”) is already the timeline section's heading.",
+ "_about": "Section 1 (Human or AI?) strings for HumanOrAI.svelte, copied from content.json sections[0] on 16 Nov 2026 and cut per Atrey's feedback: no sample size, micro-averages, 'mean over all four combinations' or per-case numbers (those stay in the paper). Paper strings carry src; every other displayed word is in ui. The site copy (atreydesai.com src/lib/who-wrote-this/s1.json) is byte-identical. The climb's chart keeps only its label: its paper sentence (“Model accuracy has improved over time.”) is already the timeline section's heading. 16 Nov 2026 clarity pass (coauthor feedback): example.text's clay segment carries slip (“with”, marked in the story; the text is unchanged); the prose note adds our gloss, listed in ui, under Fable's verbatim explanation; the source line opens a dialog with the full story (example.full.text, not paper text, kept out of check_ngrams), whose provenance and licence note are in sources.",
  "id": "human-or-ai",
  "n": 1,
  "rq": 1,
@@ -42,7 +42,8 @@
    },
    {
     "t": "mistook greatness with size",
-    "cue": "clay"
+    "cue": "clay",
+    "slip": "with"
    },
    {
     "t": "."
@@ -99,7 +100,12 @@
     ]
    }
   ],
-  "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1)"
+  "src": "paper/tables/minjoon-agent_attribution_examples.tex (row 1)",
+  "full": {
+   "text": "The Keeper lit the old stone lantern at the edge of the forest every evening. The lantern was the brightest light in the valley and rather proud of itself too. One night a firefly came to rest on the lantern, drawn in by the magnificent flame.\n\n“Your light is very beautiful,” the firefly said.\n\nThe lantern scoffed. “Yes, of course it is beautiful,” it said. “You will not find a brighter light for miles around. I have saved many a valley traveler and all who see me are grateful. Your little spark is nothing compared to me.”\n\n“You are right of course,” the firefly replied. “I cannot hope to compare with your brightness, but even small lights should shine wherever they can.”\n\nLater that evening, a violent storm began. The lantern swayed in the howling wind and a fallen branch cracked its glass and snuffed its flame. The winds and fallen trees prevented the Keeper from being able to relight it and the valley was bathed in darkness.\n\nDown in the forest, a young hare was trapped at a fork in the trees. He was carrying medicine for his sick mother and could not find the safe path home among the flooded trees. The lantern could hear the hare’s distress and tried desperately to ignite its own flame. Suddenly, the firefly appeared before the hare, joined by a swarm of other fireflies who helped the hare find its way home by their collective glow. The lantern watched the fireflies with growing shame at its inability to help and boastful behavior.\n\nThe next morning, the Keeper repaired the lantern and relit its flame by night. The firefly returned to the lantern, hesitant.\n\n“Please do not be afraid, firefly,” the lantern said. “I saw how you helped the hare last night and I am so sorry for dismissing you. I was wrong to boast. The most meaningful light is that which is provided in moments of need.”\n\nThe firefly settled on the rim of the lantern. “I forgive you, friend,” it said.\n\nThe lantern dimmed its flame, allowing the glow of the firefly to be seen as well. From that day on, travelers to the forest always saw two lights shining from the hill and the lantern never again mistook greatness with size.\n",
+   "source": "full_story",
+   "note": "Not paper text: the whole story the paper's excerpt is cut from, shown in a dialog from the source line. Kept out of check_ngrams. The excerpt's cue spans are found in it and marked the same way."
+  }
  },
  "steps": [
   "ideas",
@@ -216,6 +222,37 @@
   "Four cases",
   "This story",
   "Model showcase",
-  "Show (aria-label of the Explore buttons)"
+  "Show (aria-label of the Explore buttons)",
+  "Our note (label of our gloss under Claude Fable 5.2's prose explanation)",
+  "The idiom is “mistook … for”, not “with”.",
+  "Read the full story",
+  "Close",
+  "Close the story (aria-label of the dialog's close button)"
+ ],
+ "sources": [
+  {
+   "id": "full_story",
+   "path": "corpora/twicetold/data/stories.parquet",
+   "row": {
+    "doc_id": "twicetold-twicetold_20_human",
+    "record_id": "46957ab96ab482221afe6d31597c8e6c348929b8e06061447ab703ea3ffb4e9f",
+    "source_row": 69
+   },
+   "raw": "03_revision/ouroboros/data/stories/twicetold.jsonl row 69 (the table's source_file and source_row columns)",
+   "pair": 20,
+   "genre": "fable",
+   "split": "human_rewrite",
+   "gold_ideas": "ai",
+   "gold_prose": "human",
+   "words": 381,
+   "chars": 2127,
+   "sha256": "227eeb2891d2bd5805b553c89d298c1ebf90e3ad5ef3aa7c5acceb30de2a85a2",
+   "same_text": [
+    "paper/tables/data/minjoon_agent_attribution_examples/examples.json examples[0]: input_sha256 matches; context 'Lantern and firefly'; the paper's table row 1 (paper/tables/minjoon-agent_attribution_examples.tex)",
+    "experiments/E4_robustness/stability/data/documents.parquet row 63 (rid i40502; eval t31, arm 'team rewrites'), the input examples.json cites; identical text"
+   ],
+   "licence": "Team-authored, unpublished: a lab member rewrote a GPT-5.6 Sol story in their own prose (gold ideas AI, gold prose human; corpora/twicetold/README.md). No licence file in the repository; the rewriters' consent to publication is not recorded. The same rewrites are the team-rewrite arm of experiments/E1_main_detection (eval t31); rewriter names are deliberately not copied here.",
+   "licence_src": "docs/launch_20261116/content/print_text.json sources[18] (the same story is hero ridge text); docs/launch_20261116/README.md Open questions item 7 (publication consent to be confirmed with the rewriters before launch)"
+  }
  ]
 }

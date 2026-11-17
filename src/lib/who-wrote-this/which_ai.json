@@ -1,5 +1,5 @@
 {
- "_about": "Section 2 of the launch page (If AI, which AI?), reworked 16 Nov 2026. Fourth pass, after Atrey's user testing (\"collapse square blocks into bars\", \"bring the hovered info out\", \"emphasize timeline x axis is model releases\", \"there's no headline number\", \"a map ... like threads like in a crime scene\"): the opener; bars, one per writing model, its share of texts Claude Fable 5.2 credits to the model's own lab, in a row per lab along a model release date axis, the number on every bar, the headline 98% at chapter size on its step; then a thread map: the models the steps name (the union of the steps' focus lists), pinned, a thread from each to Anthropic or OpenAI where Fable credits that lab with 10% or more of its texts (thicker for a larger share, the share on the thread), and the four reports pinned beside them as evidence, one per step, each with the labs it names. Strings with src are paper text; ui lists every displayed string that is not; sources holds each report's link, access date and the one short excerpt shown from it; notes are the footnotes. Every share, release date, report date and the labs each report names come from rq2_writers.json (tools/build_rq2_data.py, from paper/figures/data/rq2_distill.json), computed on the page as whole percents of each writer's n; model and lab names are its writer and lab fields.",
+ "_about": "Section 2 of the launch page (If AI, which AI?), reworked 16 Nov 2026. Fourth pass, after Atrey's user testing (\"collapse square blocks into bars\", \"bring the hovered info out\", \"emphasize timeline x axis is model releases\", \"there's no headline number\", \"a map ... like threads like in a crime scene\"): the opener; bars, one per writing model, its share of texts Claude Fable 5.2 credits to the model's own lab, in a row per lab along a model release date axis, the number on every bar, the headline 98% at chapter size on its step; then a thread map: the models the steps name (the union of the steps' focus lists), pinned, a thread from each to Anthropic or OpenAI where Fable credits that lab with 10% or more of its texts (thicker for a larger share, the share on the thread), and the four reports pinned beside them as evidence, one per step, each with the labs it names. Strings with src are paper text; ui lists every displayed string that is not; sources holds each report's link, access date and the one short excerpt shown from it; notes are the footnotes. Every share, release date, report date and the labs each report names come from rq2_writers.json (tools/build_rq2_data.py, from paper/figures/data/rq2_distill.json), computed on the page as whole percents of each writer's n; model and lab names are its writer and lab fields. 16 Nov 2026 clarity pass: a board step before the first report (intro: true) says what the reports are, in the paper's words, and the three reports' cards carry the role label in reports[].kind (listed in ui).",
  "id": "which-ai",
  "n": 2,
  "rq": 2,
@@ -52,6 +52,13 @@
    ],
    "t": "Claude Fable 5.2 recognizes most texts from earlier Kimi and Qwen releases, but attributes nearly every Kimi K3 and GLM-5.3 text to Claude and most Qwen3.8 27B and Grok 4.7 texts to GPT.",
    "src": "paper/sections/09_appendix.tex (fig:md_distill_cols caption)"
+  },
+  {
+   "part": "board",
+   "intro": true,
+   "focus": [],
+   "t": "These errors are consistent with public reports of distillation. A model trained on another lab's outputs can inherit that lab's style, so a detector may name the lab it learned from.",
+   "src": "paper/sections/04_rq2_ai_vs_ai.tex: line 9 (“We find that their errors are consistent with public reports of distillation”, citing anthropic2026distillation and openai2026deepseek; “their” made “These”) and line 44 (the distillation paragraph's first sentence, verbatim). Added 16 Nov 2026 so the page says what “the reports” are before the first report step."
   },
   {
    "part": "board",
@@ -117,7 +124,8 @@
    "by": "openai",
    "icon": "openai",
    "source": "openai_memo",
-   "note": 1
+   "note": 1,
+   "kind": "Distillation report"
   },
   {
    "event": "Anthropic",
@@ -127,7 +135,8 @@
    "by": "anthropic",
    "icon": "anthropic",
    "source": "anthropic_feb",
-   "note": 2
+   "note": 2,
+   "kind": "Distillation report"
   },
   {
    "event": "Musk testimony",
@@ -145,7 +154,8 @@
    "by": "anthropic",
    "icon": "anthropic",
    "source": "anthropic_sep",
-   "note": 4
+   "note": 4,
+   "kind": "Distillation report"
   }
  ],
  "reports_src": "Report dates, line colours (Anthropic rose; OpenAI memo and Musk testimony teal) and named labs as in paper/figures/data/rq2_distill.json events (reporter field) and paper/figures/ty_rq2_distill_timeline.pdf. The June 'Anthropic letter' event there has no citation in the paper, so build_rq2_data.py leaves it out of rq2_writers.json and the page does not show it.",
@@ -273,7 +283,8 @@
   "Claude",
   "GPT",
   "Names",
-  "{lab}, {Mon} {YYYY} (a model’s card on the board)"
+  "{lab}, {Mon} {YYYY} (a model’s card on the board)",
+  "Distillation report"
  ],
  "musk_quote": {
   "before": "xAI ",
