@@ -498,7 +498,10 @@ sideways between routes, and lets task-specific content expand.
   shrink to accommodate the sidenotes. Near the `xl` boundary only the
   sidenote column may narrow to prevent horizontal overflow. Below `xl`,
   footnotes move below the main content.
-- The Photography grid may use dense masonry-like placement.
+- The Photography grid may use dense masonry-like placement. Its tiles are
+  designed at the full-width `352px` column and keep that shape at every
+  width: the row unit scales with the column, the `16px` gaps do not. A tile
+  that grows taller while its column narrows crops its photo to a sliver.
 - The Bookshelf may use horizontal table overflow, but controls and pagination
   must remain usable without horizontal page scrolling.
 - Align related baselines and repeated control heights optically.
@@ -965,6 +968,12 @@ through `<Mark kind="…" />` or `markHtml()`.
 - Escape closes the dialog.
 - Media is constrained by both `max-width` and `max-height`.
 - Caption sits `16px` below media.
+- **Show a rendition, offer the original.** A lightbox draws a WebP sized to
+  the screen (`srcset` up to `2048px` with a `sizes` that matches the frame),
+  never the full-size file, and puts the original one action away: a
+  "Download original" link under the caption with its pixel size and file
+  size. Photo URLs come only from `src/lib/photo-urls.js`;
+  `tests/photos.test.mjs` holds both halves.
 - **Give media its intrinsic `width` and `height`.** Without them the frame has
   no size until the file decodes, so the loading placeholder covers a
   zero-height box and the panel jumps when the image lands. The dimensions are

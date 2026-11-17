@@ -148,9 +148,9 @@
     on:mouseenter={handleMouseEnter}
     on:mouseleave={handleMouseLeave}
 >
-    <!-- Plain <img> is the LCP element: renders from the <link rel=preload>
-         in app.html immediately, no JS needed. The canvas sits on top and
-         stays transparent until the user hovers. -->
+    <!-- Plain <img> is the LCP element: renders from the homepage's
+         <link rel=preload> immediately, no JS needed. The canvas sits on top
+         and stays transparent until the user hovers. -->
 
     <img
         src={src}
@@ -158,7 +158,7 @@
         class="lego-img"
         width="500"
         height="500"
-        decoding="async"
+        fetchpriority="high"
     />
 
     <canvas

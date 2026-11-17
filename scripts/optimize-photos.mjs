@@ -1,18 +1,34 @@
-// Build step for the photography page and the homepage portrait: responsive
-// WebP thumbnails, an EXIF/caption manifest bundled into the app, and the
-// profile.webp hero image. Runs before every production build.
+// Build step for the photography page and the homepage portrait: WebP
+// renditions of every photo, an EXIF/caption manifest bundled into the app,
+// and the profile.webp hero image. Runs before every production build.
+//
+// Rendition names are content-addressed (src/lib/photo-urls.js): a file that
+// already exists is already correct, so a rebuild only encodes photos that are
+// new or changed, and stale files are swept away at the end. Encoded files are
+// kept in node_modules/.cache, which Vercel restores between builds, and
+// copied into static/ from there.
 
 import sharp from 'sharp';
-import { readdir, mkdir, stat, readFile, writeFile } from 'fs/promises';
-import { join, parse } from 'path';
+import { createHash } from 'crypto';
+import { access, copyFile, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { extractPhotoMeta } from './photo-exif.mjs';
+import {
+    RENDITION_QUALITY,
+    RENDITION_VERSION,
+    renditionFile,
+    renditionWidths,
+} from '../src/lib/photo-urls.js';
 
 const PHOTOS_DIR = 'static/images/photography';
 const THUMBS_DIR = 'static/images/photography/thumbs';
+const CACHE_DIR = 'node_modules/.cache/photo-renditions';
 const GENERATED_DIR = 'src/lib/generated';
-// EXIF/dimension cache used to avoid re-reading every full-size JPG when the
-// build regenerates the production-safe photo manifest.
-const META_PATH = join(THUMBS_DIR, 'photo-meta.json');
+// Per-photo cache of EXIF, dimensions, and the content hash, keyed by mtime
+// and size, so a local rebuild doesn't re-read every full-size JPEG. It lives
+// outside static/ so it is never deployed.
+const META_FILE = 'photo-meta.json';
+const META_PATH = join(CACHE_DIR, META_FILE);
 const MANIFEST_PATH = join(GENERATED_DIR, 'photo-manifest.json');
 // Hand-written captions, keyed by filename. Photos with no IPTC/XMP title and
 // no entry here stay untitled rather than falling back to their filename.
@@ -21,177 +37,171 @@ const CAPTIONS_PATH = 'scripts/photo-captions.json';
 // alt text only (what a screen reader or an AI agent gets); unlike a caption
 // they never appear as a visible title.
 const ALTS_PATH = 'scripts/photo-alts.json';
-// Bump when extractPhotoMeta's output shape changes so the mtime-keyed cache
-// re-extracts instead of serving stale fields.
-const META_VERSION = 2;
+// Bump when the cached fields change shape so the cache re-extracts instead
+// of serving stale ones.
+const META_VERSION = 3;
 
-// Thumbnail settings
-const THUMB_WIDTH = 800;  // Default grid thumbnail width (keeps the bare name)
-const THUMB_QUALITY = 80; // WebP quality (0-100)
-// Extra widths emitted for the responsive srcset (named `${name}-${w}.webp`).
-const SRCSET_WIDTHS = [400, 1200];
+const isPhoto = (f) => /\.(jpg|jpeg|png|webp)$/i.test(f) && !f.startsWith('.');
 
-async function ensureDir(dir) {
+async function exists(path) {
     try {
-        await mkdir(dir, { recursive: true });
-    } catch (err) {
-        if (err.code !== 'EEXIST') throw err;
-    }
-}
-
-async function needsUpdate(srcPath, destPath) {
-    try {
-        const [srcStat, destStat] = await Promise.all([
-            stat(srcPath),
-            stat(destPath)
-        ]);
-        return srcStat.mtime > destStat.mtime;
+        await access(path);
+        return true;
     } catch {
-        return true; // Destination doesn't exist
+        return false;
     }
 }
 
-// Resize + webp conversion for a single source file.
-// width: target width (won't enlarge); quality: webp quality 0-100.
-async function toWebp(srcPath, destPath, width, quality) {
-    if (!(await needsUpdate(srcPath, destPath))) {
-        return { src: srcPath, status: 'skipped' };
-    }
+async function readJson(path, fallback) {
     try {
-        await sharp(srcPath)
-            .resize(width, null, { withoutEnlargement: true, fit: 'inside' })
-            .webp({ quality })
-            .toFile(destPath);
-        return { src: srcPath, status: 'optimized' };
-    } catch (err) {
-        return { src: srcPath, status: 'error', error: err.message };
-    }
-}
-
-async function optimizePhoto(filename) {
-    const srcPath = join(PHOTOS_DIR, filename);
-    const { name } = parse(filename);
-
-    // The 800px default keeps its bare name (used as the <img> src); the other
-    // widths get a `-${w}` suffix and feed the responsive srcset.
-    const targets = [
-        { dest: join(THUMBS_DIR, `${name}.webp`), width: THUMB_WIDTH },
-        ...SRCSET_WIDTHS.map((w) => ({
-            dest: join(THUMBS_DIR, `${name}-${w}.webp`),
-            width: w,
-        })),
-    ];
-
-    let optimized = 0;
-    for (const { dest, width } of targets) {
-        const result = await toWebp(srcPath, dest, width, THUMB_QUALITY);
-        if (result.status === 'error') return { filename, ...result };
-        if (result.status === 'optimized') optimized++;
-    }
-    return { filename, status: optimized > 0 ? 'optimized' : 'skipped' };
-}
-
-async function optimizePhotography() {
-    console.log('📸 Optimizing photography thumbnails...');
-    await ensureDir(THUMBS_DIR);
-    const files = await readdir(PHOTOS_DIR);
-    const imageFiles = files.filter(f =>
-        /\.(jpg|jpeg|png|webp)$/i.test(f) && !f.startsWith('.')
-    );
-    const results = await Promise.all(imageFiles.map(optimizePhoto));
-    summarize(results);
-}
-
-async function optimizeProfile() {
-    console.log('\n👤 Optimizing profile image...');
-    const src = 'static/images/profile.JPG';
-    const dest = 'static/images/profile.webp';
-    const result = await toWebp(src, dest, 500, 82);
-    summarize([{ filename: 'profile.webp', ...result }]);
-}
-
-async function extractMetadata() {
-    console.log('\n🏷️  Extracting photo metadata...');
-    const files = await readdir(PHOTOS_DIR);
-    const imageFiles = files.filter(f =>
-        /\.(jpg|jpeg|png|webp)$/i.test(f) && !f.startsWith('.')
-    );
-
-    /** @type {Record<string, import('./photo-exif.mjs').PhotoMeta & { mtimeMs: number }>} */
-    let cache = {};
-    try {
-        const raw = JSON.parse(await readFile(META_PATH, 'utf-8'));
-        if (raw.__version === META_VERSION) cache = raw.photos ?? {};
+        return JSON.parse(await readFile(path, 'utf-8'));
     } catch {
-        // no cache yet — extract everything
+        return fallback;
     }
+}
 
-    /** @type {Record<string, string>} */
-    let captionOverrides = {};
-    try {
-        const raw = JSON.parse(await readFile(CAPTIONS_PATH, 'utf-8'));
-        // Keys starting with `_` are notes (e.g. `_readme`), not captions.
-        captionOverrides = Object.fromEntries(
-            Object.entries(raw).filter(([key]) => !key.startsWith('_')),
-        );
-    } catch {
-        // no overrides file — captions come from embedded metadata only
-    }
+/**
+ * EXIF, displayed dimensions, byte size, and a content hash for each photo,
+ * reusing the cache for files whose mtime and size are unchanged.
+ */
+async function readPhotos(filenames) {
+    const raw = await readJson(META_PATH, {});
+    const cache = raw.__version === META_VERSION ? (raw.photos ?? {}) : {};
 
-    /** @type {Record<string, string>} */
-    let altDescriptions = {};
-    try {
-        altDescriptions = JSON.parse(await readFile(ALTS_PATH, 'utf-8'));
-    } catch {
-        // no descriptions file — alt text falls back to the caption, if any
-    }
-
-    /** @type {typeof cache} */
-    const meta = {};
+    const photos = {};
     let extracted = 0;
-    for (const filename of imageFiles) {
+    for (const filename of filenames) {
         const srcPath = join(PHOTOS_DIR, filename);
-        const { mtimeMs } = await stat(srcPath);
+        const { mtimeMs, size } = await stat(srcPath);
         const cached = cache[filename];
-        if (cached && cached.mtimeMs === mtimeMs) {
-            meta[filename] = cached;
+        if (cached && cached.mtimeMs === mtimeMs && cached.bytes === size) {
+            photos[filename] = cached;
             continue;
         }
         const buffer = await readFile(srcPath);
-        meta[filename] = { mtimeMs, ...extractPhotoMeta(buffer, filename) };
+        const { autoOrient } = await sharp(buffer).metadata();
+        photos[filename] = {
+            mtimeMs,
+            bytes: size,
+            sha: createHash('sha256').update(buffer).digest('hex'),
+            ...extractPhotoMeta(buffer, filename),
+            // sharp's upright dimensions are the ones the renditions get, so
+            // they win over the EXIF reading.
+            width: autoOrient.width,
+            height: autoOrient.height,
+        };
         extracted++;
     }
 
-    await writeFile(META_PATH, JSON.stringify({ __version: META_VERSION, photos: meta }));
-    console.log(`   ✅ Extracted: ${extracted}   ⏭️  Cached: ${imageFiles.length - extracted}`);
+    await writeFile(META_PATH, JSON.stringify({ __version: META_VERSION, photos }));
+    console.log(`   ✅ Read: ${extracted}   ⏭️  Cached: ${filenames.length - extracted}`);
+    return photos;
+}
 
-    // Vercel serves files from static/, but they are not available for a
-    // serverless function to enumerate at request time. Bundle a manifest
-    // into the app so the photography route never depends on runtime disk
-    // access.
-    const photos = imageFiles.map((filename) => {
-        const { name } = parse(filename);
-        const { mtimeMs: _mtimeMs, caption: embedded, ...photoMeta } = meta[filename];
+/** The rendition hash: the original's bytes plus the encoding settings. */
+function versionOf(sha) {
+    return createHash('sha256')
+        .update(`${RENDITION_VERSION}:${RENDITION_QUALITY}:${sha}`)
+        .digest('hex')
+        .slice(0, 10);
+}
+
+/**
+ * Make sure every rendition is in static/: copied from the build cache when it
+ * was encoded before, encoded into the cache first when it wasn't. Returns the
+ * set of file names that should exist.
+ */
+async function writeRenditions(entries) {
+    const expected = new Set();
+    const jobs = [];
+    for (const photo of entries) {
+        for (const width of renditionWidths(photo)) {
+            const file = renditionFile(photo, width);
+            expected.add(file);
+            jobs.push({ photo, width, file });
+        }
+    }
+
+    let encoded = 0;
+    let copied = 0;
+    const errors = [];
+    await Promise.all(
+        jobs.map(async ({ photo, width, file }) => {
+            const dest = join(THUMBS_DIR, file);
+            if (await exists(dest)) return;
+            const cached = join(CACHE_DIR, file);
+            try {
+                if (await exists(cached)) {
+                    copied++;
+                } else {
+                    // Written aside and renamed into place: the name promises
+                    // finished content, so a build killed mid-encode must not
+                    // leave a truncated file under it.
+                    const partial = `${cached}.partial`;
+                    await sharp(join(PHOTOS_DIR, photo.filename))
+                        .autoOrient()
+                        .resize(width, null, { withoutEnlargement: true })
+                        .webp({ quality: RENDITION_QUALITY })
+                        .toFile(partial);
+                    await rename(partial, cached);
+                    encoded++;
+                }
+                await copyFile(cached, dest);
+            } catch (err) {
+                errors.push(`${photo.filename} @${width}: ${err.message}`);
+            }
+        }),
+    );
+
+    const current = jobs.length - encoded - copied - errors.length;
+    console.log(
+        `   ✅ Encoded: ${encoded}   📦 From cache: ${copied}   ⏭️  In place: ${current}` +
+            (errors.length ? `   ❌ Errors: ${errors.length}` : ''),
+    );
+    for (const error of errors) console.log(`   - ${error}`);
+    if (errors.length) process.exitCode = 1;
+    return expected;
+}
+
+/** Remove renditions no current photo or setting refers to. */
+async function sweep(dir, expected) {
+    let removed = 0;
+    for (const file of await readdir(dir)) {
+        if (expected.has(file) || file === META_FILE || file.startsWith('.')) continue;
+        await unlink(join(dir, file));
+        removed++;
+    }
+    if (removed) console.log(`   🧹 Removed ${removed} stale files from ${dir}`);
+}
+
+async function optimizePhotography() {
+    console.log('📸 Photography renditions and manifest...');
+    await mkdir(THUMBS_DIR, { recursive: true });
+    await mkdir(CACHE_DIR, { recursive: true });
+    const filenames = (await readdir(PHOTOS_DIR)).filter(isPhoto);
+    const meta = await readPhotos(filenames);
+
+    // Keys starting with `_` are notes (e.g. `_readme`), not captions.
+    const captionOverrides = Object.fromEntries(
+        Object.entries(await readJson(CAPTIONS_PATH, {})).filter(([key]) => !key.startsWith('_')),
+    );
+    const altDescriptions = await readJson(ALTS_PATH, {});
+
+    // Vercel serves files from static/, but a serverless function can't list
+    // them at request time, so the manifest is bundled into the app instead.
+    // It carries only facts; photo-urls.js turns them into URLs.
+    const photos = filenames.map((filename) => {
+        const { mtimeMs: _m, sha, caption: embedded, ...photoMeta } = meta[filename];
         // Precedence: hand-written override > embedded IPTC/XMP title > none.
-        // A missing caption means no visible title, rather than a filename
-        // dressed up as one.
         const caption = (captionOverrides[filename] ?? embedded ?? '').trim();
-        // Alt text is the description of what the photo shows; the caption is
-        // a title, so it is only the fallback. A photo with neither is
-        // presentational and gets an empty alt.
+        // Alt text describes what the photo shows; the caption is a title, so
+        // it is only the fallback. A photo with neither gets an empty alt.
         const alt = (altDescriptions[filename] ?? caption).trim();
-
         return {
-            src: `/images/photography/${filename}`,
-            thumbSrc: `/images/photography/thumbs/${name}.webp`,
-            thumbSrcset: [
-                `/images/photography/thumbs/${name}-400.webp 400w`,
-                `/images/photography/thumbs/${name}.webp 800w`,
-                `/images/photography/thumbs/${name}-1200.webp 1200w`,
-            ].join(', '),
+            filename,
+            v: versionOf(sha),
             caption: caption || undefined,
             alt,
-            filename,
             ...photoMeta,
         };
     });
@@ -203,26 +213,36 @@ async function extractMetadata() {
         return a.filename.localeCompare(b.filename);
     });
 
-    await ensureDir(GENERATED_DIR);
+    const expected = await writeRenditions(photos);
+    await sweep(THUMBS_DIR, expected);
+    await sweep(CACHE_DIR, expected);
+
+    await mkdir(GENERATED_DIR, { recursive: true });
     await writeFile(MANIFEST_PATH, `${JSON.stringify(photos, null, 2)}\n`);
     console.log(`   📋 Manifest: ${photos.length} photos`);
 }
 
-function summarize(results) {
-    const optimized = results.filter(r => r.status === 'optimized');
-    const skipped = results.filter(r => r.status === 'skipped');
-    const errors = results.filter(r => r.status === 'error');
-    console.log(`   ✅ Optimized: ${optimized.length}   ⏭️  Skipped: ${skipped.length}${errors.length ? `   ❌ Errors: ${errors.length}` : ''}`);
-    if (errors.length > 0) {
-        errors.forEach(e => console.log(`   - ${e.filename || e.src}: ${e.error}`));
+async function optimizeProfile() {
+    console.log('\n👤 Profile image...');
+    const src = 'static/images/profile.JPG';
+    const dest = 'static/images/profile.webp';
+    const [srcStat, destStat] = await Promise.all([stat(src), stat(dest).catch(() => null)]);
+    if (destStat && destStat.mtime >= srcStat.mtime) {
+        console.log('   ⏭️  Up to date');
+        return;
     }
+    await sharp(src).autoOrient().resize(500, null, { withoutEnlargement: true }).webp({ quality: 82 }).toFile(dest);
+    console.log('   ✅ Encoded');
 }
 
 async function main() {
+    const started = performance.now();
     await optimizePhotography();
-    await extractMetadata();
     await optimizeProfile();
-    console.log('\n✨ Done!');
+    console.log(`\n✨ Done in ${((performance.now() - started) / 1000).toFixed(1)}s`);
 }
 
-main().catch(console.error);
+main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+});

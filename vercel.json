@@ -39,6 +39,24 @@
   ],
   "headers": [
     {
+      "source": "/images/photography/thumbs/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/images/photography/:original([^/]+)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=2592000"
+        }
+      ]
+    },
+    {
       "source": "/llms.txt",
       "headers": [
         {

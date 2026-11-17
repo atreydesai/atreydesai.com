@@ -12,7 +12,7 @@
   import FallingLeaves from "#lib/components/FallingLeaves.svelte";
   import { onDestroy, onMount } from "svelte";
   import { arcadeScreen, openArcade } from "#lib/boba.ts";
-  import { sfxBoba, unlockAudio } from "#lib/sfx.ts";
+  import { unlockAudio } from "#lib/audio-context.ts";
   import { track } from "#lib/analytics.ts";
   import Lately from "#lib/components/home/Lately.svelte";
   import BannerUpdates from "#lib/components/home/BannerUpdates.svelte";
@@ -54,6 +54,8 @@
   // Once a visit, a few seconds in, the boba gives one small wiggle, so a
   // reader notices it is a thing to press. Never under Reduce Motion.
   let bobaNudge = false;
+  // Loaded on the first click (see onMount), never with the page.
+  let sfx: typeof import("#lib/sfx.ts") | null = null;
 
   onMount(() => {
     let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -81,8 +83,13 @@
     bobaGrid = [...straw, ...CUP_BODY];
     bobaPal = { ...bobaPal, L: DRINKS[Math.floor(Math.random() * DRINKS.length)] };
 
-    // Resume audio on the first click anywhere, so the boba's hover jingle plays.
-    const unlock = () => unlockAudio();
+    // Resume audio on the first click anywhere, so the boba's hover jingle
+    // plays. No sound can play before that click, so it is also when the
+    // arcade's sound code (with its soundtrack) loads, off the first paint.
+    const unlock = () => {
+      unlockAudio();
+      void import("#lib/sfx.ts").then((module) => (sfx = module));
+    };
     window.addEventListener("pointerdown", unlock, { once: true });
     return () => {
       stopNudge();
@@ -219,6 +226,12 @@
   ];
 </script>
 
+<svelte:head>
+  <!-- The portrait is this page's largest paint. Requested from the head, ahead
+       of the inline stylesheet, rather than when the parser reaches it. -->
+  <link rel="preload" as="image" href="/images/profile.webp" fetchpriority="high" />
+</svelte:head>
+
 <Seo
   title="Atrey Desai"
   description="I am a final-year undergraduate studying computer science and linguistics at the University of Maryland. I am fortunate to be advised by Professors Rachel Rudinger, Jordan Boyd-Graber, and Mohit Iyyer."
@@ -306,7 +319,7 @@
               class="boba-launcher"
               class:is-nudging={bobaNudge}
               on:click={() => openArcade("menu")}
-              on:mouseenter={sfxBoba}
+              on:mouseenter={() => sfx?.sfxBoba()}
               on:animationend={() => (bobaNudge = false)}
               aria-label="Open the boba arcade"
               title="seven small games"

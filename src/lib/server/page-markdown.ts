@@ -9,11 +9,12 @@ import type { Book } from '#lib/books.ts';
 import { categories } from '#lib/books.ts';
 import { bookTags, getNoteParagraphs, ratingLegend } from '#lib/bookshelf.ts';
 import photoManifest from '#lib/generated/photo-manifest.json';
+import { originalUrl } from '#lib/photo-urls.js';
 import { SITE_URL } from '#lib/seo.ts';
 import { books } from '#lib/server/books.ts';
 
 type Photo = {
-    src: string;
+    filename: string;
     alt: string;
     caption?: string;
     exif?: Partial<Record<'camera' | 'lens' | 'aperture' | 'shutter' | 'iso' | 'focalLength' | 'date', string>>;
@@ -99,7 +100,7 @@ function photography(brief: boolean): string {
         const e = photo.exif ?? {};
         const shot = [e.date, e.camera, e.focalLength, e.aperture, e.shutter && `${e.shutter} s`, e.iso].filter(Boolean);
         const label = photo.caption ? `**${esc(photo.caption)}**: ` : '';
-        return `- ${label}${esc(photo.alt || 'Untitled photo')} (${shot.join(', ')}) [Full size](${SITE_URL}${photo.src})`;
+        return `- ${label}${esc(photo.alt || 'Untitled photo')} (${shot.join(', ')}) [Full size](${SITE_URL}${originalUrl(photo)})`;
     });
     const parts = [
         '# photography',

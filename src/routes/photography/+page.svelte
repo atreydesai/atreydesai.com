@@ -6,8 +6,14 @@
     import { trapFocus } from "#lib/focus-trap.ts";
     import { lockScroll, unlockScroll } from "#lib/scroll-lock.ts";
     import { formatLongDate } from "#lib/utils/date.ts";
-    import { X, ChevronLeft, ChevronRight, ArrowUpRight } from "@jis3r/icons";
+    import { X, ChevronLeft, ChevronRight, ArrowUpRight, Download } from "@jis3r/icons";
+    import {
+        originalUrl,
+        renditionSrcset,
+        renditionUrl,
+    } from "#lib/photo-urls.js";
     import type { PageData } from "./$types";
+    import type { PhotoData } from "./+page.server";
     // Photos are bundled into a generated manifest during the build.
     export let data: PageData;
     $: photos = data.photos;
@@ -42,6 +48,71 @@
         return mosaicPattern[index % mosaicPattern.length];
     }
 
+    // Grid geometry. The mosaic is designed at a 352px column (the wide
+    // shell's three columns at full width), where a row step is 26px: a 10px
+    // row and the 16px gap below it. Rows are sized from the column width
+    // (.photo-grid, below), so a tile keeps the same shape at every width
+    // instead of turning into a tall sliver once columns narrow while rows
+    // stay fixed. Gaps stay 16px, the style guide's mobile minimum.
+    const DESIGN_COLUMN_PX = 352;
+    const ROW_STEP_PX = 26;
+    const GAP_PX = 16;
+    const TILE_ROWS: Record<MosaicVariant, Record<PhotoData["orientation"], number>> = {
+        feature: { portrait: 24, landscape: 24, square: 24 },
+        tall: { portrait: 24, landscape: 20, square: 20 },
+        standard: { portrait: 20, landscape: 16, square: 16 },
+        compact: { portrait: 16, landscape: 13, square: 13 },
+    };
+
+    // How wide a tile's image is drawn, for picking from its srcset. A photo
+    // fills its tile (object-fit: cover), so when the photo is wider than the
+    // tile's shape it is drawn at the tile's height and cropped at the sides:
+    // drawn width = the tile's width times (photo ratio / tile ratio), at
+    // least 1. Tiles scale with the column, so that factor is fixed per tile.
+    function tileSizes(photo: PhotoData, variant: MosaicVariant): string {
+        const rows = TILE_ROWS[variant][photo.orientation];
+        const height = rows * ROW_STEP_PX - GAP_PX;
+        const width =
+            variant === "feature" ? 2 * DESIGN_COLUMN_PX + GAP_PX : DESIGN_COLUMN_PX;
+        const factor = Math.max(1, (height * photo.width) / photo.height / width);
+        // Column widths: two columns inside 16px gutters below 768px, three
+        // inside 24-32px gutters above, up to the 352px design column.
+        const [phone, desktop] =
+            variant === "feature"
+                ? ["calc(100vw - 32px)", "min(66.67vw - 48px, 720px)"]
+                : ["calc(50vw - 24px)", "min(33.33vw - 32px, 352px)"];
+        const scaled = (expr: string) =>
+            factor > 1.01 ? `calc(${expr} * ${factor.toFixed(2)})` : expr;
+        return `(max-width: 767px) ${scaled(phone)}, ${scaled(desktop)}`;
+    }
+
+    // The grid stops at 1200px: past that a 2x screen's opening tile would
+    // pull an 800 KB file to show a crop, for no detail anyone sees at tile
+    // size. The lightbox is where the 2048px rendition earns its bytes.
+    const GRID_MAX_WIDTH = 1200;
+
+    // The lightbox draws the photo within its frame's caps (see
+    // .lightbox-* below): 70vh tall, the 1024px panel less its padding, and
+    // a width cap by orientation.
+    const LIGHTBOX_WIDTH_CAP: Record<PhotoData["orientation"], string> = {
+        landscape: "90vw",
+        portrait: "min(60vw, 500px)",
+        square: "min(70vw, 600px)",
+    };
+
+    function lightboxSizes(photo: PhotoData): string {
+        const byHeight = ((70 * photo.width) / photo.height).toFixed(2);
+        return `min(${LIGHTBOX_WIDTH_CAP[photo.orientation]}, 100vw - 32px, 992px, ${byHeight}vh)`;
+    }
+
+    // The download is the untouched original; its label says what that means.
+    function originalLabel(photo: PhotoData): string {
+        const extension = photo.filename.split(".").pop()?.toLowerCase() ?? "";
+        const format = { jpg: "JPEG", jpeg: "JPEG", png: "PNG", webp: "WebP" }[extension] ?? "";
+        const megabytes = (photo.bytes / 1_000_000).toFixed(1);
+        return `${photo.width} × ${photo.height} ${format}, ${megabytes} MB`.replace("  ", " ");
+    }
+
     // The button's name is what screen readers and Voice Control use, so it
     // carries the photo's description; a photo with none falls back to its
     // position.
@@ -59,13 +130,18 @@
     let dialogElement: HTMLElement | null = null;
 
     // Warm the neighbours so arrowing/swiping doesn't re-show the placeholder
-    // for a photo the viewer is about to reach.
+    // for a photo the viewer is about to reach. They get the lightbox's own
+    // srcset and sizes, so the browser fetches the same file the lightbox will
+    // ask for. (sizes first: setting srcset starts the selection.)
     function preloadNeighbours(index: number) {
         if (typeof Image === "undefined" || photos.length < 2) return;
         for (const offset of [1, -1]) {
             const neighbour =
                 photos[(index + offset + photos.length) % photos.length];
-            if (neighbour) new Image().src = neighbour.src;
+            if (!neighbour) continue;
+            const image = new Image();
+            image.sizes = lightboxSizes(neighbour);
+            image.srcset = renditionSrcset(neighbour);
         }
     }
 
@@ -151,14 +227,17 @@
         <ArrowUpRight size={12} />
         <span class="sr-only">(opens Instagram in a new tab)</span>
     </a>
-    <!-- Dense mosaic: mixed heights plus recurring two-column feature tiles. -->
+    <!-- Dense mosaic: mixed heights plus recurring two-column feature tiles.
+         The frame is a size container, so the grid's rows can be sized from
+         its own width (see .photo-grid). -->
     {#if photos.length > 0}
-        <div
-            class="grid grid-cols-2 md:grid-cols-3 grid-flow-dense gap-4"
-            style="grid-auto-rows: 10px;"
-        >
+        <div class="photo-grid-frame">
+        <div class="photo-grid">
             {#each photos as photo, index}
                 {@const variant = mosaicVariant(index)}
+                <!-- The first tiles fill the first screen on every layout
+                     (the opening feature tile and the column beside it), so
+                     they load at once; the first goes ahead of everything. -->
                 <button
                     type="button"
                     class="photo-tile photo-tile-{variant} photo-tile-{photo.orientation} group cursor-pointer overflow-hidden rounded-lg"
@@ -169,15 +248,19 @@
                         class="h-full w-full transition-transform duration-300 group-hover:scale-[1.02]"
                     >
                         <OptimizedImage
-                            src={photo.thumbSrc}
-                            srcset={photo.thumbSrcset}
+                            src={renditionUrl(photo, 800)}
+                            srcset={renditionSrcset(photo, GRID_MAX_WIDTH)}
+                            sizes={tileSizes(photo, variant)}
                             alt={photo.alt}
                             aspectRatio={photo.orientation}
+                            eager={index < 4}
+                            priority={index === 0}
                             class="h-full w-full"
                         />
                     </div>
                 </button>
             {/each}
+        </div>
         </div>
     {:else}
         <div class="text-center py-16 text-ink-500 dark:text-cream-500">
@@ -255,8 +338,10 @@
         >
             <!-- Image with loading state. The intrinsic width/height come from
                  the manifest, so the browser reserves a correctly-shaped box
-                 before the full-size JPEG arrives: the placeholder covers real
-                 space and the panel doesn't jump when the photo lands. -->
+                 before the photo arrives: the placeholder covers real space and
+                 the panel doesn't jump when the photo lands. The lightbox
+                 shows a WebP sized to the screen (up to 2048px wide); the
+                 original is the download link under the caption. -->
             <div
                 class="lightbox-frame relative rounded-lg overflow-hidden bg-ink-800"
                 class:lightbox-landscape={currentPhoto.orientation ===
@@ -275,7 +360,9 @@
                 ></div>
 
                 <img
-                    src={currentPhoto.src}
+                    src={renditionUrl(currentPhoto, 1200)}
+                    srcset={renditionSrcset(currentPhoto)}
+                    sizes={lightboxSizes(currentPhoto)}
                     alt={currentPhoto.alt}
                     width={currentPhoto.width}
                     height={currentPhoto.height}
@@ -310,6 +397,17 @@
                     {/if}
                 </div>
             {/if}
+
+            <!-- Full resolution, byte for byte: the file as it was uploaded. -->
+            <a
+                class="lightbox-download"
+                href={originalUrl(currentPhoto)}
+                download={currentPhoto.filename}
+            >
+                <Download size={14} />
+                Download original
+                <span class="lightbox-download-meta">{originalLabel(currentPhoto)}</span>
+            </a>
         </div>
 
         <!-- Photo counter -->
@@ -338,8 +436,36 @@
         font-variant-numeric: lining-nums tabular-nums;
     }
 
+    .photo-grid-frame {
+        container-type: inline-size;
+    }
+
+    /* Two columns, then three from 768px. A row step is 26px at the 352px
+       design column and scales with the column (100cqw is the grid's width),
+       so every tile keeps its designed shape. The 16px row gap is each tile's
+       bottom margin rather than row-gap: a fixed gap between scaled rows would
+       add up across a tile's span and stretch narrow tiles. Browsers without
+       container units keep the fixed 26px step, the full-width layout. */
+    .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-auto-flow: dense;
+        column-gap: 16px;
+        grid-auto-rows: 26px;
+        grid-auto-rows: calc((100cqw - 16px) * 26 / 704);
+        margin-bottom: -16px;
+    }
+
+    @media (min-width: 768px) {
+        .photo-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-auto-rows: calc((100cqw - 32px) * 26 / 1056);
+        }
+    }
+
     .photo-tile {
         grid-column: span 1;
+        margin-bottom: 16px;
     }
 
     .photo-tile-feature {
@@ -396,6 +522,38 @@
     }
     .lightbox-square {
         max-width: min(70vw, 600px);
+    }
+
+    /* The download is a text control on the lightbox's dark surface in both
+       themes: control-text's metrics with its dark-theme colours, and a
+       compact 32px target. */
+    .lightbox-download {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-1-5);
+        min-height: 2rem;
+        margin-top: var(--space-3);
+        padding-inline: var(--space-2);
+        border-radius: var(--radius-control);
+        color: var(--color-cream-300);
+        font-family: var(--font-ui);
+        font-size: 0.75rem;
+        letter-spacing: 0.01em;
+        font-variant-numeric: lining-nums tabular-nums;
+        text-decoration: none;
+        transition:
+            color var(--motion-base) var(--ease-standard),
+            background-color var(--motion-base) var(--ease-standard);
+    }
+
+    .lightbox-download:hover,
+    .lightbox-download:focus-visible {
+        color: var(--color-cream-100);
+        background-color: rgb(253 248 243 / 0.06);
+    }
+
+    .lightbox-download-meta {
+        color: var(--color-cream-500);
     }
 
     /* Chevrons and the close glyph are drawn small; the padding is what makes

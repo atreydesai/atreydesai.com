@@ -1,10 +1,15 @@
 import type { PageServerLoad } from "./$types";
 import photoManifest from "#lib/generated/photo-manifest.json";
 
-interface PhotoData {
-    src: string;           // Original full-size path for lightbox
-    thumbSrc: string;      // Optimized thumbnail for grid (default width)
-    thumbSrcset?: string;  // Responsive candidate set for the grid <img>
+// One manifest entry. It holds facts about the photo, not URLs:
+// #lib/photo-urls.js turns `filename` and `v` into the rendition and original
+// URLs, so the page, its Markdown, and the build script agree on them.
+export interface PhotoData {
+    filename: string;      // The original's file name; also the download name
+    v: string;             // Hash of the original and the rendition settings
+    width: number;         // The original's pixel size, upright
+    height: number;
+    bytes: number;         // The original's file size, shown on the download
     // Human-written title, from a photo-captions.json entry or the photo's
     // IPTC/XMP Title. Absent when the photo has neither.
     caption?: string;
@@ -12,10 +17,7 @@ interface PhotoData {
     // caption, else "": a photo with neither is presentational and shouldn't
     // have its filename read out as a description.
     alt: string;
-    filename: string;
     orientation: "landscape" | "portrait" | "square";
-    width?: number;
-    height?: number;
     exif: {
         camera?: string;
         lens?: string;

@@ -4,7 +4,9 @@
   import { AudioLines, Disc3, VolumeOff } from "@jis3r/icons";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
   import { openArcade } from "#lib/boba.ts";
-  import { unlockAudio } from "#lib/sfx.ts";
+  // Not #lib/sfx.ts: that carries the arcade's soundtrack, and the footer is
+  // on every page. The arcade loads it when it opens.
+  import { unlockAudio } from "#lib/audio-context.ts";
 
   // DC Time with seconds
   let dcTime = "";

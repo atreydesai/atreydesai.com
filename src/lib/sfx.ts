@@ -4,6 +4,7 @@
 // `#lib/music`; this file only creates it, rides its fader, and keeps it fed
 // from a short look-ahead timer.
 
+import { holdAudioClock, sharedAudioContext } from "./audio-context";
 import { createMusicEngine, type MusicEngine } from "./music/engine";
 import { climbingPlaylist, rememberOpener, shuffledPlaylist } from "./music/playlist";
 import { SONGS, type MusicPhase } from "./music/songs";
@@ -104,16 +105,9 @@ function audioContext(): AudioContext | null {
   loadMutePreference();
 
   if (!ctx) {
-    const AudioContextConstructor =
-      window.AudioContext ||
-      (
-        window as unknown as {
-          webkitAudioContext?: typeof AudioContext;
-        }
-      ).webkitAudioContext;
-    if (!AudioContextConstructor) return null;
-
-    ctx = new AudioContextConstructor();
+    // Often already made (and unlocked) by the click that opened the arcade.
+    ctx = sharedAudioContext();
+    if (!ctx) return null;
     master = ctx.createGain();
     master.gain.value = muted ? 0.0001 : MASTER_LEVEL;
     master.connect(ctx.destination);
@@ -360,6 +354,7 @@ export function audioClock(): number | null {
  */
 export function suspendAudio() {
   clockHeld = true;
+  holdAudioClock(true);
   // Hard stop rather than a fade: the context freezes before a fade could
   // finish, and the tail would play out on resume.
   quietThruster(0);
@@ -374,6 +369,7 @@ export function suspendAudio() {
 
 export function resumeAudio() {
   clockHeld = false;
+  holdAudioClock(false);
   if (ctx && ctx.state !== "running" && ctx.state !== "closed") {
     void ctx.resume().catch(() => {
       // A later user gesture will retry.
