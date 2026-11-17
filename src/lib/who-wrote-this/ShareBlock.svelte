@@ -49,6 +49,9 @@
 	}
 </script>
 
+<!-- The group itself isn't a control: its handlers catch what bubbles up from the buttons inside (Escape and leaving
+     focus close the menu) and let a mouse hover over the button or the menu keep it open. Every action has a button. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="sh" role="group" aria-label="Share" onpointerenter={enter} onpointerleave={leave} onkeydown={keys} onfocusout={blur}>
 	<button type="button" class="sh-main" aria-haspopup="menu" aria-expanded={open} onclick={() => share(false)} onfocus={() => (open = !coarse())}>
 		<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5m-8.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m11 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3" /></svg>
