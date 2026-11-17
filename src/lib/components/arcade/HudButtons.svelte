@@ -1,15 +1,15 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
 
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import {
     ICON_AUDIO_PAL,
     ICON_MUTE,
     ICON_PAUSE,
     ICON_PLAY,
     ICON_SPEAKER,
-  } from "$lib/arcade/art";
-  import { getMuted, setMuted, sfxBlip } from "$lib/sfx";
+  } from "#lib/arcade/art.ts";
+  import { getMuted, setMuted, sfxBlip } from "#lib/sfx.ts";
 
   export let paused = false;
   export let disabled = false;

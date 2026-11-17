@@ -1,6 +1,6 @@
-import { posts } from '$lib/content';
-import { SITE_URL } from '$lib/seo';
-import { formatUtcDate } from '$lib/utils/date';
+import { posts } from '#lib/content.ts';
+import { SITE_URL } from '#lib/seo.ts';
+import { formatUtcDate } from '#lib/utils/date.ts';
 import type { RequestHandler } from './$types';
 
 export const prerender = true;

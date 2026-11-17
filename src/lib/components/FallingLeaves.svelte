@@ -47,7 +47,7 @@
   // Colors are canvas rendering, so they are hard-coded.
   import { onMount } from "svelte";
   import { dev } from '$app/env';
-  import { arcadeScreen } from "$lib/boba";
+  import { arcadeScreen } from "#lib/boba.ts";
 
   /** Grid cell, in CSS pixels. */
   const CELL = 6;

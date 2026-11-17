@@ -1,7 +1,7 @@
 // Procedural Web Audio for the boba arcade: asset-free sound effects, keyed
 // feedback, and the controls for the soundtrack. The soundtrack itself (the
 // songbook, its notation, and the synth that arranges it) lives in
-// `$lib/music`; this file only creates it, rides its fader, and keeps it fed
+// `#lib/music`; this file only creates it, rides its fader, and keeps it fed
 // from a short look-ahead timer.
 
 import { createMusicEngine, type MusicEngine } from "./music/engine";

@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
-  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
+  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
   import {
     audioClock,
     resumeAudio,
@@ -19,8 +19,8 @@
     startMusic,
     stopMusic,
     suspendAudio,
-  } from "$lib/sfx";
-  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
+  } from "#lib/sfx.ts";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
   import {
     BEATS_PER_BAR,
     DEMO_END_BAR,
@@ -51,7 +51,7 @@
     steadyOffset,
     tierForBar,
     type StabMode,
-  } from "$lib/arcade/stab-engine.js";
+  } from "#lib/arcade/stab-engine.js";
   import {
     DRINKS,
     INK,
@@ -70,11 +70,11 @@
     stepPopups,
     type Particle,
     type Popup,
-  } from "$lib/arcade/art";
-  import { demoIntro, firstVisit } from "$lib/arcade/scores";
-  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import { REVIVE_BLINK_SECONDS, blinkShows } from "$lib/arcade/blink";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  } from "#lib/arcade/art.ts";
+  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
+  import { REVIVE_BLINK_SECONDS, blinkShows } from "#lib/arcade/blink.ts";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import DemoBar from "./DemoBar.svelte";
   import DemoCard from "./DemoCard.svelte";

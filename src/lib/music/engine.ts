@@ -9,7 +9,7 @@
 // short room and a tempo-synced echo returning into the mix. Keys, bass, and
 // arp reach the mix through a sidechain pump, idle unless a song pumps.
 
-import { BARS_PER_SONG, barSeconds } from "$lib/arcade/stab-engine.js";
+import { BARS_PER_SONG, barSeconds } from "#lib/arcade/stab-engine.js";
 import { SONGS } from "./songs";
 import type { KeysVoice, LeadVoice, MusicPhase, Song } from "./songs";
 import {

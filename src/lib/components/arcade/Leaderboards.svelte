@@ -5,10 +5,10 @@
   // nobody has signed shows only its name.
   import { createEventDispatcher, onMount } from "svelte";
 
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
-  import { GAMES, canPlay, type GameId } from "$lib/boba";
-  import { MENU_ICONS } from "$lib/arcade/art";
-  import { fetchBoard, type ArcadeMode, type BoardEntry } from "$lib/arcade/scores";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import { GAMES, canPlay, type GameId } from "#lib/boba.ts";
+  import { MENU_ICONS } from "#lib/arcade/art.ts";
+  import { fetchBoard, type ArcadeMode, type BoardEntry } from "#lib/arcade/scores.ts";
 
   export let mode: ArcadeMode;
 

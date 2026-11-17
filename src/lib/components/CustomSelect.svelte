@@ -3,7 +3,7 @@
     import { fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
     import { ChevronDown, Search } from "@jis3r/icons";
-    import Mark from "$lib/components/Mark.svelte";
+    import Mark from "#lib/components/Mark.svelte";
 
     // `count`, when given, is shown at the right of the option: how many
     // entries choosing it would leave.

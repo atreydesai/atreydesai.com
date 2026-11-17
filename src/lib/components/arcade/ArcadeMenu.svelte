@@ -1,12 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from "svelte";
 
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
-  import { GAMES, arcadeExpert, canPlay, openDemo, setExpert, type GameId } from "$lib/boba";
-  import { MENU_ICONS } from "$lib/arcade/art";
-  import { trapFocus } from "$lib/arcade/focus";
-  import { readBest } from "$lib/arcade/scores";
-  import { sfxBlip, unlockAudio } from "$lib/sfx";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import { GAMES, arcadeExpert, canPlay, openDemo, setExpert, type GameId } from "#lib/boba.ts";
+  import { MENU_ICONS } from "#lib/arcade/art.ts";
+  import { trapFocus } from "#lib/arcade/focus.ts";
+  import { readBest } from "#lib/arcade/scores.ts";
+  import { sfxBlip, unlockAudio } from "#lib/sfx.ts";
   import Leaderboards from "./Leaderboards.svelte";
 
   const dispatch = createEventDispatcher<{ pick: GameId; close: null }>();

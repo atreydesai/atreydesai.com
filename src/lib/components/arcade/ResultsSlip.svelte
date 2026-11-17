@@ -1,9 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher, onDestroy, onMount, tick } from "svelte";
 
-  import { GAMES, type GameId } from "$lib/boba";
-  import { LOOPS } from "$lib/arcade/art";
-  import { currentMode, fetchBoard, submitScore, type BoardEntry } from "$lib/arcade/scores";
+  import { GAMES, type GameId } from "#lib/boba.ts";
+  import { LOOPS } from "#lib/arcade/art.ts";
+  import { currentMode, fetchBoard, submitScore, type BoardEntry } from "#lib/arcade/scores.ts";
   import {
     canCopyImage,
     canShareFile,
@@ -13,9 +13,9 @@
     shareText,
     type ShareInput,
     type ShareOutcome,
-  } from "$lib/arcade/share";
-  import { renderShareCard } from "$lib/arcade/share-card";
-  import { cleanName, MAX_NAME } from "$lib/profanity";
+  } from "#lib/arcade/share.ts";
+  import { renderShareCard } from "#lib/arcade/share-card.ts";
+  import { cleanName, MAX_NAME } from "#lib/profanity.ts";
 
   export let game: GameId;
   export let title: string;

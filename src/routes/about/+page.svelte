@@ -1,9 +1,9 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
     import { browser } from '$app/env';
-    import Seo from "$lib/components/Seo.svelte";
-    import { aboutData } from "$lib/content";
-    import { parseInline, escapeHtml } from "$lib/utils/text";
+    import Seo from "#lib/components/Seo.svelte";
+    import { aboutData } from "#lib/content.ts";
+    import { parseInline, escapeHtml } from "#lib/utils/text.ts";
     import type { ManifoldNow, ReadingNow } from "../api/now/+server";
 
     // Sidenote layout: each footnote floats in the right margin beside its

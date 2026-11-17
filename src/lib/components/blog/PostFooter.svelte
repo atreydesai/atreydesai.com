@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Mark from "$lib/components/Mark.svelte";
-  import { homepageData } from "$lib/content";
+  import Mark from "#lib/components/Mark.svelte";
+  import { homepageData } from "#lib/content.ts";
 
   export let postId: string;
 

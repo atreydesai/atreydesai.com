@@ -3,11 +3,11 @@
 	// host will drive it. Keys 0-3 or the buttons set the level. ?level=N pins a state, ?still is reduced motion,
 	// ?dpr=2 forces the backing scale, ?lens=x,y parks the lens.
 	import { onMount } from "svelte";
-	import C from "$lib/who-wrote-this/content.json";
-	import RIDGE from "$lib/who-wrote-this/print_text.json";
-	import { createPrint } from "$lib/who-wrote-this/print/fingerprint";
-	import type { Anchor, Box } from "$lib/who-wrote-this/print/contract";
-	import { printSprite, printAspect, setSpriteText, type SpriteOpts } from "$lib/who-wrote-this/print/sprites";
+	import C from "#lib/who-wrote-this/content.json";
+	import RIDGE from "#lib/who-wrote-this/print_text.json";
+	import { createPrint } from "#lib/who-wrote-this/print/fingerprint.ts";
+	import type { Anchor, Box } from "#lib/who-wrote-this/print/contract.ts";
+	import { printSprite, printAspect, setSpriteText, type SpriteOpts } from "#lib/who-wrote-this/print/sprites.ts";
 
 	const text: string[] = [
 		...C.lede.map((s) => s.t),

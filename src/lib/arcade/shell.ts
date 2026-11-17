@@ -4,8 +4,8 @@
 // Pause and resume stay in each game, since what they hold differs.
 
 import type { EventDispatcher } from "svelte";
-import type { GameId } from "$lib/boba";
-import { finishMusic, sfxBlip, sfxGameOver } from "$lib/sfx";
+import type { GameId } from "#lib/boba.ts";
+import { finishMusic, sfxBlip, sfxGameOver } from "#lib/sfx.ts";
 import { trapFocus } from "./focus";
 import { recordScore } from "./scores";
 

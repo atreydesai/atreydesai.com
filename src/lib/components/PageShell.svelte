@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Seo from "$lib/components/Seo.svelte";
+  import Seo from "#lib/components/Seo.svelte";
 
   // SEO props (forwarded verbatim to <Seo>).
   export let title: string;

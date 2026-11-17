@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from "$app/state";
-  import Seo from "$lib/components/Seo.svelte";
+  import Seo from "#lib/components/Seo.svelte";
   import { House, ArrowLeft } from "@jis3r/icons";
 
   let hoveredHome = false;

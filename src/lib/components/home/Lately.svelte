@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Mark from "$lib/components/Mark.svelte";
-  import { formatShortDate } from "$lib/utils/date";
+  import Mark from "#lib/components/Mark.svelte";
+  import { formatShortDate } from "#lib/utils/date.ts";
 
   interface LatelyPost {
     id: string;

@@ -2,10 +2,10 @@
     import { onMount } from "svelte";
     import { browser } from '$app/env';
     import { X } from "@jis3r/icons";
-    import { explainers, type ExplainerComponent } from "$lib/explainers";
-    import { focusedExplainer } from "$lib/explainers/focus";
-    import { trapFocus } from "$lib/focus-trap";
-    import { lockScroll, unlockScroll } from "$lib/scroll-lock";
+    import { explainers, type ExplainerComponent } from "#lib/explainers/index.ts";
+    import { focusedExplainer } from "#lib/explainers/focus.ts";
+    import { trapFocus } from "#lib/focus-trap.ts";
+    import { lockScroll, unlockScroll } from "#lib/scroll-lock.ts";
 
     export let paper: {
         id: string;

@@ -7,9 +7,9 @@
   // Each row is [date] [text], with a key hanging in the margin ahead of the
   // date for the pin and the kinds that have one; written things take none.
   import { onMount } from "svelte";
-  import { markHtml, type UpdateMarkKind } from "$lib/marks";
-  import { parseInline } from "$lib/utils/text";
-  import type { BannerUpdate, BannerUpdateKind } from "$lib/content";
+  import { markHtml, type UpdateMarkKind } from "#lib/marks.ts";
+  import { parseInline } from "#lib/utils/text.ts";
+  import type { BannerUpdate, BannerUpdateKind } from "#lib/content.ts";
 
   export let updates: BannerUpdate[] = [];
   /** "YYYY-MM-DD": when the pinned sentence went up. */

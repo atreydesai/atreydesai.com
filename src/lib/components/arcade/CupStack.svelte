@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
-  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
+  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
   import {
     finishMusic,
     setMusicPaused,
@@ -14,7 +14,7 @@
     sfxTopple,
     startMusic,
     stopMusic,
-  } from "$lib/sfx";
+  } from "#lib/sfx.ts";
   import {
     NORMAL,
     START_WIDTH,
@@ -31,9 +31,9 @@
     stepSlide,
     trackFor,
     traySpan,
-  } from "$lib/arcade/stack-engine.js";
-  import type { DropKind, Rules, Span } from "$lib/arcade/stack-engine.js";
-  import { DEMO_SCRIPT, demoAim, demoDropsNow } from "$lib/arcade/stack-demo.js";
+  } from "#lib/arcade/stack-engine.js";
+  import type { DropKind, Rules, Span } from "#lib/arcade/stack-engine.js";
+  import { DEMO_SCRIPT, demoAim, demoDropsNow } from "#lib/arcade/stack-demo.js";
   import {
     DRINKS,
     INK,
@@ -50,10 +50,10 @@
     fitCanvas,
     stepPopups,
     type Popup,
-  } from "$lib/arcade/art";
-  import { demoIntro, firstVisit, readBest } from "$lib/arcade/scores";
-  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  } from "#lib/arcade/art.ts";
+  import { demoIntro, firstVisit, readBest } from "#lib/arcade/scores.ts";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import DemoBar from "./DemoBar.svelte";
   import DemoCard from "./DemoCard.svelte";
   import ExpertTag from "./ExpertTag.svelte";

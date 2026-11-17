@@ -1,5 +1,5 @@
 import type { PageServerLoad } from "./$types";
-import photoManifest from "$lib/generated/photo-manifest.json";
+import photoManifest from "#lib/generated/photo-manifest.json";
 
 interface PhotoData {
     src: string;           // Original full-size path for lightbox

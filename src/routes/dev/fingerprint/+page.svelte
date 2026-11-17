@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Prototype: the fingerprint motif in the launch page's hero. Ridge text is the paper's own sentences.
-	import Fingerprint from "$lib/who-wrote-this/Fingerprint.svelte";
-	import C from "$lib/who-wrote-this/content.json";
+	import Fingerprint from "#lib/who-wrote-this/Fingerprint.svelte";
+	import C from "#lib/who-wrote-this/content.json";
 
 	// Only section 1 carries the worked example; the rest are still pending.
 	const first = C.sections[0];

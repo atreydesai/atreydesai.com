@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LOOPS } from "$lib/arcade/art";
+  import { LOOPS } from "#lib/arcade/art.ts";
 
   /** 3, 2, 1… then 0 for "go". */
   export let value: number;

@@ -1,7 +1,7 @@
-import { posts } from '$lib/content';
-import { SITE_URL } from '$lib/seo';
+import { posts } from '#lib/content.ts';
+import { SITE_URL } from '#lib/seo.ts';
 import { execFileSync } from 'child_process';
-import { SITE_PAGES as pages } from '$lib/server/site-pages';
+import { SITE_PAGES as pages } from '#lib/server/site-pages.ts';
 import type { RequestHandler } from './$types';
 
 export const prerender = true;

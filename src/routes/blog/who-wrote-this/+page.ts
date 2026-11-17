@@ -1,4 +1,4 @@
-import { posts, unlistedPosts, draftPosts } from "$lib/content";
+import { posts, unlistedPosts, draftPosts } from "#lib/content.ts";
 import { error } from "@sveltejs/kit";
 import type { PageLoad } from "./$types";
 

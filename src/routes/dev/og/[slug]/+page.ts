@@ -1,6 +1,6 @@
 import { dev } from "$app/env";
 import { error } from "@sveltejs/kit";
-import { posts, unlistedPosts, draftPosts } from "$lib/content";
+import { posts, unlistedPosts, draftPosts } from "#lib/content.ts";
 import type { PageLoad } from "./$types";
 
 // Share-card layouts for `npm run og`; never part of the built site.

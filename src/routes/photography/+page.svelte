@@ -1,11 +1,11 @@
 <script lang="ts">
     import { onDestroy } from "svelte";
-    import PageShell from "$lib/components/PageShell.svelte";
-    import OptimizedImage from "$lib/components/OptimizedImage.svelte";
-    import Mark from "$lib/components/Mark.svelte";
-    import { trapFocus } from "$lib/focus-trap";
-    import { lockScroll, unlockScroll } from "$lib/scroll-lock";
-    import { formatLongDate } from "$lib/utils/date";
+    import PageShell from "#lib/components/PageShell.svelte";
+    import OptimizedImage from "#lib/components/OptimizedImage.svelte";
+    import Mark from "#lib/components/Mark.svelte";
+    import { trapFocus } from "#lib/focus-trap.ts";
+    import { lockScroll, unlockScroll } from "#lib/scroll-lock.ts";
+    import { formatLongDate } from "#lib/utils/date.ts";
     import { X, ChevronLeft, ChevronRight, ArrowUpRight } from "@jis3r/icons";
     import type { PageData } from "./$types";
     // Photos are bundled into a generated manifest during the build.

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from "$app/state";
-	import { explainers } from "$lib/explainers";
+	import { explainers } from "#lib/explainers/index.ts";
 
 	// ?only=<paper id> renders a single explainer, for focused visual QA.
 	const only = $derived(page.url.searchParams.get("only"));

@@ -1,7 +1,7 @@
 <script lang="ts">
-    import PageShell from "$lib/components/PageShell.svelte";
-    import Mark from "$lib/components/Mark.svelte";
-    import { withMarks } from "$lib/marks";
+    import PageShell from "#lib/components/PageShell.svelte";
+    import Mark from "#lib/components/Mark.svelte";
+    import { withMarks } from "#lib/marks.ts";
     import { Download } from "@jis3r/icons";
     import cvYaml from "../../content/cv.yaml";
 

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { SHADERS, VS } from "$lib/shaders/wallpapers";
+  import { SHADERS, VS } from "#lib/shaders/wallpapers.ts";
 
   export let variant: "mound" | "nebula" = "mound";
   export let height: string = "clamp(280px, 50vw, 480px)";

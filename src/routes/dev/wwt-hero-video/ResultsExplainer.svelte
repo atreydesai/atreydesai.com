@@ -15,7 +15,7 @@
 	//      AI rewriting only partly helps" (08_conclusion.tex); the second row is cut to "writing cannot be deleted"
 	//   5. the closing line (08_conclusion.tex), on the dark plate (ink-800)
 	// The fingerprint is a quiet motif only: a faint print in the corner, and behind the closing line.
-	import type { Beat } from "$lib/explainers/motion";
+	import type { Beat } from "#lib/explainers/motion.ts";
 
 	// beat starts; each beat's last element lands about 1.2 s before the next begins
 	const B2 = 2.2, B3 = 6.3, B4 = 10.5, B5 = 14.4, BACK = 17.9;
@@ -53,10 +53,10 @@
 
 <script lang="ts">
 	import { onMount } from "svelte";
-	import ExplainerFrame from "$lib/explainers/ExplainerFrame.svelte";
-	import { T, barBox, draw, enter, exit, restore, rise, write, type ExplainerProps, type Scene } from "$lib/explainers/motion";
-	import { printSprite } from "$lib/who-wrote-this/print/sprites";
-	import icons from "$lib/who-wrote-this/icons.json";
+	import ExplainerFrame from "#lib/explainers/ExplainerFrame.svelte";
+	import { T, barBox, draw, enter, exit, restore, rise, write, type ExplainerProps, type Scene } from "#lib/explainers/motion.ts";
+	import { printSprite } from "#lib/who-wrote-this/print/sprites.ts";
+	import icons from "#lib/who-wrote-this/icons.json";
 
 	let { size = "card", paused = false, resting = false, label }: ExplainerProps = $props();
 	const uid = $props.id();

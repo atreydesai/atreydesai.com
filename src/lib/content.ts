@@ -1,5 +1,5 @@
 import { dev } from '$app/env';
-import { validateFrontmatter } from '$lib/frontmatter';
+import { validateFrontmatter } from '#lib/frontmatter.ts';
 
 // Content loader utilities for markdown and YAML files. Bookshelf entries are
 // deliberately not here: every page that imports this module ships it, so they

@@ -3,14 +3,14 @@
     absoluteSiteUrl,
     canonicalUrl as toCanonicalUrl,
     SITE_URL,
-  } from "$lib/seo";
+  } from "#lib/seo.ts";
   import {
     graph,
     pageStructuredData,
     personStructuredData,
     websiteStructuredData,
     withoutContext,
-  } from "$lib/structured-data";
+  } from "#lib/structured-data.js";
 
   export let title = "Atrey Desai";
   export let description =

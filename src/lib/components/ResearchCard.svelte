@@ -1,10 +1,10 @@
 <script lang="ts">
     import { Award } from "@jis3r/icons";
-    import AuthorList from "$lib/components/research/AuthorList.svelte";
-    import PaperLinks from "$lib/components/research/PaperLinks.svelte";
-    import PaperMedia from "$lib/components/research/PaperMedia.svelte";
-    import type { Paper } from "$lib/content";
-    import { explainers } from "$lib/explainers";
+    import AuthorList from "#lib/components/research/AuthorList.svelte";
+    import PaperLinks from "#lib/components/research/PaperLinks.svelte";
+    import PaperMedia from "#lib/components/research/PaperMedia.svelte";
+    import type { Paper } from "#lib/content.ts";
+    import { explainers } from "#lib/explainers/index.ts";
 
     export let paper: Paper;
 

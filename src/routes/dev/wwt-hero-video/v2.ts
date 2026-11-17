@@ -6,9 +6,9 @@
 //
 // Video beats (seconds): opener 0-2.0 · human or AI 2.0-5.0 · which lab 5.0-8.2 · which human 8.2-11.6 · defenses
 // 11.6-14.6 · the closing line 14.6-18.4, whose last 0.45 s give way to the opener's first frame, so the loop is seamless.
-import { LAB, MODEL, FABLE, VERDICT, GRAY, INK } from "$lib/who-wrote-this/palette";
-import icons from "$lib/who-wrote-this/icons.json";
-import { printSprite } from "$lib/who-wrote-this/print/sprites";
+import { LAB, MODEL, FABLE, VERDICT, GRAY, INK } from "#lib/who-wrote-this/palette.ts";
+import icons from "#lib/who-wrote-this/icons.json";
+import { printSprite } from "#lib/who-wrote-this/print/sprites.ts";
 
 export const FONT = '"Inter", system-ui, -apple-system, sans-serif';
 export const P = {

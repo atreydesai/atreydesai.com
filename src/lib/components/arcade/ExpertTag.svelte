@@ -3,7 +3,7 @@
   // the player always knows which board the score is going to. Nothing in
   // normal mode. Read once: the switch lives on the menu, not in a game.
   import { get } from "svelte/store";
-  import { arcadeExpert } from "$lib/boba";
+  import { arcadeExpert } from "#lib/boba.ts";
 
   const expert = get(arcadeExpert);
 </script>

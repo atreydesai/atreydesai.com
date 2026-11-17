@@ -1,5 +1,5 @@
 import { writable } from "svelte/store";
-import { track } from "$lib/analytics";
+import { track } from "#lib/analytics.ts";
 
 // The boba arcade: a menu of small games behind the pixel boba on the
 // homepage (and the Konami code). The layout owns the render; anything can

@@ -1,9 +1,9 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import RatingGlyph from "$lib/components/RatingGlyph.svelte";
-    import type { Book } from "$lib/books";
-    import { formatMonthYear } from "$lib/utils/date";
-    import { parseInline } from "$lib/utils/text";
+    import RatingGlyph from "#lib/components/RatingGlyph.svelte";
+    import type { Book } from "#lib/books.ts";
+    import { formatMonthYear } from "#lib/utils/date.ts";
+    import { parseInline } from "#lib/utils/text.ts";
     import {
         bookTags,
         currentStatusLabel,
@@ -11,7 +11,7 @@
         getNoteParagraphs,
         isCurrent,
         ratingLegend,
-    } from "$lib/bookshelf";
+    } from "#lib/bookshelf.ts";
     import {
         ArrowUpRight,
         BadgeQuestionMark,

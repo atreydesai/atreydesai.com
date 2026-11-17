@@ -9,11 +9,11 @@
 
   import { fly } from "svelte/transition";
 
-  import Header from "$lib/components/Header.svelte";
-  import Footer from "$lib/components/Footer.svelte";
-  import CustomCursor from "$lib/components/CustomCursor.svelte";
-  import { startJustify } from "$lib/justify";
-  import { startClickTracking } from "$lib/analytics";
+  import Header from "#lib/components/Header.svelte";
+  import Footer from "#lib/components/Footer.svelte";
+  import CustomCursor from "#lib/components/CustomCursor.svelte";
+  import { startJustify } from "#lib/justify.ts";
+  import { startClickTracking } from "#lib/analytics.ts";
   import { afterNavigate, beforeNavigate, goto, preloadCode } from "$app/navigation";
   import { page } from "$app/state";
 
@@ -23,7 +23,7 @@
     arcadeScreen,
     openArcade,
     type GameId
-  } from "$lib/boba";
+  } from "#lib/boba.ts";
 
   import {
     PAGE_TRANSITIONS_ENABLED,
@@ -31,7 +31,7 @@
     PAGE_TRANSITION_IN_DELAY_MS,
     PAGE_TRANSITION_IN_X,
     PAGE_TRANSITION_OUT_Y,
-  } from "$lib/motion";
+  } from "#lib/motion.ts";
   import type { LayoutData } from "./$types";
 
   export let data: LayoutData;
@@ -45,10 +45,10 @@
   let reducedMotion = browser && matchMedia(REDUCED_MOTION_QUERY).matches;
   // The arcade component is loaded the first time it opens, so its code and
   // styles never ship with an ordinary page view.
-  let Arcade: (typeof import("$lib/components/arcade/Arcade.svelte"))["default"] | null =
+  let Arcade: (typeof import("#lib/components/arcade/Arcade.svelte"))["default"] | null =
     null;
   $: if (browser && $arcadeScreen && !Arcade) {
-    void import("$lib/components/arcade/Arcade.svelte").then((module) => {
+    void import("#lib/components/arcade/Arcade.svelte").then((module) => {
       Arcade = module.default;
     });
   }

@@ -14,7 +14,7 @@
     sfxStart,
     startMusic,
     stopMusic,
-  } from "$lib/sfx";
+  } from "#lib/sfx.ts";
   import {
     PLAYFIELD_TOP,
     bounceHorizontal,
@@ -32,7 +32,7 @@
     pointsForCatch,
     shiftCells,
     volleySize,
-  } from "$lib/boba-engine";
+  } from "#lib/boba-engine.js";
   import {
     DRINKS,
     ICON_BOBA,
@@ -50,15 +50,15 @@
     stepPopups,
     type Particle,
     type Popup,
-  } from "$lib/arcade/art";
-  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
-  import { demoIntro, firstVisit } from "$lib/arcade/scores";
-  import { emojiRows } from "$lib/arcade/share";
-  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  } from "#lib/arcade/art.ts";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
+  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
+  import { emojiRows } from "#lib/arcade/share.ts";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
+  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
-  import { REVIVE_BLINK_SECONDS, blinkShows } from "$lib/arcade/blink";
+  import { REVIVE_BLINK_SECONDS, blinkShows } from "#lib/arcade/blink.ts";
   import DemoBar from "./DemoBar.svelte";
   import DemoCard from "./DemoCard.svelte";
   import ExpertTag from "./ExpertTag.svelte";

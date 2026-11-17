@@ -1,4 +1,4 @@
-import { books } from "$lib/server/books";
+import { books } from "#lib/server/books.ts";
 import type { PageServerLoad } from "./$types";
 
 // The entries ship as this page's data rather than as an import, so they are

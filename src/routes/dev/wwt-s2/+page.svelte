@@ -3,9 +3,9 @@
 	// ?step=N scrolls to guided step N (0-based) on load, for screenshots; ?still (or reduced motion) settles animation.
 	// The site header is hidden, as on the launch page (its route brings its own chrome).
 	import { onMount } from "svelte";
-	import DotField from "$lib/who-wrote-this/DotField.svelte";
-	import WhichAI from "$lib/who-wrote-this/WhichAI.svelte";
-	import { startElastic } from "$lib/who-wrote-this/elastic";
+	import DotField from "#lib/who-wrote-this/DotField.svelte";
+	import WhichAI from "#lib/who-wrote-this/WhichAI.svelte";
+	import { startElastic } from "#lib/who-wrote-this/elastic.ts";
 
 	// the page's scroll-speed spacing for [data-lag] blocks, as on the launch page
 	onMount(() => startElastic());

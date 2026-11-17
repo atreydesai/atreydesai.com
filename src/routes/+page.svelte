@@ -1,21 +1,21 @@
 <script lang="ts">
-  import Seo from "$lib/components/Seo.svelte";
-  import ResearchCard from "$lib/components/ResearchCard.svelte";
-  import LegoImage from "$lib/components/LegoImage.svelte";
-  import { papers, homepageData } from "$lib/content";
-  import { parseInline } from "$lib/utils/text";
-  import ScrollReveal from "$lib/components/ScrollReveal.svelte";
-  import HyperText from "$lib/components/HyperText.svelte";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
-  import Mark from "$lib/components/Mark.svelte";
-  import QuadrantGlyph from "$lib/components/QuadrantGlyph.svelte";
-  import FallingLeaves from "$lib/components/FallingLeaves.svelte";
+  import Seo from "#lib/components/Seo.svelte";
+  import ResearchCard from "#lib/components/ResearchCard.svelte";
+  import LegoImage from "#lib/components/LegoImage.svelte";
+  import { papers, homepageData } from "#lib/content.ts";
+  import { parseInline } from "#lib/utils/text.ts";
+  import ScrollReveal from "#lib/components/ScrollReveal.svelte";
+  import HyperText from "#lib/components/HyperText.svelte";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import Mark from "#lib/components/Mark.svelte";
+  import QuadrantGlyph from "#lib/components/QuadrantGlyph.svelte";
+  import FallingLeaves from "#lib/components/FallingLeaves.svelte";
   import { onDestroy, onMount } from "svelte";
-  import { arcadeScreen, openArcade } from "$lib/boba";
-  import { sfxBoba, unlockAudio } from "$lib/sfx";
-  import { track } from "$lib/analytics";
-  import Lately from "$lib/components/home/Lately.svelte";
-  import BannerUpdates from "$lib/components/home/BannerUpdates.svelte";
+  import { arcadeScreen, openArcade } from "#lib/boba.ts";
+  import { sfxBoba, unlockAudio } from "#lib/sfx.ts";
+  import { track } from "#lib/analytics.ts";
+  import Lately from "#lib/components/home/Lately.svelte";
+  import BannerUpdates from "#lib/components/home/BannerUpdates.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;

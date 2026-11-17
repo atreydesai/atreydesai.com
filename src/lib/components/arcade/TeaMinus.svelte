@@ -15,8 +15,8 @@
     sfxTouchdown,
     startMusic,
     stopMusic,
-  } from "$lib/sfx";
-  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
+  } from "#lib/sfx.ts";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
   import {
     DEMO_CAPTIONS,
     DEMO_HOLD,
@@ -38,8 +38,8 @@
     stepShip,
     windAt,
     zoomForClearance,
-  } from "$lib/arcade/lander-engine.js";
-  import type { CrashReason, Pad, Pilot, Ship, Site, Terrain, Touchdown } from "$lib/arcade/lander-engine.js";
+  } from "#lib/arcade/lander-engine.js";
+  import type { CrashReason, Pad, Pilot, Ship, Site, Terrain, Touchdown } from "#lib/arcade/lander-engine.js";
   import {
     INK,
     LID,
@@ -56,13 +56,13 @@
     fitCanvas,
     stepPopups,
     type Popup,
-  } from "$lib/arcade/art";
-  import { demoIntro, firstVisit } from "$lib/arcade/scores";
-  import { emojiRows } from "$lib/arcade/share";
-  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import { REVIVE_BLINK_SECONDS, blinkShows } from "$lib/arcade/blink";
-  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  } from "#lib/arcade/art.ts";
+  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
+  import { emojiRows } from "#lib/arcade/share.ts";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
+  import { REVIVE_BLINK_SECONDS, blinkShows } from "#lib/arcade/blink.ts";
+  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
   import DemoBar from "./DemoBar.svelte";

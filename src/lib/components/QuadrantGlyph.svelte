@@ -2,7 +2,7 @@
     // A 2×2 of research settings. Columns run clear → uncertain, rows run
     // static → adapting, so "ce" (uncertain, adapting) is the bottom-right
     // cell. Filled cells mark where a research interest sits.
-    import type { QuadrantCell } from "$lib/content";
+    import type { QuadrantCell } from "#lib/content.ts";
 
     export let cells: QuadrantCell[] = [];
 

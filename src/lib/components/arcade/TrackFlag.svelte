@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
-  import WavingFlag from "$lib/components/WavingFlag.svelte";
-  import { ICON_NOTE, NOTE_PAL } from "$lib/arcade/art";
-  import { onSongChange } from "$lib/sfx";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import WavingFlag from "#lib/components/WavingFlag.svelte";
+  import { ICON_NOTE, NOTE_PAL } from "#lib/arcade/art.ts";
+  import { onSongChange } from "#lib/sfx.ts";
 
   let currentSong = "";
 

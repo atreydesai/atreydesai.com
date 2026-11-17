@@ -2,9 +2,9 @@
 	// Dev preview of the timeline section (Model accuracy has improved over time) on the launch page's field and base styles.
 	// ?step=N scrolls to scroll step N (0-based) on load, for screenshots; ?still settles every animation.
 	import { onMount } from "svelte";
-	import DotField from "$lib/who-wrote-this/DotField.svelte";
-	import Timeline from "$lib/who-wrote-this/Timeline.svelte";
-	import { startElastic } from "$lib/who-wrote-this/elastic";
+	import DotField from "#lib/who-wrote-this/DotField.svelte";
+	import Timeline from "#lib/who-wrote-this/Timeline.svelte";
+	import { startElastic } from "#lib/who-wrote-this/elastic.ts";
 
 	// the page's scroll-speed spacing for [data-lag] blocks, as on the launch page
 	onMount(() => startElastic(document));

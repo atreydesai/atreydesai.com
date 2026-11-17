@@ -1,5 +1,5 @@
-import type { Book } from '$lib/books';
-import { validateFrontmatter } from '$lib/frontmatter';
+import type { Book } from '#lib/books.ts';
+import { validateFrontmatter } from '#lib/frontmatter.ts';
 
 // A book file's frontmatter as written, before the loader normalizes it.
 type BookFrontmatter = Omit<Book, 'subcategory'> & {

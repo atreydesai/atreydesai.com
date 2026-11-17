@@ -1,5 +1,5 @@
-import { posts } from "$lib/content";
-import { artPosition } from "$lib/og-art";
+import { posts } from "#lib/content.ts";
+import { artPosition } from "#lib/og-art.ts";
 import type { PageServerLoad } from "./$types";
 
 // The homepage's "lately" section: the three newest posts, with only the

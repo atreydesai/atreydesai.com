@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { arcadeExpert, type GameId } from "$lib/boba";
+import { arcadeExpert, type GameId } from "#lib/boba.ts";
 
 // Personal bests and first-run tips live in cookies (catch keeps its original
 // names so existing bests carry over); the shared leaderboard lives behind

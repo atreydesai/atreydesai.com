@@ -23,8 +23,8 @@
     sfxStart,
     startMusic,
     stopMusic,
-  } from "$lib/sfx";
-  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
+  } from "#lib/sfx.ts";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
   import {
     AFTER_HOURS,
     CUP_WALL,
@@ -62,13 +62,13 @@
     strawLeft,
     strokeAt,
     unlockedRooms,
-  } from "$lib/arcade/spill-engine.js";
-  import type { Progress, Room, RoomResult, World } from "$lib/arcade/spill-engine.js";
-  import { ICON_AUDIO_PAL, ICON_LEVELS, ICON_LOCK, MENU_ICONS, fitCanvas, arcadeFont } from "$lib/arcade/art";
-  import { demoIntro, firstVisit, readSpillProgress, writeSpillProgress } from "$lib/arcade/scores";
-  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
-  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  } from "#lib/arcade/spill-engine.js";
+  import type { Progress, Room, RoomResult, World } from "#lib/arcade/spill-engine.js";
+  import { ICON_AUDIO_PAL, ICON_LEVELS, ICON_LOCK, MENU_ICONS, fitCanvas, arcadeFont } from "#lib/arcade/art.ts";
+  import { demoIntro, firstVisit, readSpillProgress, writeSpillProgress } from "#lib/arcade/scores.ts";
+  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import DemoBar from "./DemoBar.svelte";
   import DemoCard from "./DemoCard.svelte";

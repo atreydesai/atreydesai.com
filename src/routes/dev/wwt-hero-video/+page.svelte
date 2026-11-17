@@ -27,14 +27,14 @@
 	//                  square plate fills a square frame; a wider frame centres it. With ?clock=manual, __step seeks the
 	//                  plate's own timeline (the explainer's dev handle, window.__xp), so every frame is exact.
 	import { onMount, flushSync } from "svelte";
-	import { createPrint, type Box } from "$lib/who-wrote-this/print";
+	import { createPrint, type Box } from "#lib/who-wrote-this/print/index.ts";
 	import ResultsExplainer, { BEATS as R_BEATS, DURATION as R_DUR } from "./ResultsExplainer.svelte";
 	import * as V2 from "./v2";
 	import { THREAD, drawThread } from "./thread";
-	import { printSprite, printAspect } from "$lib/who-wrote-this/print/sprites";
-	import RIDGE from "$lib/who-wrote-this/print_text.json";
-	import C from "$lib/who-wrote-this/content.json";
-	import HERO from "$lib/who-wrote-this/hero.json";
+	import { printSprite, printAspect } from "#lib/who-wrote-this/print/sprites.ts";
+	import RIDGE from "#lib/who-wrote-this/print_text.json";
+	import C from "#lib/who-wrote-this/content.json";
+	import HERO from "#lib/who-wrote-this/hero.json";
 
 	const L = C.levels;
 	const LIT = C.art.decipher[2];

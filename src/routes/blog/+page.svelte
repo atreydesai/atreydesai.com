@@ -1,8 +1,8 @@
 <script lang="ts">
-    import PageShell from "$lib/components/PageShell.svelte";
-    import Mark from "$lib/components/Mark.svelte";
-    import { posts } from "$lib/content";
-    import { formatShortDate } from "$lib/utils/date";
+    import PageShell from "#lib/components/PageShell.svelte";
+    import Mark from "#lib/components/Mark.svelte";
+    import { posts } from "#lib/content.ts";
+    import { formatShortDate } from "#lib/utils/date.ts";
 </script>
 
 <PageShell

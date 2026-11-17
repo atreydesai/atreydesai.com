@@ -5,14 +5,14 @@
     import { onMount } from "svelte";
     import { fade, fly } from "svelte/transition";
     import { cubicOut } from "svelte/easing";
-    import PageShell from "$lib/components/PageShell.svelte";
-    import CustomSelect from "$lib/components/CustomSelect.svelte";
-    import MediumIcon from "$lib/components/MediumIcon.svelte";
-    import Mark from "$lib/components/Mark.svelte";
-    import RatingGlyph from "$lib/components/RatingGlyph.svelte";
-    import BookDetail from "$lib/components/BookDetail.svelte";
-    import { categories } from "$lib/books";
-    import type { Book } from "$lib/books";
+    import PageShell from "#lib/components/PageShell.svelte";
+    import CustomSelect from "#lib/components/CustomSelect.svelte";
+    import MediumIcon from "#lib/components/MediumIcon.svelte";
+    import Mark from "#lib/components/Mark.svelte";
+    import RatingGlyph from "#lib/components/RatingGlyph.svelte";
+    import BookDetail from "#lib/components/BookDetail.svelte";
+    import { categories } from "#lib/books.ts";
+    import type { Book } from "#lib/books.ts";
     import type { PageData } from "./$types";
     import {
         bookTags,
@@ -23,9 +23,9 @@
         ratingLegend,
         shortDate,
         tagOverflow,
-    } from "$lib/bookshelf";
-    import { trapFocus } from "$lib/focus-trap";
-    import { lockScroll, unlockScroll } from "$lib/scroll-lock";
+    } from "#lib/bookshelf.ts";
+    import { trapFocus } from "#lib/focus-trap.ts";
+    import { lockScroll, unlockScroll } from "#lib/scroll-lock.ts";
     import {
         ArrowDown,
         ArrowUp,

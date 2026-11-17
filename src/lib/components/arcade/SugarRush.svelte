@@ -27,8 +27,8 @@
     sfxStart,
     startMusic,
     stopMusic,
-  } from "$lib/sfx";
-  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
+  } from "#lib/sfx.ts";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
   import {
     BARREL_H,
     BARREL_W,
@@ -60,8 +60,8 @@
     step as stepRun,
     swingBox,
     swingReach,
-  } from "$lib/arcade/runner-engine.js";
-  import { botInput, createBot } from "$lib/arcade/runner-bot.js";
+  } from "#lib/arcade/runner-engine.js";
+  import { botInput, createBot } from "#lib/arcade/runner-bot.js";
   import {
     DRINKS,
     INK,
@@ -78,11 +78,11 @@
     cachedSprite,
     clearSpriteCache,
     fitCanvas,
-  } from "$lib/arcade/art";
-  import { demoIntro, firstVisit } from "$lib/arcade/scores";
-  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
-  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  } from "#lib/arcade/art.ts";
+  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
+  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
   import DemoBar from "./DemoBar.svelte";

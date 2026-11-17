@@ -2,7 +2,7 @@
 // list and the detail panel both need them, and the detail panel is its own
 // component so it can render either as the desktop sidebar or as a sheet on
 // narrow screens.
-import type { Book } from "$lib/books";
+import type { Book } from "#lib/books.ts";
 
 export function bookTags(book: Book): string[] {
     return [...new Set([...(book.tags || []), ...book.subcategory])];

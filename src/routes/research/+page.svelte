@@ -1,16 +1,16 @@
 <script lang="ts">
     import { afterNavigate } from "$app/navigation";
-    import PageShell from "$lib/components/PageShell.svelte";
+    import PageShell from "#lib/components/PageShell.svelte";
     import { onDestroy, tick } from "svelte";
-    import ResearchCard from "$lib/components/ResearchCard.svelte";
-    import CustomSelect from "$lib/components/CustomSelect.svelte";
-    import { papers, talks } from "$lib/content";
+    import ResearchCard from "#lib/components/ResearchCard.svelte";
+    import CustomSelect from "#lib/components/CustomSelect.svelte";
+    import { papers, talks } from "#lib/content.ts";
     import {
         PAGE_TRANSITION_DURATION_MS,
         PAGE_TRANSITION_SCROLL_BUFFER_MS,
-    } from "$lib/motion";
-    import { formatMonthYear } from "$lib/utils/date";
-    import { paperListStructuredData } from "$lib/structured-data";
+    } from "#lib/motion.ts";
+    import { formatMonthYear } from "#lib/utils/date.ts";
+    import { paperListStructuredData } from "#lib/structured-data.js";
 
     const paperJsonLd = paperListStructuredData(papers);
 

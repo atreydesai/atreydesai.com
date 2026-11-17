@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { artPosition, cardFit } from "$lib/og-art";
+  import { artPosition, cardFit } from "#lib/og-art.ts";
   import type { PageData } from "./$types";
 
   export let data: PageData;

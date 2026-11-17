@@ -3,8 +3,8 @@
 
   import { onMount } from "svelte";
 
-  import { arcadeScreen, closeArcade, type GameId } from "$lib/boba";
-  import { sfxBlip } from "$lib/sfx";
+  import { arcadeScreen, closeArcade, type GameId } from "#lib/boba.ts";
+  import { sfxBlip } from "#lib/sfx.ts";
   import ArcadeMenu from "./ArcadeMenu.svelte";
   import RisoDefs from "./RisoDefs.svelte";
 

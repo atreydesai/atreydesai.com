@@ -9,7 +9,7 @@
     WORDMARK_LETTERS,
     WORDMARK_SPLIT,
     WORDMARK_VIEWBOX,
-  } from "$lib/wordmark";
+  } from "#lib/wordmark.ts";
 
   const links = [
     { name: "about", href: "/about/" },

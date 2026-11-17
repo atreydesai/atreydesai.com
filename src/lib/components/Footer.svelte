@@ -2,9 +2,9 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
   import { AudioLines, Disc3, VolumeOff } from "@jis3r/icons";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
-  import { openArcade } from "$lib/boba";
-  import { unlockAudio } from "$lib/sfx";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import { openArcade } from "#lib/boba.ts";
+  import { unlockAudio } from "#lib/sfx.ts";
 
   // DC Time with seconds
   let dcTime = "";

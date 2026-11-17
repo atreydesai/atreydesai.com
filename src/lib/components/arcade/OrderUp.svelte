@@ -34,8 +34,8 @@
     sfxWrong,
     startMusic,
     stopMusic,
-  } from "$lib/sfx";
-  import { COUNTDOWN_SECONDS, stepCountdown } from "$lib/arcade/countdown.js";
+  } from "#lib/sfx.ts";
+  import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
   import {
     BREW_SECONDS,
     CRITIC,
@@ -97,7 +97,7 @@
     tankState,
     timeRemaining,
     waitingMood,
-  } from "$lib/arcade/orders-engine.js";
+  } from "#lib/arcade/orders-engine.js";
   import type {
     Ice,
     Order,
@@ -109,10 +109,10 @@
     Tea,
     Topping,
     WaitMood,
-  } from "$lib/arcade/orders-engine.js";
-  import { Crowd, type CrowdState } from "$lib/arcade/orders-crowd";
-  import { FIGURE_W, JAR_W } from "$lib/arcade/orders-guests.js";
-  import { GLYPHS, GLYPH_ROWS, ICONS, wordWidth } from "$lib/arcade/orders-labels.js";
+  } from "#lib/arcade/orders-engine.js";
+  import { Crowd, type CrowdState } from "#lib/arcade/orders-crowd.ts";
+  import { FIGURE_W, JAR_W } from "#lib/arcade/orders-guests.js";
+  import { GLYPHS, GLYPH_ROWS, ICONS, wordWidth } from "#lib/arcade/orders-labels.js";
   import {
     DEMO_DROP_WITHIN,
     DEMO_JAR_START,
@@ -129,8 +129,8 @@
     demoPourTarget,
     demoSugarPumps,
     reachedTarget,
-  } from "$lib/arcade/orders-demo.js";
-  import type { DemoStep } from "$lib/arcade/orders-demo.js";
+  } from "#lib/arcade/orders-demo.js";
+  import type { DemoStep } from "#lib/arcade/orders-demo.js";
   import {
     INK,
     LID,
@@ -151,13 +151,13 @@
     SPRITE_PAD,
     type Particle,
     type Popup,
-  } from "$lib/arcade/art";
-  import { demoIntro, firstVisit } from "$lib/arcade/scores";
-  import { emojiRows } from "$lib/arcade/share";
-  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "$lib/arcade/shell";
-  import { arcadeExpert, takeDemoRequest } from "$lib/boba";
-  import Mark from "$lib/components/Mark.svelte";
-  import PixelIcon from "$lib/components/PixelIcon.svelte";
+  } from "#lib/arcade/art.ts";
+  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
+  import { emojiRows } from "#lib/arcade/share.ts";
+  import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
+  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import Mark from "#lib/components/Mark.svelte";
+  import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
   import DemoCard from "./DemoCard.svelte";

@@ -6,10 +6,10 @@
     // its prose (generated from the git history of src/content/about.yaml).
     import { onMount, tick } from "svelte";
     import { ArrowDown, ArrowUp } from "@jis3r/icons";
-    import CustomSelect from "$lib/components/CustomSelect.svelte";
-    import { diffDocuments, type DiffResult } from "$lib/prose-diff/engine.js";
-    import { groupDocuments, usablePaths } from "$lib/prose-diff/sources.js";
-    import { drawSquiggle, squiggle } from "$lib/prose-diff/squiggle";
+    import CustomSelect from "#lib/components/CustomSelect.svelte";
+    import { diffDocuments, type DiffResult } from "#lib/prose-diff/engine.js";
+    import { groupDocuments, usablePaths } from "#lib/prose-diff/sources.js";
+    import { drawSquiggle, squiggle } from "#lib/prose-diff/squiggle.ts";
 
     type Source = "sample" | "paste" | "files";
     type Version = { id: string; label: string };
@@ -353,7 +353,7 @@
             // Storage blocked: every visit is a first one.
         }
         mounted = true;
-        import("$lib/prose-diff/sample.json").then(({ default: sample }) => {
+        import("#lib/prose-diff/sample.json").then(({ default: sample }) => {
             sampleTexts = new Map(sample.versions.map((v) => [v.id, v.text] as [string, string]));
             sampleDocs = [
                 { id: "sample", title: sample.title, versions: sample.versions.map(({ id, label }) => ({ id, label })) },

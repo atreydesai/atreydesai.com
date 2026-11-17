@@ -1,8 +1,8 @@
-import { posts } from '$lib/content';
-import { SITE_URL } from '$lib/seo';
-import { htmlToMarkdown, markdownPath } from '$lib/server/content-negotiation.js';
-import { PAGE_CDN_CACHE } from '$lib/server/page-cache.js';
-import { SITE_PAGES } from '$lib/server/site-pages';
+import { posts } from '#lib/content.ts';
+import { SITE_URL } from '#lib/seo.ts';
+import { htmlToMarkdown, markdownPath } from '#lib/server/content-negotiation.js';
+import { PAGE_CDN_CACHE } from '#lib/server/page-cache.js';
+import { SITE_PAGES } from '#lib/server/site-pages.ts';
 import type { RequestHandler } from './$types';
 
 // Every public page as Markdown in one file, for agents that want the whole

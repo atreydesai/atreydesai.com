@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { get, list, put } from '@vercel/blob';
 import { BLOB_READ_WRITE_TOKEN } from '$app/env/private';
-import { cleanName } from '$lib/profanity';
+import { cleanName } from '#lib/profanity.ts';
 import type { RequestHandler } from './$types';
 
 // Runs at request time (the root layout prerenders everything else).

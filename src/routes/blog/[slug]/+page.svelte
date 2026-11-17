@@ -1,15 +1,15 @@
 <script lang="ts">
-    import Seo from "$lib/components/Seo.svelte";
-    import FruitStudies from "$lib/components/FruitStudies.svelte";
-    import ShaderCanvas from "$lib/components/ShaderCanvas.svelte";
-    import ProseDiff from "$lib/components/ProseDiff.svelte";
-    import { formatLongDate } from "$lib/utils/date";
+    import Seo from "#lib/components/Seo.svelte";
+    import FruitStudies from "#lib/components/FruitStudies.svelte";
+    import ShaderCanvas from "#lib/components/ShaderCanvas.svelte";
+    import ProseDiff from "#lib/components/ProseDiff.svelte";
+    import { formatLongDate } from "#lib/utils/date.ts";
     import { marked } from "marked";
-    import { withMarks } from "$lib/marks";
+    import { withMarks } from "#lib/marks.ts";
     import { ArrowLeft, CalendarDays } from "@jis3r/icons";
-    import { SITE_URL } from "$lib/seo";
-    import { blogPostingStructuredData } from "$lib/structured-data";
-    import PostFooter from "$lib/components/blog/PostFooter.svelte";
+    import { SITE_URL } from "#lib/seo.ts";
+    import { blogPostingStructuredData } from "#lib/structured-data.js";
+    import PostFooter from "#lib/components/blog/PostFooter.svelte";
     import type { PageData } from "./$types";
 
     export let data: PageData;

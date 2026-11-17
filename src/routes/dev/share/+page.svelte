@@ -2,8 +2,8 @@
   // Every game's share card and text, drawn from sample runs, plus the edge
   // cases: a run that scored nothing and a very long one. Dev only.
   import { onMount } from "svelte";
-  import { renderShareCard } from "$lib/arcade/share-card";
-  import { shareText, type ShareInput } from "$lib/arcade/share";
+  import { renderShareCard } from "#lib/arcade/share-card.ts";
+  import { shareText, type ShareInput } from "#lib/arcade/share.ts";
 
   const SAMPLES: ShareInput[] = [
     {

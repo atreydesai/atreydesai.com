@@ -3,10 +3,10 @@
 	// ?step=N scrolls to scroll step N (0-based) on load, for screenshots, landing where that step's dash lands (the
 	// section's go(i)); ?still settles this section's own animations (the shared field follows prefers-reduced-motion).
 	import { onMount } from "svelte";
-	import DotField from "$lib/who-wrote-this/DotField.svelte";
-	import WhichHuman from "$lib/who-wrote-this/WhichHuman.svelte";
-	import FootnoteList from "$lib/who-wrote-this/FootnoteList.svelte";
-	import { startElastic } from "$lib/who-wrote-this/elastic";
+	import DotField from "#lib/who-wrote-this/DotField.svelte";
+	import WhichHuman from "#lib/who-wrote-this/WhichHuman.svelte";
+	import FootnoteList from "#lib/who-wrote-this/FootnoteList.svelte";
+	import { startElastic } from "#lib/who-wrote-this/elastic.ts";
 
 	// the page's scroll-speed spacing for [data-lag] blocks, as on the post
 	onMount(() => startElastic());
