@@ -12,6 +12,7 @@
 	import FootnoteList from "$lib/who-wrote-this/FootnoteList.svelte";
 	import PrintMark from "$lib/who-wrote-this/PrintMark.svelte";
 	import ScrollHint from "$lib/who-wrote-this/ScrollHint.svelte";
+	import ShareBlock from "$lib/who-wrote-this/ShareBlock.svelte";
 	import { field } from "$lib/who-wrote-this/field.svelte";
 	import Levels from "$lib/who-wrote-this/Levels.svelte";
 	import PrintHero from "$lib/who-wrote-this/PrintHero.svelte";
@@ -138,7 +139,7 @@
 			</p>
 			<div class="links" data-lag="3">
 				{#each C.meta.links as l}
-					<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>
+					<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} class={l.id === "paper" ? "fable" : ""} /> {l.t}</a>
 				{/each}
 				<time datetime={C.meta.date}>{new Date(C.meta.date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</time>
 			</div>
@@ -154,17 +155,24 @@
 			</div>
 		</section>
 
+		<!-- each section ends with a share control: the blog, or a link to that section (Atrey, 17 Nov) -->
 		<Timeline />
+		<ShareBlock {url} id={stops[1].id} name={stops[1].short} />
 		<div class="breath" aria-hidden="true"></div>
 		<HumanOrAIB />
+		<ShareBlock {url} id={stops[2].id} name={stops[2].short} />
 		<div class="breath" aria-hidden="true"></div>
 		<WhichAI />
+		<ShareBlock {url} id={stops[3].id} name={stops[3].short} />
 		<div class="breath" aria-hidden="true"></div>
 		<WhichHuman />
+		<ShareBlock {url} id={stops[4].id} name={stops[4].short} />
 		<div class="breath" aria-hidden="true"></div>
 		<Familiar />
+		<ShareBlock {url} id={stops[5].id} name={stops[5].short} />
 		<div class="breath" aria-hidden="true"></div>
 		<Anonymity />
+		<ShareBlock {url} id={stops[6].id} name={stops[6].short} />
 		<div class="breath" aria-hidden="true"></div>
 
 		<!-- the last word: the paper's closing line, as the page's final chapter -->
@@ -181,7 +189,7 @@
 				{#each C.meta.authors as a, i}<span>{a.name}{#if a.equal}*{/if}{#if i < C.meta.authors.length - 1}{", "}{/if}</span>{/each}
 			</p>
 			<div class="links">
-				{#each C.meta.links as l}<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>{/each}
+				{#each C.meta.links as l}<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} class={l.id === "paper" ? "fable" : ""} /> {l.t}</a>{/each}
 			</div>
 			<!-- credit for a linked site that a coauthor built (meta.links[].credit; Ty's model profiles, Atrey, 16 Nov) -->
 			{#each C.meta.links.filter((l) => "credit" in l && l.credit) as l}<p class="credit">{l.credit}</p>{/each}
@@ -191,7 +199,14 @@
 
 	<ScrollHint />
 	<footer class="site-foot">
-		<a href="/">Atrey Desai</a>
+		<!-- a pencilled note beside the name, like the homepage's "arcade" one (Atrey, 17 Nov) -->
+		<span class="me">
+			<a href="/">Atrey Desai</a>
+			<span class="phd">
+				<svg viewBox="0 0 26 14" width="26" height="14" aria-hidden="true" focusable="false"><path d="M1.5 9.5C6 11.8 13.5 12 19 7.5" /><path d="M15.6 6.6 19.6 7.1 18.4 10.9" /></svg>
+				I'm applying to PhDs
+			</span>
+		</span>
 		<span>{#each nav as link}<a href={link.href}>{link.name}</a>{/each}</span>
 	</footer>
 </div>
@@ -285,6 +300,14 @@
 	.site-foot span { display: flex; gap: 16px; }
 	.site-foot a { text-decoration: none; }
 	.site-foot a:hover { color: var(--ink); }
+	/* the note: the homepage's arcade arrow, turned to point back at the name */
+	.site-foot .me { display: inline-flex; align-items: baseline; gap: 6px; }
+	.phd { display: inline-flex; align-items: baseline; gap: 0; font-size: 12px; font-style: italic; line-height: 1; color: var(--ink2); white-space: nowrap; }
+	.phd svg { overflow: visible; margin-right: -3px; transform: translateY(2px) scaleX(-1); }
+	.phd path { fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+	.site-foot .me:hover .phd { color: var(--fable); }
+	/* the paper's icon in Fable's clay, top and bottom (Atrey, 17 Nov) */
+	.btn :global(.ic.fable) { color: var(--fable); }
 
 	@media (max-width: 760px) {
 		.finale { height: calc(160 * var(--vh, 1vh)); }
