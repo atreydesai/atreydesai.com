@@ -67,6 +67,34 @@
 	})();
 
 
+	// the paper's BibTeX (the paper's own title and author order; accents escaped for plain BibTeX). Until there is an
+	// arXiv entry it points at this page; then swap howpublished for the eprint.
+	const BIB = `@misc{desai2026unmasking,
+  title        = {${C.meta.deck.t}},
+  author       = {Desai, Atrey and B{\\"o}l{\\"o}ni-Turgut, Deniz and Brassington, Ty and
+                  Choi, Minjoon and Russell, Jenna and Rajendhran, Rishanth and
+                  Emi, Bradley and Gonen, Hila and Daum{\\'e} III, Hal and
+                  Wieting, John and Karpinska, Marzena and Iyyer, Mohit},
+  year         = {2026},
+  howpublished = {\\url{${url}}}
+}`;
+	let copied = $state(false), bibEl: HTMLElement;
+	let copiedT: ReturnType<typeof setTimeout> | undefined;
+	async function copyBib() {
+		try {
+			await navigator.clipboard.writeText(BIB);
+			copied = true;
+			clearTimeout(copiedT);
+			copiedT = setTimeout(() => (copied = false), 1800);
+		} catch {
+			// no clipboard: select the entry so it can be copied by hand
+			const r = document.createRange();
+			r.selectNodeContents(bibEl);
+			getSelection()?.removeAllRanges();
+			getSelection()?.addRange(r);
+		}
+	}
+
 	const jsonLd = $derived([
 		{
 			"@type": "BlogPosting",
@@ -202,6 +230,14 @@
 			<!-- credit for a linked site that a coauthor built (meta.links[].credit; Ty's model profiles, Atrey, 16 Nov) -->
 			{#each C.meta.links.filter((l) => "credit" in l && l.credit) as l}<p class="credit">{l.credit}</p>{/each}
 			<FootnoteList />
+			<!-- how to cite the paper, with a copy button (Atrey, 17 Nov) -->
+			<section class="cite" aria-labelledby="cite-h">
+				<div class="cite-head">
+					<h2 id="cite-h">Cite</h2>
+					<button type="button" class="copy" onclick={copyBib} aria-live="polite"><Icon name="files" />{copied ? "Copied" : "Copy"}</button>
+				</div>
+				<pre bind:this={bibEl}><code>{BIB}</code></pre>
+			</section>
 		</footer>
 	</article>
 
@@ -347,6 +383,14 @@
 	.phd svg { overflow: visible; margin-right: -3px; transform: translateY(2px) scaleX(-1); }
 	.phd path { fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
 	.site-foot .me:hover .phd { color: var(--fable); }
+	/* the citation block at the foot of the page */
+	.cite { margin-top: 40px; max-width: 52rem; }
+	.cite-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+	.cite h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+	.copy { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border: 1.25px solid var(--ink); border-radius: 2px; font-size: 13px; font-weight: 500; transition: background-color .15s, color .15s; }
+	.copy:hover { background: var(--ink); color: var(--field); }
+	.cite pre { margin: 0; padding: 14px 16px; background: var(--field); border: 1px solid var(--rule); border-radius: 3px; overflow-x: auto; }
+	.cite code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important; font-size: 12.5px; line-height: 1.5; color: var(--ink); white-space: pre; }
 	/* the paper's icon in Fable's clay, top and bottom (Atrey, 17 Nov) */
 	.btn :global(.ic.fable) { color: var(--fable); }
 
