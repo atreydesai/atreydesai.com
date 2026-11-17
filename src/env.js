@@ -1,4 +1,5 @@
 import { defineEnvVars } from '@sveltejs/kit/env';
 
-// @migration-task Review usage of dynamic environment variables. They fall back to the empty string if not present, which may not be what you want.
+// Read at request time. Without a token the boba leaderboard reports itself
+// offline (api/scores treats '' as missing), so '' is the right fallback.
 export const variables = defineEnvVars({ BLOB_READ_WRITE_TOKEN: { schema: (input) => input ?? '' } });

@@ -1,4 +1,3 @@
-import { json } from '@sveltejs/kit';
 import { get, list, put } from '@vercel/blob';
 import { BLOB_READ_WRITE_TOKEN } from '$app/env/private';
 import { cleanName } from '#lib/profanity.ts';
@@ -160,12 +159,12 @@ function rateLimited(ip: string, now: number): boolean {
 
 export const GET: RequestHandler = async ({ url }) => {
 	const path = boardPath(url.searchParams.get('game'), url.searchParams.get('mode'));
-	if (!path) return json({ available: false, scores: [] }, { status: 400 });
-	if (!token) return json({ available: false, scores: [] });
+	if (!path) return Response.json({ available: false, scores: [] }, { status: 400 });
+	if (!token) return Response.json({ available: false, scores: [] });
 	const board = await readBoard(path);
-	if (board === null) return json({ available: false, scores: [] });
+	if (board === null) return Response.json({ available: false, scores: [] });
 	board.sort((a, b) => b.score - a.score);
-	return json(
+	return Response.json(
 		{
 			available: true,
 			scores: publicEntries(bestPerName(board).slice(0, TOP)),
@@ -178,7 +177,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 	if (!token) {
-		return json({ ok: false, reason: 'global leaderboard is offline' }, { status: 503 });
+		return Response.json({ ok: false, reason: 'global leaderboard is offline' }, { status: 503 });
 	}
 
 	let ip = 'unknown';
@@ -189,29 +188,29 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		// these under one shared bucket rather than rejecting
 	}
 	if (rateLimited(ip, Date.now())) {
-		return json({ ok: false, reason: 'too many submissions, slow down' }, { status: 429 });
+		return Response.json({ ok: false, reason: 'too many submissions, slow down' }, { status: 429 });
 	}
 
 	let body: { name?: unknown; score?: unknown; game?: unknown; mode?: unknown };
 	try {
 		body = await request.json();
 	} catch {
-		return json({ ok: false, reason: 'bad request' }, { status: 400 });
+		return Response.json({ ok: false, reason: 'bad request' }, { status: 400 });
 	}
 
 	const path = boardPath(body.game, body.mode);
-	if (!path) return json({ ok: false, reason: 'unknown game' }, { status: 400 });
+	if (!path) return Response.json({ ok: false, reason: 'unknown game' }, { status: 400 });
 
 	// Validate score: a non-negative integer within a sane ceiling.
 	const score = Math.floor(Number(body.score));
 	if (!Number.isFinite(score) || score < 0 || score > 1000000) {
-		return json({ ok: false, reason: 'invalid score' }, { status: 400 });
+		return Response.json({ ok: false, reason: 'invalid score' }, { status: 400 });
 	}
 
 	// Validate + moderate the name (server is the authority).
 	const checked = cleanName(typeof body.name === 'string' ? body.name : '');
 	if (!checked.ok || !checked.value) {
-		return json({ ok: false, reason: checked.reason ?? 'invalid name' }, { status: 400 });
+		return Response.json({ ok: false, reason: checked.reason ?? 'invalid name' }, { status: 400 });
 	}
 	const name = checked.value;
 
@@ -221,7 +220,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			if (board === null) {
 				// Unknown board state: refuse to write rather than risk replacing
 				// the real leaderboard with just this entry.
-				return json({ ok: false, reason: "couldn't save, try again" }, { status: 500 });
+				return Response.json({ ok: false, reason: "couldn't save, try again" }, { status: 500 });
 			}
 			const entry: Entry = { name, score, t: Date.now() };
 			board.push(entry);
@@ -230,7 +229,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 			await writeBoard(path, trimmed);
 
 			const rank = trimmed.findIndex((e) => e === entry) + 1;
-			return json({
+			return Response.json({
 				ok: true,
 				rank: rank > 0 ? rank : null,
 				scores: publicEntries(trimmed.slice(0, TOP)),
@@ -238,6 +237,6 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		});
 	} catch (err) {
 		console.error('[api/scores] POST failed:', err);
-		return json({ ok: false, reason: "couldn't save, try again" }, { status: 500 });
+		return Response.json({ ok: false, reason: "couldn't save, try again" }, { status: 500 });
 	}
 };

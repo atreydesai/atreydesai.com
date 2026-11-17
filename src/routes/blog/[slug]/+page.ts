@@ -7,7 +7,7 @@ export const load: PageLoad = ({ params }) => {
     if (index === -1) {
         const unlisted = unlistedPosts.find((post) => post.id === params.slug);
         if (unlisted) {
-            if (unlisted.externalUrl) throw redirect(307, unlisted.externalUrl);
+            if (unlisted.externalUrl) throw redirect(307, unlisted.externalUrl, { external: true });
             return { post: unlisted, prevPost: null, nextPost: null };
         }
         const draft = draftPosts.find((post) => post.id === params.slug);
@@ -15,7 +15,8 @@ export const load: PageLoad = ({ params }) => {
         throw error(404, 'Post not found');
     }
     if (posts[index].externalUrl) {
-        throw redirect(307, posts[index].externalUrl);
+        // A post that lives on another site (externalUrl) sends readers there.
+        throw redirect(307, posts[index].externalUrl, { external: true });
     }
     return {
         post: posts[index],

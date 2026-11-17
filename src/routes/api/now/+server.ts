@@ -1,4 +1,3 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 // This route hits external APIs at request time, so it is never prerendered.
@@ -185,5 +184,5 @@ export const GET: RequestHandler = async ({ setHeaders }) => {
 		'Cache-Control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
 	});
 
-	return json({ manifold, reading });
+	return Response.json({ manifold, reading });
 };
