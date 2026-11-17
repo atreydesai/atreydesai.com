@@ -12,6 +12,7 @@ import HumorExplainer from "./HumorExplainer.svelte";
 import OccludedExplainer from "./OccludedExplainer.svelte";
 import ReasonersExplainer from "./ReasonersExplainer.svelte";
 import RlTapExplainer from "./RlTapExplainer.svelte";
+import UnmaskingExplainer from "./UnmaskingExplainer.svelte";
 import type { ExplainerProps } from "./motion";
 
 export type { ExplainerProps };
@@ -28,4 +29,5 @@ export const explainers: Partial<Record<string, ExplainerComponent>> = {
 	"booktube-phonetic": BookTubeExplainer,
 	"lol-to-llm-humor": HumorExplainer,
 	"adversarial-multimodal-questions": OccludedExplainer,
+	"unmasking-authors": UnmaskingExplainer,
 };
