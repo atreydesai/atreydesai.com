@@ -3,10 +3,13 @@
 	import Fingerprint from "$lib/who-wrote-this/Fingerprint.svelte";
 	import C from "$lib/who-wrote-this/content.json";
 
+	// Only section 1 carries the worked example; the rest are still pending.
+	const first = C.sections[0];
+	const example = first && "example" in first ? first.example : null;
 	const words = [
 		C.meta.deck.t, ...C.lede.map((s) => s.t), C.levels.lead.t, ...C.levels.items.map((i) => `${i.t}. ${i.fact}`),
-		C.sections[0].example.text.map((s) => s.t).join(""),
-		...C.sections[0].example.judgments.map((j) => j.explanation.map((s) => s.t).join("")),
+		example?.text.map((s) => s.t).join("") ?? "",
+		...(example?.judgments ?? []).map((j) => j.explanation.map((s) => s.t).join("")),
 		C.closing.t,
 	].join("   ");
 </script>

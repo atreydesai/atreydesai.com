@@ -199,7 +199,7 @@ export function frame(ctx: Ctx, W: number, H: number, tl: number, A: Assets, fir
 	const fade = b === 0 ? 1 - cl((t - (dur - OUT)) / OUT) : 1 - cl((t - (dur - OUT)) / OUT);
 	ctx.save(); ctx.globalAlpha = fade;
 	const v: V = { ctx, W, H, wide: S.wide, t, A };
-	[opener, detect, lab, human, defenses, closing][b](v, S, dur);
+	[opener, detect, lab, human, defenses, closing][b](v, S);
 	ctx.restore();
 	if (b === 5 && first) {
 		const seam = cl((t - (dur - SEAM)) / SEAM);

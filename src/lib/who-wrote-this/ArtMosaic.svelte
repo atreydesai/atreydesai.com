@@ -25,7 +25,7 @@
 	const pct = (v: number, of: number) => `${(v / of) * 100}%`;
 
 	// which arch is under the pointer: the arches nest, so the innermost box that contains it
-	function archAt(e: PointerEvent) {
+	function archAt(e: MouseEvent) {
 		const r = box.getBoundingClientRect(), f = fit;
 		const x = (e.clientX - r.left - f.ox) / f.s, y = (e.clientY - r.top - f.oy) / f.s;
 		for (const L of [...LAYERS].reverse()) if (x > L.x - 12 && x < L.x + L.w + 12 && y > L.y - 12 && y < M.horizon + 60) return L.n;

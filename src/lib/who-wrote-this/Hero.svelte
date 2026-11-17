@@ -146,7 +146,7 @@
 						<span class="how">
 							{#each col.stats as s}
 								<span class="stat"><span class="stat-v">{s.v}</span><span class="stat-t">{s.t}</span></span>
-								{#if s.logos}<span class="logos">{#each s.logos as l}<Icon name={l} />{/each}</span>{/if}
+								{#if "logos" in s && s.logos}<span class="logos">{#each s.logos as l}<Icon name={l} />{/each}</span>{/if}
 							{/each}
 							{#if col.stat_note}<span class="stat-note">{col.stat_note}</span>{/if}
 						</span>
