@@ -22,6 +22,7 @@
 	import WhichHuman from "$lib/who-wrote-this/WhichHuman.svelte";
 	import Familiar from "$lib/who-wrote-this/Familiar.svelte";
 	import Anonymity from "$lib/who-wrote-this/Anonymity.svelte";
+	import LedeHold from "$lib/who-wrote-this/LedeHold.svelte";
 	import C from "$lib/who-wrote-this/content.json";
 	import type { PageData } from "./$types";
 
@@ -148,12 +149,13 @@
 		{#key art}{#if art === "print"}<PrintHero />{:else}<Levels {art} />{/if}{/key}
 
 		<!-- the lede has a screen of its own: it is the paper's argument in one paragraph, so nothing above or below shares
-		     the view with it (Atrey, 16 Nov) -->
-		<section class="lede-wrap" aria-label="Introduction">
+		     the view with it (Atrey, 16 Nov); it holds in place for a stretch of scroll, longer for a fast scroll (LedeHold,
+		     Atrey, 17 Nov) -->
+		<LedeHold label="Introduction">
 			<div class="lede">
 				{#each ledeParts as p}{#if p.hl}<mark class="hl">{p.t}</mark>{:else}{p.t}{/if}{/each}
 			</div>
-		</section>
+		</LedeHold>
 
 		<!-- each section ends with a share control: the blog, or a link to that section (Atrey, 17 Nov) -->
 		<Timeline />
@@ -266,7 +268,7 @@
 	.links time { margin-left: 8px; font-size: 13px; color: var(--ink2); }
 	/* a short pause of empty ground between scenes: long gaps left slow scrollers wondering whether the page had ended */
 	.breath { height: calc(18 * var(--vh, 1vh)); }
-	.lede-wrap { min-height: calc(100 * var(--vh, 1vh)); padding-block: calc(22 * var(--vh, 1vh)); display: grid; align-content: center; }
+	/* (the lede's screen and its hold: LedeHold.svelte) */
 	.lede { margin-top: 0; max-width: 44rem; font-size: 22px; line-height: 1.6; letter-spacing: -0.005em; }
 	/* a book's drop cap: the opening "I" spans three lines */
 	.lede::first-letter { float: left; font-family: Georgia, "Times New Roman", serif !important; font-size: calc(22px * 1.6 * 3 * 0.86); line-height: .8; font-weight: 400; margin: 6px 12px 0 -2px; color: var(--ink); }
@@ -317,7 +319,6 @@
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }
 		.lede { font-size: 18px; }
-		.lede-wrap { padding-block: calc(16 * var(--vh, 1vh)); }
 		.breath { height: calc(12 * var(--vh, 1vh)); }
 		.lede::first-letter { font-size: calc(18px * 1.6 * 3 * 0.86); }
 		.top nav { gap: 14px; }
