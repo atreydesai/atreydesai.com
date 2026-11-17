@@ -1303,7 +1303,7 @@ has actually painted, then lays the card out on the dev-only `/dev/og/<id>`
 route. Point the post's `image` (and `imageAlt`) at the result. Cards are
 fixed-size images, so their type is set in `px`. Art that would lose its
 subject to the wide crop is fitted whole on its own flat ground, and
-text-heavy art crops from its top left; both live in `$lib/og-art`.
+text-heavy art crops from its top left; both live in `#lib/og-art.ts`.
 
 ### Lately
 
