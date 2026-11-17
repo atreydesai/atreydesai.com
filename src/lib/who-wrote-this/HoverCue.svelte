@@ -9,7 +9,7 @@
 		{ hover: string; tap?: string; show?: boolean; inline?: boolean; class?: string; style?: string } = $props();
 </script>
 
-<span class="hc {cls}" class:off={!show} class:inline {style} aria-hidden="true">
+<span class="hc {cls}" class:off={!show} class:hc-inline={inline} {style} aria-hidden="true">
 	<span class="hc-ring"><svg viewBox="0 0 16 16"><path d="M3.5 1.5v11.2l3-2.7 2 4.6 2.1-.9-2-4.5h4.1z" /></svg></span>
 	<span class="m">{hover}</span><span class="t">{tap || hover}</span>
 </span>
@@ -20,7 +20,7 @@
 		background: #14202D; color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1; letter-spacing: -0.005em; white-space: nowrap;
 		pointer-events: none; box-shadow: 0 6px 18px rgba(20, 32, 45, .22); transition: opacity .35s ease, transform .35s ease;
 	}
-	.hc.inline { position: relative; z-index: auto; vertical-align: middle; }
+	.hc.hc-inline { position: relative; z-index: auto; vertical-align: middle; }
 	.hc.off { opacity: 0; transform: translateY(4px); }
 	.hc-ring { position: relative; display: grid; place-items: center; width: 16px; height: 16px; }
 	.hc-ring::before { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 1.5px solid currentColor; opacity: 0; animation: ping 1.8s ease-out infinite; }
