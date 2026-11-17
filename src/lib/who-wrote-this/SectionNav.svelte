@@ -68,6 +68,23 @@
 			if (e.metaKey || e.ctrlKey || e.altKey || t.closest("input, textarea, select, [contenteditable]")) return;
 			if (e.key === "]") { e.preventDefault(); step(1); }
 			if (e.key === "[") { e.preventDefault(); step(-1); }
+			// one guided step at a time, in whichever section's steps are on screen (→ or J next, ← or K back); past a
+			// section's last step it moves on to the next section, before its first back to this one (coauthor, 16 Nov:
+			// "sometimes i want to go back exactly n steps")
+			const fwd = e.key === "ArrowRight" || e.key === "j", back = e.key === "ArrowLeft" || e.key === "k";
+			if (fwd || back) {
+				const navs = [...document.querySelectorAll<HTMLElement>('.wwt nav.dashes[aria-label="Steps"]')].filter((n) => {
+					const r = n.getBoundingClientRect();
+					return r.width > 0 && r.bottom > 0 && r.top < innerHeight;
+				});
+				const nav = navs.sort((x, y) => Math.abs(x.getBoundingClientRect().top) - Math.abs(y.getBoundingClientRect().top))[0];
+				const btns = nav ? [...nav.querySelectorAll<HTMLButtonElement>("button")] : [];
+				const at = btns.findIndex((b) => b.getAttribute("aria-current") === "step");
+				const to = at + (fwd ? 1 : -1);
+				e.preventDefault();
+				if (at >= 0 && to >= 0 && to < btns.length) btns[to].click();
+				else step(fwd ? 1 : -1);
+			}
 		};
 		const stopScroll = onScroll(update);
 		addEventListener("keydown", onKey);
@@ -92,7 +109,7 @@
 
 <!-- the rail, on the left, once the header has gone -->
 <nav class="rail" class:on={rail} aria-label="Sections" aria-hidden={!rail}>
-	<button type="button" class="chev" onclick={() => step(-1)} disabled={current < 0} aria-label="Previous section" title="Previous section  [" tabindex={rail ? 0 : -1}>
+	<button type="button" class="chev" onclick={() => step(-1)} disabled={current < 0} aria-label="Previous section" title="Previous section  [   (← → one step)" tabindex={rail ? 0 : -1}>
 		<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 7.5 6 4l3.5 3.5" /></svg>
 	</button>
 	{#each stops as s, i}
@@ -100,7 +117,7 @@
 			<i><b style:transform="scaleY({current > i ? 1 : current === i ? within : 0})"></b></i><span class="fly">{s.short}</span><span class="tip">{s.short}</span>
 		</button>
 	{/each}
-	<button type="button" class="chev" onclick={() => step(1)} disabled={current >= stops.length - 1} aria-label="Next section" title="Next section  ]" tabindex={rail ? 0 : -1}>
+	<button type="button" class="chev" onclick={() => step(1)} disabled={current >= stops.length - 1} aria-label="Next section" title="Next section  ]   (← → one step)" tabindex={rail ? 0 : -1}>
 		<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" /></svg>
 	</button>
 </nav>

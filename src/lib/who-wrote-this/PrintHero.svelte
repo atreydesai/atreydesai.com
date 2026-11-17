@@ -10,7 +10,7 @@
 	import Icon from "./Icon.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import { field, chart, regions } from "./field.svelte";
-	import { onScroll, view as vp, lite, onTap, requestDraw, scrolling } from "./loop";
+	import { onScroll, view as vp, lite, onTap, requestDraw, requestPaint, scrolling } from "./loop";
 	import { createPrint, type Anchor, type Box, type Print } from "./print";
 	import RIDGE from "./print_text.json";
 	import C from "./content.json";
@@ -142,9 +142,11 @@
 			pointer = { x: e.clientX, y: e.clientY };
 			lastAnchors = 0;
 		};
-		const stopTap = onTap((x, y) => { if (active && lite.on) { pointer = { x, y }; lastAnchors = 0; requestDraw(); } });
+		const stopTap = onTap((x, y) => { if (active && lite.on) { pointer = { x, y }; lastAnchors = 0; requestPaint(); } });
 		regions.hero = root;
-		const onLeave = () => { pointer = null; };
+		// only a mouse leaving the page parks the lens: a finger lifting also fires pointerleave, which used to undo every tap
+		// (a Pixel could not open the human print's card)
+		const onLeave = (e: PointerEvent) => { if (e.pointerType === "mouse") pointer = null; };
 		vw = innerWidth; vh = innerHeight; // (then from the page's loop, which keeps a phone's height steady)
 		addEventListener("pointermove", onMove, { passive: true });
 		addEventListener("pointerdown", onMove, { passive: true });
@@ -252,10 +254,10 @@
 						<h3 style:color={id === "human" ? RQ[1] : RQ[2]}><Icon name={id === "human" ? "human" : "ai"} />{E.verdict}</h3>
 						<blockquote>“{E.excerpt.t}”</blockquote>
 						<p class="ex">{E.explanation.t}</p>
-						<p class="stat"><b style:color={FABLE}>{E.stat.v}</b><span>{E.stat.t}<br /><em>Claude Fable 5.2</em></span></p>
+						<p class="stat"><b style:color={FABLE}>{E.stat.v}</b><span>{E.stat.t}<br />named correctly by <em>Claude Fable 5.2</em></span></p>
 					{:else if LB}
 						<h3 style:color={LB.rate !== undefined ? labColor(lab) : "#14202D"}>{#if LB.logo}<Icon name={LB.logo} />{/if}{lab}</h3>
-						{#if LB.rate !== undefined}<p class="stat"><b style:color={FABLE}>{LB.rate}%</b><span>named correctly<br /><em>Claude Fable 5.2</em></span></p>{/if}
+						{#if LB.rate !== undefined}<p class="stat"><b style:color={FABLE}>{LB.rate}%</b><span>named correctly by<br /><em>Claude Fable 5.2</em></span></p>{/if}
 						{#if LB.profile}<p class="ex">{LB.profile.t}</p>{/if}
 						<ul class="models">
 							{#each LB.models as m}<li><span class="mn">{m.name}</span><i><b style:width="{m.own}%" style:background={LB.rate !== undefined ? labColor(lab) : "#8A8F98"}></b></i><span class="mv">{m.own}%</span></li>{/each}
@@ -265,7 +267,7 @@
 					{:else if kind}
 						<p class="k"><Icon name="human" />Kinds of writers</p>
 						<h3>{kind.label}</h3>
-						<p class="stat"><b style:color={FABLE}>{kind.rate}%</b><span>named correctly<br /><em>Claude Fable 5.2</em></span></p>
+						<p class="stat"><b style:color={FABLE}>{kind.rate}%</b><span>named correctly by<br /><em>Claude Fable 5.2</em></span></p>
 						<p class="ex">{kindSentence(kind.t.t)}</p>
 						{#if kind.id === "icml" || kind.id === "nature"}<p class="ex small">{H.privacy.t}</p>{/if}
 					{:else if id === "lit"}

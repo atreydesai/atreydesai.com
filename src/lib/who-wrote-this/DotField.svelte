@@ -13,7 +13,7 @@
 	// The legacy hero variants (?art=dots|mosaic) still move every ground dot, so they draw the whole grid here.
 	import { onMount } from "svelte";
 	import { field, chart, hero, labCenters, regions, type Box } from "./field.svelte";
-	import { view as vp, lite, onTap, requestDraw, setDrawer } from "./loop";
+	import { view as vp, lite, onTap, requestDraw, setDrawer, paintReq } from "./loop";
 	import { spritesVersion } from "./print/sprites";
 
 	const PITCH = 18;
@@ -292,8 +292,9 @@
 			const showsChanged = shows !== lastShows;
 			lastShows = shows;
 			const lensWanted = !reduce && !legacy && F.mode === "ground" && pointer.x > -900;
+			const forced = paintReq.on; paintReq.on = false;
 			const dirty = resized || stateChanged || dimWas !== dimE || animating || chartChanged || showsChanged
-				|| (F.mode === "paint" && paintBusy)
+				|| (F.mode === "paint" && (paintBusy || forced))
 				|| (scrolled && (legacy || lensDrawn || lensWanted || F.mode === "paint"))
 				|| (moved && (legacy || lensDrawn || lensWanted || F.mode === "paint"));
 			resized = false;
@@ -333,7 +334,15 @@
 			}
 			if (best !== field.hover) field.hover = best;
 		}
-		const onLeave = () => { pointer.x = pointer.y = -999; pointerMoved = true; requestDraw(); };
+		// a mouse leaving the window (or the window losing focus) ends any hover, so no card is left standing; a finger
+		// lifting fires the same events, and must not close the card its tap just opened
+		let lastPT = "mouse";
+		const onPT = (e: PointerEvent) => { lastPT = e.pointerType || "mouse"; };
+		const onLeave = (e?: Event) => {
+			if (e && ((e as PointerEvent).pointerType ? (e as PointerEvent).pointerType !== "mouse" : lastPT !== "mouse") && e.type !== "blur") return;
+			pointer.x = pointer.y = -999; pointerMoved = true; if (field.hover !== null) field.hover = null; requestDraw();
+		};
+		const onOut = (e: MouseEvent) => { if (!e.relatedTarget) onLeave(e); };
 		// a deliberate tap on a chart (the lighter mode) opens the mark's card, or closes it
 		const stopTap = onTap((x, y) => {
 			if (!lite.on || field.mode !== "chart" || !field.interactive) return;
@@ -349,6 +358,10 @@
 		resize();
 		addEventListener("pointermove", onMove, { passive: true });
 		document.addEventListener("pointerleave", onLeave);
+		addEventListener("pointerdown", onPT, { passive: true, capture: true });
+		document.documentElement.addEventListener("mouseleave", onLeave);
+		document.addEventListener("mouseout", onOut);
+		addEventListener("blur", onLeave);
 		setDrawer(frame);
 		// a change to the field's state asks for a frame (the chart's content asks by itself: field.svelte.ts)
 		const stopWatch = $effect.root(() => {
@@ -359,6 +372,10 @@
 			stopWatch(); stopTap();
 			removeEventListener("pointermove", onMove);
 			document.removeEventListener("pointerleave", onLeave);
+			removeEventListener("pointerdown", onPT, { capture: true });
+			document.documentElement.removeEventListener("mouseleave", onLeave);
+			document.removeEventListener("mouseout", onOut);
+			removeEventListener("blur", onLeave);
 			canvas.remove();
 			document.documentElement.classList.remove("wwt-field-on");
 			field.mode = "ground"; chart.marks = []; chart.paths = []; chart.texts = []; chart.paint = null; field.hover = null;

@@ -157,6 +157,11 @@ export function requestFrame(fn: Fn) {
 	schedule();
 }
 
+/** A painting section's input changed while it was idle (a tap moved the hero's lens): the drawer must repaint even though
+ * nothing it tracks itself has changed. Read and cleared by the drawer. */
+export const paintReq = { on: false };
+export function requestPaint() { paintReq.on = true; requestDraw(); }
+
 /** Ask the drawer to draw in the coming frame. */
 export function requestDraw() {
 	if (typeof window === "undefined" || before) return; // (inside the loop, before the drawer: it is about to draw)
