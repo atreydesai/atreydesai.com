@@ -512,11 +512,16 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		labs.forEach((it, i) => (it.full = lab2[i][2]));
 		crowd.forEach((it, i) => (it.full = pts[i] ? pts[i][2] : 0));
 		// each writer takes the colour of the band of the stage it stands in (the kinds of text, left to right)
-		const bands = opts.crowdBands;
-		if (bands?.length) for (let i = 0; i < pts.length; i++) {
-			const u = (pts[i][0] - S.x) / (S.w || 1);
-			let color = bands[bands.length - 1].color;
-			for (let b = 0; b < bands.length; b++) if (u <= bands[b].to) { color = bands[b].color; break; }
+		// (or, with crowdColors, the colour given for that writer: the kinds mixed through the crowd)
+		const bands = opts.crowdBands, per = opts.crowdColors;
+		if (per?.length || bands?.length) for (let i = 0; i < pts.length; i++) {
+			let color: string;
+			if (per?.length) color = per[i % per.length];
+			else {
+				const u = (pts[i][0] - S.x) / (S.w || 1);
+				color = bands![bands!.length - 1].color;
+				for (let b = 0; b < bands!.length; b++) if (u <= bands![b].to) { color = bands![b].color; break; }
+			}
 			const it = crowd[i];
 			if (it.color === color) continue;
 			// a new colour is a new sprite, and new thread colours for the division it forms in

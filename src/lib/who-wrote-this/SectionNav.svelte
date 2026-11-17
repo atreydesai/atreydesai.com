@@ -10,6 +10,7 @@
 	let { stops }: { stops: Stop[] } = $props();
 
 	let current = $state(-1);
+	let within = $state(0); // how far through the current section, 0 to 1 (its rail bar fills with it)
 	let rail = $state(false); // the header has scrolled away: show the left rail
 	let home: HTMLElement;
 	const inlineEls: HTMLElement[] = $state([]);
@@ -17,9 +18,10 @@
 	const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 	const tops = () => stops.map((s) => { const e = document.getElementById(s.id); return e ? e.getBoundingClientRect().top + scrollY : Infinity; });
 	function go(i: number) {
-		if (i < 0) { scrollTo({ top: 0, behavior: reduce() ? "instant" : "smooth" }); return; }
+		// jumps are instant: a smooth scroll played every section's animations on the way, a speed run (Marzena, 16 Nov)
+		if (i < 0) { scrollTo({ top: 0, behavior: "instant" }); return; }
 		const t = tops()[Math.min(i, stops.length - 1)];
-		if (Number.isFinite(t)) scrollTo({ top: t - 4, behavior: reduce() ? "instant" : "smooth" });
+		if (Number.isFinite(t)) scrollTo({ top: t - 4, behavior: "instant" });
 	}
 	const step = (d: number) => go(Math.max(-1, Math.min(stops.length - 1, current + d)));
 
@@ -46,6 +48,11 @@
 			let c = -1;
 			for (let i = 0; i < ts.length; i++) if (ts[i] <= y) c = i;
 			if (c !== current) current = c;
+			if (c >= 0) {
+				const end = c + 1 < ts.length ? ts[c + 1] : (document.querySelector(".finale")?.getBoundingClientRect().top ?? innerHeight) + scrollY;
+				const w = Math.max(0, Math.min(1, (y - ts[c]) / Math.max(1, end - ts[c])));
+				if (Math.abs(w - within) > 0.005) within = w;
+			}
 		};
 		const io = new IntersectionObserver(([e]) => {
 			const next = !e.isIntersecting && e.boundingClientRect.top < 0;
@@ -87,8 +94,8 @@
 		<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 7.5 6 4l3.5 3.5" /></svg>
 	</button>
 	{#each stops as s, i}
-		<button type="button" class="dot" bind:this={railEls[i]} class:cur={current === i} onclick={() => go(i)} aria-label={s.label} aria-current={current === i ? "location" : undefined} tabindex={rail ? 0 : -1}>
-			<i></i><span class="fly">{s.short}</span><span class="tip">{s.short}</span>
+		<button type="button" class="dot" bind:this={railEls[i]} class:cur={current === i} class:done={current > i} onclick={() => go(i)} aria-label={s.label} aria-current={current === i ? "location" : undefined} tabindex={rail ? 0 : -1}>
+			<i><b style:transform="scaleY({current > i ? 1 : current === i ? within : 0})"></b></i><span class="fly">{s.short}</span><span class="tip">{s.short}</span>
 		</button>
 	{/each}
 	<button type="button" class="chev" onclick={() => step(1)} disabled={current >= stops.length - 1} aria-label="Next section" title="Next section  ]" tabindex={rail ? 0 : -1}>
@@ -110,13 +117,14 @@
 	.chev svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 	/* the rail, on the left */
-	.rail { position: fixed; left: 10px; top: 50%; transform: translateY(-50%); z-index: 15; display: grid; justify-items: center; gap: 2px; padding: 4px 1px; border-radius: 13px; background: rgba(243, 243, 239, .86); opacity: 0; pointer-events: none; transition: opacity .25s; }
-	.rail.on { opacity: .6; pointer-events: auto; }
+	.rail { position: fixed; left: 10px; top: 50%; transform: translateY(-50%); z-index: 15; display: grid; justify-items: center; gap: 2px; padding: 6px 3px; border-radius: 16px; background: rgba(243, 243, 239, .92); box-shadow: 0 2px 10px rgba(20, 32, 45, .08); opacity: 0; pointer-events: none; transition: opacity .25s; }
+	.rail.on { opacity: .92; pointer-events: auto; }
 	.rail.on:hover, .rail.on:focus-within { opacity: 1; }
-	.dot { position: relative; display: grid; place-items: center; width: 22px; height: 16px; }
-	.dot i { width: 4px; height: 4px; border-radius: 2px; background: #5A6270; opacity: .55; transition: height .2s, opacity .2s; }
-	.dot:hover i { opacity: 1; }
-	.dot.cur i { height: 12px; opacity: 1; background: #14202D; }
+	/* one bar per section: done ones dark, the current one filling as the reader goes through it, the rest pale (Ty, 16 Nov) */
+	.dot { position: relative; display: grid; place-items: center; width: 24px; height: 34px; }
+	.dot i { position: relative; width: 5px; height: 26px; border-radius: 3px; background: #C9CBC7; overflow: hidden; transition: width .2s; }
+	.dot i b { position: absolute; inset: 0; background: #14202D; transform-origin: top center; transition: transform .15s linear; }
+	.dot:hover i, .dot.cur i { width: 7px; }
 	.dot .fly { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #14202D; white-space: nowrap; opacity: 0; pointer-events: none; }
 	.dot .tip { position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%); padding: 2px 7px; border-radius: 2px; background: #14202D; color: #fff; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; }
 	.dot:hover .tip, .dot:focus-visible .tip { opacity: 1; }

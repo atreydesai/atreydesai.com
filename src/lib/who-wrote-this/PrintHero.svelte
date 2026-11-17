@@ -28,6 +28,18 @@
 	// inactive). Three families of two from the page palette: teal for reviews, rose for Reddit, aubergine for published
 	// writing; the writer the model finds is in ink, like the one print at level 0 (Atrey, 16 Nov: different fingerprint
 	// colours for different sets of texts; one teal ramp read as one grey crowd)
+	// which kind each crowd writer is: the kinds mixed evenly through the crowd in proportion to their shares, not in bands
+	// (Jenna, 16 Nov: spread the datasets instead of all ICML on the left). A golden-ratio walk spreads each kind out.
+	const CROWD_N = 400;
+	const CROWD_KIND = (() => {
+		const tot = H.crowd.reduce((a, c) => a + c.layout_share, 0);
+		return Array.from({ length: CROWD_N }, (_, i) => {
+			const u = ((i * 0.6180339887) % 1) * tot;
+			let a = 0;
+			for (let k = 0; k < H.crowd.length; k++) { a += H.crowd[k].layout_share; if (u < a) return k; }
+			return H.crowd.length - 1;
+		});
+	})();
 	const KIND_COLORS = ["#437E8E", "#C85A82", "#461E47", "#9A82B4", "#8CB5C0", "#DC89A7"];
 
 	let root: HTMLElement, stick: HTMLElement, panel: HTMLElement;
@@ -76,19 +88,12 @@
 		];
 		print = createPrint({
 			text, labs: LABS, litText: LIT.excerpt.t, ridge: RIDGE,
-			crowdBands: (() => { const tot = H.crowd.reduce((a, c) => a + c.layout_share, 0); let a = 0; return H.crowd.map((c, i) => ({ to: (a += c.layout_share) / tot, color: KIND_COLORS[i] })); })(),
+			crowdColors: CROWD_KIND.map((k) => KIND_COLORS[k]),
 			colors: { human: "#C85A82", ai: "#461E47", lit: "#14202D", ink: "#14202D", labs: ["#C85A82", "#437E8E", "#461E47"], other: "#8A8F98" },
 		});
 		let pointer: { x: number; y: number } | null = null;
 		let lastAnchors = 0, anchorKey = "", inspKey = "";
 		let lastStage: Box = { x: 0, y: 0, w: 1, h: 1 };
-		// the crowd's kinds of writers sit in bands across it, in proportion, so moving the lens explores them
-		const bands = (() => { let a = 0; return H.crowd.map((c) => (a += c.layout_share)); })();
-		const kindAt = (x: number) => {
-			const t = ((x - lastStage.x) / Math.max(1, lastStage.w)) * bands[bands.length - 1];
-			const i = bands.findIndex((b) => t <= b);
-			return i < 0 ? bands.length - 1 : i;
-		};
 		const rect = (el: Element): Box => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
 		const mast = document.querySelector(".mast");
 
@@ -122,7 +127,7 @@
 				let id = h?.id ?? null;
 				// level 0 has no card: the one print speaks for itself (Atrey, 16 Nov: remove the preview)
 				if (id === "main") id = null;
-				const kind = id?.startsWith("writer:") && L ? kindAt(L.x) : -1;
+				const kind = id?.startsWith("writer:") ? CROWD_KIND[(Number(id.slice(7)) || 0) % CROWD_N] : -1;
 				const ik = id && L ? `${id}|${kind}|${Math.round(L.x / 3)}|${Math.round(L.y / 3)}|${Math.round(L.r)}` : "";
 				if (ik !== inspKey) { inspKey = ik; insp = id && L ? { id, kind, x: L.x, y: L.y, r: L.r } : null; }
 			}

@@ -76,6 +76,9 @@ export type PrintOptions = {
 	 * cumulative fraction of the stage width (0..1) where the band ends; a writer takes the colour of the band its place
 	 * falls in. Without it the crowd is `colors.human`. The lit writer keeps `colors.lit`. */
 	crowdBands?: { to: number; color: string }[];
+	/** level 3: a colour per crowd writer, by index (overrides crowdBands), so the kinds of text can be mixed through the
+	 * crowd rather than set in bands */
+	crowdColors?: string[];
 	/** the lit writer's ridge text in level 3 (readable in the lens) */
 	litText: string;
 	/** level 3: draw the lit writer as solid ink lines at full strength instead of ridges set as text, so the found writer
