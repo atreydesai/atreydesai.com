@@ -6,7 +6,7 @@ const config = {
   preprocess: vitePreprocess(),
   kit: {
     adapter: adapter({
-      runtime: 'nodejs24.x'
+      runtime: 'nodejs26.x'
     }),
     // Inline CSS chunks under ~64 KB (uncompressed) directly into the HTML
     // response to eliminate render-blocking stylesheet requests on the
