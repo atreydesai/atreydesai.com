@@ -14,7 +14,7 @@
   import CustomCursor from "$lib/components/CustomCursor.svelte";
   import { startJustify } from "$lib/justify";
   import { startClickTracking } from "$lib/analytics";
-  import { afterNavigate, replaceState } from "$app/navigation";
+  import { afterNavigate, beforeNavigate, preloadCode, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import { BOBA_DESKTOP_QUERY, GAMES, arcadeScreen, openArcade, type GameId } from "$lib/boba";
   import {
@@ -50,6 +50,16 @@
   $: animatePages = PAGE_TRANSITIONS_ENABLED && !isTouch && !reducedMotion;
   // Feature pages that bring their own chrome and theme (the paper launch page) hide the site header and footer.
   $: takeover = data.pathname?.startsWith("/blog/who-wrote-this/");
+  // A route change into or out of a takeover page swaps at once: the shared
+  // slide would carry that page's fixed canvas and nav along with its layer
+  // (a transform re-anchors fixed children) and leave them over the site
+  // header for the length of the exit. Set before the route data changes, so
+  // the outgoing layer's exit reads it.
+  let swapNow = false;
+  const isTakeover = (path: string | undefined) => !!path?.startsWith("/blog/who-wrote-this/");
+  beforeNavigate(({ from, to }) => {
+    swapNow = isTakeover(from?.url.pathname) || isTakeover(to?.url.pathname);
+  });
 
   // A shared run links straight into its game (?play=stack): the arcade
   // opens on it, and the link tidies itself out of the address bar so a
@@ -101,6 +111,15 @@
     // so deferring their injection still captures paint/LCP events that
     // occurred earlier in the page lifecycle.
     inject({ mode: dev ? "development" : "production" });
+
+    // From a takeover page the way out is the name link to the homepage: its
+    // code loads in an idle moment, so the click only waits for its small data
+    // request (hover preloading fetches that too).
+    if (takeover) {
+      const warm = () => void preloadCode("/").catch(() => {});
+      if ("requestIdleCallback" in window) (window as any).requestIdleCallback(warm, { timeout: 4000 });
+      else setTimeout(warm, 2000);
+    }
     injectSpeedInsights();
 
     // Easter egg #1: a greeting for anyone who cracks open the console.
@@ -198,12 +217,12 @@
           class="page-layer"
           in:fly={{
             x: PAGE_TRANSITION_IN_X,
-            duration: PAGE_TRANSITION_DURATION_MS,
-            delay: PAGE_TRANSITION_IN_DELAY_MS,
+            duration: swapNow ? 0 : PAGE_TRANSITION_DURATION_MS,
+            delay: swapNow ? 0 : PAGE_TRANSITION_IN_DELAY_MS,
           }}
           out:fly={{
             y: PAGE_TRANSITION_OUT_Y,
-            duration: PAGE_TRANSITION_DURATION_MS,
+            duration: swapNow ? 0 : PAGE_TRANSITION_DURATION_MS,
           }}
         >
           <slot />
