@@ -1,3 +1,5 @@
+import adapter from "@sveltejs/adapter-vercel";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { sveltekit } from "@sveltejs/kit/vite";
 import pluginYaml from "@rollup/plugin-yaml";
 import yaml from "js-yaml";
@@ -49,7 +51,19 @@ function markdown() {
 }
 
 const config: UserConfig = {
-  plugins: [sveltekit(), pluginYaml() as any, markdown()],
+  plugins: [
+    sveltekit({
+      preprocess: vitePreprocess(),
+      adapter: adapter({ runtime: 'nodejs26.x' }),
+      // Inline CSS chunks under ~64 KB (uncompressed) directly into the HTML
+      // response to eliminate render-blocking stylesheet requests on the
+      // critical path. The threshold is uncompressed bytes; Tailwind output
+      // gzips ~4x, so 64 KB here covers chunks that PSI reports as ~15 KiB.
+      inlineStyleThreshold: 65536
+    }),
+    pluginYaml() as any,
+    markdown()
+  ],
   define: {
     __BUILD_DATE__: JSON.stringify(gitDate),
     __CV_DATE__: JSON.stringify(cvDate),
