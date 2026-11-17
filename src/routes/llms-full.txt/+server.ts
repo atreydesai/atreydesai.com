@@ -2,6 +2,7 @@ import { posts } from '#lib/content.ts';
 import { SITE_URL } from '#lib/seo.ts';
 import { htmlToMarkdown, markdownPath } from '#lib/server/content-negotiation.js';
 import { PAGE_CDN_CACHE } from '#lib/server/page-cache.js';
+import { pageMarkdown } from '#lib/server/page-markdown.ts';
 import { SITE_PAGES } from '#lib/server/site-pages.ts';
 import type { RequestHandler } from './$types';
 
@@ -12,16 +13,12 @@ import type { RequestHandler } from './$types';
 export const prerender = false;
 export const trailingSlash = 'ignore';
 
-// Who Atrey is and what he works on first.
-const ORDER = ['/', '/about/', '/research/', '/cv/', '/blog/'];
-// Left out until their Markdown carries their content: the bookshelf's titles
-// and the photo tiles sit inside <button>s, which the conversion drops.
-const LEFT_OUT = new Set(['/bookshelf/', '/photography/']);
+// Who Atrey is and what he works on first; the long lists last, in their
+// short forms (each points to its full Markdown).
+const ORDER = ['/', '/about/', '/research/', '/cv/', '/blog/', '/bookshelf/', '/photography/'];
 
 function fullSitePaths(): string[] {
-    const pages = SITE_PAGES.map((page) => page.path).filter(
-        (path) => path.endsWith('/') && !LEFT_OUT.has(path)
-    );
+    const pages = SITE_PAGES.map((page) => page.path).filter((path) => path.endsWith('/'));
     pages.sort((a, b) => rank(a) - rank(b));
     const postPaths = posts.filter((post) => !post.externalUrl).map((post) => `/blog/${post.id}/`);
     const blog = pages.indexOf('/blog/');
@@ -36,17 +33,20 @@ function rank(path: string): number {
 export const GET: RequestHandler = async ({ fetch }) => {
     const sections = await Promise.all(
         fullSitePaths().map(async (path) => {
-            const response = await fetch(path, { headers: { accept: 'text/html' } });
-            if (!response.ok) return null;
             const url = `${SITE_URL}${path}`;
-            const markdown = htmlToMarkdown(await response.text(), url, { footer: false });
+            let markdown = pageMarkdown(path, { brief: true });
+            if (!markdown) {
+                const response = await fetch(path, { headers: { accept: 'text/html' } });
+                if (!response.ok) return null;
+                markdown = htmlToMarkdown(await response.text(), url, { footer: false });
+            }
             return `URL: ${url}\nMarkdown: ${SITE_URL}${markdownPath(path)}\n\n${markdown}`;
         })
     );
 
     const body = `# Atrey Desai: full site
 
-> Every public page of atreydesai.com as Markdown, in one file: the homepage, about, research, CV, the blog, and each post. Each page starts with its URL. For a short index with guidance on which page answers what, read ${SITE_URL}/llms.txt instead.
+> Every public page of atreydesai.com as Markdown, in one file: the homepage, about, research, CV, the blog and each post, then the bookshelf and the photography portfolio in short form. Each page starts with its URL. For a short index with guidance on which page answers what, read ${SITE_URL}/llms.txt instead.
 
 ${sections.filter(Boolean).join('\n\n---\n\n')}
 `;

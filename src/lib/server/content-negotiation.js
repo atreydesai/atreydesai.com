@@ -205,6 +205,24 @@ function absolutizeLinks(html, canonical) {
 }
 
 /**
+ * End a page's Markdown with its source page and the agent guide.
+ *
+ * @param {string} markdown
+ * @param {URL} canonicalUrl
+ */
+export function withFooter(markdown, canonicalUrl) {
+  const sourceUrl = new URL(canonicalUrl.pathname, SITE_URL).toString();
+  return `${markdown.trim()}\n\n---\n\nSource: [${sourceUrl}](${sourceUrl})  \nAgent guide: [${SITE_URL}/llms.txt](${SITE_URL}/llms.txt)\n`;
+}
+
+/**
+ * A page that writes its own Markdown from data (see
+ * $lib/server/page-markdown): resolves to that Markdown, or null to convert
+ * the page's HTML.
+ * @typedef {(pathname: string) => Promise<string | null>} PageMarkdown
+ */
+
+/**
  * Convert the server-rendered main landmark to a clean CommonMark response.
  * Navigation, scripts, styles, and hydration payloads are intentionally left
  * out so agents receive the same primary content at a much lower token cost.
@@ -225,8 +243,7 @@ export function htmlToMarkdown(html, canonical, { footer = true } = {}) {
     .trim();
 
   if (!footer) return `${markdown}\n`;
-  const sourceUrl = new URL(canonicalUrl.pathname, SITE_URL).toString();
-  return `${markdown}\n\n---\n\nSource: [${sourceUrl}](${sourceUrl})  \nAgent guide: [${SITE_URL}/llms.txt](${SITE_URL}/llms.txt)\n`;
+  return withFooter(markdown, canonicalUrl);
 }
 
 /** @param {URL | string} requested */
@@ -253,7 +270,12 @@ No page exists at \`${requestedUrl.pathname}\`.
  * @param {Response} response
  * @param {URL} url
  */
-export async function negotiateHtmlResponse(request, response, url) {
+export async function negotiateHtmlResponse(
+  request,
+  response,
+  url,
+  /** @type {{ pageMarkdown?: PageMarkdown }} */ { pageMarkdown } = {},
+) {
   if (
     !response.headers.get("content-type")?.toLowerCase().includes("text/html")
   ) {
@@ -302,10 +324,14 @@ export async function negotiateHtmlResponse(request, response, url) {
 
   let body = null;
   if (request.method !== "HEAD") {
+    const own =
+      response.status === 200 ? await pageMarkdown?.(url.pathname) : null;
     body =
       response.status === 404
         ? markdownNotFound(url)
-        : htmlToMarkdown(await response.text(), url);
+        : own
+          ? withFooter(own, url)
+          : htmlToMarkdown(await response.text(), url);
   }
 
   return new Response(body, {
@@ -325,13 +351,28 @@ export async function negotiateHtmlResponse(request, response, url) {
  * @param {typeof fetch} fetch the request event's fetch (served in-process)
  * @param {string} page the page path, from markdownTarget()
  */
-export async function serveMarkdownUrl(request, fetch, page) {
+export async function serveMarkdownUrl(
+  request,
+  fetch,
+  page,
+  /** @type {{ pageMarkdown?: PageMarkdown }} */ { pageMarkdown } = {},
+) {
   const pageUrl = new URL(page, SITE_URL);
-  const response = await fetch(page, { headers: { accept: "text/html" } });
   const headers = new Headers({
     "Content-Type": "text/markdown; charset=utf-8",
     Link: `<${pageUrl}>; rel="canonical", ${AGENT_GUIDE_LINK}`,
   });
+
+  // A page that writes its own Markdown needs no render of its HTML.
+  const own = await pageMarkdown?.(page);
+  if (own) {
+    return new Response(
+      request.method === "HEAD" ? null : withFooter(own, pageUrl),
+      { status: 200, headers },
+    );
+  }
+
+  const response = await fetch(page, { headers: { accept: "text/html" } });
 
   if (response.status !== 200 && response.status !== 404) {
     headers.set("Content-Type", "text/plain; charset=utf-8");

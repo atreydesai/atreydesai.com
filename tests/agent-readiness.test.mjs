@@ -9,7 +9,9 @@ import {
   htmlToMarkdown,
   markdownPath,
   markdownTarget,
+  negotiateHtmlResponse,
   preferredType,
+  serveMarkdownUrl,
 } from "../src/lib/server/content-negotiation.js";
 import {
   PERSON_DESCRIPTION,
@@ -251,6 +253,39 @@ test("Markdown links to site pages lead to their Markdown; files and other sites
   // The footer still names the HTML page as the source.
   assert.match(markdown, /Source: \[https:\/\/atreydesai\.com\/\]/);
   assert.doesNotMatch(htmlToMarkdown("<main>x</main>", "/", { footer: false }), /Source:/);
+});
+
+test("pages that write their own Markdown use it instead of converting their HTML", async () => {
+  const pageMarkdown = async (/** @type {string} */ path) =>
+    path === "/bookshelf/" ? "# bookshelf\n\n- [A book](https://example.com/): by Someone" : null;
+
+  const viaAccept = await negotiateHtmlResponse(
+    new Request("https://atreydesai.com/bookshelf/", { headers: { Accept: "text/markdown" } }),
+    htmlResponse(),
+    new URL("https://atreydesai.com/bookshelf/"),
+    { pageMarkdown },
+  );
+  const accepted = await viaAccept.text();
+  assert.match(accepted, /^# bookshelf/);
+  assert.doesNotMatch(accepted, /Atrey Desai\n\n## Research/);
+  assert.match(accepted, /Source: \[https:\/\/atreydesai\.com\/bookshelf\/\]/);
+
+  let rendered = 0;
+  const fetch = async () => (rendered++, htmlResponse());
+  const viaUrl = await serveMarkdownUrl(
+    new Request("https://atreydesai.com/bookshelf/index.md"),
+    fetch,
+    "/bookshelf/",
+    { pageMarkdown },
+  );
+  assert.equal(viaUrl.status, 200);
+  assert.equal(rendered, 0, "the page's HTML isn't rendered");
+  assert.match(await viaUrl.text(), /A book/);
+
+  // Other pages still convert their HTML.
+  const other = await serveMarkdownUrl(new Request("https://atreydesai.com/research/index.md"), fetch, "/research/", { pageMarkdown });
+  assert.equal(rendered, 1);
+  assert.match(await other.text(), /^# Atrey Desai/m);
 });
 
 test("HTML conversion keeps the main semantic outline and omits document chrome", () => {
