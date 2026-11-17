@@ -623,6 +623,24 @@
 "prose": 98.0,
 "ideas": 88.3,
 "both": 82.4
+},
+{
+"model": "GPT-6.2 Astra",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-11-17",
+"prose": 98.4,
+"ideas": 88.7,
+"both": 82.7
+},
+{
+"model": "GPT-6.2 Sol",
+"lab": "OpenAI",
+"line": "closed",
+"release": "2026-11-17",
+"prose": 97.6,
+"ideas": 86.8,
+"both": 80.1
 }
 ]
 }
