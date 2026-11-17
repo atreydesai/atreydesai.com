@@ -241,13 +241,14 @@ type Build = { key: string; step: (deadline: number) => boolean };
 const later = new Map<string, { p: Promise<HTMLCanvasElement>; b: Build }>();
 const urgent: Build[] = [], spare: Build[] = []; // builds waiting for idle time, oldest first
 let askedSoon = false, askedSpare = false;
-const SLICE = 5; // ms of work per idle slice
+const SLICE = 5, SPARE = 3; // ms of work per idle slice (prints wanted soon; prints set ahead)
 function pump(d: Idle) {
 	const until = performance.now() + SLICE;
 	for (;;) {
 		const q = urgent.length ? urgent : spare;
 		if (!q.length) break;
-		const budget = d ? Math.min(SLICE, Math.max(1, d.timeRemaining() - 1)) : SLICE;
+		const most = q === urgent ? SLICE : SPARE;
+		const budget = d ? Math.min(most, Math.max(1, d.timeRemaining() - 1)) : most;
 		if (!q[0].step(performance.now() + budget)) break;
 		q.shift();
 		if (performance.now() > until) break;
@@ -298,10 +299,10 @@ export function printSpriteLater(o: SpriteOpts, soon = true): Promise<HTMLCanvas
 /** Trace the ridges of a family's small prints ahead of time, in idle moments, for tiles from pxFrom to pxTo px tall:
  * a section that stamps hundreds of small prints when it comes into view then only draws them (tracing is most of the
  * cost: about 14 ms for 64 writers on a fast laptop, four times that on an older one). */
-/** warmTiles once `el` comes within about three screens of the viewport; returns a function that stops waiting */
+/** warmTiles once `el` comes within about eight screens of the viewport (a section or so ahead); returns a function that stops waiting */
 export function warmTilesNear(el: Element, family: SpriteOpts["family"], count: number, pxFrom: number, pxTo: number): () => void {
 	if (typeof IntersectionObserver === "undefined") return () => {};
-	const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); warmTiles(family, count, pxFrom, pxTo); } }, { rootMargin: "300% 0px 300% 0px" });
+	const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); warmTiles(family, count, pxFrom, pxTo); } }, { rootMargin: "800% 0px 800% 0px" });
 	io.observe(el);
 	return () => io.disconnect();
 }

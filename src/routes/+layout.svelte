@@ -169,11 +169,12 @@
   });
 </script>
 
-<!-- Custom Cursor (desktop only) -->
-<CustomCursor />
+<!-- Custom Cursor (desktop only; not on the paper launch page, whose canvas and lens track the pointer themselves and
+     where the cursor's per-move hit test forced a layout every frame) -->
+{#if !takeover}<CustomCursor />{/if}
 
 <div
-  class="min-h-screen flex flex-col cursor-custom"
+  class="min-h-screen flex flex-col {takeover ? '' : 'cursor-custom'}"
   inert={$arcadeScreen !== null}
   aria-hidden={$arcadeScreen !== null ? "true" : undefined}
 >

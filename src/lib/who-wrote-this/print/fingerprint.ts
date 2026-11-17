@@ -936,7 +936,15 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		for (;;) {
 			if (!bgJob) {
 				const next = bgNext(l);
-				if (!next) return false;
+				if (!next) {
+					// then the three divisions' threads, so the first scroll through the levels builds none of them
+					const live = l.crowd.length;
+					if (splits[2] && splits[2].kids.length !== live) splits[2] = null;
+					if (!splits[0]) { splits[0] = buildSplit(main, [human, ai], l.main, [l.human1, l.ai1]); return !!splits[0]; }
+					if (!splits[1]) { splits[1] = buildSplit(ai, labs, l.ai1, l.lab2); return !!splits[1]; }
+					if (!splits[2]) { splits[2] = buildSplit(human, crowd.slice(0, live), l.crowd0, l.crowd); return !!splits[2]; }
+					return false;
+				}
 				if (!geometry(next, deadline)) return true;
 				bgJob = begin(next, dprNow);
 			}

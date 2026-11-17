@@ -106,6 +106,12 @@
 
 	const view = $derived<View>(STEPS[step].view as View);
 	const demo = $derived(view === "review" || view === "prompt");
+	// the demo's three states (the review alone; the prompt around it; the answer in), each laid out once in its own
+	// layer and cross-faded: animating the type's size and the rows' heights laid the demo out every frame. Leaving the
+	// demo, the last state stays as it fades out.
+	type DemoState = "review" | "prompt" | "answer";
+	let lastDemo: DemoState = "review";
+	const demoState = $derived.by<DemoState>(() => (lastDemo = view === "review" ? "review" : view === "prompt" ? (ans ? "answer" : "prompt") : lastDemo));
 	const tiles = $derived(view !== "review" && view !== "prompt" && view !== "example");
 	const lit = (c: string) => cue === null || cue === c;
 	const pick = (c: string) => { cue = cue === c ? null : c; };
@@ -591,7 +597,40 @@
 </script>
 
 <!-- a footnote mark: numbered for the whole page by FootnoteList; data-n ties it to its step's return anchor -->
-{#snippet mark(n: number)}<sup class="fnref"><a href="#fn-{S.id}-{n}" id="wh-fn-{n}" data-n={n}>{n}</a></sup>{/snippet}
+{#snippet mark(n: number, copy = "")}<sup class="fnref"><a href="#fn-{S.id}-{n}" id={copy ? `wh-fn-${n}-${copy}` : `wh-fn-${n}`} data-n={copy ? undefined : n}>{n}</a></sup>{/snippet}
+<!-- one of the demo's states, laid out once (its footnote marks are the real ones in the state that cites them; in the
+     other layers they are look-alikes with no return anchor) -->
+{#snippet demoLayer(st: DemoState)}
+	{@const pr = st !== "review"}
+	<div class="d-col" class:prompt={pr} class:cur={demoState === st} inert={demoState !== st} aria-hidden={demoState !== st}>
+		<div class="d-prompt">
+			<div class="fold top" class:open={pr}><div>
+				<p class="d-head"><Icon name="list" />{D["prompt.head"]}</p>
+				<p class="d-task">{#each S.prompt.task as seg}{#if seg.hl}<span class="hl">{seg.t}</span>{:else if seg.b}<b>{seg.t}</b>{:else}{seg.t}{/if}{/each}</p>
+			</div></div>
+			<article class="d-review">
+				<p class="d-head"><Icon name="incognito" /><span class="d-rh">{D["review.head"]}</span><span class="d-sh">{D["prompt.slot"]}</span>{@render mark(FN.demo, st === "review" ? "" : st)}</p>
+				<p class="d-par"><b>{D["review.k1"]}.</b> {D["review.t1"]}</p>
+				<p class="d-par"><b>{D["review.k2"]}.</b> {D["review.t2"]}</p>
+				<div class="fold" class:open={!pr}><div>
+					<p class="d-par"><b>{D["review.k3"]}.</b> {D["review.t3"]}</p>
+					<p class="d-who">{D["review.who"]} <span class="hl">{D["review.anon"]}</span></p>
+				</div></div>
+			</article>
+			<div class="fold bot" class:open={pr}><div>
+				<p class="d-fields">{#each S.prompt.fields as f}<span class:hl={f.hl}><b>{f.k}</b> &lt;{f.v}&gt;</span>{/each}</p>
+			</div></div>
+		</div>
+		<div class="fold ans" class:open={st === "answer"}><div>
+			<p class="d-arrow" aria-hidden="true"><Icon name="arrow" /></p>
+			<div class="d-answer">
+				<p class="d-head"><Icon name="ai" class="fable" />{D["answer.head"]}<span class="d-by">{FAB.name}</span></p>
+				<p class="d-name"><b>{S.prompt.fields[1].k}</b> <span class="hl">{D["answer.name"]}</span>{@render mark(FN.placeholder, st === "answer" ? "" : st)}</p>
+				<p class="d-ok"><Icon name="check" class="ok" />{D["answer.verdict"]}</p>
+			</div>
+		</div></div>
+	</div>
+{/snippet}
 
 <section class="wh" class:still id={S.id} data-rq={S.rq} data-step={step} data-answer={ans ? 1 : 0} bind:this={root}>
 	<SectionOpener n={S.n} title={S.title.t} takeaway={S.takeaway.t} context={S.context.t} accent={TEAL_L} prints={PRINTS} />
@@ -601,35 +640,8 @@
 			<!-- the picture: the demo and the example are page text; the tiles are on the field behind, their words here -->
 			<div class="area">
 				<!-- the demo: the few words that carry the point are highlighted (.hl); the rest is quiet gray -->
-				<div class="demo" class:on={demo} class:prompt={view === "prompt"} inert={!demo} aria-hidden={!demo}>
-					<div class="d-col">
-						<div class="d-prompt">
-							<div class="fold top" class:open={view === "prompt"}><div>
-								<p class="d-head"><Icon name="list" />{D["prompt.head"]}</p>
-								<p class="d-task">{#each S.prompt.task as seg}{#if seg.hl}<span class="hl">{seg.t}</span>{:else if seg.b}<b>{seg.t}</b>{:else}{seg.t}{/if}{/each}</p>
-							</div></div>
-							<article class="d-review">
-								<p class="d-head"><Icon name="incognito" /><span class="d-rh">{D["review.head"]}</span><span class="d-sh">{D["prompt.slot"]}</span>{@render mark(FN.demo)}</p>
-								<p class="d-par"><b>{D["review.k1"]}.</b> {D["review.t1"]}</p>
-								<p class="d-par"><b>{D["review.k2"]}.</b> {D["review.t2"]}</p>
-								<div class="fold" class:open={view === "review"}><div>
-									<p class="d-par"><b>{D["review.k3"]}.</b> {D["review.t3"]}</p>
-									<p class="d-who">{D["review.who"]} <span class="hl">{D["review.anon"]}</span></p>
-								</div></div>
-							</article>
-							<div class="fold bot" class:open={view === "prompt"}><div>
-								<p class="d-fields">{#each S.prompt.fields as f}<span class:hl={f.hl}><b>{f.k}</b> &lt;{f.v}&gt;</span>{/each}</p>
-							</div></div>
-						</div>
-						<div class="fold ans" class:open={ans && view === "prompt"}><div>
-							<p class="d-arrow" aria-hidden="true"><Icon name="arrow" /></p>
-							<div class="d-answer">
-								<p class="d-head"><Icon name="ai" class="fable" />{D["answer.head"]}<span class="d-by">{FAB.name}</span></p>
-								<p class="d-name"><b>{S.prompt.fields[1].k}</b> <span class="hl">{D["answer.name"]}</span>{@render mark(FN.placeholder)}</p>
-								<p class="d-ok"><Icon name="check" class="ok" />{D["answer.verdict"]}</p>
-							</div>
-						</div></div>
-					</div>
+				<div class="demo" class:on={demo} inert={!demo} aria-hidden={!demo}>
+					{@render demoLayer("review")}{@render demoLayer("prompt")}{@render demoLayer("answer")}
 				</div>
 
 				<!-- the worked example: Fable 5.2's explanation first and largest; the story it explains and the answer beside it.
@@ -728,31 +740,33 @@
 	.hl { color: var(--ink); font-weight: 600; background: color-mix(in srgb, var(--ink) 8%, transparent); padding: 0 .16em; margin: 0 -.04em; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 
 	/* folding rows: a row opens or closes in place, so the column re-centres as it changes */
-	.fold { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .6s var(--ease), opacity .35s; }
+	.fold { display: grid; grid-template-rows: 0fr; opacity: 0; }
 	.fold > div { overflow: hidden; min-height: 0; }
-	.fold.open { grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .6s var(--ease), opacity .45s .12s; }
+	.fold.open { grid-template-rows: 1fr; opacity: 1; }
 
 	/* the demo: the review alone, then the prompt closing around it, then the answer */
 	/* contain: the demo's rows fold and its type eases between sizes over .6s, which lays it out every frame; as a layout
 	   root (it is absolute and fills the area, so its size never depends on its content) only it is laid out, not the page */
 	.demo, .ex { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; visibility: hidden; transition: opacity .4s, visibility 0s .4s; contain: layout size; }
 	.demo.on, .ex.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .4s; }
-	.d-col { width: min(100%, 46rem); display: grid; }
-	.d-prompt { display: grid; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 3px; transition: padding .6s var(--ease), background-color .5s, border-color .5s; }
-	.demo.prompt .d-prompt { padding: 16px 18px; background: var(--field); border-color: var(--rule); }
+	/* the three states share one place in the area and cross-fade (opacity only: nothing is laid out as they change) */
+	.d-col { grid-area: 1 / 1; width: min(100%, 46rem); display: grid; opacity: 0; transition: opacity .5s var(--ease); }
+	.d-col.cur { opacity: 1; }
+	.d-prompt { display: grid; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 3px; }
+	.prompt .d-prompt { padding: 16px 18px; background: var(--field); border-color: var(--rule); }
 	.d-head { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink2); }
 	.d-head :global(.fable) { color: var(--fable); }
 	.d-head sup { letter-spacing: 0; color: var(--ink); }
 	.fold.top > div { display: grid; gap: 10px; padding-bottom: 12px; }
 	.d-task { font-size: 16px; line-height: 1.55; color: var(--gray); }
 	.d-task b, .d-fields b, .d-par b { font-weight: 600; }
-	.d-review { display: grid; gap: 10px; padding: 20px 22px; background: #fff; border-radius: 3px; transition: padding .6s var(--ease), gap .6s var(--ease); }
-	.demo.prompt .d-review { gap: 4px; padding: 10px 12px; box-shadow: 0 1px 0 var(--rule); }
+	.d-review { display: grid; gap: 10px; padding: 20px 22px; background: #fff; border-radius: 3px; }
+	.prompt .d-review { gap: 4px; padding: 10px 12px; box-shadow: 0 1px 0 var(--rule); }
 	.d-sh { display: none; }
-	.demo.prompt .d-rh { display: none; }
-	.demo.prompt .d-sh { display: inline; }
-	.d-par { font-size: 22px; line-height: 1.5; letter-spacing: -0.006em; color: var(--gray); transition: font-size .6s var(--ease), line-height .6s var(--ease); }
-	.demo.prompt .d-par { font-size: 14px; line-height: 1.45; letter-spacing: 0; }
+	.prompt .d-rh { display: none; }
+	.prompt .d-sh { display: inline; }
+	.d-par { font-size: 22px; line-height: 1.5; letter-spacing: -0.006em; color: var(--gray); }
+	.prompt .d-par { font-size: 14px; line-height: 1.45; letter-spacing: 0; }
 	.d-review .fold > div { display: grid; gap: 10px; }
 	.d-who { padding-top: 12px; border-top: 1px solid var(--rule); font-size: 16px; color: var(--gray); }
 	.fold.bot > div { padding-top: 12px; }
@@ -806,8 +820,8 @@
 		.say { font-size: 15px; line-height: 1.45; }
 		.d-review { padding: 14px 16px; gap: 8px; }
 		.d-par { font-size: 15.5px; line-height: 1.5; }
-		.demo.prompt .d-par { font-size: 12.5px; }
-		.demo.prompt .d-prompt { padding: 12px 14px; }
+		.prompt .d-par { font-size: 12.5px; }
+		.prompt .d-prompt { padding: 12px 14px; }
 		.d-task { font-size: 13.5px; }
 		.d-who { font-size: 14px; }
 		.fold.top > div { gap: 8px; padding-bottom: 10px; }
@@ -823,9 +837,9 @@
 		.ex-ans { font-size: 20px; }
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.fold, .d-prompt, .d-review, .d-par, .demo, .ex, .lab, .cue { transition: none; }
+		.d-col, .demo, .ex, .lab, .cue { transition: none; }
 		.say { animation: none; }
 	}
-	.still :is(.fold, .d-prompt, .d-review, .d-par, .demo, .ex, .lab) { transition: none; }
+	.still :is(.d-col, .demo, .ex, .lab) { transition: none; }
 	.still .say { animation: none; }
 </style>

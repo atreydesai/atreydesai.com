@@ -3,10 +3,11 @@
 	// bookend). Drawn once from the shared sprite cache; it inks in from its core when it first scrolls into view.
 	//
 	// Performance: a large print set as type costs tens of ms to set (more on an older machine), and the page has a
-	// dozen of them, all below the first screen. Each is set a few ms at a time in idle moments once it comes within
-	// about two and a half screens of the viewport (so a reader arriving at a section finds its prints set, and one who
-	// stops at the top costs nothing more); when it is set as type, once the page's face has loaded, so it is set once.
-	// It is hidden by its reveal until it is in view, so the reader never sees it unset.
+	// dozen of them, all below the first screen. Each is set a few ms at a time in idle moments: in spare moments (only
+	// when the page is otherwise idle, in small slices) once it is within about eight screens, a section or so ahead of
+	// the reader, and first in line once it is within two and a half; so a reader arriving at a section finds its prints
+	// set, and one who stops at the top costs nothing more. When it is set as type, once the page's face has loaded, so
+	// it is set once. It is hidden by its reveal until it is in view, so the reader never sees it unset.
 	import { onMount } from "svelte";
 	import { printSpriteLater, printAspect, type SpriteOpts } from "./print/sprites";
 	import { FONT } from "./print/fingerprint";
@@ -31,12 +32,13 @@
 		};
 		const face = text && document.fonts?.load ? document.fonts.load(`500 12px ${FONT}`).catch(() => null) : Promise.resolve(null);
 		const opts = () => ({ family, index, color, px, clarity, text, dpr: Math.min(2, devicePixelRatio || 1) });
-		const set = () => face.then(() => { if (alive) void printSpriteLater(opts()).then(draw); });
-		const near = new IntersectionObserver(([e]) => { if (e.isIntersecting) { near.disconnect(); void set(); } }, { rootMargin: "250% 0px 250% 0px" });
-		near.observe(wrap);
+		const set = (soon: boolean) => face.then(() => { if (alive) void printSpriteLater(opts(), soon).then(draw); });
+		const near = new IntersectionObserver(([e]) => { if (e.isIntersecting) { near.disconnect(); ahead.disconnect(); void set(true); } }, { rootMargin: "250% 0px 250% 0px" });
+		const ahead = new IntersectionObserver(([e]) => { if (e.isIntersecting) { ahead.disconnect(); void set(false); } }, { rootMargin: "800% 0px 800% 0px" });
+		near.observe(wrap); ahead.observe(wrap);
 		const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { shown = true; io.disconnect(); } }, { rootMargin: "0px 0px -10% 0px" });
 		io.observe(wrap);
-		return () => { alive = false; near.disconnect(); io.disconnect(); };
+		return () => { alive = false; near.disconnect(); ahead.disconnect(); io.disconnect(); };
 	});
 </script>
 
