@@ -517,14 +517,14 @@
         font-size: 0.75rem;
         line-height: 1;
         vertical-align: super;
-        color: theme("colors.accent.DEFAULT");
+        color: var(--color-accent);
         cursor: pointer;
         text-decoration: none;
         transition: color var(--motion-base) var(--ease-standard);
     }
 
     :global(.footnote-ref:hover) {
-        color: theme("colors.accent.dark");
+        color: var(--color-accent-dark);
     }
 
     /* The markers are links, so the shared :focus-visible ring applies. Only
@@ -549,7 +549,7 @@
     :global(.fn-stat) {
         font-family: var(--font-ui);
         letter-spacing: -0.01em;
-        color: theme("colors.accent.DEFAULT");
+        color: var(--color-accent);
     }
 
     /* Margin sidenotes: absolutely positioned level with their markers
@@ -584,7 +584,7 @@
 
     /* Marker echo: while its sidenote is hovered, the in-text marker warms. */
     :global(.footnote-ref.fn-hot) {
-        color: theme("colors.accent.dark");
+        color: var(--color-accent-dark);
     }
 
     /* The Manifold footnote pair [6][7]: hovering either one makes them

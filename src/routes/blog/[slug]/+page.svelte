@@ -247,13 +247,13 @@
     }
 
     .prose-custom :global(a) {
-        color: theme("colors.accent.DEFAULT");
+        color: var(--color-accent);
         text-decoration: underline;
         text-underline-offset: 3px;
     }
 
     :global(.dark) .prose-custom :global(a) {
-        color: theme("colors.accent.light");
+        color: var(--color-accent-light);
     }
 
     .prose-custom :global(ul),
@@ -275,32 +275,32 @@
     }
 
     .prose-custom :global(blockquote) {
-        border-left: 3px solid theme("colors.ink.200");
+        border-left: 3px solid var(--color-ink-200);
         padding-left: var(--space-4);
         margin: var(--space-6) 0;
         font-style: italic;
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
     }
 
     :global(.dark) .prose-custom :global(blockquote) {
-        border-color: theme("colors.ink.600");
-        color: theme("colors.ink.400");
+        border-color: var(--color-ink-600);
+        color: var(--color-ink-400);
     }
 
     .prose-custom :global(code) {
         font-size: 0.9em;
-        background-color: theme("colors.cream.200");
+        background-color: var(--color-cream-200);
         padding: var(--space-0-5) var(--space-1-5);
         border-radius: var(--radius-control);
     }
 
     :global(.dark) .prose-custom :global(code) {
-        background-color: theme("colors.ink.700");
+        background-color: var(--color-ink-700);
     }
 
     .prose-custom :global(pre) {
-        background-color: theme("colors.ink.900");
-        color: theme("colors.cream.200");
+        background-color: var(--color-ink-900);
+        color: var(--color-cream-200);
         padding: var(--space-4);
         border-radius: var(--radius-media);
         overflow-x: auto;
@@ -330,7 +330,7 @@
     .blog-figure figcaption {
         max-width: 45ch;
         margin-top: var(--space-2);
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-family: var(--font-ui);
         font-size: 0.8125rem;
         font-weight: 400;
@@ -340,6 +340,6 @@
     }
 
     :global(.dark) .blog-figure figcaption {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 </style>

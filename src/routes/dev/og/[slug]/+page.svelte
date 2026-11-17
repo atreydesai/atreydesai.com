@@ -49,22 +49,22 @@
     height: 630px;
     overflow: hidden;
     z-index: 60; /* layer-modal: above the header it covers */
-    background-color: theme("colors.cream.100");
+    background-color: var(--color-cream-100);
     background-image: radial-gradient(rgba(26, 26, 26, 0.03) 1px, transparent 1.2px);
     background-size: 5px 5px;
-    color: theme("colors.ink.700");
+    color: var(--color-ink-700);
   }
 
   .og-title {
     font-family: var(--font-display);
     font-weight: 600;
-    color: theme("colors.ink.900");
+    color: var(--color-ink-900);
     text-wrap: balance;
   }
 
   .og-excerpt {
     font-family: var(--font-prose);
-    color: theme("colors.ink.700");
+    color: var(--color-ink-700);
     text-wrap: pretty;
   }
 
@@ -72,7 +72,7 @@
     font-family: var(--font-ui);
     font-weight: 400;
     font-variant-numeric: lining-nums tabular-nums;
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
   }
 
   /* Art above, a caption line below, like a figure in a paper. */
@@ -112,7 +112,7 @@
     font-size: 26px;
     line-height: 1.3;
     font-style: italic;
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
   }
 
   .og-by {

@@ -224,12 +224,12 @@
     margin: var(--space-8) 0;
     border-radius: var(--radius-panel);
     overflow: hidden;
-    background: theme("colors.cream.100");
-    border: 1px solid theme("colors.ink.100");
+    background: var(--color-cream-100);
+    border: 1px solid var(--color-ink-100);
   }
   :global(.dark) .shader-figure {
-    background: theme("colors.ink.800");
-    border-color: theme("colors.ink.700");
+    background: var(--color-ink-800);
+    border-color: var(--color-ink-700);
   }
   .canvas-wrap {
     position: relative;
@@ -263,7 +263,7 @@
     align-items: center;
     justify-content: center;
     height: var(--shader-h);
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
     font-size: 0.875rem;
   }
   figcaption {
@@ -271,8 +271,8 @@
     flex-direction: column;
     gap: var(--space-0-5);
     padding: var(--space-2-5) var(--space-4);
-    border-top: 1px solid theme("colors.ink.100");
-    background: theme("colors.cream.50");
+    border-top: 1px solid var(--color-ink-100);
+    background: var(--color-cream-50);
     font-family: var(--font-ui);
     font-size: 0.8125rem;
     font-weight: 400;
@@ -280,23 +280,23 @@
     letter-spacing: 0.005em;
   }
   :global(.dark) figcaption {
-    background: theme("colors.ink.900");
-    border-color: theme("colors.ink.700");
+    background: var(--color-ink-900);
+    border-color: var(--color-ink-700);
   }
   .cap-name {
     font-size: 0.75rem;
     font-weight: 400;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: theme("colors.ink.700");
+    color: var(--color-ink-700);
   }
   :global(.dark) .cap-name {
-    color: theme("colors.cream.200");
+    color: var(--color-cream-200);
   }
   .cap-desc {
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
   }
   :global(.dark) .cap-desc {
-    color: theme("colors.cream.500");
+    color: var(--color-cream-500);
   }
 </style>

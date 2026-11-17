@@ -676,12 +676,12 @@
         flex-direction: column;
         gap: var(--space-5);
         padding: var(--space-4);
-        background: theme("colors.cream.200");
+        background: var(--color-cream-200);
         border-radius: var(--radius-media);
     }
 
     :global(.dark) .pdv-side {
-        background: theme("colors.ink.800");
+        background: var(--color-ink-800);
     }
 
     .pdv-main {
@@ -765,14 +765,14 @@
     }
 
     .pdv-note {
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }
 
     :global(.dark) .pdv-note {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     /* ---- summary ---- */
@@ -789,27 +789,27 @@
     }
 
     .pdv-fig-add {
-        color: theme("colors.steel.DEFAULT");
+        color: var(--color-steel);
     }
 
     .pdv-fig-del {
-        color: theme("colors.wine.DEFAULT");
+        color: var(--color-wine);
     }
 
     :global(.dark) .pdv-fig-add {
-        color: theme("colors.steel.light");
+        color: var(--color-steel-light);
     }
 
     :global(.dark) .pdv-fig-del {
-        color: theme("colors.wine.light");
+        color: var(--color-wine-light);
     }
 
     .pdv-fig-note {
-        color: theme("colors.ochre.DEFAULT");
+        color: var(--color-ochre);
     }
 
     :global(.dark) .pdv-fig-note {
-        color: theme("colors.ochre.light");
+        color: var(--color-ochre-light);
     }
 
     /* ---- changes ---- */
@@ -869,7 +869,7 @@
         width: 100%;
         padding: var(--space-1-5);
         text-align: left;
-        color: theme("colors.ink.700");
+        color: var(--color-ink-700);
         background: transparent;
         border: 0;
         border-radius: var(--radius-control);
@@ -897,7 +897,7 @@
     }
 
     :global(.dark) .pdv-change-row {
-        color: theme("colors.cream.200");
+        color: var(--color-cream-200);
     }
 
     :global(.dark) .pdv-change-row:hover,
@@ -913,35 +913,35 @@
         font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
     }
 
     .pdv-kind-added {
-        color: theme("colors.steel.DEFAULT");
+        color: var(--color-steel);
     }
 
     .pdv-kind-removed {
-        color: theme("colors.wine.DEFAULT");
+        color: var(--color-wine);
     }
 
     :global(.dark) .pdv-kind {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     :global(.dark) .pdv-kind-added {
-        color: theme("colors.steel.light");
+        color: var(--color-steel-light);
     }
 
     :global(.dark) .pdv-kind-removed {
-        color: theme("colors.wine.light");
+        color: var(--color-wine-light);
     }
 
     .pdv-kind-comment {
-        color: theme("colors.ochre.DEFAULT");
+        color: var(--color-ochre);
     }
 
     :global(.dark) .pdv-kind-comment {
-        color: theme("colors.ochre.light");
+        color: var(--color-ochre-light);
     }
 
     .pdv-excerpt {
@@ -958,7 +958,7 @@
     .pdv-pos {
         min-width: 7ch;
         text-align: center;
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
@@ -966,7 +966,7 @@
     }
 
     :global(.dark) .pdv-pos {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     /* ---- paste ---- */
@@ -999,12 +999,12 @@
     }
 
     .pdv-field-count {
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-variant-numeric: lining-nums tabular-nums;
     }
 
     :global(.dark) .pdv-field-count {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     /* Each paste box is a sheet of ruled notebook paper on the subtle
@@ -1017,13 +1017,13 @@
         --pdv-line: 1.5rem;
         --pdv-margin: var(--space-6);
         --pdv-rule: rgb(26 26 26 / 0.07);
-        --pdv-margin-rule: theme("colors.blush.400");
+        --pdv-margin-rule: var(--color-blush-400);
         width: 100%;
         min-height: calc(8 * var(--pdv-line) + 2 * var(--space-3));
         resize: vertical;
         padding: var(--space-3) var(--space-3) var(--space-3) calc(var(--pdv-margin) + var(--space-2-5));
-        color: theme("colors.ink.700");
-        background-color: theme("colors.cream.200");
+        color: var(--color-ink-700);
+        background-color: var(--color-cream-200);
         background-image:
             linear-gradient(
                 to right,
@@ -1043,9 +1043,9 @@
             0 0,
             0 var(--space-3);
         background-attachment: local;
-        border: 1px solid theme("colors.ink.200");
+        border: 1px solid var(--color-ink-200);
         border-radius: var(--radius-inline);
-        caret-color: theme("colors.accent.dark");
+        caret-color: var(--color-accent-dark);
         font-family: var(--font-prose);
         font-size: 0.95rem;
         line-height: var(--pdv-line);
@@ -1055,30 +1055,30 @@
 
     .pdv-field textarea:hover,
     .pdv-field textarea:focus-visible {
-        border-color: theme("colors.ink.500");
+        border-color: var(--color-ink-500);
     }
 
     .pdv-field textarea::placeholder {
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-style: italic;
     }
 
     :global(.dark) .pdv-field textarea {
         --pdv-rule: rgb(253 248 243 / 0.07);
         --pdv-margin-rule: rgb(241 130 114 / 0.4);
-        color: theme("colors.cream.200");
-        background-color: theme("colors.ink.800");
-        border-color: theme("colors.ink.700");
-        caret-color: theme("colors.accent.light");
+        color: var(--color-cream-200);
+        background-color: var(--color-ink-800);
+        border-color: var(--color-ink-700);
+        caret-color: var(--color-accent-light);
     }
 
     :global(.dark) .pdv-field textarea:hover,
     :global(.dark) .pdv-field textarea:focus-visible {
-        border-color: theme("colors.cream.400");
+        border-color: var(--color-cream-400);
     }
 
     :global(.dark) .pdv-field textarea::placeholder {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     /* ---- files ---- */
@@ -1088,7 +1088,7 @@
         align-items: flex-start;
         gap: var(--space-2);
         padding: var(--space-4) var(--space-5);
-        border: 1px dashed theme("colors.ink.300");
+        border: 1px dashed var(--color-ink-300);
         border-radius: var(--radius-control);
         transition:
             border-color var(--motion-fast) var(--ease-standard),
@@ -1096,16 +1096,16 @@
     }
 
     .pdv-drop.dragging {
-        border-color: theme("colors.accent.dark");
+        border-color: var(--color-accent-dark);
         background: rgb(232 93 76 / 0.06);
     }
 
     :global(.dark) .pdv-drop {
-        border-color: theme("colors.ink.600");
+        border-color: var(--color-ink-600);
     }
 
     :global(.dark) .pdv-drop.dragging {
-        border-color: theme("colors.accent.light");
+        border-color: var(--color-accent-light);
         background: rgb(245 230 211 / 0.05);
     }
 
@@ -1126,28 +1126,28 @@
     .below-inputs {
         margin-top: var(--space-6);
         padding-top: var(--space-6);
-        border-top: 1px solid theme("colors.ink.200");
+        border-top: 1px solid var(--color-ink-200);
     }
 
     :global(.dark) .below-inputs {
-        border-color: theme("colors.ink.700");
+        border-color: var(--color-ink-700);
     }
 
     .pdv-empty {
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-style: italic;
     }
 
     .pdv-empty.failed {
-        color: theme("colors.wine.DEFAULT");
+        color: var(--color-wine);
     }
 
     :global(.dark) .pdv-empty {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     :global(.dark) .pdv-empty.failed {
-        color: theme("colors.wine.light");
+        color: var(--color-wine-light);
     }
 
     .pdv-doc > :global(:first-child),
@@ -1175,12 +1175,12 @@
 
     .pdv-doc :global(hr)::before {
         content: "* * *";
-        color: theme("colors.ink.400");
+        color: var(--color-ink-400);
         letter-spacing: 0.4em;
     }
 
     :global(.dark) .pdv-doc :global(hr)::before {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 
     /* latexdiff conventions in the support palette: additions in steel and
@@ -1188,7 +1188,7 @@
        of its own hue. The marks carry the meaning; the hue only helps. The
        default shades clear 4.5:1 on their washes (4.9 and 6.6). */
     .pdv-doc :global(ins) {
-        color: theme("colors.steel.DEFAULT");
+        color: var(--color-steel);
         background: rgb(58 106 145 / 0.08);
         text-decoration: underline;
         text-decoration-thickness: 1px;
@@ -1197,7 +1197,7 @@
     }
 
     .pdv-doc :global(del) {
-        color: theme("colors.wine.DEFAULT");
+        color: var(--color-wine);
         background: rgb(138 50 81 / 0.08);
         text-decoration: line-through;
         text-decoration-thickness: 1px;
@@ -1205,12 +1205,12 @@
     }
 
     :global(.dark) .pdv-doc :global(ins) {
-        color: theme("colors.steel.light");
+        color: var(--color-steel-light);
         background: rgb(31 69 103 / 0.45);
     }
 
     :global(.dark) .pdv-doc :global(del) {
-        color: theme("colors.wine.light");
+        color: var(--color-wine-light);
         background: rgb(94 31 55 / 0.45);
     }
 
@@ -1226,7 +1226,7 @@
        keeps the strike or underline, so the marks still carry the change. */
     .pdv-doc :global(.note) {
         padding: 0 0.3em;
-        color: theme("colors.ochre.DEFAULT");
+        color: var(--color-ochre);
         background: rgb(148 100 16 / 0.08);
         font-family: var(--font-ui);
         font-size: 0.8em;
@@ -1241,7 +1241,7 @@
     }
 
     :global(.dark) .pdv-doc :global(.note) {
-        color: theme("colors.ochre.light");
+        color: var(--color-ochre-light);
         background: rgb(112 74 5 / 0.35);
     }
 
@@ -1300,7 +1300,7 @@
     }
 
     :global(.squiggle-quiet .squiggle-line) {
-        stroke: theme("colors.ink.300");
+        stroke: var(--color-ink-300);
         stroke-width: 1.2;
         stroke-dashoffset: 0;
         animation: none;
@@ -1309,15 +1309,15 @@
     /* A shade lighter than the old 2px bar's ink-600: the pen line is
        thinner, so it needs the extra value to read on ink-900. */
     :global(.dark .squiggle-quiet .squiggle-line) {
-        stroke: theme("colors.ink.500");
+        stroke: var(--color-ink-500);
     }
 
     .pdv-doc :global(.change.gap .squiggle-quiet .squiggle-line) {
-        stroke: theme("colors.wine.DEFAULT");
+        stroke: var(--color-wine);
     }
 
     :global(.dark) .pdv-doc :global(.change.gap .squiggle-quiet .squiggle-line) {
-        stroke: theme("colors.wine.light");
+        stroke: var(--color-wine-light);
     }
 
     :global(.squiggle-ghost) {
@@ -1354,16 +1354,16 @@
         align-items: center;
         gap: var(--space-1);
         padding: var(--space-1);
-        background: theme("colors.cream.50");
+        background: var(--color-cream-50);
         border-radius: var(--radius-control);
         box-shadow: var(--shadow-popover);
         pointer-events: auto;
     }
 
     :global(.dark) .pdv-nav {
-        background: theme("colors.ink.800");
+        background: var(--color-ink-800);
         box-shadow:
-            0 0 0 1px theme("colors.ink.700"),
+            0 0 0 1px var(--color-ink-700),
             var(--shadow-popover-dark);
     }
 </style>

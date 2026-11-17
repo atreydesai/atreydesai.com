@@ -221,10 +221,10 @@
   }
 
   .updates-date {
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
   }
   :global(.dark) .updates-date {
-    color: theme("colors.cream.400");
+    color: var(--color-cream-400);
   }
 
   /* The scrolling window: three single-line rows, with the top three
@@ -287,10 +287,10 @@
     padding-left: var(--update-hang);
     border-radius: var(--radius-control);
     scrollbar-width: thin;
-    scrollbar-color: theme("colors.ink.200") transparent;
+    scrollbar-color: var(--color-ink-200) transparent;
   }
   :global(.dark) .updates-scroller {
-    scrollbar-color: theme("colors.ink.600") transparent;
+    scrollbar-color: var(--color-ink-600) transparent;
   }
   /* Stacked rows run a date line plus one or two text lines on a phone, so
      the window grows to keep about two of them and the start of a third. */

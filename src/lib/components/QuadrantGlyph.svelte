@@ -48,7 +48,7 @@
     }
     rect {
         fill: none;
-        stroke: theme("colors.ink.200");
+        stroke: var(--color-ink-200);
         stroke-width: 1;
     }
     rect.on {
@@ -56,7 +56,7 @@
         stroke: #e85d4c;
     }
     :global(.dark) rect {
-        stroke: theme("colors.ink.600");
+        stroke: var(--color-ink-600);
     }
     :global(.dark) rect.on {
         fill: #f07563;

@@ -607,7 +607,7 @@
     justify-content: flex-start;
     gap: var(--space-1-5);
     border-radius: var(--radius-control);
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
     font-family: var(--font-ui);
     font-size: 0.75rem;
     font-weight: 400;
@@ -617,13 +617,13 @@
     transition: color var(--motion-base) var(--ease-standard);
   }
   .research-toggle:hover {
-    color: theme("colors.accent.dark");
+    color: var(--color-accent-dark);
   }
   :global(.dark) .research-toggle {
-    color: theme("colors.cream.400");
+    color: var(--color-cream-400);
   }
   :global(.dark) .research-toggle:hover {
-    color: theme("colors.accent.light");
+    color: var(--color-accent-light);
   }
   .research-interest-title {
     border-radius: var(--radius-control);
@@ -723,7 +723,7 @@
     font-family: var(--font-ui);
     font-size: 0.72rem;
     font-weight: 400;
-    color: theme("colors.ink.400");
+    color: var(--color-ink-400);
     transition-delay: var(--interest-delay, 0ms);
     /* Cancels the title line's gap while collapsed, so no sliver of space
        trails the title. */
@@ -738,17 +738,17 @@
     gap: 0.4rem;
   }
   :global(.dark) .interest-quadrant {
-    color: theme("colors.cream.500");
+    color: var(--color-cream-500);
   }
 
   .research-interest-row {
     cursor: pointer;
   }
   .research-interest-row:hover .research-interest-title {
-    color: theme("colors.accent.dark");
+    color: var(--color-accent-dark);
   }
   :global(.dark) .research-interest-row:hover .research-interest-title {
-    color: theme("colors.accent.light");
+    color: var(--color-accent-light);
   }
 
   .interest-summary-shell,
@@ -893,7 +893,7 @@
     display: inline-flex;
     align-items: flex-end;
     gap: 2px;
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
     font-family: var(--font-ui);
     font-size: 0.75rem;
     font-style: italic;
@@ -913,13 +913,13 @@
     stroke-linejoin: round;
   }
   :global(.dark) .boba-hint {
-    color: theme("colors.cream.500");
+    color: var(--color-cream-500);
   }
   .boba-launcher:is(:hover, :focus-visible) + .boba-hint {
-    color: theme("colors.accent.dark");
+    color: var(--color-accent-dark);
   }
   :global(.dark) .boba-launcher:is(:hover, :focus-visible) + .boba-hint {
-    color: theme("colors.accent.light");
+    color: var(--color-accent-light);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -965,18 +965,18 @@
      (ink on cream, inverted in dark) rather than small cream text on accent,
      and accepts the pointer. */
   .copied-tooltip.is-address {
-    background: theme("colors.ink.900");
-    color: theme("colors.cream.100");
+    background: var(--color-ink-900);
+    color: var(--color-cream-100);
     pointer-events: auto;
     user-select: all;
   }
   .copied-tooltip.is-address .copied-triangle {
-    background: theme("colors.ink.900");
+    background: var(--color-ink-900);
   }
   :global(.dark) .copied-tooltip.is-address,
   :global(.dark) .copied-tooltip.is-address .copied-triangle {
-    background: theme("colors.cream.100");
-    color: theme("colors.ink.900");
+    background: var(--color-cream-100);
+    color: var(--color-ink-900);
   }
 
   /* Riso + sketchy combo: a wobbly accent slab sits offset behind a wobbly

@@ -14,8 +14,8 @@
     let imgElement: HTMLImageElement;
 
     const aspectRatios = {
-        landscape: "aspect-[3/2]",
-        portrait: "aspect-[2/3]",
+        landscape: "aspect-3/2",
+        portrait: "aspect-2/3",
         square: "aspect-square",
     };
 
@@ -41,7 +41,7 @@
 >
     <!-- Gradient placeholder, faded out once the image has loaded -->
     <div
-        class="absolute inset-0 bg-gradient-to-br from-cream-200 to-cream-300 transition-opacity duration-[400ms] dark:from-ink-700 dark:to-ink-800"
+        class="absolute inset-0 bg-linear-to-br from-cream-200 to-cream-300 transition-opacity duration-400 dark:from-ink-700 dark:to-ink-800"
         class:opacity-0={loaded}
     ></div>
 
@@ -56,7 +56,7 @@
         decoding="async"
         fetchpriority="auto"
         on:load={handleLoad}
-        class="h-full w-full object-cover transition-[opacity,transform] duration-[400ms]"
+        class="h-full w-full object-cover transition-[opacity,transform] duration-400"
         class:opacity-0={!loaded}
         class:scale-105={!loaded}
         class:opacity-100={loaded}

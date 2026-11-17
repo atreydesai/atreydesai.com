@@ -73,7 +73,7 @@
 
 {#if Explainer || paper.image}
     <div
-        class={`relative w-full md:flex-shrink-0 ${isPreview ? "md:w-40 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-40"}`}
+        class={`relative w-full md:shrink-0 ${isPreview ? "md:w-40 md:-mt-2.5 md:-mb-2.5 md:-mr-2.5" : "md:w-40"}`}
     >
         <button
             type="button"

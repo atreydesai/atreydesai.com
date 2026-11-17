@@ -62,32 +62,32 @@
 
 <style>
   .lately-title {
-    color: theme("colors.ink.900");
+    color: var(--color-ink-900);
     transition: color var(--motion-fast) var(--ease-standard);
   }
 
   :global(.dark) .lately-title {
-    color: theme("colors.cream.100");
+    color: var(--color-cream-100);
   }
 
   .group:hover .lately-title {
-    color: theme("colors.accent.dark");
+    color: var(--color-accent-dark);
   }
 
   :global(.dark) .group:hover .lately-title {
-    color: theme("colors.accent.light");
+    color: var(--color-accent-light);
   }
 
   .lately-meta {
     display: inline-flex;
     align-items: baseline;
     gap: var(--space-1-5);
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
     white-space: nowrap;
   }
 
   :global(.dark) .lately-meta {
-    color: theme("colors.cream.400");
+    color: var(--color-cream-400);
   }
 
   /* Phones: compact rows, the art a small plate beside the words. From sm:
@@ -112,14 +112,14 @@
     aspect-ratio: 4 / 3;
     object-fit: cover;
     border-radius: var(--radius-media);
-    background: theme("colors.cream.200");
+    background: var(--color-cream-200);
     /* A hairline edge, so pale art doesn't dissolve into the paper. */
     outline: 1px solid rgba(26, 26, 26, 0.08);
     outline-offset: -1px;
   }
 
   :global(.dark) .lately-thumb-art {
-    background: theme("colors.ink.800");
+    background: var(--color-ink-800);
     outline-color: rgba(245, 230, 211, 0.08);
   }
 
@@ -145,11 +145,11 @@
     place-items: center;
     padding: var(--space-2);
     text-align: center;
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
   }
 
   :global(.dark) .lately-thumb-plain {
-    color: theme("colors.cream.400");
+    color: var(--color-cream-400);
   }
 
   /* Hover answers with the title's colour and a slight lift in the art's

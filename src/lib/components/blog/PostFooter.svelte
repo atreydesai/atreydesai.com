@@ -32,10 +32,10 @@
     flex-wrap: wrap;
     align-items: baseline;
     gap: var(--space-1) var(--space-1-5);
-    color: theme("colors.ink.500");
+    color: var(--color-ink-500);
   }
 
   :global(.dark) .follow-line {
-    color: theme("colors.cream.400");
+    color: var(--color-cream-400);
   }
 </style>

@@ -447,12 +447,12 @@
     }
 
     .select-trigger.open {
-        color: theme("colors.ink.900");
+        color: var(--color-ink-900);
         background-color: rgb(26 26 26 / 0.07);
     }
 
     :global(.dark) .select-trigger.open {
-        color: theme("colors.cream.100");
+        color: var(--color-cream-100);
         background-color: rgb(253 248 243 / 0.1);
     }
 
@@ -466,21 +466,21 @@
     /* An active filter reads in the accent, so a glance at the row shows
        which controls are narrowing the list. */
     .select-trigger.is-filtered .select-value {
-        color: theme("colors.accent.dark");
+        color: var(--color-accent-dark);
     }
 
     :global(.dark) .select-trigger.is-filtered .select-value {
-        color: theme("colors.accent.light");
+        color: var(--color-accent-light);
     }
 
     .select-chevron {
         display: inline-flex;
-        color: theme("colors.ink.400");
+        color: var(--color-ink-400);
         transition: transform var(--motion-slow) var(--ease-standard);
     }
 
     :global(.dark) .select-chevron {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 
     .select-chevron.rotate {
@@ -493,8 +493,8 @@
         left: 0;
         min-width: max(100%, 9rem);
         max-width: min(18rem, calc(100vw - 2rem));
-        background-color: theme("colors.cream.50");
-        border: 1px solid theme("colors.ink.200");
+        background-color: var(--color-cream-50);
+        border: 1px solid var(--color-ink-200);
         border-radius: var(--radius-control);
         box-shadow: var(--shadow-popover);
         z-index: var(--layer-popover);
@@ -511,8 +511,8 @@
     }
 
     :global(.dark) .select-dropdown {
-        background-color: theme("colors.ink.800");
-        border-color: theme("colors.ink.700");
+        background-color: var(--color-ink-800);
+        border-color: var(--color-ink-700);
         box-shadow: var(--shadow-popover-dark);
     }
 
@@ -523,13 +523,13 @@
         z-index: 1;
         display: flex;
         align-items: stretch;
-        background-color: theme("colors.cream.50");
-        border-bottom: 1px solid theme("colors.ink.200");
+        background-color: var(--color-cream-50);
+        border-bottom: 1px solid var(--color-ink-200);
     }
 
     :global(.dark) .select-head {
-        background-color: theme("colors.ink.800");
-        border-bottom-color: theme("colors.ink.700");
+        background-color: var(--color-ink-800);
+        border-bottom-color: var(--color-ink-700);
     }
 
     .select-search {
@@ -539,11 +539,11 @@
         align-items: center;
         gap: var(--space-1);
         padding-left: var(--space-2-5);
-        color: theme("colors.ink.400");
+        color: var(--color-ink-400);
     }
 
     :global(.dark) .select-search {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 
     .select-search input {
@@ -551,7 +551,7 @@
         min-width: 0;
         min-height: 1.75rem;
         padding: 0 var(--space-1);
-        color: theme("colors.ink.900");
+        color: var(--color-ink-900);
         background: transparent;
         border: 0;
         font-family: var(--font-ui);
@@ -560,7 +560,7 @@
     }
 
     .select-search input::placeholder {
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
     }
 
     /* Inside the clipped menu, so the shared ring is drawn inset. */
@@ -569,11 +569,11 @@
     }
 
     :global(.dark) .select-search input {
-        color: theme("colors.cream.100");
+        color: var(--color-cream-100);
     }
 
     :global(.dark) .select-search input::placeholder {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 
     .select-toggle {
@@ -589,7 +589,7 @@
         line-height: 1.333;
         text-align: left;
         white-space: nowrap;
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         background: none;
         border: none;
         cursor: pointer;
@@ -599,11 +599,11 @@
     /* Beside a filter field the toggle shrinks to its label. */
     .select-search + .select-toggle {
         flex: none;
-        border-left: 1px solid theme("colors.ink.200");
+        border-left: 1px solid var(--color-ink-200);
     }
 
     :global(.dark) .select-search + .select-toggle {
-        border-left-color: theme("colors.ink.700");
+        border-left-color: var(--color-ink-700);
     }
 
     .select-toggle:focus-visible {
@@ -611,31 +611,31 @@
     }
 
     :global(.dark) .select-toggle {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     .select-toggle:hover,
     .select-toggle:focus-visible {
-        color: theme("colors.ink.900");
+        color: var(--color-ink-900);
     }
 
     :global(.dark) .select-toggle:hover,
     :global(.dark) .select-toggle:focus-visible {
-        color: theme("colors.cream.100");
+        color: var(--color-cream-100);
     }
 
     .select-toggle.active {
-        color: theme("colors.accent.dark");
+        color: var(--color-accent-dark);
     }
 
     :global(.dark) .select-toggle.active {
-        color: theme("colors.accent.light");
+        color: var(--color-accent-light);
     }
 
     .select-toggle-indicator {
         width: 0.625rem;
         height: 0.625rem;
-        border: 1px solid theme("colors.ink.300");
+        border: 1px solid var(--color-ink-300);
         border-radius: var(--radius-control);
         transition:
             background-color var(--motion-base) var(--ease-standard),
@@ -643,12 +643,12 @@
     }
 
     :global(.dark) .select-toggle-indicator {
-        border-color: theme("colors.ink.600");
+        border-color: var(--color-ink-600);
     }
 
     .select-toggle-indicator.on {
-        background-color: theme("colors.accent.DEFAULT");
-        border-color: theme("colors.accent.DEFAULT");
+        background-color: var(--color-accent);
+        border-color: var(--color-accent);
     }
 
     .select-list {
@@ -682,7 +682,7 @@
         font-weight: 400;
         line-height: 1.333;
         text-align: left;
-        color: theme("colors.ink.700");
+        color: var(--color-ink-700);
         background: none;
         border: none;
         cursor: pointer;
@@ -693,13 +693,13 @@
     }
 
     :global(.dark) .select-option {
-        color: theme("colors.cream.300");
+        color: var(--color-cream-300);
     }
 
     .select-option:hover,
     .select-option:focus-visible {
-        background-color: theme("colors.blush.100");
-        color: theme("colors.ink.900");
+        background-color: var(--color-blush-100);
+        color: var(--color-ink-900);
     }
 
     /* Options sit flush against a scrolling, clipped dropdown, so the ring is
@@ -711,8 +711,8 @@
 
     :global(.dark) .select-option:hover,
     :global(.dark) .select-option:focus-visible {
-        background-color: theme("colors.ink.700");
-        color: theme("colors.cream.100");
+        background-color: var(--color-ink-700);
+        color: var(--color-cream-100);
     }
 
     /* A fixed marker column, so marking an option never shifts its label. The
@@ -734,33 +734,33 @@
     .select-count {
         flex: none;
         margin-left: var(--space-3);
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-variant-numeric: lining-nums tabular-nums;
     }
 
     :global(.dark) .select-count {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 
     .select-option.selected,
     .select-option.excluded {
-        color: theme("colors.accent.dark");
+        color: var(--color-accent-dark);
     }
 
     :global(.dark) .select-option.selected,
     :global(.dark) .select-option.excluded {
-        color: theme("colors.accent.light");
+        color: var(--color-accent-light);
     }
 
     .select-empty {
         padding: var(--space-1-5) var(--space-2-5);
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
     }
 
     :global(.dark) .select-empty {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 </style>

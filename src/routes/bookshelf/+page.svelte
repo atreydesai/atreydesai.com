@@ -930,7 +930,7 @@
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                                     <tr
-                                    class="group cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/[0.08] dark:outline-accent-light/30' : ''}"
+                                    class="group cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline-solid outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/8 dark:outline-accent-light/30' : ''}"
                                         aria-current={selectedBookId === book.id ? "true" : undefined}
                                         on:click={(event) => onRowClick(event, book.id)}
                                         on:mouseenter={() => hoveredBookId = book.id}
@@ -1015,7 +1015,7 @@
                                                 {#each previewTags(book) as tag}
                                                     <button
                                                         type="button"
-                                                        class="pill max-w-[9rem] truncate"
+                                                        class="pill max-w-36 truncate"
                                                         title={tag}
                                                         on:click|stopPropagation={() => setTag(tag)}
                                                 >
@@ -1060,7 +1060,7 @@
                         <li
                             class="p-3 transition-colors duration-150 {selectedBookId ===
                             book.id
-                                ? 'bg-blush-100/70 dark:bg-accent/[0.08]'
+                                ? 'bg-blush-100/70 dark:bg-accent/8'
                                 : ''}"
                             aria-current={selectedBookId === book.id
                                 ? "true"
@@ -1125,7 +1125,7 @@
                                 {#each previewTags(book) as tag}
                                     <button
                                         type="button"
-                                        class="pill max-w-[9rem] truncate"
+                                        class="pill max-w-36 truncate"
                                         on:click={() => setTag(tag)}
                                     >
                                         {tag}
@@ -1351,11 +1351,11 @@
     }
 
     .shelf-count {
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
     }
 
     :global(.dark) .shelf-count {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 
     /* An underline field rather than a box, so it sits in the row like the
@@ -1368,23 +1368,23 @@
         gap: var(--space-1-5);
         min-height: 1.75rem;
         padding-inline: var(--space-1-5);
-        color: theme("colors.ink.400");
-        border-bottom: 1px solid theme("colors.ink.200");
+        color: var(--color-ink-400);
+        border-bottom: 1px solid var(--color-ink-200);
         border-radius: var(--radius-control) var(--radius-control) 0 0;
         transition: border-color var(--motion-base) var(--ease-standard);
     }
 
     .shelf-search:focus-within {
-        border-bottom-color: theme("colors.ink.500");
+        border-bottom-color: var(--color-ink-500);
     }
 
     :global(.dark) .shelf-search {
-        color: theme("colors.cream.500");
-        border-bottom-color: theme("colors.ink.700");
+        color: var(--color-cream-500);
+        border-bottom-color: var(--color-ink-700);
     }
 
     :global(.dark) .shelf-search:focus-within {
-        border-bottom-color: theme("colors.cream.500");
+        border-bottom-color: var(--color-cream-500);
     }
 
     .shelf-search input {
@@ -1392,7 +1392,7 @@
         min-width: 0;
         min-height: 1.75rem;
         padding: 0;
-        color: theme("colors.ink.900");
+        color: var(--color-ink-900);
         background: transparent;
         border: 0;
         font-family: var(--font-ui);
@@ -1401,15 +1401,15 @@
     }
 
     .shelf-search input::placeholder {
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
     }
 
     :global(.dark) .shelf-search input {
-        color: theme("colors.cream.100");
+        color: var(--color-cream-100);
     }
 
     :global(.dark) .shelf-search input::placeholder {
-        color: theme("colors.cream.500");
+        color: var(--color-cream-500);
     }
 
     /* The shared ring goes around the whole field (icon, text, clear) rather
@@ -1429,7 +1429,7 @@
     .shelf-search-clear {
         display: inline-flex;
         padding: var(--space-1);
-        color: theme("colors.ink.400");
+        color: var(--color-ink-400);
         background: none;
         border: 0;
         border-radius: var(--radius-control);
@@ -1438,11 +1438,11 @@
     }
 
     .shelf-search-clear:hover {
-        color: theme("colors.ink.800");
+        color: var(--color-ink-800);
     }
 
     :global(.dark) .shelf-search-clear:hover {
-        color: theme("colors.cream.100");
+        color: var(--color-cream-100);
     }
 
     .shelf-pages {
@@ -1452,7 +1452,7 @@
         justify-content: space-between;
         gap: var(--space-2) var(--space-4);
         margin-top: var(--space-3);
-        color: theme("colors.ink.500");
+        color: var(--color-ink-500);
         font-family: var(--font-ui);
         font-size: 0.75rem;
         line-height: 1.333;
@@ -1460,7 +1460,7 @@
     }
 
     :global(.dark) .shelf-pages {
-        color: theme("colors.cream.400");
+        color: var(--color-cream-400);
     }
 
     .shelf-page-step {

@@ -414,7 +414,7 @@
 		overflow: hidden;
 		border-radius: var(--radius-control);
 		background: rgb(253 248 243 / 0.08);
-		color: theme("colors.cream.300");
+		color: var(--color-cream-300);
 		white-space: nowrap;
 		transition:
 			background-color var(--motion-fast) var(--ease-standard),
@@ -428,23 +428,23 @@
 		right: 0;
 		bottom: 0;
 		height: 2px;
-		background: theme("colors.accent.light");
+		background: var(--color-accent-light);
 		transform: scaleX(var(--fill, 0));
 		transform-origin: left;
 	}
 	.xp-step:hover:not(:disabled) {
 		background: rgb(253 248 243 / 0.16);
-		color: theme("colors.cream.100");
+		color: var(--color-cream-100);
 	}
 	.xp-step-current {
 		background: rgb(232 93 76 / 0.2);
-		color: theme("colors.cream.100");
+		color: var(--color-cream-100);
 	}
 	.xp-step-held {
 		background: rgb(232 93 76 / 0.32);
 	}
 	.xp-step-index {
-		color: theme("colors.accent.light");
+		color: var(--color-accent-light);
 	}
 	.xp-step-label {
 		overflow: hidden;

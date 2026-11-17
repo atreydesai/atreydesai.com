@@ -1,40 +1,978 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-/* ============================================
+@custom-variant dark (&:is(.dark *));
+
+@theme static {
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.95rem;
+  --text-sm--line-height: 1.4rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.1rem;
+  --text-lg--line-height: 1.7rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+
+  --color-cream-50: #fffdfb;
+  --color-cream-100: #fdf8f3;
+  --color-cream-200: #faf0e6;
+  --color-cream-300: #f5e6d3;
+  --color-cream-400: #e8d5c4;
+  --color-cream-500: #d4c4b0;
+
+  --color-blush-50: #fff9f7;
+  --color-blush-100: #fff0eb;
+  --color-blush-200: #ffe4db;
+  --color-blush-300: #ffd4c7;
+  --color-blush-400: #e8b8a8;
+
+  --color-ink-50: #f7f7f7;
+  --color-ink-100: #e3e3e3;
+  --color-ink-200: #c8c8c8;
+  --color-ink-300: #a4a4a4;
+  --color-ink-400: #818181;
+  --color-ink-500: #666666;
+  --color-ink-600: #515151;
+  --color-ink-700: #434343;
+  --color-ink-800: #383838;
+  --color-ink-900: #1a1a1a;
+
+  --color-accent: #e85d4c;
+  --color-accent-light: #f18272;
+  --color-accent-dark: #c9462f;
+  --color-accent-muted: #d4847a;
+
+  --color-sage: #3d7a55;
+  --color-sage-light: #7bae8c;
+  --color-sage-dark: #1f5234;
+
+  --color-ochre: #946410;
+  --color-ochre-light: #dba84d;
+  --color-ochre-dark: #704a05;
+
+  --color-wine: #8a3251;
+  --color-wine-light: #c68098;
+  --color-wine-dark: #5e1f37;
+
+  --color-steel: #3a6a91;
+  --color-steel-light: #779bbe;
+  --color-steel-dark: #1f4567;
+
+  --color-plum: #6f4476;
+  --color-plum-light: #aa89b1;
+  --color-plum-dark: #4a2a50;
+
+  --font-display: var(--font-display);
+  --font-ui: var(--font-ui);
+  --font-serif: var(--font-prose);
+
+  --default-ring-color: #c9462f;
+
+  --ring-offset-color: #fdf8f3;
+
+  --breakpoint-xs: 375px;
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@layer components {
+  .text-serif {
+    font-family: var(--font-prose);
+  }
+}
+
+@layer components {
+  .page-shell-standard {
+    /* Layout: every route chooses one of two explicit page widths. */
+    @apply mx-auto w-full max-w-[820px] px-4 sm:px-6;
+  }
+}
+
+@layer components {
+  .page-shell-wide {
+    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
+
+    /* Wide routes keep their header in the standard column, aligned with the
+       wordmark, so the title never jumps sideways between pages. Only the
+       collection underneath breaks out to the wide measure. 820px minus the
+       standard gutters is the standard column's content width. */
+    & > .page-header {
+      max-width: calc(820px - 2 * var(--space-6));
+      margin-inline: auto;
+    }
+  }
+}
+
+@layer components {
+  .page-shell {
+    padding-top: var(--space-8);
+    padding-bottom: var(--space-12);
+
+    @media (min-width: 768px) {
+      padding-top: var(--space-12);
+    }
+  }
+}
+
+@layer components {
+  .page-header {
+    /* Header variants encode the relationship between a title and the content
+       below it instead of letting every route invent a margin. */
+    text-wrap: balance;
+
+    /* Wide routes keep their header in the standard column, aligned with the
+       wordmark, so the title never jumps sideways between pages. Only the
+       collection underneath breaks out to the wide measure. 820px minus the
+       standard gutters is the standard column's content width. */
+    .page-shell-wide > & {
+      max-width: calc(820px - 2 * var(--space-6));
+      margin-inline: auto;
+    }
+  }
+}
+
+@layer components {
+  .page-header-title-only {
+    margin-bottom: var(--space-6);
+  }
+}
+
+@layer components {
+  .page-header-deck {
+    margin-bottom: var(--space-8);
+  }
+}
+
+@layer components {
+  .page-header-meta {
+    margin-bottom: var(--space-8);
+  }
+}
+
+@layer components {
+  .page-header-action {
+    margin-bottom: var(--space-8);
+  }
+}
+
+@layer components {
+  .page-header-row {
+    /* Header anatomy shared by every route: the title, an optional aside of
+       quiet interface text on the title's baseline (counts, filters, a
+       download), and an optional deck underneath. On narrow screens the aside
+       wraps under the title rather than squeezing it. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-6);
+  }
+}
+
+@layer components {
+  .page-header-aside {
+    /* Every item carries the text controls' 6px inline padding, and the aside
+       is pulled out by the same amount, so its text lines up with the column
+       edges (right on desktop, left once it wraps) while hover fills overshoot
+       them slightly, like the blog index rows. Items read 16px apart, the
+       navigation's spacing. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1);
+    margin-inline: calc(-1 * var(--space-1-5));
+    color: var(--color-ink-500);
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.333;
+    letter-spacing: 0.01em;
+    font-variant-numeric: lining-nums tabular-nums;
+
+    & > :not(.control-text, .custom-select) {
+      padding-inline: var(--space-1-5);
+      white-space: nowrap;
+    }
+
+    .dark & {
+      color: var(--color-cream-400);
+    }
+  }
+}
+
+@layer components {
+  .dark {
+    & .page-header-aside {
+      color: var(--color-cream-400);
+    }
+
+    & .control-text {
+      color: var(--color-cream-300);
+    }
+
+    & .control-text:hover {
+      color: var(--color-cream-100);
+      background-color: rgb(253 248 243 / 0.06);
+    }
+
+    & .control-text:focus-visible {
+      color: var(--color-cream-100);
+      background-color: rgb(253 248 243 / 0.06);
+    }
+
+    & .control-text[aria-pressed='true'] {
+      color: var(--color-cream-100);
+      background-color: rgb(253 248 243 / 0.1);
+    }
+
+    & .control-text:disabled {
+      background-color: transparent;
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    & .control-label {
+      color: var(--color-cream-500);
+    }
+
+    & .control-text.control-accent {
+      color: var(--color-accent-light);
+    }
+
+    & .control-text.control-accent:hover {
+      color: var(--color-cream-100);
+    }
+
+    & .control-text.control-accent:focus-visible {
+      color: var(--color-cream-100);
+    }
+
+    /* Dark theme: accent-light rests at 6.16:1 on ink-900, and hover rises to
+       cream-100 so it never reads dimmer than the resting state. */
+    & .link {
+      @apply text-accent-light;
+    }
+
+    & .link:hover {
+      @apply text-cream-100 underline decoration-current;
+    }
+
+    & .link-subtle {
+      @apply text-cream-500;
+    }
+
+    & .link-subtle:hover {
+      @apply text-accent-light;
+    }
+
+    & .section-rule-line {
+      background: linear-gradient(
+        90deg,
+        rgba(245, 230, 211, 0.18) 0%,
+        rgba(245, 230, 211, 0.18) 35%,
+        rgba(245, 230, 211, 0) 100%
+      );
+    }
+
+    & .meta-label {
+      @apply text-cream-400;
+    }
+
+    & .surface-card-hover:hover {
+      background: rgba(245, 230, 211, 0.05);
+    }
+
+    & .surface-tooltip {
+      box-shadow: var(--shadow-popover-dark);
+    }
+
+    & .btn-primary {
+      @apply bg-cream-100 text-ink-900 hover:bg-cream-200;
+    }
+
+    & .pill {
+      @apply bg-cream-100/8 text-cream-400;
+    }
+
+    & button.pill:hover {
+      @apply bg-cream-100/16 text-cream-100;
+    }
+
+    & a.pill:hover {
+      @apply bg-cream-100/16 text-cream-100;
+    }
+
+    & .section-heading {
+      color: var(--color-cream-100);
+    }
+  }
+}
+
+@layer components {
+  .page-deck {
+    margin-top: var(--space-3);
+    max-width: 58ch;
+  }
+}
+
+@layer components {
+  .control-text {
+    /* Text controls: filters, sort, tabs, and header actions. Borderless
+       text like the navigation, with a quiet fill for hover and for the
+       pressed state instead of a box. 28px is the dense target height. */
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    min-height: 1.75rem;
+    padding-inline: var(--space-1-5);
+    color: var(--color-ink-700);
+    background-color: transparent;
+    border: 0;
+    border-radius: var(--radius-control);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.333;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+    font-variant-numeric: lining-nums tabular-nums;
+    transition:
+      color var(--motion-base) var(--ease-standard),
+      background-color var(--motion-base) var(--ease-standard);
+
+    &:hover {
+      color: var(--color-ink-900);
+      background-color: rgb(26 26 26 / 0.04);
+    }
+
+    &:focus-visible {
+      color: var(--color-ink-900);
+      background-color: rgb(26 26 26 / 0.04);
+    }
+
+    &[aria-pressed='true'] {
+      color: var(--color-ink-900);
+      background-color: rgb(26 26 26 / 0.07);
+    }
+
+    .dark & {
+      color: var(--color-cream-300);
+    }
+
+    .dark &:hover {
+      color: var(--color-cream-100);
+      background-color: rgb(253 248 243 / 0.06);
+    }
+
+    .dark &:focus-visible {
+      color: var(--color-cream-100);
+      background-color: rgb(253 248 243 / 0.06);
+    }
+
+    .dark &[aria-pressed='true'] {
+      color: var(--color-cream-100);
+      background-color: rgb(253 248 243 / 0.1);
+    }
+
+    &:disabled {
+      background-color: transparent;
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    .dark &:disabled {
+      background-color: transparent;
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    /* A leading icon would otherwise set the control's baseline (a box with no
+       text uses its bottom edge), dropping "Download PDF" below the text beside
+       it. A zero-width first item keeps the baseline on the text; its negative
+       margin cancels the gap it would add. */
+    &::before {
+      content: '\200b';
+      margin-inline-end: calc(-1 * var(--space-1-5));
+    }
+
+    /* An action rather than a filter: Download PDF, clear. */
+    &.control-accent {
+      color: var(--color-accent-dark);
+    }
+
+    .dark &.control-accent {
+      color: var(--color-accent-light);
+    }
+
+    &.control-accent:hover {
+      color: var(--color-ink-900);
+    }
+
+    &.control-accent:focus-visible {
+      color: var(--color-ink-900);
+    }
+
+    .dark &.control-accent:hover {
+      color: var(--color-cream-100);
+    }
+
+    .dark &.control-accent:focus-visible {
+      color: var(--color-cream-100);
+    }
+  }
+}
+
+@layer components {
+  .control-label {
+    /* The dimension a control acts on ("year", "tag", "sort"), set quieter than
+       the value it currently holds. */
+    color: var(--color-ink-500);
+
+    .dark & {
+      color: var(--color-cream-500);
+    }
+  }
+}
+
+@utility control-accent {
+  /* An action rather than a filter: Download PDF, clear. */
+  &.control-text {
+    color: var(--color-accent-dark);
+  }
+
+  .dark &.control-text {
+    color: var(--color-accent-light);
+  }
+
+  &.control-text:hover {
+    color: var(--color-ink-900);
+  }
+
+  & .control-text:focus-visible {
+    color: var(--color-ink-900);
+  }
+
+  .dark &.control-text:hover {
+    color: var(--color-cream-100);
+  }
+
+  .dark &.control-text:focus-visible {
+    color: var(--color-cream-100);
+  }
+}
+
+@layer components {
+  .flow-prose {
+    /* Named vertical rhythm. */
+    & > * + * {
+      margin-top: var(--space-4);
+    }
+  }
+}
+
+@layer components {
+  .section-gap {
+    margin-bottom: var(--space-12);
+  }
+}
+
+@layer components {
+  .section-stack {
+    & > * + * {
+      margin-top: var(--space-12);
+    }
+  }
+}
+
+@layer components {
+  .link {
+    /* Links - Adobe-ish accent color */
+    @apply text-accent-dark no-underline underline-offset-[3px];
+    @apply rounded-xs px-0.5 -mx-0.5;
+    transition:
+      color var(--motion-slow) ease-out,
+      text-decoration-color var(--motion-slow) ease-out;
+
+    &:hover {
+      @apply text-accent underline decoration-current;
+    }
+
+    /* Dark theme: accent-light rests at 6.16:1 on ink-900, and hover rises to
+       cream-100 so it never reads dimmer than the resting state. */
+    .dark & {
+      @apply text-accent-light;
+    }
+
+    .dark &:hover {
+      @apply text-cream-100 underline decoration-current;
+    }
+  }
+}
+
+@layer components {
+  .link-subtle {
+    @apply text-ink-500;
+    transition:
+      color var(--motion-slow) ease-out,
+      transform var(--motion-slow) ease-out;
+
+    &:hover {
+      @apply text-accent-dark;
+      transform: translateY(-1px);
+    }
+
+    .dark & {
+      @apply text-cream-500;
+    }
+
+    .dark &:hover {
+      @apply text-accent-light;
+    }
+  }
+}
+
+@layer components {
+  .section-rule {
+    @apply flex items-center gap-4;
+  }
+}
+
+@layer components {
+  .section-heading {
+    margin-bottom: var(--space-4);
+
+    /* The one serif heading: an italic Optima accent for editorial section
+       labels. Every other heading is Neue Haas Grotesk. */
+    color: var(--color-ink-900);
+    font-family: var(--font-prose);
+    font-size: 1.2rem;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: 0;
+    text-wrap: pretty;
+
+    .dark & {
+      color: var(--color-cream-100);
+    }
+  }
+}
+
+@layer components {
+  .section-rule-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      rgba(81, 81, 81, 0.18) 0%,
+      rgba(81, 81, 81, 0.18) 35%,
+      rgba(81, 81, 81, 0) 100%
+    );
+
+    .dark & {
+      background: linear-gradient(
+        90deg,
+        rgba(245, 230, 211, 0.18) 0%,
+        rgba(245, 230, 211, 0.18) 35%,
+        rgba(245, 230, 211, 0) 100%
+      );
+    }
+  }
+}
+
+@layer components {
+  .meta-label {
+    @apply text-ink-500;
+
+    .dark & {
+      @apply text-cream-400;
+    }
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.25;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+}
+
+@layer components {
+  .surface-card {
+    /* Ledger rows: no box at all. Each work is a bibliography row on the bare
+       paper, divided by a faded hairline (same fade as the section rules).
+       Hover washes the row with a faint warm tint; nothing floats or lifts. */
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    position: relative;
+  }
+}
+
+@layer components {
+  .surface-card-hover {
+    transition:
+      background-color var(--motion-base) var(--ease-standard),
+      color var(--motion-base) var(--ease-standard);
+
+    &:hover {
+      background: rgba(232, 93, 76, 0.06);
+    }
+
+    .dark &:hover {
+      background: rgba(245, 230, 211, 0.05);
+    }
+  }
+}
+
+@layer components {
+  .surface-document {
+    overflow: hidden;
+    border-radius: var(--radius-media);
+    box-shadow: var(--shadow-popover);
+  }
+}
+
+@layer components {
+  .surface-ledger {
+    box-shadow: var(--shadow-ledger);
+  }
+}
+
+@layer components {
+  .surface-panel {
+    box-shadow: var(--shadow-dialog);
+  }
+}
+
+@layer components {
+  .surface-tooltip {
+    border-radius: var(--radius-inline);
+    box-shadow: var(--shadow-popover);
+
+    .dark & {
+      box-shadow: var(--shadow-popover-dark);
+    }
+  }
+}
+
+@layer components {
+  .btn,
+  .btn-primary {
+    /* Buttons: square-cornered like the bookshelf controls */
+    @apply inline-flex items-center justify-center px-4 py-2;
+    border-radius: var(--radius-control);
+    font-weight: 400;
+    transition:
+      color var(--motion-base) var(--ease-standard),
+      background-color var(--motion-base) var(--ease-standard),
+      border-color var(--motion-base) var(--ease-standard),
+      transform var(--motion-base) var(--ease-standard);
+  }
+}
+
+@layer components {
+  .control-compact {
+    min-height: 2rem;
+    padding-inline: var(--space-3);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    /* .btn's rules also select .btn-primary (v4 can't @apply a class). */
+    @apply bg-ink-900 text-cream-100;
+    @apply hover:bg-ink-700;
+
+    .dark & {
+      @apply bg-cream-100 text-ink-900 hover:bg-cream-200;
+    }
+  }
+}
+
+@layer components {
+  .pill {
+    /* Tags/Pills: compact ledger labels used across research, blog, and bookshelf.
+       Borderless chips in the interface face: a quiet background fill carries
+       the shape, matching the [IP1]-style citation labels on the homepage. */
+    @apply inline-flex items-center gap-1 whitespace-nowrap bg-ink-900/5;
+    @apply font-normal text-ink-500;
+    font-family: var(--font-ui);
+    font-size: 0.75rem;
+    line-height: 1.333;
+    letter-spacing: 0.01em;
+    padding: var(--space-0-5) var(--space-1-5);
+    border-radius: var(--radius-control);
+    font-variant-numeric: lining-nums tabular-nums;
+
+    .dark & {
+      @apply bg-cream-100/8 text-cream-400;
+    }
+
+    &button {
+      @apply cursor-pointer transition-colors duration-200;
+    }
+
+    & a {
+      @apply cursor-pointer transition-colors duration-200;
+    }
+
+    &button:hover {
+      @apply bg-ink-900/10 text-ink-800;
+    }
+
+    & a:hover {
+      @apply bg-ink-900/10 text-ink-800;
+    }
+
+    .dark &button:hover {
+      @apply bg-cream-100/16 text-cream-100;
+    }
+
+    .dark &a:hover {
+      @apply bg-cream-100/16 text-cream-100;
+    }
+  }
+}
+
+@utility type-page-title {
+  /* Atomic type roles. Each class owns the complete typographic recipe so
+     route-level size utilities cannot silently change its leading. */
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+@utility type-article-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.875rem, 1.6rem + 1.1vw, 2.25rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+@utility type-hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(3.75rem, 2.25rem + 6vw, 6rem);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+@utility type-item-heading {
+  /* Titles of items in a list (papers, talks, posts, games): scanned, so
+     NHG Text. Regular weight: the family and size carry the hierarchy, not
+     boldness. */
+  font-family: var(--font-ui);
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+  text-wrap: pretty;
+}
+
+@utility type-deck {
+  font-family: var(--font-prose);
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+
+@utility deck {
+  font-family: var(--font-prose);
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-wrap: pretty;
+}
+
+@utility type-body {
+  font-family: var(--font-prose);
+  font-size: 1.0625rem;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+@utility type-longform {
+  font-family: var(--font-prose);
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.65;
+}
+
+@utility type-body-small {
+  font-family: var(--font-prose);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.47;
+}
+
+@utility type-nav {
+  /* Interface roles: NHG Text for what you scan or click. */
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0; /* text-size UI is never tightened */
+}
+
+@utility type-meta {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.333;
+  letter-spacing: 0.01em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+@utility type-label {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@utility measure-reading {
+  max-width: 68ch;
+}
+
+@utility layer-raised {
+  z-index: var(--layer-raised);
+}
+
+@utility layer-sticky {
+  z-index: var(--layer-sticky);
+}
+
+@utility layer-tooltip {
+  z-index: var(--layer-tooltip);
+}
+
+@utility layer-modal {
+  z-index: var(--layer-modal);
+}
+
+@utility cursor-custom {
+  /* Custom cursor */
+  cursor: none;
+}
+
+@utility text-balance {
+  /* Text balance for headings */
+  text-wrap: balance;
+}
+
+@utility stagger-children {
+  /* Staggered fade-in animation for list items */
+  & > * {
+    opacity: 0;
+    animation: stagger-fade-in var(--motion-reveal) var(--ease-emphasized)
+      forwards;
+  }
+
+  /* Stagger delays capped at 10 items × 0.03s = 0.27s max, under the 0.5s perception threshold */
+  & > *:nth-child(1) {
+    animation-delay: 0s;
+  }
+  & > *:nth-child(2) {
+    animation-delay: 0.03s;
+  }
+  & > *:nth-child(3) {
+    animation-delay: 0.06s;
+  }
+  & > *:nth-child(4) {
+    animation-delay: 0.09s;
+  }
+  & > *:nth-child(5) {
+    animation-delay: 0.12s;
+  }
+  & > *:nth-child(6) {
+    animation-delay: 0.15s;
+  }
+  & > *:nth-child(7) {
+    animation-delay: 0.18s;
+  }
+  & > *:nth-child(8) {
+    animation-delay: 0.21s;
+  }
+  & > *:nth-child(9) {
+    animation-delay: 0.24s;
+  }
+  & > *:nth-child(n + 10) {
+    animation-delay: 0.27s;
+  }
+}
+
+@layer utilities {
+  /* ============================================
    Design System - Atrey Desai's Personal Site
    ============================================ */
 
-/* Metric-matched fallbacks to reduce CLS while Typekit loads: one per
+  /* Metric-matched fallbacks to reduce CLS while Typekit loads: one per
    Typekit cut, since Text is set wider and with a taller x-height than
    Display. The Text values were measured in-browser against Helvetica Neue:
    NHG Text runs 3.5% wider (x-height +3.9%), with a 0.98em ascent and 0.25em
    descent, given here divided by the size-adjust. */
-@font-face {
-  font-family: "neue-haas-grotesk-fallback";
-  src: local("Helvetica Neue"), local("Helvetica"), local("Arial");
-  size-adjust: 100%;
-  ascent-override: 95%;
-  descent-override: 22%;
-  line-gap-override: 0%;
-}
-@font-face {
-  font-family: "neue-haas-grotesk-text-fallback";
-  src: local("Helvetica Neue"), local("Helvetica"), local("Arial");
-  size-adjust: 103.5%;
-  ascent-override: 95%;
-  descent-override: 24%;
-  line-gap-override: 0%;
-}
-/* Prose font is Optima, sourced from the system: it ships with macOS/iOS, so
+  @font-face {
+    font-family: 'neue-haas-grotesk-fallback';
+    src: local('Helvetica Neue'), local('Helvetica'), local('Arial');
+    size-adjust: 100%;
+    ascent-override: 95%;
+    descent-override: 22%;
+    line-gap-override: 0%;
+  }
+  @font-face {
+    font-family: 'neue-haas-grotesk-text-fallback';
+    src: local('Helvetica Neue'), local('Helvetica'), local('Arial');
+    size-adjust: 103.5%;
+    ascent-override: 95%;
+    descent-override: 24%;
+    line-gap-override: 0%;
+  }
+  /* Prose font is Optima, sourced from the system: it ships with macOS/iOS, so
    there's no @font-face / web-font download. Where Optima is absent it falls
    back to Candara (Windows), then URW Classico (an Optima clone on some Linux
    distros), then the platform default sans-serif. Since it loads locally
    there's no FOUT, so no metric-matched fallback face is needed (unlike the
    Typekit faces above). */
 
-/* ============================================
+  /* ============================================
    Type system: three roles, one source of truth. Both these CSS vars and the
    Tailwind fontFamily keys (display / ui / serif) point here, so there's a
    single place to change a typeface. The rule: serif (Optima) for what you
@@ -48,84 +986,85 @@
                                               italic .section-heading accent
    There is no monospace face.
    ============================================ */
-:root {
-  --font-display: "neue-haas-grotesk-display", "neue-haas-grotesk-fallback",
-    sans-serif;
-  --font-ui: "neue-haas-grotesk-text", "neue-haas-grotesk-text-fallback",
-    sans-serif;
-  --font-prose: Optima, Candara, "URW Classico", sans-serif;
+  :root {
+    --font-display:
+      'neue-haas-grotesk-display', 'neue-haas-grotesk-fallback', sans-serif;
+    --font-ui:
+      'neue-haas-grotesk-text', 'neue-haas-grotesk-text-fallback', sans-serif;
+    --font-prose: Optima, Candara, 'URW Classico', sans-serif;
 
-  /* Cross-page semantic colors. Component-local roles use the Tailwind
+    /* Cross-page semantic colors. Component-local roles use the Tailwind
      palette directly so there is only one source of truth for each value. */
-  --color-surface-page: #fdf8f3;
-  --color-text-primary: #434343;
+    --color-surface-page: #fdf8f3;
+    --color-text-primary: #434343;
 
-  /* Four-point spacing system. Half steps are reserved for compact controls
+    /* Four-point spacing system. Half steps are reserved for compact controls
      and fine alignment; page rhythm uses the named 4–20 steps. */
-  --space-0: 0;
-  --space-0-5: 0.125rem;
-  --space-1: 0.25rem;
-  --space-1-5: 0.375rem;
-  --space-2: 0.5rem;
-  --space-2-5: 0.625rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
-  --space-10: 2.5rem;
-  --space-12: 3rem;
-  --space-16: 4rem;
-  --space-20: 5rem;
+    --space-0: 0;
+    --space-0-5: 0.125rem;
+    --space-1: 0.25rem;
+    --space-1-5: 0.375rem;
+    --space-2: 0.5rem;
+    --space-2-5: 0.625rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+    --space-16: 4rem;
+    --space-20: 5rem;
 
-  /* Keyboard focus. One value, used by the single :focus-visible rule below
+    /* Keyboard focus. One value, used by the single :focus-visible rule below
      and by nothing else — components must not invent their own ring. Both
      variants clear 3:1 against their page surface (4.52:1 on cream-100,
      6.16:1 on ink-900). */
-  --focus-ring: #c9462f; /* accent-dark */
+    --focus-ring: #c9462f; /* accent-dark */
 
-  --radius-control: 0.125rem;
-  --radius-inline: 0.25rem;
-  --radius-media: 0.5rem;
-  --radius-panel: 0.75rem;
+    --radius-control: 0.125rem;
+    --radius-inline: 0.25rem;
+    --radius-media: 0.5rem;
+    --radius-panel: 0.75rem;
 
-  --shadow-popover: 0 0.625rem 1.75rem rgb(81 81 81 / 0.12);
-  --shadow-popover-dark: 0 0.625rem 1.75rem rgb(0 0 0 / 0.32);
-  --shadow-ledger: 0 0.0625rem 0 rgb(26 26 26 / 0.04);
-  --shadow-dialog: 0 0.75rem 2.25rem rgb(81 81 81 / 0.1);
+    --shadow-popover: 0 0.625rem 1.75rem rgb(81 81 81 / 0.12);
+    --shadow-popover-dark: 0 0.625rem 1.75rem rgb(0 0 0 / 0.32);
+    --shadow-ledger: 0 0.0625rem 0 rgb(26 26 26 / 0.04);
+    --shadow-dialog: 0 0.75rem 2.25rem rgb(81 81 81 / 0.1);
 
-  --motion-instant: 100ms;
-  --motion-fast: 150ms;
-  --motion-base: 200ms;
-  --motion-slow: 300ms;
-  --motion-reveal: 400ms;
-  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-instant: 100ms;
+    --motion-fast: 150ms;
+    --motion-base: 200ms;
+    --motion-slow: 300ms;
+    --motion-reveal: 400ms;
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Local children use 1–3; these values are reserved for elements that
+    /* Local children use 1–3; these values are reserved for elements that
      cross component or page boundaries. */
-  --layer-base: 0;
-  --layer-raised: 10;
-  --layer-sticky: 20;
-  --layer-tooltip: 30;
-  --layer-popover: 40;
-  --layer-overlay: 50;
-  --layer-modal: 60;
-  --layer-cursor: 70;
+    --layer-base: 0;
+    --layer-raised: 10;
+    --layer-sticky: 20;
+    --layer-tooltip: 30;
+    --layer-popover: 40;
+    --layer-overlay: 50;
+    --layer-modal: 60;
+    --layer-cursor: 70;
 
-  /* Riso colours for the drawn marks ($lib/marks), the same paper and plate
+    /* Riso colours for the drawn marks ($lib/marks), the same paper and plate
      as the banner and the interest loops. Variables so a dark surface (the
      photo lightbox) can hand a mark its own paper. */
-  --mark-paper: #fbf2e8;
-  --mark-plate: #e85d4c;
-}
+    --mark-paper: #fbf2e8;
+    --mark-plate: #e85d4c;
+  }
 
-.dark {
-  --color-surface-page: #1a1a1a;
-  --color-text-primary: #faf0e6;
-  --focus-ring: #f18272; /* accent-light */
-  --mark-paper: #2a2422;
-  --mark-plate: #f07563;
+  .dark {
+    --color-surface-page: #1a1a1a;
+    --color-text-primary: #faf0e6;
+    --focus-ring: #f18272; /* accent-light */
+    --mark-paper: #2a2422;
+    --mark-plate: #f07563;
+  }
 }
 
 @layer base {
@@ -204,7 +1143,8 @@
   nav,
   button,
   .meta-label,
-  .btn {
+  .btn,
+  .btn-primary {
     font-family: var(--font-ui);
   }
 
@@ -251,588 +1191,7 @@
   }
 }
 
-@layer components {
-  .text-serif {
-    font-family: var(--font-prose);
-  }
-
-  /* Layout: every route chooses one of two explicit page widths. */
-  .page-shell-standard {
-    @apply mx-auto w-full max-w-[820px] px-4 sm:px-6;
-  }
-
-  .page-shell-wide {
-    @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
-  }
-
-  .page-shell {
-    padding-top: var(--space-8);
-    padding-bottom: var(--space-12);
-  }
-
-  @media (min-width: 768px) {
-    .page-shell {
-      padding-top: var(--space-12);
-    }
-  }
-
-  /* Header variants encode the relationship between a title and the content
-     below it instead of letting every route invent a margin. */
-  .page-header {
-    text-wrap: balance;
-  }
-
-  .page-header-title-only {
-    margin-bottom: var(--space-6);
-  }
-
-  .page-header-deck,
-  .page-header-meta,
-  .page-header-action {
-    margin-bottom: var(--space-8);
-  }
-
-  /* Header anatomy shared by every route: the title, an optional aside of
-     quiet interface text on the title's baseline (counts, filters, a
-     download), and an optional deck underneath. On narrow screens the aside
-     wraps under the title rather than squeezing it. */
-  .page-header-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3) var(--space-6);
-  }
-
-  /* Every item carries the text controls' 6px inline padding, and the aside
-     is pulled out by the same amount, so its text lines up with the column
-     edges (right on desktop, left once it wraps) while hover fills overshoot
-     them slightly, like the blog index rows. Items read 16px apart, the
-     navigation's spacing. */
-  .page-header-aside {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-1);
-    margin-inline: calc(-1 * var(--space-1-5));
-    color: theme("colors.ink.500");
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    font-weight: 400;
-    line-height: 1.333;
-    letter-spacing: 0.01em;
-    font-variant-numeric: lining-nums tabular-nums;
-  }
-
-  .page-header-aside > :not(.control-text, .custom-select) {
-    padding-inline: var(--space-1-5);
-    white-space: nowrap;
-  }
-
-  .dark .page-header-aside {
-    color: theme("colors.cream.400");
-  }
-
-  .page-deck {
-    margin-top: var(--space-3);
-    max-width: 58ch;
-  }
-
-  /* Wide routes keep their header in the standard column, aligned with the
-     wordmark, so the title never jumps sideways between pages. Only the
-     collection underneath breaks out to the wide measure. 820px minus the
-     standard gutters is the standard column's content width. */
-  .page-shell-wide > .page-header {
-    max-width: calc(820px - 2 * var(--space-6));
-    margin-inline: auto;
-  }
-
-  /* Text controls: filters, sort, tabs, and header actions. Borderless
-     text like the navigation, with a quiet fill for hover and for the
-     pressed state instead of a box. 28px is the dense target height. */
-  .control-text {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    min-height: 1.75rem;
-    padding-inline: var(--space-1-5);
-    color: theme("colors.ink.700");
-    background-color: transparent;
-    border: 0;
-    border-radius: var(--radius-control);
-    cursor: pointer;
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    font-weight: 400;
-    line-height: 1.333;
-    letter-spacing: 0.01em;
-    text-decoration: none;
-    white-space: nowrap;
-    font-variant-numeric: lining-nums tabular-nums;
-    transition:
-      color var(--motion-base) var(--ease-standard),
-      background-color var(--motion-base) var(--ease-standard);
-  }
-
-  .control-text:hover,
-  .control-text:focus-visible {
-    color: theme("colors.ink.900");
-    background-color: rgb(26 26 26 / 0.04);
-  }
-
-  .control-text[aria-pressed="true"] {
-    color: theme("colors.ink.900");
-    background-color: rgb(26 26 26 / 0.07);
-  }
-
-  .dark .control-text {
-    color: theme("colors.cream.300");
-  }
-
-  .dark .control-text:hover,
-  .dark .control-text:focus-visible {
-    color: theme("colors.cream.100");
-    background-color: rgb(253 248 243 / 0.06);
-  }
-
-  .dark .control-text[aria-pressed="true"] {
-    color: theme("colors.cream.100");
-    background-color: rgb(253 248 243 / 0.1);
-  }
-
-  .control-text:disabled,
-  .dark .control-text:disabled {
-    background-color: transparent;
-    cursor: not-allowed;
-    opacity: 0.4;
-  }
-
-  /* A leading icon would otherwise set the control's baseline (a box with no
-     text uses its bottom edge), dropping "Download PDF" below the text beside
-     it. A zero-width first item keeps the baseline on the text; its negative
-     margin cancels the gap it would add. */
-  .control-text::before {
-    content: "\200b";
-    margin-inline-end: calc(-1 * var(--space-1-5));
-  }
-
-  /* The dimension a control acts on ("year", "tag", "sort"), set quieter than
-     the value it currently holds. */
-  .control-label {
-    color: theme("colors.ink.500");
-  }
-
-  .dark .control-label {
-    color: theme("colors.cream.500");
-  }
-
-  /* An action rather than a filter: Download PDF, clear. */
-  .control-text.control-accent {
-    color: theme("colors.accent.dark");
-  }
-
-  .dark .control-text.control-accent {
-    color: theme("colors.accent.light");
-  }
-
-  .control-text.control-accent:hover,
-  .control-text.control-accent:focus-visible {
-    color: theme("colors.ink.900");
-  }
-
-  .dark .control-text.control-accent:hover,
-  .dark .control-text.control-accent:focus-visible {
-    color: theme("colors.cream.100");
-  }
-
-  /* Named vertical rhythm. */
-  .flow-prose > * + * {
-    margin-top: var(--space-4);
-  }
-
-  .section-gap {
-    margin-bottom: var(--space-12);
-  }
-
-  .section-stack > * + * {
-    margin-top: var(--space-12);
-  }
-
-  /* Links - Adobe-ish accent color */
-  .link {
-    @apply text-accent-dark no-underline underline-offset-[3px];
-    @apply rounded-sm px-0.5 -mx-0.5;
-    transition:
-      color var(--motion-slow) ease-out,
-      text-decoration-color var(--motion-slow) ease-out;
-  }
-
-  .link:hover {
-    @apply text-accent underline decoration-current;
-  }
-
-  /* Dark theme: accent-light rests at 6.16:1 on ink-900, and hover rises to
-     cream-100 so it never reads dimmer than the resting state. */
-  .dark .link {
-    @apply text-accent-light;
-  }
-
-  .dark .link:hover {
-    @apply text-cream-100 underline decoration-current;
-  }
-
-  .link-subtle {
-    @apply text-ink-500;
-    transition:
-      color var(--motion-slow) ease-out,
-      transform var(--motion-slow) ease-out;
-  }
-
-  .link-subtle:hover {
-    @apply text-accent-dark;
-    transform: translateY(-1px);
-  }
-
-  .dark .link-subtle {
-    @apply text-cream-500;
-  }
-
-  .dark .link-subtle:hover {
-    @apply text-accent-light;
-  }
-
-  .section-rule {
-    @apply flex items-center gap-4;
-  }
-
-  .section-heading {
-    margin-bottom: var(--space-4);
-  }
-
-  .section-rule-line {
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      rgba(81, 81, 81, 0.18) 0%,
-      rgba(81, 81, 81, 0.18) 35%,
-      rgba(81, 81, 81, 0) 100%
-    );
-  }
-
-  .dark .section-rule-line {
-    background: linear-gradient(
-      90deg,
-      rgba(245, 230, 211, 0.18) 0%,
-      rgba(245, 230, 211, 0.18) 35%,
-      rgba(245, 230, 211, 0) 100%
-    );
-  }
-
-  .meta-label {
-    @apply text-ink-500;
-  }
-
-  .dark .meta-label {
-    @apply text-cream-400;
-  }
-
-  /* Ledger rows: no box at all. Each work is a bibliography row on the bare
-     paper, divided by a faded hairline (same fade as the section rules).
-     Hover washes the row with a faint warm tint; nothing floats or lifts. */
-  .surface-card {
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    position: relative;
-  }
-
-  .surface-card-hover {
-    transition:
-      background-color var(--motion-base) var(--ease-standard),
-      color var(--motion-base) var(--ease-standard);
-  }
-
-  .surface-card-hover:hover {
-    background: rgba(232, 93, 76, 0.06);
-  }
-
-  .dark .surface-card-hover:hover {
-    background: rgba(245, 230, 211, 0.05);
-  }
-
-  .surface-document {
-    overflow: hidden;
-    border-radius: var(--radius-media);
-    box-shadow: var(--shadow-popover);
-  }
-
-  .surface-ledger {
-    box-shadow: var(--shadow-ledger);
-  }
-
-  .surface-panel {
-    box-shadow: var(--shadow-dialog);
-  }
-
-  .surface-tooltip {
-    border-radius: var(--radius-inline);
-    box-shadow: var(--shadow-popover);
-  }
-
-  .dark .surface-tooltip {
-    box-shadow: var(--shadow-popover-dark);
-  }
-
-  /* Buttons: square-cornered like the bookshelf controls */
-  .btn {
-    @apply inline-flex items-center justify-center px-4 py-2;
-    border-radius: var(--radius-control);
-    font-weight: 400;
-    transition:
-      color var(--motion-base) var(--ease-standard),
-      background-color var(--motion-base) var(--ease-standard),
-      border-color var(--motion-base) var(--ease-standard),
-      transform var(--motion-base) var(--ease-standard);
-  }
-
-  .control-compact {
-    min-height: 2rem;
-    padding-inline: var(--space-3);
-  }
-
-  .btn-primary {
-    @apply btn bg-ink-900 text-cream-100;
-    @apply hover:bg-ink-700;
-  }
-
-  .dark .btn-primary {
-    @apply bg-cream-100 text-ink-900 hover:bg-cream-200;
-  }
-
-  /* Tags/Pills: compact ledger labels used across research, blog, and bookshelf.
-     Borderless chips in the interface face: a quiet background fill carries
-     the shape, matching the [IP1]-style citation labels on the homepage. */
-  .pill {
-    @apply inline-flex items-center gap-1 whitespace-nowrap bg-ink-900/[0.05];
-    @apply font-normal text-ink-500;
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    line-height: 1.333;
-    letter-spacing: 0.01em;
-    padding: var(--space-0-5) var(--space-1-5);
-    border-radius: var(--radius-control);
-    font-variant-numeric: lining-nums tabular-nums;
-  }
-
-  .dark .pill {
-    @apply bg-cream-100/[0.08] text-cream-400;
-  }
-
-  button.pill,
-  a.pill {
-    @apply cursor-pointer transition-colors duration-200;
-  }
-
-  button.pill:hover,
-  a.pill:hover {
-    @apply bg-ink-900/10 text-ink-800;
-  }
-
-  .dark button.pill:hover,
-  .dark a.pill:hover {
-    @apply bg-cream-100/[0.16] text-cream-100;
-  }
-}
-
 @layer utilities {
-  /* Atomic type roles. Each class owns the complete typographic recipe so
-     route-level size utilities cannot silently change its leading. */
-  .type-page-title {
-    font-family: var(--font-display);
-    font-size: 1.875rem;
-    font-weight: 600;
-    line-height: 1.05;
-    letter-spacing: -0.015em;
-    text-wrap: balance;
-  }
-
-  .type-article-title {
-    font-family: var(--font-display);
-    font-size: clamp(1.875rem, 1.6rem + 1.1vw, 2.25rem);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: -0.015em;
-    text-wrap: balance;
-  }
-
-  .type-hero-title {
-    font-family: var(--font-display);
-    font-size: clamp(3.75rem, 2.25rem + 6vw, 6rem);
-    font-weight: 700;
-    line-height: 0.9;
-    letter-spacing: -0.025em;
-    text-wrap: balance;
-  }
-
-  /* The one serif heading: an italic Optima accent for editorial section
-     labels. Every other heading is Neue Haas Grotesk. */
-  .section-heading {
-    color: theme("colors.ink.900");
-    font-family: var(--font-prose);
-    font-size: 1.2rem;
-    font-style: italic;
-    font-weight: 400;
-    line-height: 1.4;
-    letter-spacing: 0;
-    text-wrap: pretty;
-  }
-
-  .dark .section-heading {
-    color: theme("colors.cream.100");
-  }
-
-  /* Titles of items in a list (papers, talks, posts, games): scanned, so
-     NHG Text. Regular weight: the family and size carry the hierarchy, not
-     boldness. */
-  .type-item-heading {
-    font-family: var(--font-ui);
-    font-size: 1.125rem;
-    font-weight: 400;
-    line-height: 1.3;
-    letter-spacing: -0.005em;
-    text-wrap: pretty;
-  }
-
-  .type-deck,
-  .deck {
-    font-family: var(--font-prose);
-    font-size: 1.125rem;
-    font-weight: 400;
-    line-height: 1.5;
-    letter-spacing: 0;
-    text-wrap: pretty;
-  }
-
-  .type-body {
-    font-family: var(--font-prose);
-    font-size: 1.0625rem;
-    font-weight: 400;
-    line-height: 1.55;
-  }
-
-  .type-longform {
-    font-family: var(--font-prose);
-    font-size: 1.125rem;
-    font-weight: 400;
-    line-height: 1.65;
-  }
-
-  .type-body-small {
-    font-family: var(--font-prose);
-    font-size: 0.95rem;
-    font-weight: 400;
-    line-height: 1.47;
-  }
-
-  /* Interface roles: NHG Text for what you scan or click. */
-  .type-nav {
-    font-family: var(--font-ui);
-    font-size: 0.8125rem;
-    font-weight: 400;
-    line-height: 1.4;
-    letter-spacing: 0; /* text-size UI is never tightened */
-  }
-
-  .type-meta {
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    font-weight: 400;
-    line-height: 1.333;
-    letter-spacing: 0.01em;
-    font-variant-numeric: lining-nums tabular-nums;
-  }
-
-  .type-label,
-  .meta-label {
-    font-family: var(--font-ui);
-    font-size: 0.75rem;
-    font-weight: 400;
-    line-height: 1.25;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .measure-reading {
-    max-width: 68ch;
-  }
-
-  .layer-raised {
-    z-index: var(--layer-raised);
-  }
-
-  .layer-sticky {
-    z-index: var(--layer-sticky);
-  }
-
-  .layer-tooltip {
-    z-index: var(--layer-tooltip);
-  }
-
-  .layer-modal {
-    z-index: var(--layer-modal);
-  }
-
-  /* Custom cursor */
-  .cursor-custom {
-    cursor: none;
-  }
-
-  /* Text balance for headings */
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Staggered fade-in animation for list items */
-  .stagger-children > * {
-    opacity: 0;
-    animation: stagger-fade-in var(--motion-reveal) var(--ease-emphasized)
-      forwards;
-  }
-
-  /* Stagger delays capped at 10 items × 0.03s = 0.27s max, under the 0.5s perception threshold */
-  .stagger-children > *:nth-child(1) {
-    animation-delay: 0s;
-  }
-  .stagger-children > *:nth-child(2) {
-    animation-delay: 0.03s;
-  }
-  .stagger-children > *:nth-child(3) {
-    animation-delay: 0.06s;
-  }
-  .stagger-children > *:nth-child(4) {
-    animation-delay: 0.09s;
-  }
-  .stagger-children > *:nth-child(5) {
-    animation-delay: 0.12s;
-  }
-  .stagger-children > *:nth-child(6) {
-    animation-delay: 0.15s;
-  }
-  .stagger-children > *:nth-child(7) {
-    animation-delay: 0.18s;
-  }
-  .stagger-children > *:nth-child(8) {
-    animation-delay: 0.21s;
-  }
-  .stagger-children > *:nth-child(9) {
-    animation-delay: 0.24s;
-  }
-  .stagger-children > *:nth-child(n + 10) {
-    animation-delay: 0.27s;
-  }
-
   @keyframes stagger-fade-in {
     from {
       opacity: 0;
@@ -966,7 +1325,7 @@ details[open] > summary > .mark-caret {
    vanishes under `difference`. A cream ring inverts against the backdrop and
    the photos alike, so it reads on both. */
 body:has(.photo-lightbox) .custom-cursor {
-  color: theme("colors.cream.50");
+  color: var(--color-cream-50);
 }
 
 .custom-cursor.cursor-hover {

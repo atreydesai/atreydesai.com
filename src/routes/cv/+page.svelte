@@ -298,12 +298,12 @@
 
     .cv :global(.cv-title),
     .cv :global(.cv-label) {
-        color: theme("colors.ink.900");
+        color: var(--color-ink-900);
     }
 
     :global(.dark) .cv :global(.cv-title),
     :global(.dark) .cv :global(.cv-label) {
-        color: theme("colors.cream.100");
+        color: var(--color-cream-100);
     }
 
     /* A linked title keeps the link colour. */

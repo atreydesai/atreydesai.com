@@ -184,7 +184,7 @@
             <p class="mb-4">No photos yet.</p>
             <p class="text-sm">
                 Add photos to <code
-                    class="border border-ink-300 dark:border-ink-600 px-2 py-1 rounded"
+                    class="border border-ink-300 dark:border-ink-600 px-2 py-1 rounded-sm"
                     >static/images/photography/</code
                 >
             </p>
@@ -329,7 +329,7 @@
        caption take a dark paper and the lighter plate. The caption and
        settings are interface text, with lining figures for the numbers. */
     .photo-exif {
-        --mark-paper: theme("colors.ink.900");
+        --mark-paper: var(--color-ink-900);
         --mark-plate: #f07563;
     }
 

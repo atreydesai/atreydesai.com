@@ -1,6 +1,7 @@
 import adapter from "@sveltejs/adapter-vercel";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { sveltekit } from "@sveltejs/kit/vite";
+import tailwindcss from "@tailwindcss/vite";
 import pluginYaml from "@rollup/plugin-yaml";
 import yaml from "js-yaml";
 import { dataToEsm } from "@rollup/pluginutils";
@@ -52,6 +53,7 @@ function markdown() {
 
 const config: UserConfig = {
   plugins: [
+    tailwindcss(),
     sveltekit({
       preprocess: vitePreprocess(),
       adapter: adapter({ runtime: 'nodejs26.x' }),
