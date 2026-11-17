@@ -164,11 +164,10 @@
 
 <!-- Full-width so the sticky band covers wide pages too; the inner shell keeps
      the usual measure. Sticky only from md up: on phones the nav wraps under
-     the wordmark and a pinned header would eat too much of the screen. -->
-<header
-  class="site-header layer-sticky w-full md:sticky"
-  data-sveltekit-preload-code="eager"
->
+     the wordmark and a pinned header would eat too much of the screen.
+     Nav links preload on hover (or touch), like every link via app.html:
+     loading every page's code up front cost each first visit ~30 requests. -->
+<header class="site-header layer-sticky w-full md:sticky">
   <div class="page-shell-standard pt-7 md:pb-3 md:pt-8">
     <div class="flex flex-col gap-2 md:flex-row md:items-baseline md:justify-between md:gap-6">
       <!-- Just the wordmark: the page's own title and the highlighted nav item
