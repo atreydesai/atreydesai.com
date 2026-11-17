@@ -26,10 +26,11 @@
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes from "./Footnotes.svelte";
-	import { field, chart, type Mark, type Path } from "./field.svelte";
+	import { field, chart, regions, type Mark, type Path } from "./field.svelte";
+	import { onScroll as onPageScroll, requestFrame, view as vp, lite } from "./loop";
 	import { FABLE, GRAY, INK as TONE, modelColor, deepen, TILE } from "./palette";
 	import S from "./rq3.json";
-	import { printSprite, printAspect } from "./print/sprites";
+	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 
 	type View = "review" | "prompt" | "icml" | "models" | "domains" | "confidence" | "example";
 	type Model = (typeof S.models)[number];
@@ -146,7 +147,7 @@
 		m.color = ink;
 		if (!m.sprite && !m.spriteKey) return; // a plain square (too small for a print)
 		const px = Math.round(m.r * 2), wi = id % 64;
-		m.sprite = printSprite({ family: "writer", index: wi, color: on ? deepen(ink, TILE.inkDepth) : ink, px, clarity: 1 });
+		m.sprite = printSprite({ family: "writer", index: wi, color: on ? deepen(ink, TILE.inkDepth) : ink, px, clarity: 1, defer: true });
 		m.spriteKey = `w${wi}|${ink}|${px}|${on ? 1 : 0}`;
 		m.backing = on ? TILE.litBacking : TILE.unlitBacking;
 	}
@@ -166,7 +167,7 @@
 			const pr = px >= 14;
 			G.marks.push({
 				id: `t${base + i}`, square: true, x: b.x + c * b.s + b.s / 2, y: b.y + r * b.s + b.s / 2, r: pr ? px / 2 : b.s * 0.36, color: ink, alpha: b.alpha,
-				...(pr ? { sprite: printSprite({ family: "writer", index: wi, color: lt ? deepen(ink, TILE.inkDepth) : ink, px, clarity: 1 }), spriteKey: `w${wi}|${ink}|${px}|${lt ? 1 : 0}`, aspect: ASPECT, backing: lt ? TILE.litBacking : TILE.unlitBacking } : {}),
+				...(pr ? { sprite: printSprite({ family: "writer", index: wi, color: lt ? deepen(ink, TILE.inkDepth) : ink, px, clarity: 1, defer: true }), spriteKey: `w${wi}|${ink}|${px}|${lt ? 1 : 0}`, aspect: ASPECT, backing: lt ? TILE.litBacking : TILE.unlitBacking } : {}),
 			});
 		}
 		const e: Entry = { b, base, on, edge: null };
@@ -415,11 +416,14 @@
 
 	// one frame of work; true while a lit count is still easing
 	let padT = 0, padB = 0;
+	// the picture ends above the caption card at its tallest, so a shorter sentence never moves the tiles; measured
+	// when the card's size changes (a ResizeObserver, after layout), not every frame
+	let room = -1;
+	const roomOf = () => card.offsetHeight + Math.max(0, sizer.offsetHeight - says.offsetHeight);
 	function layout(dt: number) {
 		const rs = stick.getBoundingClientRect();
 		const narrow = rs.width < 700, gap = narrow ? 12 : 18;
-		// the picture ends above the caption card at its tallest, so a shorter sentence never moves the tiles
-		const room = card.offsetHeight + Math.max(0, sizer.offsetHeight - says.offsetHeight);
+		if (room < 0) room = roomOf();
 		const h = Math.max(120, rs.height - padB - room - gap - padT);
 		const k = `${view}|${rs.width | 0}x${h | 0}`;
 		if (!geo || geo.key !== k) build(rs, narrow, k, h);
@@ -428,11 +432,12 @@
 		return tween(dt);
 	}
 
-	// frames run on demand: an input change kicks one, and an easing count asks for the next
-	let raf = 0, last = 0;
-	function kick() { if (!raf && stick) raf = requestAnimationFrame(frame); }
+	// frames run on demand: an input change kicks one, and an easing count asks for the next (in the page's loop,
+	// loop.ts: after every section has read the scroll, before the canvas draws)
+	let last = 0, alive = true;
+	function kick() { if (stick && alive) requestFrame(frame); }
 	function frame(now: number) {
-		raf = 0;
+		if (!alive) return;
 		const dt = Math.min(0.05, (now - last) / 1000); last = now;
 		// retake the canvas if a neighbour left it on the plain ground while this section is in view
 		if (active && field.mode === "ground") { field.mode = "chart"; field.owner = OWNER; field.dim = 0.75; field.interactive = false; field.hover = null; }
@@ -467,7 +472,7 @@
 		let s = 0;
 		for (let i = 1; i <= LAST; i++) if (y >= starts[i]) s = i;
 		want = beatOf(s, (y - starts[s]) / ((s < LAST ? starts[s + 1] : end) - starts[s]));
-		return r.bottom <= 0 || r.top >= innerHeight;
+		return r.bottom <= 0 || r.top >= (vp.h || innerHeight);
 	}
 	function fillDash() {
 		const a = starts[step], b = step < LAST ? starts[step + 1] : end;
@@ -500,7 +505,8 @@
 	}
 	function onScroll() {
 		moved = performance.now();
-		const off = read(), snap = off || away || still;
+		// (the lighter mode for phones: the step follows the scroll directly; a momentum scroll is not held back)
+		const off = read(), snap = off || away || still || lite.on;
 		away = off;
 		if (pin >= 0 && want === pin) { pin = -1; clearTimeout(pinT); }
 		if (snap) { clearTimeout(timer); const goal = pin >= 0 ? pin : want; if (goal !== shown) show(goal); }
@@ -519,10 +525,10 @@
 		still = new URLSearchParams(location.search).has("still");
 		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || still;
 		meter = document.createElement("canvas").getContext("2d");
+		const stopWarm = warmTilesNear(root, "writer", 64, 14, 20); // the tiles' prints' ridges, traced ahead in idle moments
 		last = performance.now();
-		measure();
-		away = read();
-		show(want);
+		// (the steps are measured, and the step the scroll names shown, in the loop's first frame: away is true until
+		// then, so that frame shows it at once)
 		const release = () => {
 			if (field.owner !== OWNER) return;
 			if (field.mode === "chart") field.mode = "ground";
@@ -534,12 +540,16 @@
 			else release();
 		}), { rootMargin: "-35% 0px -35% 0px" });
 		io.observe(track);
-		const onResize = () => { measure(); onScroll(); kick(); };
-		addEventListener("scroll", onScroll, { passive: true });
-		addEventListener("resize", onResize, { passive: true });
+		// scroll and resize, in the page's loop (loop.ts); a new viewport size measures the steps again first
+		let vw = -1, vh = -1;
+		const stopScroll = onPageScroll(() => {
+			if (vp.w !== vw || vp.h !== vh) { vw = vp.w; vh = vp.h; measure(); kick(); }
+			onScroll();
+		});
+		regions[OWNER] = track;
 		// the card's height sets the picture's foot
-		const ro = new ResizeObserver(() => kick());
-		ro.observe(band);
+		const ro = new ResizeObserver(() => { room = roomOf(); kick(); });
+		for (const el of [band, card, says, sizer]) ro.observe(el);
 		document.fonts?.ready.then(() => { geo = null; kick(); });
 		// the page's footnote list renumbers every mark and sends its back link to "#fnref-<number>"; a mark here sits on
 		// a pinned stage (wherever the stage is when the reader returns), so the back link goes to the step that shows
@@ -569,10 +579,10 @@
 		const ended = () => { clearTimeout(endT); endT = setTimeout(() => { if (performance.now() - moved > 90) unpin(); }, 120); };
 		addEventListener("scrollend", ended, { passive: true });
 		return () => {
-			cancelAnimationFrame(raf); raf = 0;
+			alive = false; stopWarm();
 			clearTimeout(timer); clearTimeout(pinT);
 			io.disconnect(); ro.disconnect(); fo.disconnect();
-			removeEventListener("scroll", onScroll); removeEventListener("resize", onResize);
+			stopScroll();
 			document.removeEventListener("click", onBack);
 			removeEventListener("scrollend", ended); clearTimeout(endT);
 			release(); if (field.owner === OWNER) field.owner = "";
@@ -676,7 +686,7 @@
 		<!-- the scroll track's steps (layout only); each footnote's back link returns to the step that shows its mark -->
 		<div class="steps" aria-hidden="true">
 			{#each VH as h, i}
-				<div class="step" style:height="{h}vh">
+				<div class="step" style:height="calc({h} * var(--vh, 1vh))">
 					{#each NOTES.filter((f) => FN_STEP[f.n] === i) as f}<span class="fnback" data-n={f.n} style:top="{LAND[i] * 100}%"></span>{/each}
 				</div>
 			{/each}
@@ -688,8 +698,8 @@
 
 <style>
 	.wh { position: relative; }
-	.track { position: relative; height: calc(var(--len) * 1vh + 100vh); }
-	.stick { position: sticky; top: 0; z-index: 1; height: 100vh; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 18px; padding: 28px 0 22px; pointer-events: none; }
+	.track { position: relative; height: calc((var(--len) + 100) * var(--vh, 1vh)); }
+	.stick { position: sticky; top: 0; z-index: 1; height: calc(100 * var(--vh, 1vh)); display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 18px; padding: 28px 0 22px; pointer-events: none; }
 	.area { position: relative; min-height: 0; }
 	.steps { position: absolute; inset: 0 0 auto; pointer-events: none; }
 	.step { position: relative; }
@@ -723,7 +733,9 @@
 	.fold.open { grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .6s var(--ease), opacity .45s .12s; }
 
 	/* the demo: the review alone, then the prompt closing around it, then the answer */
-	.demo, .ex { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; visibility: hidden; transition: opacity .4s, visibility 0s .4s; }
+	/* contain: the demo's rows fold and its type eases between sizes over .6s, which lays it out every frame; as a layout
+	   root (it is absolute and fills the area, so its size never depends on its content) only it is laid out, not the page */
+	.demo, .ex { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; visibility: hidden; transition: opacity .4s, visibility 0s .4s; contain: layout size; }
 	.demo.on, .ex.on { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity .4s; }
 	.d-col { width: min(100%, 46rem); display: grid; }
 	.d-prompt { display: grid; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 3px; transition: padding .6s var(--ease), background-color .5s, border-color .5s; }

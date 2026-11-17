@@ -44,7 +44,7 @@
 	{#if prints.length && mounted}
 		<div class="o-prints" class:many={prints.length > 2} style:--cols={prints.length} aria-hidden="true">
 			{#each prints as p, i}
-				<figure class="o-p" style:--drop="{prints.length <= 2 && i % 2 ? 18 : 0}vh">
+				<figure class="o-p" style:--drop="calc({prints.length <= 2 && i % 2 ? 18 : 0} * var(--vh, 1vh))">
 					<PrintMark family={p.family} index={p.index ?? 0} color={p.color} {px} clarity={p.clarity ?? 1} text={px >= 120} />
 					{#if p.label}<figcaption>{#if p.icon}<Icon name={p.icon} />{/if}{p.label}</figcaption>{/if}
 				</figure>
@@ -55,7 +55,7 @@
 
 <style>
 	.opener {
-		width: 100vw; margin-left: calc(50% - 50vw); min-height: 92vh; padding: 12vh max(16px, calc(50vw - 36rem)) 10vh;
+		width: 100vw; margin-left: calc(50% - 50vw); min-height: calc(92 * var(--vh, 1vh)); padding: calc(12 * var(--vh, 1vh)) max(16px, calc(50vw - 36rem)) calc(10 * var(--vh, 1vh));
 		background: #14202D; color: #F3F3EF; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: center; gap: 4vw;
 	}
 	.o-n { font-size: clamp(64px, 9vw, 140px); line-height: .8; font-weight: 600; letter-spacing: -0.05em; color: var(--accent); }
@@ -68,7 +68,7 @@
 	.o-p { display: grid; justify-items: center; gap: 14px; margin: var(--drop) 0 0; }
 	.o-p figcaption { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: .02em; color: #F3F3EF; }
 	@media (max-width: 979px) {
-		.opener { grid-template-columns: 1fr; min-height: 0; padding-top: 10vh; gap: 8vh; }
+		.opener { grid-template-columns: 1fr; min-height: 0; padding-top: calc(10 * var(--vh, 1vh)); gap: calc(8 * var(--vh, 1vh)); }
 		.o-p { margin-top: calc(var(--drop) / 2); }
 		.o-prints.many { grid-template-columns: repeat(min(var(--cols), 2), auto); }
 	}

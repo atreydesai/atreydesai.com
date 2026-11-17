@@ -1,4 +1,6 @@
 // Shared state for the page-wide dot field. Sections write what the field should show; DotField draws it.
+import { untrack } from "svelte";
+import { requestDraw } from "./loop";
 
 export type Mark = {
 	id: string;
@@ -38,7 +40,28 @@ export const field = $state({
 /** What a chart section draws. Plain (not reactive): rewritten every frame, read only by DotField's draw loop. */
 /** A section that paints its own art. Return false once nothing is moving, so the canvas can rest until input changes. */
 export type Paint = (ctx: CanvasRenderingContext2D, f: { now: number; dt: number; w: number; h: number; dpr: number }) => boolean | void;
-export const chart = { marks: [] as Mark[], paths: [] as Path[], texts: [] as Text[], paint: null as Paint | null };
+// The canvas draws only when asked (loop.ts): giving it content asks (the same array again counts: it may have been
+// refilled). A section that changes its marks in place without assigning asks itself, with requestDraw.
+// Each assignment also notes which section owned the field when it gave the content (`chart.from`), so the canvas never
+// shows one section's chart under another's ownership (the lighter mode for phones checks it: DotField).
+let _marks: Mark[] = [], _paths: Path[] = [], _texts: Text[] = [], _paint: Paint | null = null, _from = "";
+const gave = () => { _from = untrack(() => field.owner); requestDraw(); };
+export const chart = {
+	get marks() { return _marks; },
+	set marks(v: Mark[]) { _marks = v; gave(); },
+	get paths() { return _paths; },
+	set paths(v: Path[]) { _paths = v; gave(); },
+	get texts() { return _texts; },
+	set texts(v: Text[]) { _texts = v; gave(); },
+	get paint() { return _paint; },
+	set paint(v: Paint | null) { _paint = v; requestDraw(); },
+	/** the owner (field.owner) when the marks, paths or texts were last given */
+	get from() { return _from; },
+};
+
+/** Where each owner's picture lives on the page (its pinned stage or track), by owner id: the lighter mode draws an
+ * owner's chart only while this is on screen. Plain; sections register on mount. */
+export const regions: Record<string, Element> = {};
 
 export type Box = { x: number; y: number; w: number; h: number };
 

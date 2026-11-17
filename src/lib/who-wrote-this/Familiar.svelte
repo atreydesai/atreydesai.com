@@ -36,8 +36,9 @@
 	import PrintMark from "./PrintMark.svelte";
 	import Footnotes, { type Note } from "./Footnotes.svelte";
 	import { MODEL, GRAY, INK as INKS, SIGNED, deepen, TILE } from "./palette";
-	import { printSprite, printAspect } from "./print/sprites";
-	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
+	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
+	import { field, chart, regions, type Mark, type Path, type Text } from "./field.svelte";
+	import { onScroll as onPageScroll, requestFrame, view as vp, lite, deliberate, pointerKind } from "./loop";
 	import F from "./familiarity.json";
 
 	type Bin = { bin: string; shown: boolean; pct: number; tiles: number };
@@ -252,7 +253,7 @@
 	const ASPECT = printAspect();
 	const IDS = Array.from({ length: 4 }, (_, g) => Array.from({ length: 100 }, (_, i) => `${OWNER}:g${g}:${i}`));
 	const marks: Mark[] = [];
-	let lastKey = "", lastStep = -1, t0 = 0, raf = 0, anim: "enter" | "ctrl" | "settle" = "settle";
+	let lastKey = "", lastStep = -1, t0 = 0, alive = true, anim: "enter" | "ctrl" | "settle" = "settle";
 	let fromLit = [0, 0, 0, 0], curLit = [0, 0, 0, 0];
 	const ease = (x: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
 	const inout = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
@@ -407,7 +408,7 @@
 			if (pitch < 15) { m.sprite = undefined; m.backing = undefined; continue; }
 			const lit = m.color !== OFF, px = Math.round(pitch * 0.9), clarity = CLARITY[gi], idx = +m.id.slice(m.id.lastIndexOf(":") + 1);
 			const ink = m.color === INK ? GRAY.mid : lit ? deepen(m.color, TILE.inkDepth) : m.color;
-			m.sprite = printSprite({ family: "writer", index: idx % 48, color: ink, px, clarity });
+			m.sprite = printSprite({ family: "writer", index: idx % 48, color: ink, px, clarity, defer: true });
 			m.spriteKey = `f${idx % 48}|${ink}|${px}|${clarity}`;
 			m.aspect = ASPECT; m.r = px / 2; m.backing = lit ? TILE.litBacking : TILE.unlitBacking;
 		}
@@ -417,12 +418,12 @@
 		return busy;
 	}
 
+	// frames run in the page's loop (loop.ts): after every section has read the scroll, before the canvas draws
 	function tick(now: number) {
-		raf = 0;
-		if (!active || field.owner !== OWNER) return;
-		if (render(now)) raf = requestAnimationFrame(tick);
+		if (!alive || !active || field.owner !== OWNER) return;
+		if (render(now)) requestFrame(tick);
 	}
-	const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+	const kick = () => { if (alive) requestFrame(tick); };
 
 	// any input that changes the picture asks for one frame (more only while a tween moves)
 	$effect(() => {
@@ -478,7 +479,7 @@
 		const r = root.getBoundingClientRect();
 		y = -r.top / vhPx;
 		want = Math.max(0, Math.min(LAST, Math.floor(y / STEP_VH)));
-		return r.bottom <= 0 || r.top >= innerHeight;
+		return r.bottom <= 0 || r.top >= (vp.h || innerHeight);
 	}
 	function fillDash() {
 		const p = Math.round(Math.max(0, Math.min(1, y / STEP_VH - step)) * 1000) / 1000;
@@ -507,7 +508,8 @@
 	}
 	function sync() {
 		moved = performance.now();
-		const off = read(), snap = off || away || still;
+		// (the lighter mode for phones: the step follows the scroll directly; a momentum scroll is not held back)
+		const off = read(), snap = off || away || still || lite.on;
 		away = off;
 		if (pin >= 0 && want === pin) { pin = -1; clearTimeout(pinT); }
 		if (snap) { clearTimeout(timer); const goal = pin >= 0 ? pin : want; if (goal !== step) show(goal); }
@@ -535,20 +537,22 @@
 	onMount(() => {
 		still = new URLSearchParams(location.search).has("still");
 		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || still;
+		const stopWarm = warmTilesNear(root, "writer", 48, 14, 26); // the tiles' prints' ridges, traced ahead in idle moments
 		const size = () => { opx = innerWidth >= 980 ? 236 : 150; vhPx = root.offsetHeight / (STEPS.length * STEP_VH + 1); };
 		size();
 		ready = true;
 		const onScroll = () => {
 			sync();
+			// the lighter mode: a scroll closes a card a finger opened
+			if (lite.on && sel !== null && pointerKind() !== "mouse") sel = null;
 			if (!active) return;
 			if (active && field.mode === "ground") { field.mode = "chart"; field.owner = OWNER; field.dim = 0.75; field.interactive = false; }
 			place();
 		};
-		const onResize = () => { size(); onScroll(); };
-		away = read();
-		show(want);
-		addEventListener("scroll", onScroll, { passive: true });
-		addEventListener("resize", onResize, { passive: true });
+		// scroll and resize, in the page's loop (loop.ts); a new viewport size measures the track again first
+		let sw = vp.w, sh = vp.h;
+		const stopScroll = onPageScroll(() => { if (vp.w !== sw || vp.h !== sh) { sw = vp.w; sh = vp.h; size(); } onScroll(); });
+		regions[OWNER] = root;
 		document.addEventListener("click", back);
 		// the page coming to rest lets a held step go (also when the reader's own scroll cut the jump short); a wheel
 		// tick mid-jump ends its own scroll while the jump goes on, so only a page that has stopped moving counts
@@ -561,8 +565,8 @@
 		}), { rootMargin: "-35% 0px -35% 0px" });
 		io.observe(root);
 		return () => {
-			cancelAnimationFrame(raf); cancelAnimationFrame(praf); clearTimeout(timer); clearTimeout(pinT); io.disconnect();
-			removeEventListener("scroll", onScroll); removeEventListener("resize", onResize); document.removeEventListener("click", back);
+			alive = false; stopWarm(); cancelAnimationFrame(praf); clearTimeout(timer); clearTimeout(pinT); io.disconnect();
+			stopScroll(); document.removeEventListener("click", back);
 			removeEventListener("scrollend", ended); clearTimeout(endT);
 		};
 	});
@@ -605,7 +609,7 @@
 		{/if}
 	</div>
 
-	<div class="scrolly" class:still={reduce} bind:this={root} style="--steps:{STEPS.length}; --step-vh:{STEP_VH * 100}vh">
+	<div class="scrolly" class:still={reduce} bind:this={root} style="--steps:{STEPS.length}; --step-vh:calc({STEP_VH * 100} * var(--vh, 1vh))">
 		<div class="stick" bind:this={stage} bind:clientWidth={W} bind:clientHeight={H}>
 			<!-- the narration: a caption band on top; the dashes jump to a step; the controls open under it at the end -->
 			<div class="cap" class:unsized={!W} style="left:{geo.cap.x}px; top:{geo.cap.y}px; width:{geo.cap.w}px">
@@ -657,9 +661,9 @@
 					{#each geo.g as g, i}
 						<button type="button" class="hit" aria-label={aria(i)}
 							style="left:{g.x - 5}px; top:{g.y - 5}px; width:{g.gw + 10}px; height:{g.gw + 10}px"
-							onpointerenter={() => (sel = i)} onpointerleave={() => (sel = sel === i ? null : sel)}
+							onpointerenter={(e) => e.pointerType === "mouse" && (sel = i)} onpointerleave={(e) => e.pointerType === "mouse" && (sel = sel === i ? null : sel)}
 							onfocus={() => (sel = i)} onblur={() => (sel = sel === i ? null : sel)}
-							onclick={() => (sel = sel === i ? null : i)}></button>
+							onclick={(e) => deliberate(e) && (sel = sel === i ? null : i)}></button>
 					{/each}
 				</div>
 			{/if}
@@ -680,19 +684,19 @@
 	.fa { position: relative; }
 	/* the opener's prints: in the opener's right column (its grid is 1.1fr : 1fr with a 4vw gap); under it on a phone */
 	.op { position: relative; }
-	.op-prints { position: absolute; top: 0; bottom: 0; right: 0; width: calc((100% - 4vw) / 2.1); display: grid; grid-template-columns: repeat(2, auto); place-content: center; gap: 4vh 3.4vw; pointer-events: none; }
+	.op-prints { position: absolute; top: 0; bottom: 0; right: 0; width: calc((100% - 4vw) / 2.1); display: grid; grid-template-columns: repeat(2, auto); place-content: center; gap: calc(4 * var(--vh, 1vh)) 3.4vw; pointer-events: none; }
 	.op-p { display: grid; justify-items: center; gap: 14px; margin: 0; }
 	.op-stack { position: relative; display: block; }
 	.op-under { position: absolute; left: 7px; top: 8px; opacity: .6; }
 	.op-p figcaption { position: relative; font-size: 15px; font-weight: 600; letter-spacing: .02em; color: #F3F3EF; white-space: nowrap; }
 	@media (max-width: 979px) {
-		.op-prints { position: relative; width: 100vw; margin: -4vh 0 0 calc(50% - 50vw); padding: 0 16px 10vh; background: #14202D; gap: 28px 24px; }
+		.op-prints { position: relative; width: 100vw; margin: calc(-4 * var(--vh, 1vh)) 0 0 calc(50% - 50vw); padding: 0 16px calc(10 * var(--vh, 1vh)); background: #14202D; gap: 28px 24px; }
 		.op-under { left: 5px; top: 6px; }
 		.op-p figcaption { font-size: 14px; }
 	}
 
-	.scrolly { position: relative; height: calc(var(--steps) * var(--step-vh) + 100vh); }
-	.stick { position: sticky; top: 0; height: 100vh; pointer-events: none; }
+	.scrolly { position: relative; height: calc(var(--steps) * var(--step-vh) + calc(100 * var(--vh, 1vh))); }
+	.stick { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); pointer-events: none; }
 
 	/* the caption band */
 	.cap { position: absolute; z-index: 2; pointer-events: auto; padding: 14px 18px 16px; background: #fff; border-radius: 3px; box-shadow: 0 2px 14px rgba(20, 32, 45, .06); display: grid; gap: 10px; }

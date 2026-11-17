@@ -24,25 +24,31 @@
 
 
 	// follow: no easing on position, so tags stay glued to something that moves with the page (a pinned card)
+	// Performance: a tag is placed by a transform on its wrapper (not left/top), so moving it, and easing it to a new
+	// place, needs no layout: the easing runs on the compositor. The wrapper sits at the point; the tag inside it keeps
+	// its own offset from the point (its at-* side), so the words land exactly where left/top put them.
 	let { items, follow = false }: { items: Tag[]; follow?: boolean } = $props();
 </script>
 
 <div class="tags" class:follow aria-hidden="true">
 	{#each items as tg (tg.id)}
-		<span class="tag at-{tg.at ?? 'right'}" class:strong={tg.strong} style:left="{tg.x}px" style:top="{tg.y}px" style:opacity={tg.alpha ?? 1} style:--c={tg.color ?? "var(--ink)"}>
-			<span class="line">
-				{#if tg.color}<i class="sw sw-{tg.swatch ?? 'square'}"></i>{/if}
-				{#if tg.icon}<Icon name={tg.icon} />{/if}
-				<span class="t">{tg.t}</span>
+		<span class="pos" style:transform="translate({tg.x}px, {tg.y}px)">
+			<span class="tag at-{tg.at ?? 'right'}" class:strong={tg.strong} style:opacity={tg.alpha ?? 1} style:--c={tg.color ?? "var(--ink)"}>
+				<span class="line">
+					{#if tg.color}<i class="sw sw-{tg.swatch ?? 'square'}"></i>{/if}
+					{#if tg.icon}<Icon name={tg.icon} />{/if}
+					<span class="t">{tg.t}</span>
+				</span>
+				{#if tg.sub}<span class="sub">{tg.sub}</span>{/if}
 			</span>
-			{#if tg.sub}<span class="sub">{tg.sub}</span>{/if}
 		</span>
 	{/each}
 </div>
 
 <style>
 	.tags { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
-	.tag { position: fixed; display: grid; gap: 1px; padding: 3px 8px; border-radius: 3px; background: rgba(243, 243, 239, .94); box-shadow: 0 2px 10px rgba(20, 32, 45, .08); font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; transition: opacity .3s, left .35s var(--ease, ease), top .35s var(--ease, ease); }
+	.pos { position: fixed; left: 0; top: 0; transition: transform .35s var(--ease, ease); }
+	.tag { position: relative; display: grid; gap: 1px; padding: 3px 8px; border-radius: 3px; background: rgba(243, 243, 239, .94); box-shadow: 0 2px 10px rgba(20, 32, 45, .08); font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; transition: opacity .3s; }
 	.tag.strong { font-size: 14px; padding: 5px 10px; }
 	.line { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 	.line :global(svg) { width: 1em; height: 1em; color: var(--c); }
@@ -59,6 +65,6 @@
 	.at-above { transform: translate(-50%, calc(-100% - 8px)); }
 	.at-below { transform: translate(-50%, 8px); }
 	.at-center { transform: translate(-50%, -50%); }
-	.follow .tag { transition: opacity .3s; }
-	@media (prefers-reduced-motion: reduce) { .tag { transition: none; } }
+	.follow .pos { transition: none; }
+	@media (prefers-reduced-motion: reduce) { .tag, .pos { transition: none; } }
 </style>

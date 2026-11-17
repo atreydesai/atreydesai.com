@@ -1,7 +1,12 @@
 // Small cached prints for the rest of the page: the hero's own patterns (same source, same order), drawn once to a
 // canvas and blitted. A section can stamp thousands of them a frame, so building one costs well under a few ms and
 // every distinct sprite is built once. `clarity` is how well the print took: 1 crisp, 0.5 broken ridges, 0 a smudge.
-import { FONT, HW, TYPE, fieldOf, patternSpec, rng, setType, sharedText, traceRidges, type Spec } from "./fingerprint";
+//
+// Large prints set as type (a section opener's, the closing bookend) cost tens of ms each, more on an older machine, so
+// they can also be built a few ms at a time in idle moments (printSpriteLater): the same drawing, in the same order,
+// paused between batches of ridges and letters.
+import { requestFrame } from "../loop";
+import { FONT, HW, TYPE, drawShare, fieldOf, patternSpec, rng, settleCanvas as settle, setType, sharedText, traceSteps, type Spec } from "./fingerprint";
 
 export type SpriteOpts = {
 	family: "main" | "human" | "ai" | "lab" | "writer";
@@ -17,6 +22,9 @@ export type SpriteOpts = {
 	clarity?: number;
 	/** ridges set as paper text (sensible from about 120 px); default: ink-line ridges */
 	text?: boolean;
+	/** may be handed out blank and filled in within a few frames, once this frame has spent its tracing time (for
+	 * sections placing many tiles at once; see printSprite) */
+	defer?: boolean;
 };
 
 /** width / height of a print */
@@ -37,35 +45,50 @@ const geos = new Map<string, Geo>();
 let fontWatch = false;
 
 const WRITERS = 220;
-function geometry(family: SpriteOpts["family"], index: number, ds: number): Geo {
-	// quantised like the hero's, so nearby sizes share one tracing
+// a pause point: the build yields here, and a time-sliced caller decides whether to go on now or in the next slice
+type Steps<T> = Generator<void, T, void>;
+// quantised like the hero's, so nearby sizes share one tracing
+const geoKey = (family: SpriteOpts["family"], index: number, ds: number) => {
 	const q = Math.pow(1.18, Math.round(Math.log(ds) / Math.log(1.18)));
 	const i = family === "writer" ? ((index % WRITERS) + WRITERS) % WRITERS : family === "lab" ? index : 0;
-	const key = `${family}|${i}|${q.toFixed(4)}`;
+	return { q, i, key: `${family}|${i}|${q.toFixed(4)}` };
+};
+function* geometry(family: SpriteOpts["family"], index: number, ds: number): Steps<Geo> {
+	const { q, i, key } = geoKey(family, index, ds);
 	let g = geos.get(key);
-	if (!g) { const spec = patternSpec(family, i); g = { spec, ds: q, ridges: traceRidges(spec, q), field: fieldOf(spec) }; geos.set(key, g); }
+	if (!g) {
+		const spec = patternSpec(family, i);
+		const ridges = yield* traceSteps(spec, q);
+		g = geos.get(key) ?? { spec, ds: q, ridges, field: fieldOf(spec) }; // (another build may have finished it meanwhile)
+		geos.set(key, g);
+	}
 	return g;
 }
 
-/** A print as a canvas, cached by every field. Draw it with drawImage at (px * printAspect()) by px. */
-export function printSprite(o: SpriteOpts): HTMLCanvasElement {
+function keyOf(o: SpriteOpts) {
 	const px = Math.max(4, Math.round(o.px)), index = o.index ?? 0;
 	const dpr = Math.min(2, o.dpr ?? (typeof devicePixelRatio === "number" ? devicePixelRatio : 1));
 	const clarity = Math.round(Math.max(0, Math.min(1, o.clarity ?? 1)) * 10) / 10;
 	const body = spriteText || sharedText;
 	const text = !!o.text && px >= 60 && body.length > 0;
-	const key = `${o.family}|${index}|${o.color}|${px}|${dpr}|${clarity}|${text ? "t" : "l"}`;
-	const hit = cache.get(key);
-	if (hit) return hit;
+	return { px, index, dpr, clarity, body, text, key: `${o.family}|${index}|${o.color}|${px}|${dpr}|${clarity}|${text ? "t" : "l"}` };
+}
 
+const RUN = 64; // ridges or letters drawn between pauses
+// the ridge gap grows slowly with size: a 16 px tile keeps four or five bold ridges, a large print many fine ones
+const gapOf = (text: boolean, px: number) => (text ? Math.max(4.4, Math.min(6, px * 0.036)) : Math.max(1.9, Math.min(4.2, 1.35 + px * 0.021)));
+
+/** The drawing itself, with pauses. Run to the end it returns the finished canvas (not yet cached). */
+function* paint(o: SpriteOpts, k0: ReturnType<typeof keyOf>, out?: { cv?: HTMLCanvasElement }): Steps<HTMLCanvasElement> {
+	const { px, index, dpr, clarity, body, text } = k0;
 	const r = px / 2; // half-height in CSS px
-	// the ridge gap grows slowly with size: a 16 px tile keeps four or five bold ridges, a large print many fine ones
-	const gap = text ? Math.max(4.4, Math.min(6, px * 0.036)) : Math.max(1.9, Math.min(4.2, 1.35 + px * 0.021));
-	const G = geometry(o.family, index, gap / r);
+	const gap = gapOf(text, px);
+	const G = yield* geometry(o.family, index, gap / r);
 	const R = rng(((index + 1) * 7919) ^ (px * 31) ^ (o.family.charCodeAt(0) << 8));
 	const cv = document.createElement("canvas");
 	cv.width = Math.max(1, Math.ceil(px * HW * dpr)); cv.height = Math.max(1, Math.ceil(px * dpr));
 	const g = cv.getContext("2d")!;
+	if (out) out.cv = cv;
 	const k = (r - 0.5) * dpr, ox = cv.width / 2, oy = cv.height / 2;
 	const c = clarity, lost = 1 - c;
 	g.fillStyle = g.strokeStyle = o.color;
@@ -93,12 +116,14 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 			document.fonts.load(`500 12px ${FONT}`).then(() => { for (const key of [...cache.keys()]) if (key.endsWith("|t")) cache.delete(key); }, () => {});
 		}
 		const T = setType(G.ridges, G.ds, body, Math.floor(R() * body.length), G.field.ink);
+		yield;
 		g.font = `500 ${G.ds * TYPE * k}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
 		// a hairline under the type keeps each ridge whole (it goes first as the print degrades)
 		g.lineWidth = Math.max(0.5, G.ds * TYPE * k * (0.07 + 0.3 * lost)); g.globalAlpha = Math.max(0.16 * c * c, floor); g.lineCap = "round"; g.lineJoin = "round";
 		g.beginPath();
 		for (const rd of G.ridges) { g.moveTo(ox + rd[0] * k, oy + rd[1] * k); for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k); }
 		g.stroke();
+		yield;
 		for (let p = 0; p < passes; p++) {
 			const sx = Math.cos(slipA) * slip * p * k, sy = Math.sin(slipA) * slip * p * k;
 			let run = 0, on = true;
@@ -109,6 +134,7 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 				g.globalAlpha = T.a[i] * strength * (p ? 0.55 : 1);
 				g.setTransform(T.c[i], T.s[i], -T.s[i], T.c[i], ox + T.x[i] * k + sx, oy + T.y[i] * k + sy);
 				g.fillText(T.ch[i], 0, 0);
+				if (i % RUN === RUN - 1) { g.setTransform(1, 0, 0, 1, 0, 0); yield; }
 			}
 		}
 		g.setTransform(1, 0, 0, 1, 0, 0);
@@ -123,6 +149,7 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 		}
 		for (let p = 0; p < passes; p++) {
 			const sx = Math.cos(slipA) * slip * p * k, sy = Math.sin(slipA) * slip * p * k;
+			let ri = 0;
 			for (const rd of G.ridges) {
 				const n = rd.length / 2, mid = (n >> 1) << 1;
 				const ink = G.field.ink(rd[mid], rd[mid + 1]);
@@ -138,24 +165,165 @@ export function printSprite(o: SpriteOpts): HTMLCanvasElement {
 					i = end + (lost < 0.05 ? 0 : Math.round(1 + R() * 9 * lost));
 				}
 				if (drew) g.stroke();
+				if (++ri % RUN === 0) yield;
 			}
 		}
 	}
 	g.globalAlpha = 1;
-	cache.set(key, cv);
 	return cv;
+}
+
+// Tracing a small print's ridges is most of its cost, and a section that places hundreds of new prints at once (tiles
+// coming into view) would stall that frame on an older machine. So a frame traces new ridges for at most TRACE_MS; past
+// that, a print is handed out blank, at its size, and filled in place within the next frames (a few ms each, in the
+// page's loop); spritesVersion() tells the canvas to draw again. Tiles grow in from dots as they arrive, so the few
+// frames before their prints fill in pass unseen. A print whose ridges are traced already is always drawn at once.
+const TRACE_MS = 4;
+let frameT = -1e9, spent = 0, version = 0;
+const owed: Build[] = [];
+/** changes whenever a print handed out blank has been filled in */
+export const spritesVersion = () => version;
+function fill(now: number) {
+	const until = performance.now() + TRACE_MS;
+	while (owed.length && owed[0].step(until)) owed.shift();
+	if (owed.length) requestFrame(fill);
+	void now;
+}
+
+/** A print as a canvas, cached by every field. Draw it with drawImage at (px * printAspect()) by px. */
+export function printSprite(o: SpriteOpts): HTMLCanvasElement {
+	const k = keyOf(o);
+	const hit = cache.get(k.key);
+	if (hit) return hit;
+	const now = performance.now();
+	if (now - frameT > 10) { frameT = now; spent = 0; } // a new frame's budget
+	const traced = geos.has(geoKey(o.family, k.index, gapOf(k.text, k.px) / (k.px / 2)).key);
+	if (o.defer && !traced && spent >= TRACE_MS && typeof window !== "undefined") {
+		const cv = document.createElement("canvas");
+		cv.width = Math.max(1, Math.ceil(k.px * HW * k.dpr)); cv.height = Math.max(1, Math.ceil(k.px * k.dpr));
+		cache.set(k.key, cv);
+		const run = paint(o, k);
+		owed.push({ key: k.key, step: (deadline) => {
+			let r = run.next();
+			while (!r.done && performance.now() < deadline) r = run.next();
+			if (!r.done) return false;
+			cv.getContext("2d")!.drawImage(r.value, 0, 0);
+			version++;
+			return true;
+		} });
+		if (owed.length === 1) requestFrame(fill);
+		return cv;
+	}
+	const run = paint(o, k);
+	let r = run.next();
+	while (!r.done) r = run.next();
+	if (!traced) spent += performance.now() - now;
+	cache.set(k.key, r.value);
+	return r.value;
+}
+
+/** The cached print if it has been built, else null (no work). */
+export function cachedSprite(o: SpriteOpts): HTMLCanvasElement | null {
+	return cache.get(keyOf(o).key) ?? null;
+}
+
+// ---- building in idle moments --------------------------------------------------------------------------------------
+
+type Idle = { timeRemaining(): number } | undefined;
+// A print wanted soon (near the viewport) is built in the next idle moments, or within 300 ms if there are none; one
+// wanted some time (the rest of the page's prints, set ahead) only when the page is truly idle.
+const idle = (cb: (d: Idle) => void, soon: boolean) => {
+	const w = window as unknown as { requestIdleCallback?: (cb: (d: Idle) => void, o?: { timeout: number }) => number };
+	if (w.requestIdleCallback) w.requestIdleCallback(cb, { timeout: soon ? 300 : 4000 });
+	else setTimeout(() => cb(undefined), soon ? 16 : 200);
+};
+type Build = { key: string; step: (deadline: number) => boolean };
+const later = new Map<string, { p: Promise<HTMLCanvasElement>; b: Build }>();
+const urgent: Build[] = [], spare: Build[] = []; // builds waiting for idle time, oldest first
+let askedSoon = false, askedSpare = false;
+const SLICE = 5; // ms of work per idle slice
+function pump(d: Idle) {
+	const until = performance.now() + SLICE;
+	for (;;) {
+		const q = urgent.length ? urgent : spare;
+		if (!q.length) break;
+		const budget = d ? Math.min(SLICE, Math.max(1, d.timeRemaining() - 1)) : SLICE;
+		if (!q[0].step(performance.now() + budget)) break;
+		q.shift();
+		if (performance.now() > until) break;
+	}
+	ask();
+}
+function ask() {
+	if (urgent.length && !askedSoon) { askedSoon = true; idle((d) => { askedSoon = false; pump(d); }, true); }
+	else if (spare.length && !askedSoon && !askedSpare) { askedSpare = true; idle((d) => { askedSpare = false; pump(d); }, false); }
+}
+
+/** The same print as printSprite, built a few ms at a time in idle moments. Resolves with the cached canvas. `soon`:
+ * it is wanted soon (near the viewport), so it goes ahead of prints set ahead of time. */
+export function printSpriteLater(o: SpriteOpts, soon = true): Promise<HTMLCanvasElement> {
+	const k = keyOf(o);
+	const hit = cache.get(k.key);
+	if (hit) return Promise.resolve(hit);
+	const busy = later.get(k.key);
+	if (busy) {
+		// wanted sooner now: move it ahead
+		const i = spare.indexOf(busy.b);
+		if (soon && i >= 0) { spare.splice(i, 1); urgent.push(busy.b); ask(); }
+		return busy.p;
+	}
+	let b!: Build;
+	const p = new Promise<HTMLCanvasElement>((resolve) => {
+		const out: { cv?: HTMLCanvasElement } = {};
+		const run = paint(o, k, out);
+		b = { key: k.key, step: (deadline) => {
+			const t0 = performance.now(), drawUntil = t0 + drawShare(deadline - t0);
+			let r = run.next();
+			while (!r.done && performance.now() < drawUntil) r = run.next();
+			// use what has been drawn so far, so this slice pays for rasterising it
+			if (!r.done) { if (out.cv) settle(out.cv, performance.now() - t0); return false; }
+			cache.set(k.key, r.value);
+			settle(r.value, performance.now() - t0);
+			later.delete(k.key);
+			resolve(r.value);
+			return true;
+		} };
+	});
+	(soon ? urgent : spare).push(b);
+	later.set(k.key, { p, b });
+	ask();
+	return p;
+}
+
+/** Trace the ridges of a family's small prints ahead of time, in idle moments, for tiles from pxFrom to pxTo px tall:
+ * a section that stamps hundreds of small prints when it comes into view then only draws them (tracing is most of the
+ * cost: about 14 ms for 64 writers on a fast laptop, four times that on an older one). */
+/** warmTiles once `el` comes within about three screens of the viewport; returns a function that stops waiting */
+export function warmTilesNear(el: Element, family: SpriteOpts["family"], count: number, pxFrom: number, pxTo: number): () => void {
+	if (typeof IntersectionObserver === "undefined") return () => {};
+	const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { io.disconnect(); warmTiles(family, count, pxFrom, pxTo); } }, { rootMargin: "300% 0px 300% 0px" });
+	io.observe(el);
+	return () => io.disconnect();
+}
+export function warmTiles(family: SpriteOpts["family"], count: number, pxFrom: number, pxTo: number) {
+	if (typeof window === "undefined") return;
+	const seen = new Set<string>();
+	for (let px = pxFrom; px <= pxTo; px++) {
+		const gap = Math.max(1.9, Math.min(4.2, 1.35 + px * 0.021)), ds = gap / (px / 2); // as paint() sets an ink-line print
+		const q = Math.pow(1.18, Math.round(Math.log(ds) / Math.log(1.18)));
+		for (let i = 0; i < count; i++) {
+			const key = `${family}|${i}|${q.toFixed(4)}`;
+			if (seen.has(key) || geos.has(key)) continue;
+			seen.add(key);
+			const run = geometry(family, i, ds);
+			spare.push({ key, step: (deadline) => { let r = run.next(); while (!r.done && performance.now() < deadline) r = run.next(); return !!r.done; } });
+		}
+	}
+	ask();
 }
 
 /** Build a list of sprites ahead of use, a few at a time in idle moments, so first use never stalls a frame. */
 export function warm(list: SpriteOpts[]) {
 	if (typeof window === "undefined") return;
-	let i = 0;
-	const idle: (cb: (d?: { timeRemaining(): number }) => void) => void =
-		(window as any).requestIdleCallback ? (cb) => (window as any).requestIdleCallback(cb, { timeout: 500 }) : (cb) => setTimeout(() => cb(), 16);
-	const work = (d?: { timeRemaining(): number }) => {
-		const until = performance.now() + 6;
-		while (i < list.length && (d ? d.timeRemaining() > 2 : true) && performance.now() < until) printSprite(list[i++]);
-		if (i < list.length) idle(work);
-	};
-	idle(work);
+	for (const o of list) void printSpriteLater(o, false);
 }

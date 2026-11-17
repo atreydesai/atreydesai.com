@@ -18,6 +18,7 @@
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes from "./Footnotes.svelte";
 	import { FABLE, KIND, LAB } from "./palette";
+	import { onScroll, requestFrame, view as vp, lite } from "./loop";
 	import S from "./s1.json";
 
 	type Kind = "ideas" | "prose";
@@ -72,15 +73,16 @@
 	}
 	function update() {
 		const { r, u, at } = geo();
-		if (r.bottom < -innerHeight || r.top > innerHeight * 2) { away = true; return; }
+		if (r.bottom < -vp.h || r.top > vp.h * 2) { away = true; return; }
 		const t = -r.top;
 		let s = 0;
 		while (s < STEPS.length - 1 && t >= at(s + 1)) s++;
 		target = s;
 		frac = Math.max(0, Math.min(1, (t - at(s)) / u));
-		const out = r.bottom <= 0 || r.top >= innerHeight;
+		const out = r.bottom <= 0 || r.top >= vp.h;
 		// off screen (now or at the last look): jump straight to the right state, no queue
-		if (out || away) { clearTimeout(timer); timer = undefined; show(s); }
+		// (the lighter mode for phones: the step follows the scroll directly; a momentum scroll is not held back)
+		if (out || away || lite.on) { clearTimeout(timer); timer = undefined; show(s); }
 		else if (timer === undefined) advance();
 		syncFill();
 		away = out;
@@ -106,16 +108,16 @@
 	}
 
 	onMount(() => {
-		const resize = () => { update(); measure(); };
+		// scroll and resize, in the page's loop (loop.ts); the leaders are measured again when the width changes
+		let w = vp.w;
+		const read = () => { update(); if (vp.w !== w) { w = vp.w; requestFrame(measure); } };
 		away = true;
-		update();
-		addEventListener("scroll", update, { passive: true });
-		addEventListener("resize", resize, { passive: true });
-		document.fonts?.ready.then(measure);
-		return () => { clearTimeout(timer); removeEventListener("scroll", update); removeEventListener("resize", resize); };
+		const stop = onScroll(read);
+		document.fonts?.ready.then(() => requestFrame(measure));
+		return () => { clearTimeout(timer); stop(); };
 	});
 	// re-measure when the step changes (the notes and cues change size as they light)
-	$effect(() => { void step; requestAnimationFrame(measure); });
+	$effect(() => { void step; requestFrame(measure); });
 </script>
 
 <section class="hb" id={S.id} data-rq={S.rq}>
@@ -124,7 +126,7 @@
 		prints={[{ family: "human", color: "#DC89A7", label: KIND.prose.label, icon: KIND.prose.icon }, { family: "ai", color: "#9A82B4", label: KIND.ideas.label, icon: KIND.ideas.icon }]} />
 
 	<!-- 2. the manuscript: the story as the page, the verdicts in the margins -->
-	<div class="ms" bind:this={ms} style="--run:{RUN}vh">
+	<div class="ms" bind:this={ms} style="--run:calc({RUN} * var(--vh, 1vh))">
 		<div class="pin" bind:this={pin}>
 			<aside class="note left prose" class:on={noteOn("prose")} class:seen={noteSeen("prose")} bind:this={notes.prose}>
 				<p class="n-k"><span class="kind"><Icon name="pen" /></span>{J.prose.label}</p>
@@ -182,8 +184,8 @@
 	.hb { --f: #B4501C; position: relative; }
 
 	/* 2. manuscript: the pin plus the pinned scroll (--run, from STEP_VH and LEAD) */
-	.ms { position: relative; height: calc(100vh + var(--run)); }
-	.pin { position: sticky; top: 0; height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 38rem) minmax(0, 1fr); grid-template-rows: 1fr; align-items: center; align-content: center; gap: 48px; }
+	.ms { position: relative; height: calc(100 * var(--vh, 1vh) + var(--run)); }
+	.pin { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 38rem) minmax(0, 1fr); grid-template-rows: 1fr; align-items: center; align-content: center; gap: 48px; }
 	.page { grid-column: 2; display: grid; gap: 22px; }
 	.p-cap { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink2); }
 	.p-cap :global(svg) { color: var(--f); }
@@ -218,20 +220,20 @@
 
 
 	/* 3. showcase */
-	.sc { position: relative; margin: 14vh 0 0; padding: 4vh 0 6vh; }
+	.sc { position: relative; margin: calc(14 * var(--vh, 1vh)) 0 0; padding: calc(4 * var(--vh, 1vh)) 0 calc(6 * var(--vh, 1vh)); }
 	.sc h3 { margin-top: 10px; display: inline-flex; align-items: center; gap: 12px; font-size: clamp(30px, 3.4vw, 46px); font-weight: 600; letter-spacing: -0.03em; color: #7A3410; }
-	.sc-nums { margin-top: 5vh; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4vw; }
+	.sc-nums { margin-top: calc(5 * var(--vh, 1vh)); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4vw; }
 	.num { display: grid; gap: 10px; }
 	.num b { font-size: clamp(64px, 9.5vw, 148px); line-height: .85; font-weight: 600; letter-spacing: -0.045em; color: var(--f); font-variant-numeric: tabular-nums; }
 	.num span { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; color: var(--ink); }
-	.sc-d { margin-top: 5vh; max-width: 48ch; font-size: 18px; line-height: 1.5; color: var(--ink2); }
+	.sc-d { margin-top: calc(5 * var(--vh, 1vh)); max-width: 48ch; font-size: 18px; line-height: 1.5; color: var(--ink2); }
 
 	/* phones and narrow tablets: the same pinned steps (same .lit/.on/.seen classes); layout only here. The story spans
 	   the width, the two notes sit side by side under it (prose left, ideas right, both left-aligned), and the bottom
 	   is kept clear of the section rail (SectionNav sits bottom-left below 980px). */
 	@media (max-width: 979px) {
-		.ms { height: calc(100vh + var(--run)); height: calc(100svh + var(--run)); }
-		.pin { box-sizing: border-box; height: 100vh; height: 100svh; padding-bottom: 56px; grid-template-columns: repeat(2, minmax(0, 19rem)); grid-template-rows: auto auto; justify-content: center; align-content: center; gap: 22px 20px; }
+		.ms { height: calc(100 * var(--vh, 1vh) + var(--run)); height: calc(100 * var(--svh, 1vh) + var(--run)); }
+		.pin { box-sizing: border-box; height: calc(100 * var(--vh, 1vh)); height: calc(100 * var(--svh, 1vh)); padding-bottom: 56px; grid-template-columns: repeat(2, minmax(0, 19rem)); grid-template-rows: auto auto; justify-content: center; align-content: center; gap: 22px 20px; }
 		.page { grid-column: 1 / -1; grid-row: 1; gap: 14px; }
 		.quote { gap: 10px; }
 		.story { font-size: clamp(23px, 3.2vw, 30px); line-height: 1.45; }

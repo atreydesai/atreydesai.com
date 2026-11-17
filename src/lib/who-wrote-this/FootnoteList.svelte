@@ -76,7 +76,7 @@
 {/if}
 
 <style>
-	.fns { max-width: 46rem; margin: 10vh 0 0; padding-top: 18px; border-top: 1px solid #C9C9C9; }
+	.fns { max-width: 46rem; margin: calc(10 * var(--vh, 1vh)) 0 0; padding-top: 18px; border-top: 1px solid #C9C9C9; }
 	h2 { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #5A6270; margin: 0 0 12px; }
 	ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 	li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; gap: 6px; font-size: 13px; line-height: 1.55; color: #5A6270; }

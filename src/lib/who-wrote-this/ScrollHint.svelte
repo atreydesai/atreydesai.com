@@ -4,6 +4,7 @@
 	// dark pill rises at the bottom of the screen; any scroll hides it, and a click moves on by about half a screen.
 	// It stays away while the hero's own scroll cue is showing and once the closing band is reached.
 	import { onMount } from "svelte";
+	import { docBox, view as vp } from "./loop";
 
 	let show = $state(false);
 	const IDLE = 2200;
@@ -11,10 +12,13 @@
 	onMount(() => {
 		let last = performance.now();
 		const onScroll = () => { last = performance.now(); if (show) show = false; };
+		let finale: Element | null = null;
 		const tick = setInterval(() => {
 			if (document.hidden) return;
-			const end = document.querySelector(".finale")?.getBoundingClientRect().top ?? Infinity;
-			const want = performance.now() - last > IDLE && end > innerHeight * 0.9 && !document.querySelector(".ph .cue");
+			// (the closing band's place is cached by the page's loop: no layout read here)
+			finale ??= document.querySelector(".finale");
+			const end = finale ? docBox(finale).top - vp.y : Infinity;
+			const want = performance.now() - last > IDLE && end > (vp.h || innerHeight) * 0.9 && !document.querySelector(".ph .cue");
 			if (want !== show) show = want;
 		}, 400);
 		addEventListener("scroll", onScroll, { passive: true });

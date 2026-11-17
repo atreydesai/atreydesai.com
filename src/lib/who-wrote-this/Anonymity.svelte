@@ -27,8 +27,9 @@
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes, { type Note } from "./Footnotes.svelte";
 	import { MODEL, GRAY, INK as INKS, deepen, TILE } from "./palette";
-	import { printSprite, printAspect } from "./print/sprites";
-	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
+	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
+	import { field, chart, regions, type Mark, type Path, type Text } from "./field.svelte";
+	import { onScroll as onPageScroll, requestFrame, view as vp, lite, deliberate, pointerKind } from "./loop";
 	import A from "./anonymity.json";
 
 	type Bin = { bin: string; shown: boolean; pct: number; tiles: number; pct_rw: number; tiles_rw: number };
@@ -196,7 +197,7 @@
 	const PIDS = Array.from({ length: R.posts }, (_, i) => `${OWNER}:p:${i}`);
 	const GOF = new Map<string, number>(IDS.flatMap((ids, gi) => ids.map((id) => [id, gi] as [string, number])));
 	const marks: Mark[] = [];
-	let lastKey = "", lastStep = -1, lastReplays = 0, t0 = 0, raf = 0, anim: "enter" | "ctrl" | "settle" = "settle", replayed = false;
+	let lastKey = "", lastStep = -1, lastReplays = 0, t0 = 0, alive = true, anim: "enter" | "ctrl" | "settle" = "settle", replayed = false;
 	let fromLit = [0, 0, 0, 0], curLit = [0, 0, 0, 0];
 	const ease = (x: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
 
@@ -288,7 +289,7 @@
 			if (gi === undefined || pitch < 15) { if (gi !== undefined) { m.sprite = undefined; m.backing = undefined; } continue; }
 			const lit = m.color !== OFF, px = Math.round(pitch * 0.9), clarity = CLARITY[gi], idx = +m.id.slice(m.id.lastIndexOf(":") + 1);
 			const ink = !lit ? m.color : m.color === mlight ? deepen(m.color, TILE.inkDepth * 0.6) : deepen(m.color, TILE.inkDepth);
-			m.sprite = printSprite({ family: "writer", index: idx % 48, color: ink, px, clarity });
+			m.sprite = printSprite({ family: "writer", index: idx % 48, color: ink, px, clarity, defer: true });
 			m.spriteKey = `a${idx % 48}|${ink}|${px}|${clarity}`;
 			m.aspect = ASPECT; m.r = px / 2; m.backing = lit ? TILE.litBacking : TILE.unlitBacking;
 		}
@@ -298,12 +299,12 @@
 		return busy;
 	}
 
+	// frames run in the page's loop (loop.ts): after every section has read the scroll, before the canvas draws
 	function tick(now: number) {
-		raf = 0;
-		if (!active || field.owner !== OWNER) return;
-		if (render(now)) raf = requestAnimationFrame(tick);
+		if (!alive || !active || field.owner !== OWNER) return;
+		if (render(now)) requestFrame(tick);
 	}
-	const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+	const kick = () => { if (alive) requestFrame(tick); };
 
 	// any input that changes the picture asks for one frame (more only while a tween moves)
 	$effect(() => {
@@ -346,17 +347,19 @@
 	onMount(() => {
 		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).has("still");
 		ready = true;
+		const stopWarm = warmTilesNear(root, "writer", 48, 14, 26); // the tiles' prints' ridges, traced ahead in idle moments
 		// While the stage is on screen the shown step walks toward the scroll's step one at a time, holding each for
 		// HOLD_MS (a timer, not a frame loop); off screen, or on arriving from off screen, it jumps there at once.
 		let since = 0, hold = 0, seen = false; // when the shown step last changed
 		const update = () => {
-			const r = root.getBoundingClientRect(), H = innerHeight;
+			const r = root.getBoundingClientRect(), H = vp.h || innerHeight;
 			if (r.bottom < -H || r.top > H * 2) { seen = false; return; }
 			const y = -r.top / H;
 			let goal = 0;
 			while (goal < LAST && y >= AT[goal + 1]) goal++;
 			const vis = r.bottom > 0 && r.top < H, now = performance.now();
-			if (!vis || !seen) {
+			// (the lighter mode for phones: the step follows the scroll directly; a momentum scroll is not held back)
+			if (!vis || !seen || lite.on) {
 				clearTimeout(hold); hold = 0;
 				if (goal !== step) { step = goal; since = now; }
 			} else if (goal !== step && !hold) {
@@ -370,14 +373,15 @@
 		};
 		const onScroll = () => {
 			update();
+			// the lighter mode: a scroll closes a card a finger opened
+			if (lite.on && sel !== null && pointerKind() !== "mouse") sel = null;
 			if (!active) return;
 			if (active && field.mode === "ground") { field.mode = "chart"; field.owner = OWNER; field.dim = 0.75; field.interactive = false; }
 			place();
 		};
-		update();
-		addEventListener("scroll", onScroll, { passive: true });
+		const stopScroll = onPageScroll(onScroll); // scroll and resize, in the page's loop
+		regions[OWNER] = root;
 		document.addEventListener("click", back);
-		addEventListener("resize", onScroll, { passive: true });
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
 			if (active) { field.mode = "chart"; field.owner = OWNER; field.dim = 0.75; field.interactive = false; place(); }
@@ -390,7 +394,7 @@
 		const ro = new ResizeObserver(measure);
 		if (body?.firstElementChild) ro.observe(body.firstElementChild);
 		measure();
-		return () => { cancelAnimationFrame(raf); clearTimeout(hold); io.disconnect(); ro.disconnect(); removeEventListener("scroll", onScroll); removeEventListener("resize", onScroll); document.removeEventListener("click", back); };
+		return () => { alive = false; stopWarm(); clearTimeout(hold); io.disconnect(); ro.disconnect(); stopScroll(); document.removeEventListener("click", back); };
 	});
 
 	const hitIdx = $derived(view === "refusals" ? [] : showSmall ? [0, 1, 2, 3] : [FOCUS]);
@@ -418,7 +422,7 @@
 <section class="an" id={A.id} data-rq="0" data-step={step}>
 	<SectionOpener n={A.n} title={A.title.t} takeaway={A.takeaway.t} context={A.context.t} accent={GRAY.mid} prints={ready ? OPENER : []} />
 
-	<div class="scrolly" class:still={reduce} bind:this={root} style="--span:{SPAN_VH * 100}vh">
+	<div class="scrolly" class:still={reduce} bind:this={root} style="--span:calc({SPAN_VH * 100} * var(--vh, 1vh))">
 		<div class="stick" bind:this={stage} bind:clientWidth={W} bind:clientHeight={H}>
 			<!-- the giant numeral: the one number each frame is about -->
 			<div class="num" style="left:{geo.num.x}px; top:{geo.num.y}px; width:{geo.num.w}px; --size:{geo.numSize}px" aria-hidden="true">
@@ -449,9 +453,9 @@
 					{#if g}
 						<button type="button" class="hit" aria-label={aria(i)}
 							style="left:{g.x - 5}px; top:{g.y - 5}px; width:{g.gw + 10}px; height:{g.gw + 10}px"
-							onpointerenter={() => (sel = i)} onpointerleave={() => (sel = sel === i ? null : sel)}
+							onpointerenter={(e) => e.pointerType === "mouse" && (sel = i)} onpointerleave={(e) => e.pointerType === "mouse" && (sel = sel === i ? null : sel)}
 							onfocus={() => (sel = i)} onblur={() => (sel = sel === i ? null : sel)}
-							onclick={() => (sel = sel === i ? null : i)}></button>
+							onclick={(e) => deliberate(e) && (sel = sel === i ? null : i)}></button>
 					{/if}
 				{/each}
 			</div>
@@ -500,8 +504,8 @@
 
 <style>
 	.an { position: relative; }
-	.scrolly { position: relative; height: calc(var(--span) + 100vh); }
-	.stick { position: sticky; top: 0; height: 100vh; pointer-events: none; }
+	.scrolly { position: relative; height: calc(var(--span) + calc(100 * var(--vh, 1vh))); }
+	.stick { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); pointer-events: none; }
 
 	/* the caption band, along the bottom */
 	.cap { position: absolute; z-index: 2; left: 50%; bottom: 16px; width: min(800px, 100%); transform: translateX(-50%); pointer-events: auto; padding: 14px 18px 16px; background: #fff; border-radius: 3px; box-shadow: 0 2px 14px rgba(20, 32, 45, .06); display: grid; gap: 10px; }

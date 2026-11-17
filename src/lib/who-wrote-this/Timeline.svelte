@@ -25,6 +25,8 @@
 	// the plot is moving over for Explore.
 	import { onMount } from "svelte";
 	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
+	import { onScroll as onPageScroll, requestFrame, view as vp, lite } from "./loop";
+	import { regions } from "./field.svelte";
 	import { WEIGHTS, MODEL, GRAY, INK, FABLE as CLAY_RAMP } from "./palette";
 	import Icon from "./Icon.svelte";
 	import Reveal from "./Reveal.svelte";
@@ -309,7 +311,7 @@
 	let tagSig = "";
 	type Geo = { r: DOMRect; hb: DOMRect; cr: DOMRect; cl: DOMRect; foot: number; narrow: boolean };
 	function layout({ r, hb, cr, cl, foot, narrow }: Geo) {
-		const W = innerWidth;
+		const W = vp.w || innerWidth;
 		const t0 = START + wa * DAY, t1 = START + wb * DAY;
 		// frontier lines inside the window: they start afresh from the models released in it
 		const lines = frontier(metric, t0, t1);
@@ -547,23 +549,24 @@
 	}
 
 	// ---- scheduling: one frame per input; more frames only while a line traces or the plot moves over ---------------
-	let raf = 0, last = 0, dirty = true;
+	// (frames run in the page's loop, loop.ts: after every section has read the scroll, before the canvas draws)
+	let last = 0, dirty = true, alive = true;
 	let prevSig = "";
-	const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+	const kick = () => { if (alive) requestFrame(tick); };
 	function tick(now: number) {
-		raf = 0;
+		if (!alive) return;
 		const dt = last ? Math.min(1 / 30, (now - last) / 1000) : 1 / 60;
 		last = now;
 		let moved = advance(dt);
 		// retake the canvas if a neighbour left it on the plain ground while this section is in view
 		if (active && field.mode === "ground") { field.mode = "chart"; field.owner = "rq1"; field.dim = 0.75; field.interactive = true; }
 		if (active && field.owner === "rq1") {
-			const narrow = innerWidth <= 860;
+			const narrow = vp.w <= 860;
 			const g: Geo = { r: stage.getBoundingClientRect(), hb: head.getBoundingClientRect(), cr: card.getBoundingClientRect(), cl: col.getBoundingClientRect(), foot: 0, narrow };
 			// where the card and the control row end once Explore has fully opened (its natural height, not the sliding one)
 			const inner = bar.querySelector<HTMLElement>(".inner");
 			g.foot = explore && inner ? bar.getBoundingClientRect().top + inner.scrollHeight : g.cr.bottom;
-			const s = [g.r.left, g.r.top, g.r.width, g.r.height, g.hb.bottom, g.cr.left, g.cr.top, g.cr.right, g.cr.bottom, g.cl.right, g.foot, innerWidth].join(",");
+			const s = [g.r.left, g.r.top, g.r.width, g.r.height, g.hb.bottom, g.cr.left, g.cr.top, g.cr.right, g.cr.bottom, g.cl.right, g.foot, vp.w].join(",");
 			const changed = s !== prevSig;
 			prevSig = s;
 			if (dirty || moved || changed) { dirty = false; layout(g); }
@@ -596,12 +599,13 @@
 	// HOLD_MS (a timer, not a frame loop); off screen, or on arriving from off screen, it jumps there at once.
 	let since = 0, hold = 0, seen = false; // when the shown step last changed
 	function follow() {
-		const r = root.getBoundingClientRect(), H = innerHeight;
+		const r = root.getBoundingClientRect(), H = vp.h;
 		if (r.bottom < -H || r.top > 2 * H) { seen = false; return; }
 		const q = (TRIG * H - r.top - LEAD_VH * H) / (STEP_VH * H);
 		const goal = Math.max(-1, Math.min(LAST, Math.floor(q)));
 		const vis = r.bottom > 0 && r.top < H, now = performance.now();
-		if (!vis || !seen) {
+		// (the lighter mode for phones: the step follows the scroll directly; a momentum scroll is not held back)
+		if (!vis || !seen || lite.on) {
 			clearTimeout(hold); hold = 0;
 			if (goal !== step) { setStep(goal); since = now; }
 		} else if (goal !== step && !hold) {
@@ -652,14 +656,13 @@
 		}), { rootMargin: "-35% 0px -35% 0px" });
 		io.observe(root);
 		const onScroll = () => { follow(); kick(); };
-		follow();
 		// the stage scrolling in or out, a new size, or the column growing (Explore opening) asks for one frame
 		const ro = new ResizeObserver(kick);
 		ro.observe(col);
 		ro.observe(head);
 		ro.observe(bar);
-		addEventListener("scroll", onScroll, { passive: true });
-		addEventListener("resize", onScroll, { passive: true });
+		const stopScroll = onPageScroll(onScroll); // scroll and resize, in the page's loop
+		regions.rq1 = root;
 		// a transform that settles (the route transition) moves the stage without a scroll or resize: check once more
 		const settle = () => { if (active) kick(); };
 		document.addEventListener("transitionend", settle, { passive: true });
@@ -667,16 +670,16 @@
 		// tag widths are measured in Inter: measure again once it has loaded
 		document.fonts?.ready.then(() => { widths.clear(); dirty = true; kick(); });
 		return () => {
-			cancelAnimationFrame(raf); raf = 0;
+			alive = false;
 			clearTimeout(hold); hold = 0;
 			io.disconnect(); ro.disconnect();
-			removeEventListener("scroll", onScroll); removeEventListener("resize", onScroll);
+			stopScroll();
 			document.removeEventListener("transitionend", settle); document.removeEventListener("animationend", settle);
 		};
 	});
 </script>
 
-<section class="tl" id={T.id} bind:this={root} data-step={step} style="--steps:{T.steps.length}; --step:{STEP_VH * 100}vh; --lead:{LEAD_VH * 100}vh; --tail:{(1 - TRIG) * 100}vh">
+<section class="tl" id={T.id} bind:this={root} data-step={step} style="--steps:{T.steps.length}; --step:calc({STEP_VH * 100} * var(--vh, 1vh)); --lead:calc({LEAD_VH * 100} * var(--vh, 1vh)); --tail:calc({(1 - TRIG) * 100} * var(--vh, 1vh))">
 	<div class="stick" bind:this={stage}>
 		<div class="lead">
 			<h2 bind:this={head}>{T.title.t}</h2>
@@ -743,10 +746,10 @@
 <style>
 	/* lead + every step + the part of the stage below the trigger line: the last step keeps a full step of pinned scroll */
 	.tl { position: relative; margin-top: 56px; height: calc(var(--lead) + var(--steps) * var(--step) + var(--tail)); }
-	.stick { position: sticky; top: 0; height: 100vh; pointer-events: none; }
+	.stick { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); pointer-events: none; }
 	/* the headline over the chart's empty upper left, the card under it (lined up with the plot's left edge) */
 	.lead { position: absolute; left: 40px; right: 0; top: 56px; display: grid; justify-items: start; align-content: start; gap: 18px; }
-	h2 { max-width: 11.5em; font-size: clamp(34px, min(4.4vw, 6.8vh), 60px); line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; text-wrap: balance; }
+	h2 { max-width: 11.5em; font-size: clamp(34px, min(4.4vw, calc(6.8 * var(--vh, 1vh))), 60px); line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; text-wrap: balance; }
 	.col { pointer-events: auto; width: 300px; display: grid; gap: 12px; }
 	.say { padding: 14px 16px 16px; background: #fff; border-radius: 3px; opacity: 0; transform: translateY(8px); transition: opacity .45s var(--ease), transform .45s var(--ease); }
 	.say.on { opacity: 1; transform: none; }
@@ -798,11 +801,12 @@
 	.tv em { font-style: normal; font-size: 12px; font-weight: 400; color: var(--ink2); }
 	/* tags follow the chart at once (scrubbing redraws at once); they still fade in and out */
 	.tl :global(.tags .tag) { transition: opacity .3s; }
+	.tl :global(.tags .pos) { transition: none; }
 
 	.steps { position: absolute; inset: 0; pointer-events: none; }
 	.step { height: var(--step); }
 	.step:first-child { margin-top: var(--lead); }
-	@media (prefers-reduced-motion: reduce) { .say, .say-t { transition: none; animation: none; } .tl :global(.tags .tag) { transition: none; } }
+	@media (prefers-reduced-motion: reduce) { .say, .say-t { transition: none; animation: none; } .tl :global(.tags .tag), .tl :global(.tags .pos) { transition: none; } }
 	@media (max-width: 860px) {
 		.lead { left: 0; top: 16px; gap: 10px; }
 		h2 { font-size: clamp(28px, 8.4vw, 36px); }

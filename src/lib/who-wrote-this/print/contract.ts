@@ -28,6 +28,10 @@ export type PrintInput = {
 	/** the print the reader is inspecting (an anchor or hit id, "main" at level 0), or null: the renderer brings it
 	 * forward (full ink) and lets the others recede a little, so the lens reads as pointing at one thing */
 	focus?: string | null;
+	/** the lighter mode (phones): the level follows the scroll as it slides, never paced as a leap, and the prints do
+	 * not breathe while `calm` (the page is scrolling) */
+	follow?: boolean;
+	calm?: boolean;
 };
 
 export type Anchor = {

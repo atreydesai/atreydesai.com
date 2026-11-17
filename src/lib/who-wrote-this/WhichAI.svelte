@@ -17,7 +17,8 @@
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes from "./Footnotes.svelte";
-	import { field, chart } from "./field.svelte";
+	import { field, chart, regions } from "./field.svelte";
+	import { onScroll as onPageScroll, view as vp, lite, deliberate } from "./loop";
 	import { LAB, INK, GRAY } from "./palette";
 	import S from "./which_ai.json";
 	import R from "./rq2_writers.json";
@@ -264,13 +265,14 @@
 	let holdT: ReturnType<typeof setTimeout> | undefined, goalT: ReturnType<typeof setTimeout> | undefined;
 	const at = (c: number[], q: number) => { let i = 0; while (i < c.length - 2 && q >= c[i + 1]) i++; return i; };
 	function show(s: number) { if (s !== step) { step = s; shownAt = performance.now(); } }
-	function onScreen() { const r = body.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }
+	function onScreen() { const r = body.getBoundingClientRect(); return r.bottom > 0 && r.top < (vp.h || innerHeight); }
 	function settle(snap = false) {
 		clearTimeout(holdT); holdT = undefined;
 		if (want === step) return;
 		// off screen, just arrived on screen in one jump (a link, a reload) or settled motion: no queue, the shown
 		// step is the asked one
-		if (snap || still || !onScreen()) { show(want); return; }
+		// (the lighter mode for phones: the step follows the scroll directly; a momentum scroll is not held back)
+		if (snap || still || lite.on || !onScreen()) { show(want); return; }
 		const wait = HOLD - (performance.now() - shownAt);
 		if (wait > 0) { holdT = setTimeout(settle, wait); return; }
 		show(step + Math.sign(want - step));
@@ -279,7 +281,7 @@
 	// the bars' steps while they are pinned, the board's once its stage is half up
 	function readStep() {
 		if (!barsBlk) return;
-		const H = innerHeight, rb = barsBlk.getBoundingClientRect(), rk = boardBlk.getBoundingClientRect();
+		const H = vp.h || innerHeight, rb = barsBlk.getBoundingClientRect(), rk = boardBlk.getBoundingClientRect();
 		const board = rk.top < H * 0.5, c = board ? KC : BC, q = Math.max(0, -(board ? rk.top : rb.top) / H), k = at(c, q);
 		want = (board ? NB : 0) + k;
 		// a dash or footnote jump shows its step at once; the positions the scroll passes on the way are not steps
@@ -312,13 +314,12 @@
 
 	onMount(() => {
 		still = matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).has("still");
-		const onResize = () => { narrow = innerWidth <= 860; readStep(); };
-		onResize();
-		const onScroll = () => { readStep(); sync(); if (hov && tapType !== "mouse") hov = null; };
+		narrow = innerWidth <= 860;
+		// scroll and resize, in the page's loop (loop.ts)
+		const onScroll = () => { if ((vp.w <= 860) !== narrow) narrow = vp.w <= 860; readStep(); sync(); if (hov && tapType !== "mouse") hov = null; };
 		// a reader's own scroll ends a jump at once
 		const own = () => { if (goal >= 0) { goal = -1; clearTimeout(goalT); readStep(); } };
-		addEventListener("resize", onResize, { passive: true });
-		addEventListener("scroll", onScroll, { passive: true });
+		const stopScroll = onPageScroll(onScroll);
 		addEventListener("wheel", own, { passive: true });
 		addEventListener("touchstart", own, { passive: true });
 		document.fonts?.ready.then(() => { widths.clear(); fontsV++; });
@@ -329,6 +330,7 @@
 			else if (field.mode === "chart" && field.owner === "rq2") { field.mode = "ground"; field.dim = 0; field.interactive = false; chart.marks = []; chart.paths = []; chart.texts = []; }
 		}), { rootMargin: "0px" });
 		io.observe(body);
+		regions.rq2 = body;
 		const onGo = (e: Event) => go((e as CustomEvent<{ i: number; instant?: boolean }>).detail.i, (e as CustomEvent<{ i: number; instant?: boolean }>).detail.instant);
 		root.addEventListener("wa-go", onGo);
 		// a footnote's ↩ (the page's list renumbers every mark, so it points at "#fnref-<n>", not this section's own id):
@@ -345,11 +347,10 @@
 			go(i);
 		};
 		document.addEventListener("click", onBack);
-		readStep();
 		// dev only: the asked and shown steps, for checking the pacing
 		if (import.meta.env.DEV) (window as unknown as { __wa: () => unknown }).__wa = () => ({ step, want, goal, prog });
 		return () => {
-			removeEventListener("resize", onResize); removeEventListener("scroll", onScroll); removeEventListener("wheel", own); removeEventListener("touchstart", own);
+			stopScroll(); removeEventListener("wheel", own); removeEventListener("touchstart", own);
 			io.disconnect(); root.removeEventListener("wa-go", onGo); document.removeEventListener("click", onBack); clearTimeout(holdT); clearTimeout(goalT);
 		};
 	});
@@ -404,7 +405,7 @@
 											<rect class="bv" class:up={grown} x={it.x - G.barW / 2} y={r.base - (G.trackH * it.own) / 100} width={G.barW} height={(G.trackH * it.own) / 100} fill={lit ? barCol(it.w) : wash(barCol(it.w))} />
 											<text class="n" class:on={grown} x={it.x} y={r.top + G.numH - 3}>{it.own}%</text>
 											{#if !narrow || it.phoneName}<text class="nm" class:on={!narrow || barFocus.has(it.w.writer)} class:strong={barFocus.has(it.w.writer)} x={it.x} y={narrow ? r.top + 9 : r.base + 14}>{it.name}</text>{/if}
-											<rect class="hit" x={it.x - it.half} y={r.top} width={it.half * 2} height={G.rh} role="presentation" onpointerenter={(e) => e.pointerType === "mouse" && (hov = it)} onpointerleave={(e) => e.pointerType === "mouse" && hov === it && (hov = null)} onpointerdown={(e) => (tapType = e.pointerType)} onclick={() => tapType !== "mouse" && (hov = hov === it ? null : it)} />
+											<rect class="hit" x={it.x - it.half} y={r.top} width={it.half * 2} height={G.rh} role="presentation" onpointerenter={(e) => e.pointerType === "mouse" && (hov = it)} onpointerleave={(e) => e.pointerType === "mouse" && hov === it && (hov = null)} onpointerdown={(e) => (tapType = e.pointerType)} onclick={(e) => tapType !== "mouse" && deliberate(e) && (hov = hov === it ? null : it)} />
 										</g>
 									{/each}
 								{/each}
@@ -507,10 +508,10 @@
 
 <style>
 	.wa { position: relative; --gut: max(16px, calc(50vw - 40rem)); }
-	.wa-body { position: relative; padding-bottom: 8vh; }
+	.wa-body { position: relative; padding-bottom: calc(8 * var(--vh, 1vh)); }
 	/* each picture: a tall block whose stage pins for its steps (LEN viewport heights each, summed in --len) */
-	.blk { position: relative; width: 100vw; margin-left: calc(50% - 50vw); height: calc(var(--len) * 100vh + 100vh); }
-	.stage { position: sticky; top: 0; height: 100vh; pointer-events: none; }
+	.blk { position: relative; width: 100vw; margin-left: calc(50% - 50vw); height: calc((var(--len) + 1) * 100 * var(--vh, 1vh)); }
+	.stage { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); pointer-events: none; }
 	.frame { position: absolute; left: var(--gut); right: var(--gut); top: 28px; bottom: 16px; display: flex; flex-direction: column; }
 
 	/* the caption band, with the headline numeral on its step */

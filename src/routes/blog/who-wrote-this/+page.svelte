@@ -248,7 +248,7 @@
 	.btn:hover { background: var(--ink); color: var(--field); }
 	.links time { margin-left: 8px; font-size: 13px; color: var(--ink2); }
 	/* a short pause of empty ground between scenes: long gaps left slow scrollers wondering whether the page had ended */
-	.breath { height: 18vh; }
+	.breath { height: calc(18 * var(--vh, 1vh)); }
 	.lede { margin-top: 0; max-width: 46rem; font-size: 19px; line-height: 1.6; }
 	/* a book's drop cap: the opening "I" spans three lines */
 	.lede::first-letter { float: left; font-family: Georgia, "Times New Roman", serif !important; font-size: calc(19px * 1.6 * 3 * 0.86); line-height: .8; font-weight: 400; margin: 6px 12px 0 -2px; color: var(--ink); }
@@ -271,9 +271,9 @@
 	.todo { margin-top: 28px; height: 180px; display: grid; place-items: center; border: 1.5px dashed var(--axis); border-radius: 3px; color: var(--ink2); font-size: 13px; }
 
 	/* the finale: full bleed and dark, the closing line at chapter size with the one print */
-	.finale { width: 100vw; margin-left: calc(50% - 50vw); height: 175vh; background: #14202D; color: #fff; }
+	.finale { width: 100vw; margin-left: calc(50% - 50vw); height: calc(175 * var(--vh, 1vh)); background: #14202D; color: #fff; }
 	.finale-in {
-		position: sticky; top: 0; min-height: 100vh; padding: 12vh max(16px, calc(50vw - 36rem));
+		position: sticky; top: 0; min-height: calc(100 * var(--vh, 1vh)); padding: calc(12 * var(--vh, 1vh)) max(16px, calc(50vw - 36rem));
 		display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6vw;
 	}
 	.closing { max-width: 18ch; font-size: clamp(36px, 5.2vw, 80px); line-height: 1.04; font-weight: 600; letter-spacing: -0.04em; text-wrap: balance; color: #fff; }
@@ -290,14 +290,14 @@
 		.body { grid-template-columns: minmax(0, 1fr); }
 	}
 	@media (max-width: 760px) {
-		.finale { height: 160vh; }
-		.finale-in { grid-template-columns: 1fr; align-content: center; gap: 6vh; padding-block: 10vh; }
+		.finale { height: calc(160 * var(--vh, 1vh)); }
+		.finale-in { grid-template-columns: 1fr; align-content: center; gap: calc(6 * var(--vh, 1vh)); padding-block: calc(10 * var(--vh, 1vh)); }
 		.top { grid-template-columns: auto 1fr auto; gap: 8px; }
 	}
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }
 		.lede { font-size: 17px; }
-		.breath { height: 12vh; }
+		.breath { height: calc(12 * var(--vh, 1vh)); }
 		.lede::first-letter { font-size: calc(17px * 1.6 * 3 * 0.86); }
 		.top nav { gap: 14px; }
 	}

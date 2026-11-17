@@ -9,7 +9,8 @@
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
 	import StepDashes from "./StepDashes.svelte";
-	import { field, chart } from "./field.svelte";
+	import { field, chart, regions } from "./field.svelte";
+	import { onScroll, view as vp, lite, onTap, requestDraw, scrolling } from "./loop";
 	import { createPrint, type Anchor, type Box, type Print } from "./print";
 	import RIDGE from "./print_text.json";
 	import C from "./content.json";
@@ -76,7 +77,8 @@
 	// a row click scrolls to where that level is held, so the print morphs there with the scroll
 	function go(n: number) {
 		const top = root.getBoundingClientRect().top + scrollY;
-		const y = top + (STEPS.indexOf(n) + 0.3) * innerHeight * STEP - innerHeight * 0.5;
+		const H = vp.h || innerHeight;
+		const y = top + (STEPS.indexOf(n) + 0.3) * H * STEP - H * 0.5;
 		scrollTo({ top: y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 	}
 
@@ -110,7 +112,7 @@
 			const enter = Math.max(0, Math.min(1, 1 - Math.max(0, s.y) / f.h, (s.y + s.h) / f.h));
 			const quiet = mast ? [p, rect(mast)] : [p];
 			lastStage = stage;
-			print.draw(ctx, { level: lv, t: f.now / 1000, dt: Math.min(0.05, f.dt), view: { w: f.w, h: f.h, dpr: f.dpr }, stage, quiet, pointer, enter, reduce, focus: insp?.id ?? null });
+			print.draw(ctx, { level: lv, t: f.now / 1000, dt: Math.min(0.05, f.dt), view: { w: f.w, h: f.h, dpr: f.dpr }, stage, quiet, pointer, enter, reduce, focus: insp?.id ?? null, follow: lite.on, calm: lite.on && scrolling() });
 			if (f.now - lastAnchors > 50) {
 				lastAnchors = f.now;
 				// labels re-render only when a print moved or faded, not on every painted frame
@@ -135,34 +137,38 @@
 		};
 
 		const onMove = (e: PointerEvent) => {
-			if (!active) return;
+			// the lighter mode (phones): the lens stays parked while a finger scrolls; a deliberate tap moves it (onTap)
+			if (!active || (lite.on && e.pointerType !== "mouse")) return;
 			pointer = { x: e.clientX, y: e.clientY };
 			lastAnchors = 0;
 		};
+		const stopTap = onTap((x, y) => { if (active && lite.on) { pointer = { x, y }; lastAnchors = 0; requestDraw(); } });
+		regions.hero = root;
 		const onLeave = () => { pointer = null; };
-		const onSize = () => { vw = innerWidth; vh = innerHeight; };
-		onSize();
-		addEventListener("resize", onSize, { passive: true });
+		vw = innerWidth; vh = innerHeight; // (then from the page's loop, which keeps a phone's height steady)
 		addEventListener("pointermove", onMove, { passive: true });
 		addEventListener("pointerdown", onMove, { passive: true });
 		document.addEventListener("pointerleave", onLeave);
 
 		const own = () => { field.mode = "paint"; field.owner = "hero"; field.dim = 0.55; field.interactive = false; };
-		// where the reader is, from the scroll position itself (robust to remounts and jumps); runs on scroll and resize,
-		// not every frame. Also retakes the canvas if a neighbour left it on the plain ground while this section is in view.
+		// where the reader is, from the scroll position itself (robust to remounts and jumps); runs in the page's loop
+		// (loop.ts) on scroll and resize, not every frame. Also retakes the canvas if a neighbour left it on the plain
+		// ground while this section is in view. Past the section the position stops counting (it would only rewrite
+		// this section's attributes on every scroll further down the page).
 		const update = () => {
 			if (active && field.mode === "ground") own();
-			const r = root.getBoundingClientRect();
-			const p = Math.max(0, (innerHeight * 0.5 - r.top) / (innerHeight * STEP));
+			if (lite.on && pointer && scrolling()) { pointer = null; lastAnchors = 0; } // a scroll parks a tapped lens again
+			if (vp.w !== vw) vw = vp.w;
+			if (vp.h !== vh) vh = vp.h;
+			const r = root.getBoundingClientRect(), H = vp.h;
+			const p = Math.min(STEPS.length + 1, Math.max(0, (H * 0.5 - r.top) / (H * STEP)));
 			if (Math.abs(p - pos) > 0.002) pos = p;
 			const k = Math.min(STEPS.length - 1, Math.floor(p));
 			// past two thirds of a step the next level starts, and the renderer plays the whole division smoothly
 			const want = k >= STEPS.length - 1 ? STEPS[k] : p - k > 0.66 ? STEPS[k + 1] : STEPS[k];
 			if (Math.abs(want - lv) > 0.001) lv = want;
 		};
-		addEventListener("scroll", update, { passive: true });
-		addEventListener("resize", update, { passive: true });
-		update();
+		const stopScroll = onScroll(update);
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
 			if (active) { own(); update(); }
@@ -170,8 +176,8 @@
 		}), { rootMargin: "0px 0px -10% 0px" });
 		io.observe(root);
 		return () => {
-			removeEventListener("pointermove", onMove); removeEventListener("pointerdown", onMove); document.removeEventListener("pointerleave", onLeave); removeEventListener("resize", onSize);
-			io.disconnect(); removeEventListener("scroll", update); removeEventListener("resize", update); print.dispose?.();
+			removeEventListener("pointermove", onMove); removeEventListener("pointerdown", onMove); stopTap(); document.removeEventListener("pointerleave", onLeave); 
+			io.disconnect(); stopScroll(); print.dispose?.();
 			if (field.owner === "hero") { field.mode = "ground"; field.dim = 0; field.owner = ""; chart.paint = null; }
 		};
 	});
@@ -215,17 +221,18 @@
 			<div class="tags" aria-hidden="true">
 				{#each tags as a (a.id)}
 					{@const lab = a.id.startsWith("lab:") ? a.id.slice(4) : ""}
-					<span
-						class="tag {a.id === 'lit' ? 'lit' : ''} {lab && !LOGO[lab] ? 'small' : ''}"
-						data-k={a.id === "human" ? "human" : a.id === "ai" ? "ai" : lab ? "lab" : "lit"}
-						style:left="{a.x}px"
-						style:top="{a.y + a.r + 14}px"
-						style:opacity={Math.min(1, a.alpha * 1.4)}
-					>
-						{#if a.id === "human"}<Icon name="human" />Human{/if}
-						{#if a.id === "ai"}<Icon name="ai" />AI{/if}
-						{#if lab}{#if LOGO[lab]}<Icon name={LOGO[lab]} />{/if}{lab}{/if}
-						{#if a.id === "lit"}<span class="who"><Icon name="check" /><b>{LIT.answers[0].verdict}</b></span>{/if}
+					<!-- placed by a transform on a wrapper (no layout as the prints move); the tag keeps its own offset -->
+					<span class="tpos" style:transform="translate({a.x}px, {a.y + a.r + 14}px)">
+						<span
+							class="tag {a.id === 'lit' ? 'lit' : ''} {lab && !LOGO[lab] ? 'small' : ''}"
+							data-k={a.id === "human" ? "human" : a.id === "ai" ? "ai" : lab ? "lab" : "lit"}
+							style:opacity={Math.min(1, a.alpha * 1.4)}
+						>
+							{#if a.id === "human"}<Icon name="human" />Human{/if}
+							{#if a.id === "ai"}<Icon name="ai" />AI{/if}
+							{#if lab}{#if LOGO[lab]}<Icon name={LOGO[lab]} />{/if}{lab}{/if}
+							{#if a.id === "lit"}<span class="who"><Icon name="check" /><b>{LIT.answers[0].verdict}</b></span>{/if}
+						</span>
 					</span>
 				{/each}
 			</div>
@@ -234,7 +241,9 @@
 				{@const lab = id.startsWith("lab:") ? id.slice(4) : ""}
 				{@const LB = lab ? LABS_H[lab] : null}
 				{@const kind = id.startsWith("writer:") ? H.crowd[Math.max(0, insp.kind)] : null}
-				<div class="insp" class:right={card.right} style:left="{card.x}px" style:top="{card.y}px" aria-live="polite">
+				<!-- the card glides after the lens by a transform on its wrapper, so following the pointer needs no layout -->
+				<div class="ipos" style:transform="translate({card.x}px, {card.y}px)">
+				<div class="insp" class:right={card.right} aria-live="polite">
 					{#if id === "main"}
 						<blockquote class="reads">“{print.lensText?.()}”</blockquote>
 					{:else if id === "human" || id === "ai"}
@@ -266,6 +275,7 @@
 						<p class="ex">{H.lit.explanation.t}</p>
 					{/if}
 				</div>
+				</div>
 			{/if}
 		{/if}
 	</div>
@@ -274,8 +284,8 @@
 </section>
 
 <style>
-	.ph { position: relative; margin-top: 24px; height: calc((var(--steps) + 0.6) * 65vh); }
-	.stick { position: sticky; top: 0; height: 100vh; pointer-events: none; }
+	.ph { position: relative; margin-top: 24px; height: calc((var(--steps) + 0.6) * 65 * var(--vh, 1vh)); }
+	.stick { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); pointer-events: none; }
 	.panel { pointer-events: auto; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: min(36%, 430px); display: grid; gap: 10px; }
 	.lead { font-size: clamp(19px, 1.9vw, 23px); line-height: 1.3; font-weight: 500; letter-spacing: -0.015em; text-wrap: balance; }
 	.panel ol { margin-top: 10px; display: grid; gap: 8px; }
@@ -299,8 +309,9 @@
 	.say-n i { position: relative; width: 22px; height: 3px; border-radius: 2px; background: var(--rule); overflow: hidden; }
 	.say-n b { position: absolute; inset: 0 auto 0 0; background: var(--ink); }
 	.tags { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
+	.tpos { position: fixed; left: 0; top: 0; }
 	.tag {
-		position: fixed; transform: translate(-50%, 0); display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; white-space: nowrap;
+		position: relative; transform: translate(-50%, 0); display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; white-space: nowrap;
 		border-radius: 3px; background: rgba(255, 255, 255, .94); font-size: 13px; font-weight: 600; color: var(--ink);
 		box-shadow: 0 4px 14px rgba(20, 32, 45, .12); transition: opacity .3s;
 	}
@@ -313,10 +324,11 @@
 	.tag.lit b { color: var(--ink); }
 	@keyframes lit-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 	/* the inspector card, hung off the lens's edge */
+	.ipos { position: fixed; left: 0; top: 0; z-index: 5; pointer-events: none; transition: transform .25s var(--ease); }
 	.insp {
-		position: fixed; z-index: 5; width: 330px; transform: translate(-100%, -50%); display: grid; gap: 8px; padding: 14px 16px;
+		position: relative; width: 330px; transform: translate(-100%, -50%); display: grid; gap: 8px; padding: 14px 16px;
 		background: #fff; border-radius: 4px; box-shadow: 0 10px 30px rgba(20, 32, 45, .16); font-size: 13px; line-height: 1.45; color: var(--ink2);
-		pointer-events: none; transition: left .25s var(--ease), top .25s var(--ease);
+		pointer-events: none;
 	}
 	.insp.right { transform: translate(0, -50%); }
 	.insp::before { content: ""; position: absolute; top: 50%; width: 18px; border-top: 1.5px solid var(--ink); right: -18px; }
@@ -365,14 +377,15 @@
 	@keyframes ring { 0% { opacity: .5; transform: scale(1); } 100% { opacity: 0; transform: scale(1.18); } }
 	@keyframes cue-in { from { opacity: 0; transform: translate(-50%, 12px); } }
 	.steps { position: absolute; inset: 0; pointer-events: none; }
-	.step { height: 65vh; }
+	.step { height: calc(65 * var(--vh, 1vh)); }
 	@media (max-width: 860px) {
 		.cue { bottom: 24px; font-size: 14px; padding: 10px 16px 10px 12px; }
 		.kinds { font-size: 11px; gap: 3px 10px; }
 		/* on a phone the card is a compact strip docked under the prints (clear of the rail's arrows at the left), holding
 		   only the name and the number, or the quote and the writer, so it never covers a print's name (Atrey, 16 Nov) */
+		.ipos { transform: none !important; transition: none; }
 		.insp {
-			width: auto; left: 48px !important; right: 12px; top: auto !important; bottom: 10px; transform: none;
+			position: fixed; width: auto; left: 48px; right: 12px; top: auto; bottom: 10px; transform: none;
 			display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: 8px 12px; transition: none;
 		}
 		.insp::before { display: none; }

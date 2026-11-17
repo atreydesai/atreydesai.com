@@ -71,8 +71,9 @@ export function fieldOf(s: Spec) {
 	return { theta, edge, ink };
 }
 
-/** Evenly spaced streamlines (Jobard and Lefer): a ridge stops where it would crowd another, which is where real ridges end. */
-export function traceRidges(s: Spec, ds: number): Float32Array[] {
+/** Evenly spaced streamlines (Jobard and Lefer): a ridge stops where it would crowd another, which is where real ridges
+ * end. A generator: step it (next()) until done; its value is the ridges. */
+export function* traceSteps(s: Spec, ds: number): Generator<void, Float32Array[], void> {
 	const { theta, edge } = fieldOf(s);
 	const h = ds * 0.3, dtest = ds * 0.6, guard = Math.ceil(dtest / h) + 3;
 	const gx0 = -HW - ds * 3, gy0 = -1 - ds * 3;
@@ -141,26 +142,40 @@ export function traceRidges(s: Spec, ds: number): Float32Array[] {
 		return pts;
 	};
 	const ridges: Float32Array[] = [], queue: Float32Array[] = [];
+	/** true when a ridge was grown (the moment a caller may pause) */
 	const trySeed = (x: number, y: number) => {
-		if (!inside(x, y) || !free(x, y, ds * 0.98, -1, 0)) return;
+		if (!inside(x, y) || !free(x, y, ds * 0.98, -1, 0)) return false;
 		const r = grow(x, y);
 		if (r) { ridges.push(r); queue.push(r); }
+		return true;
 	};
-	const drain = () => {
+	// the same seeds in the same order as one uninterrupted pass; it pauses after each ridge it grows (and every few
+	// hundred seeds tried), so a large print can be traced a few ms at a time
+	function* drain() {
 		while (queue.length) {
 			const r = queue.shift()!;
 			for (let i = 2; i < r.length - 2; i += 4) {
 				const tx = r[i + 2] - r[i - 2], ty = r[i + 3] - r[i - 1], l = Math.hypot(tx, ty) || 1;
 				const nx = (-ty / l) * ds, ny = (tx / l) * ds;
-				trySeed(r[i] + nx, r[i + 1] + ny);
-				trySeed(r[i] - nx, r[i + 1] - ny);
+				if (trySeed(r[i] + nx, r[i + 1] + ny)) yield;
+				if (trySeed(r[i] - nx, r[i + 1] - ny)) yield;
 			}
 		}
-	};
+	}
 	trySeed(0.02, 0.62);
-	drain();
-	for (let y = -1; y <= 1; y += ds * 0.7) for (let x = -HW; x <= HW; x += ds * 0.7) { trySeed(x, y); drain(); }
+	yield* drain();
+	let tried = 0;
+	for (let y = -1; y <= 1; y += ds * 0.7) for (let x = -HW; x <= HW; x += ds * 0.7) {
+		if (trySeed(x, y) || ++tried % 256 === 0) yield;
+		yield* drain();
+	}
 	return ridges;
+}
+
+/** Evenly spaced streamlines (Jobard and Lefer), traced in one go. traceSteps is the same tracing, resumable. */
+export function traceRidges(s: Spec, ds: number): Float32Array[] {
+	const g = traceSteps(s, ds);
+	for (;;) { const r = g.next(); if (r.done) return r.value; }
 }
 
 // ───────────────────────────────────────────────────────────── type on the ridges
@@ -185,6 +200,24 @@ function widthOf(ch: string) {
 		widths.set(ch, w);
 	}
 	return w;
+}
+
+// A canvas records its drawing and rasterises it when it is first used, so a print of thousands of letters set over
+// many frames would spend the whole cost in the one frame that first shows it. Drawing it onto a 1 px canvas after each
+// slice of work uses it at once, so the cost is paid slice by slice.
+// Rasterising costs several times the drawing calls that recorded it, so a slice of work gives the drawing only its
+// share of the time: rasterK (measured as it goes) is how many times longer rasterising takes than drawing.
+let probe: CanvasRenderingContext2D | null = null;
+export const raster = { k: 5 };
+/** the time to spend drawing, out of a budget that must also cover rasterising it */
+export const drawShare = (budget: number) => budget / (1 + raster.k);
+export function settleCanvas(cv: HTMLCanvasElement, drewMs = 0) {
+	if (!probe) { const c = document.createElement("canvas"); c.width = c.height = 1; probe = c.getContext("2d"); }
+	if (!probe || !cv.width || !cv.height) return;
+	const t = performance.now();
+	probe.drawImage(cv, 0, 0, 1, 1);
+	probe.canvas.width = 1; // drop the probe's own record of it
+	if (drewMs > 0.3) raster.k = Math.max(0.5, Math.min(20, raster.k + ((performance.now() - t) / drewMs - raster.k) * 0.3));
 }
 
 // Glyph angles snap to 3° steps: a rasteriser caches each letter per angle, so this is what makes setting type fast.
@@ -244,6 +277,7 @@ type Item = {
 	// built lazily
 	ds: number;
 	ridges: Float32Array[] | null;
+	trace: { q: number; run: Generator<void, Float32Array[], void> } | null; // a tracing under way (geometry, a few ms at a time)
 	field: ReturnType<typeof fieldOf> | null;
 	glyphs: Glyphs | null;
 	glyphEpoch: number;
@@ -326,7 +360,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 
 	const make = (id: string, sp: Spec, gap: number, color: string, text = body): Item => ({
 		id, spec: sp, gap, color, rgb: hexRgb(color), text, offset: Math.floor(R0() * text.length), phase: R0() * TAU,
-		lines: false, edge: 1, cap: 2600, lensPx: 0, lensFont: "", hit: { id }, aim: 1, fo: 0, ds: 0, ridges: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
+		lines: false, edge: 1, cap: 2600, lensPx: 0, lensFont: "", hit: { id }, aim: 1, fo: 0, ds: 0, ridges: null, trace: null, field: null, glyphs: null, glyphEpoch: -1, sprite: null, spriteR: 0, spriteDpr: 1, spriteEpoch: -1, full: 0,
 		rest: { x: 0, y: 0, r: 0, rot: 0, a: 0 },
 	});
 
@@ -352,6 +386,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	let L: Layout | null = null;
 	let lensMag = 3, lensA = 0, lensX = 0, lensY = 0;
 	const drawn: Item[] = [];
+	const onStage = new Set<Item>(); // the same prints as drawn, for lookups
 	let poseE = NaN, poseL: Layout | null = null;
 	let active = true, dirty = false; // busy(): something is still moving; something changed between frames
 	let lastPX = NaN, lastPY = NaN, anyFo = false;
@@ -376,17 +411,25 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 
 	// ── geometry and sprites, built on demand
 
-	function geometry(it: Item) {
+	/** true once the print's ridges suit its size; otherwise traces on until the deadline (a large print takes tens of
+	 * ms, so it is traced over several frames) and returns false */
+	function geometry(it: Item, deadline = Infinity): boolean {
 		// the ridge gap is fixed in px, so smaller prints have fewer, bolder ridges; quantised so a resize rarely retraces
 		const want = it.gap / Math.max(8, it.full);
 		const q = Math.pow(1.18, Math.round(Math.log(want) / Math.log(1.18)));
 		// ridges already traced are kept unless the print's size has changed a good deal (two steps): a stage that settles
 		// a little larger or smaller re-sets the sprite from the same ridges
-		if (it.ridges && Math.abs(Math.log(q / it.ds)) < 0.36) return;
+		if (it.ridges && Math.abs(Math.log(q / it.ds)) < 0.36) { it.trace = null; return true; }
+		if (!it.trace || it.trace.q !== q) it.trace = { q, run: traceSteps(it.spec, q) };
+		let r = it.trace.run.next();
+		while (!r.done && performance.now() < deadline) r = it.trace.run.next();
+		if (!r.done) return false;
+		it.trace = null;
 		it.ds = q;
 		it.field = fieldOf(it.spec);
-		it.ridges = traceRidges(it.spec, q);
+		it.ridges = r.value;
 		it.glyphs = null; it.lensPx = 0; splits.length = 0; // the old sprite stays up until the new one is whole
+		return true;
 	}
 	function glyphsOf(it: Item): Glyphs {
 		if (!it.glyphs || it.glyphEpoch !== fontEpoch) { it.glyphs = setType(it.ridges!, it.ds, it.text, it.offset, it.field!.ink); it.glyphEpoch = fontEpoch; }
@@ -394,15 +437,17 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	}
 	const typePx = (it: Item, r: number) => it.ds * TYPE * r;
 
-	// Sprites are set a few ms at a time, so a large print inks in over several frames instead of stalling one.
-	type Job = { it: Item; cv: HTMLCanvasElement; g: CanvasRenderingContext2D; epoch: number; dpr: number; r: number; ox: number; oy: number; k: number; i: number; G: Glyphs | null };
-	let job: Job | null = null;
+	// Sprites are set a few ms at a time, so a large print inks in over several frames instead of stalling one: first
+	// the hairline under the type (or the ink lines), a batch of ridges at a time, then the letters.
+	type Job = { it: Item; cv: HTMLCanvasElement; g: CanvasRenderingContext2D; epoch: number; dpr: number; r: number; ox: number; oy: number; k: number; i: number; G: Glyphs | null; ri: number; lw: number };
+	let job: Job | null = null; // a print on stage being set (in the frame loop)
+	let bgJob: Job | null = null; // a print off stage being set (in idle moments)
 
 	/** sprite pixels per px: the screen's, but never above 2, nor past the print's cap */
 	const scaleOf = (it: Item, dpr: number) => Math.min(dpr, 2, it.cap / (2 * it.full + 6));
 
 	function begin(it: Item, screenDpr: number): Job {
-		geometry(it);
+		geometry(it); // (already traced: the caller waits for geometry first)
 		const r = it.full, dpr = scaleOf(it, screenDpr);
 		const pad = 3, w = Math.ceil((2 * HW * r + pad * 2) * dpr), h = Math.ceil((2 * r + pad * 2) * dpr);
 		const cv = document.createElement("canvas");
@@ -412,35 +457,47 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		const fpx = typePx(it, r);
 		let G: Glyphs | null = null;
 		g.fillStyle = g.strokeStyle = it.color;
+		let lw = 0;
 		if (fpx >= 2.7 && !it.lines) {
-			// a hairline under the type keeps each ridge whole
+			// a hairline under the type keeps each ridge whole (laid in step(), a batch of ridges at a time)
 			g.lineWidth = Math.max(0.5, fpx * 0.07) * dpr; g.globalAlpha = 0.16; g.lineJoin = "round";
-			g.beginPath();
-			for (const rd of it.ridges!) { g.moveTo(ox + rd[0] * k, oy + rd[1] * k); for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k); }
-			g.stroke();
 			G = glyphsOf(it);
-			g.font = `500 ${fpx * dpr}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
 		} else {
-			// too small for type: the ridges as ink lines, pressed unevenly
+			// too small for type: the ridges as ink lines, pressed unevenly (in step())
 			g.lineCap = "round"; g.lineJoin = "round";
-			const lw = it.ds * k * 0.4;
-			for (const rd of it.ridges!) {
-				const mid = (rd.length >> 2) << 1;
-				g.globalAlpha = it.solid ? 1 : 0.55 + 0.4 * it.field!.ink(rd[mid], rd[mid + 1]);
-				g.lineWidth = lw * (it.solid ? 1.3 : 0.8 + 0.4 * it.field!.ink(rd[0], rd[1]));
-				g.beginPath(); g.moveTo(ox + rd[0] * k, oy + rd[1] * k);
-				for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k);
-				g.stroke();
-			}
+			lw = it.ds * k * 0.4;
 		}
 		// a print with nothing to show yet shows its sprite as it is set; one being re-set keeps the old until the new is whole
 		if (!it.sprite) { it.sprite = cv; it.spriteR = r; it.spriteDpr = dpr; it.spriteEpoch = -1; }
-		return { it, cv, g, epoch: fontEpoch, dpr, r, ox, oy, k, i: 0, G };
+		return { it, cv, g, epoch: fontEpoch, dpr, r, ox, oy, k, i: 0, G, ri: 0, lw };
 	}
 
-	/** set more of the job's type; true when the sprite is finished */
+	/** set more of the job's ridges, then its type; true when the sprite is finished */
 	function step(j: Job, deadline: number): boolean {
 		const { g, G, ox, oy, k } = j;
+		const rs = j.it.ridges!;
+		if (j.ri < rs.length) {
+			// the same strokes as one pass over every ridge, in batches (the hairline under type is one path per batch:
+			// its strokes are one colour and alpha, so the batches read as one)
+			const it = j.it;
+			while (j.ri < rs.length) {
+				const end = Math.min(rs.length, j.ri + 24);
+				if (G) {
+					g.beginPath();
+					for (; j.ri < end; j.ri++) { const rd = rs[j.ri]; g.moveTo(ox + rd[0] * k, oy + rd[1] * k); for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k); }
+					g.stroke();
+				} else for (; j.ri < end; j.ri++) {
+					const rd = rs[j.ri], mid = (rd.length >> 2) << 1;
+					g.globalAlpha = it.solid ? 1 : 0.55 + 0.4 * it.field!.ink(rd[mid], rd[mid + 1]);
+					g.lineWidth = j.lw * (it.solid ? 1.3 : 0.8 + 0.4 * it.field!.ink(rd[0], rd[1]));
+					g.beginPath(); g.moveTo(ox + rd[0] * k, oy + rd[1] * k);
+					for (let i = 2; i < rd.length; i += 2) g.lineTo(ox + rd[i] * k, oy + rd[i + 1] * k);
+					g.stroke();
+				}
+				if (j.ri < rs.length && performance.now() > deadline) return false;
+			}
+			if (G) { g.font = `500 ${typePx(it, j.r) * j.dpr}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle"; }
+		}
 		if (G) {
 			while (j.i < G.n) {
 				for (const end = Math.min(G.n, j.i + 48); j.i < end; j.i++) {
@@ -857,6 +914,54 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		return null;
 	}
 
+	// ── the background: ridges for the whole cast, then the sprites of prints not on stage, so that every division has
+	// its threads and every print its sprite before the reader scrolls to it. This runs in idle moments (not in the
+	// frame loop), so an idle hero redraws only when something on screen changes, and it never adds to a frame.
+	let bgAsked = false, bgOff = false;
+	function bgNext(l: Layout): Item | null {
+		for (let i = 0; i < cast.length; i++) { const it = cast[i]; if (!onStage.has(it) && it !== job?.it && stale(it)) return it; }
+		for (let i = 0; i < l.crowd.length; i++) { const it = crowd[i]; if (!onStage.has(it) && it !== job?.it && stale(it)) return it; }
+		return null;
+	}
+	/** a few ms of background work; true while more remains */
+	function bgWork(deadline: number): boolean {
+		const l = L;
+		if (!l || disposed || bgOff) return false;
+		if (!traced) {
+			traced = true;
+			for (let i = 0; i < cast.length && traced; i++) if (!cast[i].ridges && cast[i].full > 0 && (!geometry(cast[i], deadline) || performance.now() > deadline)) traced = false;
+			for (let i = 0; i < l.crowd.length && traced; i++) if (!crowd[i].ridges && crowd[i].full > 0 && (!geometry(crowd[i], deadline) || performance.now() > deadline)) traced = false;
+			if (!traced) return true;
+		}
+		for (;;) {
+			if (!bgJob) {
+				const next = bgNext(l);
+				if (!next) return false;
+				if (!geometry(next, deadline)) return true;
+				bgJob = begin(next, dprNow);
+			}
+			const j = bgJob, t0 = performance.now();
+			if (!step(j, t0 + drawShare(deadline - t0))) {
+				// rasterise what this slice drew now (a print off stage is not drawn to do it)
+				settleCanvas(j.cv, performance.now() - t0);
+				return true;
+			}
+			bgJob = null;
+			if (performance.now() > deadline) return true;
+		}
+	}
+	function askIdle() {
+		if (bgAsked || disposed || bgOff) return;
+		bgAsked = true;
+		const w = window as unknown as { requestIdleCallback?: (cb: (d: { timeRemaining(): number }) => void, o?: { timeout: number }) => number };
+		const run = (d?: { timeRemaining(): number }) => {
+			bgAsked = false;
+			const until = performance.now() + Math.min(8, d ? Math.max(2, d.timeRemaining() - 1) : 5);
+			if (bgWork(until)) askIdle();
+		};
+		if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 400 }); else setTimeout(run, 30);
+	}
+
 	function draw(ctx: CanvasRenderingContext2D, s: PrintInput) {
 		if (disposed) return;
 		const { view, stage, quiet } = s, dpr = view.dpr;
@@ -873,7 +978,8 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			const dt = Math.min(0.05, Math.max(0, s.dt));
 			// a level that slides (scroll) is followed closely, with about 120 ms of smoothing; one that leaps (a click,
 			// a key) is paced over 1.2 to 1.8 s so every division on the way plays
-			if (Math.abs(goal - lastGoal) > 0.2) leap = { from: e, to: goal, t: 0, dur: Math.max(1.2, Math.min(1.8, 0.9 + 0.3 * Math.abs(goal - e))) };
+			// (the lighter mode follows the scroll however fast it moves: a fling is not a leap)
+			if (Math.abs(goal - lastGoal) > 0.2 && !s.follow) leap = { from: e, to: goal, t: 0, dur: Math.max(1.2, Math.min(1.8, 0.9 + 0.3 * Math.abs(goal - e))) };
 			else if (leap) leap.to = goal;
 			if (leap) {
 				leap.t += dt;
@@ -889,7 +995,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			poseL = l; poseE = e;
 			pose(l, stage);
 			// who is on stage, back to front
-			drawn.length = 0;
+			drawn.length = 0; onStage.clear();
 			const p3 = clamp01(e - 2);
 			if (main.rest.a > 0.004) drawn.push(main);
 			if (p3 > 0.5) for (const it of labs) if (it.rest.a > 0.004) drawn.push(it);
@@ -898,32 +1004,42 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			if (p3 <= 0.5) for (const it of labs) if (it.rest.a > 0.004) drawn.push(it);
 			for (let i = 0; i < l.crowd.length; i++) if (crowd[i].rest.a > 0.004) drawn.push(crowd[i]);
 			if (lit.rest.a > 0.004) drawn.push(lit);
+			for (const it of drawn) onStage.add(it);
 		}
 
 		// set what is missing, a few ms a frame: what is on stage first, then the rest of the cast, so that every
 		// division has its threads ready (when motion is reduced: what is on stage, at once)
 		if (!fontReady && s.t - firstT > 1.2) fontReady = true;
-		const soon = performance.now() + 1.5, deadline = soon + 3; // wall-clock, so a slow machine does less per frame, not longer frames
+		// wall-clock, so a slow machine does less per frame, not longer frames; the letters drawn get only their share of
+		// it, since rasterising them (this frame) costs several times as much
+		const t0 = performance.now(), deadline = t0 + 4.5, drawUntil = t0 + drawShare(4.5);
 		stillNow = s.t - movedT > 0.2; dprNow = dpr;
 		let pending = false;
-		if (!s.reduce && !traced) {
-			// ridges first, for the whole cast: the divisions need them, and they are quick to trace
-			traced = true;
-			for (let i = 0; i < cast.length && traced; i++) if (!cast[i].ridges && cast[i].full > 0) { geometry(cast[i]); if (performance.now() > soon) traced = false; }
-			for (let i = 0; i < l.crowd.length && traced; i++) if (!crowd[i].ridges && crowd[i].full > 0) { geometry(crowd[i]); if (performance.now() > soon) traced = false; }
-			pending = !traced;
-		}
+		// (the rest of the cast, and every print's ridges, are set in idle moments: bgWork)
+		bgOff = s.reduce;
+		if (!s.reduce) askIdle();
 		for (;;) {
 			if (!job) {
-				const next = nextStale(l, !s.reduce);
+				const next = nextStale(l, false);
 				if (!next) break;
-				job = begin(next, dpr);
+				// a print that came on stage while it was being set in the background goes on from where it was
+				if (bgJob && bgJob.it === next) { job = bgJob; bgJob = null; }
+				else {
+					if (!geometry(next, s.reduce ? Infinity : deadline)) { pending = true; break; }
+					job = begin(next, dpr);
+				}
 			}
 			// with motion reduced there is no inking in: a print with nothing to show yet is set at once
-			const first = job.it.sprite === job.cv;
-			if (!step(job, s.reduce && first ? Infinity : deadline)) { pending = true; break; }
+			const first = job.it.sprite === job.cv, ts = performance.now();
+			if (!step(job, s.reduce && first ? Infinity : drawUntil)) {
+				pending = true;
+				// a print being re-set stays off screen until it is whole: rasterise this slice now (one being inked in
+				// is rasterised as it is stamped below)
+				if (!first) settleCanvas(job.cv, performance.now() - ts);
+				break;
+			}
 			job = null;
-			if (performance.now() > deadline) { pending = true; break; }
+			if (performance.now() > drawUntil) { pending = true; break; }
 		}
 
 		// the lens: where it is and how strongly it magnifies. It follows the pointer (on touch, the last tap); with no
@@ -996,7 +1112,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		}
 
 		const gain = clamp01(s.enter);
-		breathing = !s.reduce && gain >= 0.003;
+		breathing = !s.reduce && !s.calm && gain >= 0.003;
 		breathTick = Math.floor(s.t * BREATH_HZ); bt = breathTick / BREATH_HZ;
 		// nothing below changes state: the same inputs give the same frame, whenever the host asks for it
 		active = e !== goal || leap !== null || pending || job !== null || !fontReady || !stillNow || lensMoving || focusMoving;
@@ -1076,7 +1192,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	function dispose() {
 		disposed = true;
 		for (const it of [...cast, ...crowd]) { (it.sprite as any)?.close?.(); it.sprite = null; it.ridges = null; it.glyphs = null; }
-		tile = null; tg = null; job = null; splits.length = 0;
+		tile = null; tg = null; job = null; bgJob = null; splits.length = 0;
 	}
 
 	/** where the lens is this frame, for the host's card; null when it is not shown */

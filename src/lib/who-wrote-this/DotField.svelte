@@ -6,11 +6,15 @@
 	// changes: a dimming veil over the ground while a section owns it, the lens of swollen dots under the pointer, a
 	// section's chart marks (tweened toward their targets), or a section's own painting. It redraws only when something
 	// changed (scroll, pointer, size, the field's state, the chart's content, or a tween or painting still moving);
-	// otherwise a frame costs a few property reads and the last picture stays on the canvas.
+	// otherwise the last picture stays on the canvas. It draws at the end of the page's one loop (loop.ts), after the
+	// sections have read the layout and placed their marks, and it reads no layout itself (the loop's view has the
+	// scroll position and size); when nothing asks for a frame, nothing runs.
 	//
 	// The legacy hero variants (?art=dots|mosaic) still move every ground dot, so they draw the whole grid here.
 	import { onMount } from "svelte";
-	import { field, chart, hero, labCenters, type Box } from "./field.svelte";
+	import { field, chart, hero, labCenters, regions, type Box } from "./field.svelte";
+	import { view as vp, lite, onTap, requestDraw, setDrawer } from "./loop";
+	import { spritesVersion } from "./print/sprites";
 
 	const PITCH = 18;
 	const INK: RGB = [20, 32, 45];
@@ -29,22 +33,24 @@
 		const canvas = document.createElement("canvas");
 		canvas.className = "wwt-field";
 		canvas.setAttribute("aria-hidden", "true");
-		Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100vw", height: "100vh", zIndex: "0", pointerEvents: "none" });
+		// (its height is the page's steady viewport height on a touch screen: loop.ts sets --vh)
+		Object.assign(canvas.style, { position: "fixed", left: "0", top: "0", width: "100vw", height: "calc(100 * var(--vh, 1vh))", zIndex: "0", pointerEvents: "none" });
 		document.body.prepend(canvas);
 		const ctx = canvas.getContext("2d")!;
 		const reduceMQ = matchMedia("(prefers-reduced-motion: reduce)");
-		let W = 0, H = 0, dpr = 1, raf = 0, last = performance.now();
+		let W = 0, H = 0, dpr = 1, last = performance.now();
 		let dots: Dot[] = [];
 		const live = new Map<string, Live>();
 		const pointer = { x: -999, y: -999 };
 		let pointerMoved = false, resized = true, lastScroll = -1, lastKey = "", lastSig = NaN;
 		let dimE = 0, animating = false, paintBusy = false, lensDrawn = false, legacyOn = false;
+		let shownOwner = "", lastShows = true, lastSprites = 0; // the lighter mode: whose chart is on the canvas, and whether it may be
 		// this frame's view of the field (one read each, not one per dot)
 		const F = { mode: "ground" as string, level: 0, dim: 0, shape: "dot" as string, hover: null as string | null, anchor: field.anchor };
 
 		function resize() {
 			dpr = Math.min(2, devicePixelRatio || 1);
-			W = innerWidth; H = innerHeight;
+			W = vp.w || innerWidth; H = vp.h || innerHeight;
 			canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 			if (legacyOn) buildDots();
@@ -209,7 +215,8 @@
 				seen.add(m.id);
 				let l = live.get(m.id);
 				if (!l) { // a new mark lifts off the ground near where it is going (or appears in place, if it snaps)
-					const a = Math.random() * 6.28, d = m.snap ? 0 : 140 + Math.random() * 220;
+					// (the lighter mode: in place, growing and fading in, with no flight across the screen)
+					const a = Math.random() * 6.28, d = m.snap || lite.on ? 0 : 140 + Math.random() * 220;
 					l = { x: m.x + Math.cos(a) * d, y: m.y + Math.sin(a) * d, r: m.snap ? m.r : 1.1, a: 0.1, tx: m.x, ty: m.y };
 					live.set(m.id, l);
 				}
@@ -244,21 +251,22 @@
 		}
 
 		function frame(now: number) {
-			raf = requestAnimationFrame(frame);
 			// the viewport can change size without a resize event (device emulation, zoom): keep the canvas matched
-			if (innerWidth !== W || innerHeight !== H) resize();
-			const dt = Math.min(0.05, (now - last) / 1000);
+			if (vp.w !== W || vp.h !== H || Math.min(2, devicePixelRatio || 1) !== dpr) resize();
+			// (after a rest the first step is one frame's, as when the loop ran every frame)
+			const dt = now - last > 100 ? 1 / 60 : Math.min(0.05, (now - last) / 1000);
 			last = now;
 			const reduce = reduceMQ.matches;
 			F.mode = field.mode; F.level = field.level; F.dim = field.dim; F.shape = field.shape; F.hover = field.hover;
 			const legacy = F.mode === "levels" || F.shape === "tile";
 			setLegacy(legacy);
 			if (legacy) F.anchor = field.anchor;
-			const sy = scrollY, scrolled = sy !== lastScroll;
+			const sy = vp.y, scrolled = sy !== lastScroll;
 			lastScroll = sy;
 			const moved = pointerMoved;
 			pointerMoved = false;
-			const k = reduce ? 1 : 1 - Math.pow(0.0015, dt);
+			// (the lighter mode settles about three times sooner, so fewer marks are in flight at once)
+			const k = reduce ? 1 : 1 - Math.pow(lite.on ? 0.00005 : 0.0015, dt);
 			const dimWas = dimE;
 			dimE += (F.dim - dimE) * k;
 			if (Math.abs(F.dim - dimE) < 0.002) dimE = F.dim;
@@ -267,13 +275,31 @@
 			lastKey = key;
 			let chartChanged = false;
 			if (F.mode === "chart") { const sig = chartSig(); chartChanged = sig !== lastSig; lastSig = sig; } else lastSig = NaN;
+			// a print handed out blank has been filled in (print/sprites.ts)
+			if (spritesVersion() !== lastSprites) { lastSprites = spritesVersion(); if (F.mode === "chart") chartChanged = true; }
+			// The lighter mode (phones): a section's chart or painting is drawn only while that section owns the field, gave
+			// the content itself, and has its picture on screen; a change of owner starts from a clear canvas (a fast flick
+			// can leave the last owner's marks behind for a frame or two otherwise). Scrolling closes any card.
+			let shows = true;
+			if (lite.on) {
+				const owner = field.owner;
+				if (owner !== shownOwner) { shownOwner = owner; live.clear(); lastSig = NaN; chartChanged = true; }
+				const el = regions[owner];
+				const r = el && (F.mode === "chart" || F.mode === "paint") ? el.getBoundingClientRect() : null;
+				shows = (F.mode !== "chart" || chart.from === owner) && (!r || (r.bottom > 0 && r.top < H));
+				if (scrolled && field.hover !== null) field.hover = null;
+			}
+			const showsChanged = shows !== lastShows;
+			lastShows = shows;
 			const lensWanted = !reduce && !legacy && F.mode === "ground" && pointer.x > -900;
-			const dirty = resized || stateChanged || dimWas !== dimE || animating || chartChanged
+			const dirty = resized || stateChanged || dimWas !== dimE || animating || chartChanged || showsChanged
 				|| (F.mode === "paint" && paintBusy)
 				|| (scrolled && (legacy || lensDrawn || lensWanted || F.mode === "paint"))
 				|| (moved && (legacy || lensDrawn || lensWanted || F.mode === "paint"));
 			resized = false;
 			if (!dirty) return;
+			// still moving after this frame: ask for the next (the loop runs only when asked)
+			const again = () => { if (animating || (F.mode === "paint" && paintBusy)) requestDraw(); };
 
 			ctx.clearRect(0, 0, W, H);
 			animating = false;
@@ -281,16 +307,23 @@
 			if (legacy) animating = drawLegacy(k, now, sy, !reduce && F.mode !== "chart" && F.mode !== "paint");
 			else {
 				// a veil of the ground colour dims the CSS dots behind a section's chart or painting
-				if (dimE > 0.004) { ctx.fillStyle = `rgba(232,232,227,${(dimE * 0.85).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
+				if (dimE > 0.004 && shows) { ctx.fillStyle = `rgba(232,232,227,${(dimE * 0.85).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
 				if (lensWanted) { drawLens(sy); lensDrawn = true; }
 			}
-			if (F.mode === "chart") animating = drawChart(k) || animating;
-			paintBusy = F.mode === "paint" && chart.paint ? chart.paint(ctx, { now, dt, w: W, h: H, dpr }) !== false : false;
+			if (F.mode === "chart" && shows) animating = drawChart(k) || animating;
+			paintBusy = F.mode === "paint" && chart.paint && shows ? chart.paint(ctx, { now, dt, w: W, h: H, dpr }) !== false : false;
+			// the veil easing toward its level is a change the next frame must draw
+			if (dimE !== F.dim) animating = true;
+			again();
 		}
 
 		function onMove(e: PointerEvent) {
+			// the lighter mode: a finger on the screen is scrolling, so neither the lens nor a hover follows it (a
+			// deliberate tap opens a card: onTap below)
+			if (lite.on && e.pointerType !== "mouse") return;
 			pointer.x = e.clientX; pointer.y = e.clientY;
 			pointerMoved = true;
+			requestDraw();
 			if (field.mode !== "chart" || !field.interactive) { if (field.hover) field.hover = null; return; }
 			let best: string | null = null, bd = 14;
 			for (const m of chart.marks) {
@@ -300,16 +333,30 @@
 			}
 			if (best !== field.hover) field.hover = best;
 		}
-		const onLeave = () => { pointer.x = pointer.y = -999; pointerMoved = true; };
+		const onLeave = () => { pointer.x = pointer.y = -999; pointerMoved = true; requestDraw(); };
+		// a deliberate tap on a chart (the lighter mode) opens the mark's card, or closes it
+		const stopTap = onTap((x, y) => {
+			if (!lite.on || field.mode !== "chart" || !field.interactive) return;
+			let best: string | null = null, bd = 22; // a fingertip's reach
+			for (const m of chart.marks) {
+				if ((m.alpha ?? 1) < 0.3) continue;
+				const d = Math.hypot(m.x - x, m.y - y);
+				if (d < bd) { bd = d; best = m.group ?? m.id; }
+			}
+			field.hover = best === field.hover ? null : best;
+		});
 
 		resize();
-		addEventListener("resize", resize);
 		addEventListener("pointermove", onMove, { passive: true });
 		document.addEventListener("pointerleave", onLeave);
-		raf = requestAnimationFrame(frame);
+		setDrawer(frame);
+		// a change to the field's state asks for a frame (the chart's content asks by itself: field.svelte.ts)
+		const stopWatch = $effect.root(() => {
+			$effect(() => { void [field.mode, field.level, field.dim, field.shape, field.hover, field.interactive, field.anchor]; requestDraw(); });
+		});
 		return () => {
-			cancelAnimationFrame(raf);
-			removeEventListener("resize", resize);
+			setDrawer(null);
+			stopWatch(); stopTap();
 			removeEventListener("pointermove", onMove);
 			document.removeEventListener("pointerleave", onLeave);
 			canvas.remove();

@@ -3,8 +3,10 @@
 	// the site links: the sections by short name, with up and down arrows. Once the reader scrolls past the header, the
 	// names fly to a quiet rail on the left and shrink into dots (FLIP: each rail item starts where its name was);
 	// scrolling back up sends them home the same way. Up and down skip a whole section; a name or dot jumps there;
-	// [ and ] also skip. Updates on scroll and on the header leaving view, never per frame.
+	// [ and ] also skip. Updates on scroll (in the page's loop, from the sections' cached places) and on the header
+	// leaving view, never per frame.
 	import { onMount, tick } from "svelte";
+	import { docBox, onScroll, view as vp } from "./loop";
 
 	type Stop = { id: string; short: string; label: string };
 	let { stops }: { stops: Stop[] } = $props();
@@ -16,7 +18,7 @@
 	const inlineEls: HTMLElement[] = $state([]);
 	const railEls: HTMLElement[] = $state([]);
 	const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-	const tops = () => stops.map((s) => { const e = document.getElementById(s.id); return e ? e.getBoundingClientRect().top + scrollY : Infinity; });
+	const tops = () => stops.map((s) => { const e = document.getElementById(s.id); return e ? docBox(e).top : Infinity; });
 	function go(i: number) {
 		// jumps are instant: a smooth scroll played every section's animations on the way, a speed run (Marzena, 16 Nov)
 		if (i < 0) { scrollTo({ top: 0, behavior: "instant" }); return; }
@@ -43,13 +45,15 @@
 	}
 
 	onMount(() => {
+		let finale: Element | null = null;
 		const update = () => {
-			const ts = tops(), y = scrollY + innerHeight * 0.4;
+			const ts = tops(), y = vp.y + vp.h * 0.4;
 			let c = -1;
 			for (let i = 0; i < ts.length; i++) if (ts[i] <= y) c = i;
 			if (c !== current) current = c;
 			if (c >= 0) {
-				const end = c + 1 < ts.length ? ts[c + 1] : (document.querySelector(".finale")?.getBoundingClientRect().top ?? innerHeight) + scrollY;
+				finale ??= document.querySelector(".finale");
+				const end = c + 1 < ts.length ? ts[c + 1] : finale ? docBox(finale).top : vp.h + vp.y;
 				const w = Math.max(0, Math.min(1, (y - ts[c]) / Math.max(1, end - ts[c])));
 				if (Math.abs(w - within) > 0.005) within = w;
 			}
@@ -65,11 +69,9 @@
 			if (e.key === "]") { e.preventDefault(); step(1); }
 			if (e.key === "[") { e.preventDefault(); step(-1); }
 		};
-		update();
-		addEventListener("scroll", update, { passive: true });
-		addEventListener("resize", update, { passive: true });
+		const stopScroll = onScroll(update);
 		addEventListener("keydown", onKey);
-		return () => { io.disconnect(); removeEventListener("scroll", update); removeEventListener("resize", update); removeEventListener("keydown", onKey); };
+		return () => { io.disconnect(); stopScroll(); removeEventListener("keydown", onKey); };
 	});
 </script>
 
