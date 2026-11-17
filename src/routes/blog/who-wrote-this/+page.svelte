@@ -2,7 +2,6 @@
 	// The paper launch page. It brings its own chrome and theme (the llm-detectors house style: warm gray
 	// dotted ground, Inter, Figure 1's question colours) in place of the site's header, footer and palette.
 	// All copy is paper text, from content.json (built in the private llm-detectors repo, docs/launch_20261116).
-	import { onMount, setContext } from "svelte";
 	import { dev } from '$app/env';
 	import Seo from "#lib/components/Seo.svelte";
 	import { SITE_URL } from "#lib/seo.ts";
@@ -13,8 +12,6 @@
 	import PrintMark from "#lib/who-wrote-this/PrintMark.svelte";
 	import ScrollHint from "#lib/who-wrote-this/ScrollHint.svelte";
 	import ShareBlock from "#lib/who-wrote-this/ShareBlock.svelte";
-	import { field } from "#lib/who-wrote-this/field.svelte.ts";
-	import Levels from "#lib/who-wrote-this/Levels.svelte";
 	import PrintHero from "#lib/who-wrote-this/PrintHero.svelte";
 	import Timeline from "#lib/who-wrote-this/Timeline.svelte";
 	import HumanOrAIB from "#lib/who-wrote-this/HumanOrAIB.svelte";
@@ -28,9 +25,6 @@
 
 	let { data }: { data: PageData } = $props();
 	const post = $derived(data.post);
-	const art = $derived(data.art);
-	setContext("wwt-art", () => data.art);
-	$effect(() => { field.shape = art === "mosaic" ? "tile" : "dot"; });
 	const url = `${SITE_URL}/blog/who-wrote-this/`;
 	const affIndex = Object.fromEntries(C.meta.affiliations.map((a, i) => [a.key, i + 1]));
 	const nav = [
@@ -39,7 +33,7 @@
 		{ name: "about", href: "/about/" },
 	];
 
-	// the side rail's stops, and the scroll-speed spacing (elastic.ts) for every [data-lag] block on the page
+	// the side rail's stops
 	const stops = [
 		{ id: "levels", short: "Intro", label: C.meta.title.t },
 		{ id: C.timeline.id, short: "Over time", label: C.timeline.title.t.replace(/\.$/, "") },
@@ -174,13 +168,7 @@
 			</div>
 		</header>
 
-		{#key art}
-			{#if art === "print"}
-				<PrintHero />
-			{:else}
-				<Levels art={art} />
-			{/if}
-		{/key}
+		<PrintHero />
 
 		<!-- the lede has a screen of its own: it is the paper's argument in one paragraph, so nothing above or below shares
 		     the view with it (Atrey, 16 Nov); it holds in place for a stretch of scroll, longer for a fast scroll (LedeHold,
