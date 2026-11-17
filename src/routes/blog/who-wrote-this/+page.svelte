@@ -183,6 +183,8 @@
 			<div class="links">
 				{#each C.meta.links as l}<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>{/each}
 			</div>
+			<!-- credit for a linked site that a coauthor built (meta.links[].credit; Ty's model profiles, Atrey, 16 Nov) -->
+			{#each C.meta.links.filter((l) => "credit" in l && l.credit) as l}<p class="credit">{l.credit}</p>{/each}
 			<FootnoteList />
 		</footer>
 	</article>
@@ -282,6 +284,7 @@
 	/* the lede's highlights, and selection, in a deep rose (rgb 126 34 62) */
 	.lede :global(mark.hl) { color: rgb(126, 34, 62); background: linear-gradient(transparent 58%, rgba(126, 34, 62, .14) 58%); padding: 0 1px; font-weight: 500; }
 	.byline.small { font-size: 13px; color: var(--ink2); margin-top: 24px; max-width: 52rem; }
+	.credit { margin-top: 10px; font-size: 13px; color: var(--ink2); }
 	.site-foot { display: flex; justify-content: space-between; gap: 16px; padding-block: 28px 40px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink2); }
 	.site-foot span { display: flex; gap: 16px; }
 	.site-foot a { text-decoration: none; }

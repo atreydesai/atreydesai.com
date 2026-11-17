@@ -135,6 +135,13 @@
     "t": "Thread",
     "href": "#THREAD_URL",
     "icon": "x"
+   },
+   {
+    "id": "profiles",
+    "t": "Model profiles",
+    "href": "https://model-profiles.github.io/",
+    "icon": "ai",
+    "credit": "Model profiles by Ty Brassington"
    }
   ]
  },
@@ -547,7 +554,9 @@
   "Dots",
   "Fingerprint",
   "Mosaic",
-  "Art"
+  "Art",
+  "Model profiles",
+  "Model profiles by Ty Brassington"
  ],
  "levels": {
   "lead": {
