@@ -221,7 +221,7 @@
 	let narrow = $state(false);
 	let fontsV = $state(0);
 	let bw = $state(0), bh = $state(0), kw = $state(0), kh = $state(0), fw = $state(0);
-	let hov = $state<BarIt | null>(null);
+	let hov = $state.raw<BarIt | null>(null); // raw: the leave test compares it with the bar itself (a proxy never equals it)
 	let tapType = "mouse";
 	let root: HTMLElement, body: HTMLElement, barsBlk: HTMLElement, boardBlk: HTMLElement;
 

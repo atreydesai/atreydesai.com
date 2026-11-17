@@ -106,6 +106,7 @@
 	let W = $state(0), H = $state(0), capMax = $state(0);
 	let ctlH = $state(0); // the controls' natural height: on a phone they wrap to three rows
 	let cap: HTMLElement;
+	let capH = $state(0); // the caption band's height: the phone's group card covers it exactly
 	let ox = $state(0), oy = $state(0); // the stage's viewport offset
 	let reduce = $state(false);
 	// the opener's prints arrive once mounted: SectionOpener sizes them for a wide screen on its first render, and on a
@@ -486,13 +487,16 @@
 				style="left:{geo.stackKeys ? geo.keyX : 0}px; top:{geo.keyY - 13}px; width:{geo.stackKeys ? geo.num.w : W}px">{#each REFUSAL as p}{#if p.em}<b style:color={CLAY}>{p.t}</b>{:else}{p.t}{/if}{/each}</p>
 			{#if tip && active && sel !== null && geo.g[sel]}
 				{@const g = geo.g[sel]}
-				<div class="tip" class:flip={g.x + g.gw > W - 220} style="left:{g.x + g.gw + 12}px; top:{g.y}px; --gw:{g.gw + 24}px" role="status">
+				<!-- on a narrow screen the card docks over the caption band at the bottom, like the hero's phone card: beside a
+				     middle group it ran off the screen's edge, and under the groups the keys' layer covered it -->
+				{@const below = W < 600}
+				<div class="tip" class:flip={!below && g.x + g.gw > W - 220} class:below style={below ? `min-height:${capH}px` : `left:${g.x + g.gw + 12}px; top:${g.y}px; --gw:${g.gw + 24}px`} role="status">
 					<b>{tip.h}</b><span class="tv">{tip.v}</span>{#each tip.s as s}<span>{s}</span>{/each}
 				</div>
 			{/if}
 
 			<!-- the narration: a caption band along the bottom; the dashes jump to a step; the controls open inside it -->
-			<div class="cap" bind:this={cap}>
+			<div class="cap" bind:this={cap} bind:clientHeight={capH}>
 				<StepDashes count={STEPS.length} current={step} {progress} {go} />
 				<div class="say" aria-live="polite" bind:clientHeight={capMax}>
 					{#each STEPS as s, i}
@@ -579,6 +583,7 @@
 	.hit:focus-visible { outline: 2px solid var(--ink); outline-offset: 0; }
 	.tip { position: absolute; z-index: 5; display: grid; gap: 2px; min-width: 150px; padding: 9px 12px; background: #fff; border-radius: 3px; box-shadow: 0 6px 20px rgba(20, 32, 45, .14); font-size: 12.5px; color: var(--ink2); pointer-events: none; white-space: nowrap; }
 	.tip.flip { transform: translateX(calc(-100% - var(--gw))); }
+	.tip.below { z-index: 40; left: 0; right: 0; bottom: 16px; align-content: start; min-width: 0; padding: 12px 16px; white-space: normal; box-shadow: 0 8px 26px rgba(20, 32, 45, .18); }
 	.tip b { font-size: 13.5px; color: var(--ink); }
 	.tv { font-size: 20px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 	@media (max-width: 759px) {
