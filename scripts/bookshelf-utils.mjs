@@ -1,13 +1,14 @@
 // Frontmatter editing and text helpers shared by the bookshelf sync scripts.
 
-import yaml from "js-yaml";
+import { load } from "js-yaml";
 
 export function parseFrontmatter(text) {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) return null;
 
   return {
-    data: yaml.load(match[1]) ?? {},
+    // js-yaml 5 throws on empty input, where 4 returned undefined.
+    data: (match[1].trim() ? load(match[1]) : null) ?? {},
     lines: match[1].split(/\r?\n/),
     end: match[0].length,
   };

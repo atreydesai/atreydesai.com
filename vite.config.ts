@@ -3,7 +3,7 @@ import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import pluginYaml from "@rollup/plugin-yaml";
-import yaml from "js-yaml";
+import { load } from "js-yaml";
 import { dataToEsm } from "@rollup/pluginutils";
 import { execSync } from "child_process";
 import type { UserConfig } from "vite";
@@ -39,7 +39,9 @@ function markdown() {
           if (!match) {
             throw new Error(`Unclosed YAML frontmatter in ${id}`);
           }
-          frontmatter = yaml.load(match[1].trim()) as any;
+          // js-yaml 5 throws on empty input, where 4 returned undefined.
+          const fm = match[1].trim();
+          frontmatter = fm ? (load(fm) as any) : {};
           content = src.slice(3 + match[0].length).trim();
         }
         return {
