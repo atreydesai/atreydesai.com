@@ -5,10 +5,12 @@
 	// and full width below. One idea per step, each move starting where the last one ended:
 	//   ask       the question card appears, an arrow carries it to the model, and the 0–3 scale rises as four steps
 	//             (in the groups' places)
-	//   answer    an arrow carries the model's two answers out ("familiarity: 3"); a leader runs from them down to step
-	//             3, which lights
-	//   sort      this writer's texts leave the account, pass under the answers and follow the leader into group 3
-	//             (the label rides with them); then each step fills with every other text, in place, from the bottom
+	//   answer    an arrow carries the model's two answers out ("familiarity: 3", named as the two independent calls); a
+	//             leader runs from them down to step 3, which lights
+	//   sort      the two answers give way to one chip, their average and what it means ("average: 3", "3 = very
+	//             familiar"), at the leader's top; this writer's texts leave the account, pass under it and follow the
+	//             leader into group 3 (the label rides with them), which is then outlined; each step fills with every
+	//             other text, in place, from the bottom, and takes its rating above it ("rated 2.5–3") as its step fades
 	//   light     each group lights to how often the model named the writer (Figure rq3_familiarity, 1 tile = 1% of
 	//             texts, in the model's colour), with the number large above it
 	//   takeaway  a line traces the lit levels: the steps of the scale again, now as accuracy; the controls open in one
@@ -80,7 +82,8 @@
 	const CLARITY = [0.1, 0.4, 0.7, 1]; // legibility of the prints in each familiarity group, least to most familiar
 	const est = (t: string) => 30 + t.length * 7.1; // a tag's width, for laying tags side by side
 	// the entrance timeline of the diagram (seconds after the reader arrives at the step from the one before)
-	const T = { card: 0.1, arrow1: 0.5, model: 0.9, rise: 1.25, arrow2: 0.1, chip: [0.5, 0.9], leader: 1.25, lit: 1.7 };
+	// (merge: in the sort step, when the two answers give way to their average)
+	const T = { card: 0.1, arrow1: 0.5, model: 0.9, rise: 1.25, arrow2: 0.1, chip: [0.5, 0.9], leader: 1.25, lit: 1.7, merge: 0.1 };
 	// the sort: the writer's texts move along the diagram (A), then down the leader (B); each step then fills
 	const S = { a0: 0.1, a1: 0.85, b1: 1.75, gone3: 1.2, fill: 1.9, gap: 0.25, row: 0.035 };
 
@@ -118,7 +121,9 @@
 	const arrow1On = $derived(diagOn && from("ask", T.arrow1));
 	const modelOn = $derived(diagOn && from("ask", T.model));
 	const arrow2On = $derived(answered && from("answer", T.arrow2));
-	const chipOn = $derived(T.chip.map((t) => answered && from("answer", t)));
+	// in the sort step the two answers give way to their average, the rating the grouping uses
+	const merged = $derived(view === "sort" && from("sort", T.merge));
+	const chipOn = $derived(T.chip.map((t) => answered && from("answer", t) && !merged));
 	const leaderOn = $derived(answered && from("answer", T.leader));
 
 	// where everything sits, in stage coordinates; it depends on the size only (never on the step), so the groups keep
@@ -212,6 +217,11 @@
 		t.push({ id: "acct", x: X(geo.acct.x), y: Y(geo.acct.y), t: L.account, icon: "reddit", at: "right", alpha: cardOn ? 1 : 0 });
 		t.push({ id: "mdl", x: X(geo.mdl.x), y: Y(geo.mdl.y), t: MODELS.Opus, color: OPUS, at: narrow ? "right" : "below", alpha: modelOn ? 1 : 0 });
 		geo.ans.y.forEach((y, j) => t.push({ id: `ans${j}`, x: X(geo.ans.x), y: Y(y), t: L.answer, color: OPUS, strong: true, at: "center", alpha: chipOn[j] ? 1 : 0 }));
+		// what the two answers are: beside them where there is room, else under them
+		const mid = (geo.ans.y[0] + geo.ans.y[1]) / 2, side = !narrow && geo.ans.x + 62 + est(L.calls) < W;
+		t.push({ id: "calls", x: X(side ? geo.ans.x + 62 : geo.ans.x), y: Y(side ? mid : geo.ans.y[1] + 16), t: L.calls, at: side ? "right" : "below", alpha: chipOn[1] ? 1 : 0 });
+		// then their average, the rating the grouping uses, with what it means on the scale (it ends where the leader starts)
+		t.push({ id: "avg", x: X(geo.ans.x), y: Y(mid), t: L.average, sub: L.scale3, color: OPUS, strong: true, at: "center", alpha: merged ? 1 : 0 });
 		const key: { t: string; color: string }[] = [];
 		if (mode === "sort") key.push({ t: L.unit, color: OFF });
 		else if (mode === "light" || mode === "takeaway") key.push({ t: `${MODELS[model]} ${L.named}`, color: mcolor }, { t: L.not_named, color: OFF });
@@ -304,7 +314,19 @@
 			if (e < S.a1) { const k = inout((e - S.a0) / (S.a1 - S.a0)); at = { x: lane.x0 + (lane.x1 - lane.x0) * k, y: lane.y }; }
 			else at = bez({ x: lane.x1, y: lane.y }, end, inout((e - S.a1) / (S.b1 - S.a1)));
 			const fillAt = (gi: number) => S.fill + S.gap * gi;
-			stairs(paths, texts, [1, 1, 1, 1], true, [0, 1, 2, 3].map((i) => 1 - ease((e - (i === ANSWER ? S.gone3 : fillAt(i))) / 0.4)));
+			const fade = [0, 1, 2, 3].map((i) => ease((e - (i === ANSWER ? S.gone3 : fillAt(i))) / 0.4));
+			stairs(paths, texts, [1, 1, 1, 1], true, fade.map((f) => 1 - f));
+			// as each step gives way to its group, the group takes its rating above it (the average of the two calls, as
+			// the chip shows it); the alpha rides on y by a hair, so the fade redraws the canvas
+			G4.forEach((g, gi) => {
+				if (fade[gi] <= 0.01) return;
+				texts.push({ x: ox + g.x, y: oy + g.y - (narrow ? 15 : 19) + fade[gi] * 0.001, t: `${L.rated} ${GROUPS[gi].bin}`, color: rgba(INK, fade[gi]), size: narrow ? 13 : 16, weight: 600 });
+			});
+			// the group this writer's texts land in, outlined once they arrive
+			{
+				const g = G4[ANSWER], w = g.gw, x = ox + g.x - 5, y = oy + g.y - 5;
+				paths.push({ pts: [[x + w / 2 + 5, y], [x + w + 10, y], [x + w + 10, y + w + 10], [x, y + w + 10], [x, y], [x + w / 2 + 5, y]], color: INK, width: 1.5, progress: ease((e - S.b1) / 0.6) });
+			}
 			G4.forEach((g, gi) => {
 				for (let i = 0; i < 100; i++) {
 					const writer = gi === ANSWER && WRITER.includes(i);

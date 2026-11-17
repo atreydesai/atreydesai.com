@@ -29,8 +29,8 @@
   {
    "view": "sort",
    "fn": 2,
-   "t": "We group accounts by each model's own rating.",
-   "src": "paper/sections/06_discussion.tex"
+   "t": "We group accounts by each model's own rating: how well it knows someone, given only their name or username.",
+   "src": "paper/sections/06_discussion.tex + paper/sections/02_introduction.tex"
   },
   {
    "view": "light",
@@ -168,7 +168,11 @@
   "question": "Do you recognize this account?",
   "account": "u/[username]",
   "answer": "familiarity: 3",
-  "writer": "This writer's texts"
+  "writer": "This writer's texts",
+  "calls": "two independent calls",
+  "average": "average: 3",
+  "scale3": "3 = very familiar",
+  "rated": "rated"
  },
  "ui": [
   "Familiarity",
@@ -190,13 +194,17 @@
   "<1%",
   "lowest effort",
   "Added at highest effort",
-  "Lost at highest effort"
+  "Lost at highest effort",
+  "rated"
  ],
  "demo": [
   "Do you recognize this account?",
   "u/[username]",
   "familiarity: 3",
-  "This writer's texts"
+  "This writer's texts",
+  "two independent calls",
+  "average: 3",
+  "3 = very familiar"
  ],
  "data": {
   "bins": {
