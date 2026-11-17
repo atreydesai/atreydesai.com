@@ -28,6 +28,7 @@ export interface Paper {
     imageDescription: string | null;
     image?: string | null;
     classProject?: boolean;  // Distinguishes class projects from regular papers
+    hidden?: boolean;  // Not listed anywhere yet (shown under `npm run dev` only); its banner updates wait with it
 }
 
 export interface Talk {
@@ -94,6 +95,8 @@ export interface BannerUpdate {
     kind?: BannerUpdateKind;
     /** Inline markdown: **bold** and [links](url). */
     text: string;
+    /** A paper's id: the update shows only once that paper is listed (not `hidden`). */
+    paper?: string;
 }
 
 export interface HomepageData {
@@ -150,6 +153,8 @@ export const papers: Paper[] = Object.entries(paperModules)
     });
     return mod as unknown as Paper;
     })
+    // a hidden paper (one being readied for launch) is left out of every listing; dev shows it for previewing
+    .filter((p) => dev || !p.hidden)
     .sort((a, b) => {
     if (a.year !== b.year) return b.year - a.year;
         return (a.priority ?? 99) - (b.priority ?? 99);  // Secondary sort by priority (lower = higher priority)
@@ -183,4 +188,16 @@ import homepageYaml from '../content/homepage.yaml';
 
 export const talks: Talk[] = talksYaml as unknown as Talk[];
 export const aboutData: AboutData = aboutYaml as unknown as AboutData;
-export const homepageData: HomepageData = homepageYaml as unknown as HomepageData;
+// Banner updates tied to a paper (`paper: <id>`) wait until that paper is listed, so a launch's announcement and its
+// paper appear together.
+const listedPaperIds = new Set(papers.map((p) => p.id));
+const homepageRaw = homepageYaml as unknown as HomepageData;
+export const homepageData: HomepageData = homepageRaw.banner
+    ? {
+          ...homepageRaw,
+          banner: {
+              ...homepageRaw.banner,
+              updates: homepageRaw.banner.updates?.filter((u) => !u.paper || listedPaperIds.has(u.paper)),
+          },
+      }
+    : homepageRaw;

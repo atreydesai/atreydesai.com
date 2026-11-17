@@ -32,12 +32,20 @@ banner:
   #         announcement: "New blog post: …", "New paper on arXiv: …",
   #         "Accepted to …". Links to this site (/blog/..., /research/#id)
   #         stay in the same tab; others open a new one.
+  #   paper: (optional) a paper's id: the update shows only once that paper
+  #         is listed, i.e. its file in src/content/papers/ is not `hidden`.
   # Sources for the dates below: blog posts from their frontmatter; arXiv v1
   # submission dates from arxiv.org/abs; ACL 2026's official notification
   # date (2026.aclweb.org); the TLS 2026 schedule; ACM Computing Surveys
   # online date (Crossref, doi 10.1145/3850160); the EMM-QA
   # workshop day at ICML 2026 (qanta-org.github.io).
   updates:
+    # Hidden with its paper (unmasking-authors.md, `hidden: true`) until the
+    # launch; set the date to the launch day when it goes up.
+    - date: "2026-11-17"
+      kind: paper
+      paper: unmasking-authors
+      text: "New paper: [Frontier models need only one text to unmask its human or AI author](/research/#unmasking-authors), with an [interactive explainer](/blog/who-wrote-this/)."
     - date: "2026-10-09"
       kind: paper
       text: "New blog post: [Prose diff](/blog/prose-diff/)."

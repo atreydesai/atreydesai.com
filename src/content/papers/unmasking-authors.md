@@ -1,0 +1,40 @@
+---
+# Hidden until launch: `hidden: true` keeps this paper off the research page, the homepage's papers and its
+# announcement in the homepage banner (that update names this id under `paper:`). Set `hidden: false` to show all
+# three; `featured: true` with priority 0 puts it first among the homepage's papers. Fill `arxiv`, `pdf` and `twitter`
+# once they exist. In `npm run dev` hidden papers show, for previewing.
+id: unmasking-authors
+hidden: true
+title: "Frontier models need only one text to unmask its human or AI author"
+authors:
+  - Atrey Desai*
+  - Deniz Bölöni-Turgut*
+  - Ty Brassington*
+  - Minjoon Choi*
+  - Jenna Russell*
+  - Rishanth Rajendhran*
+  - Bradley Emi
+  - Hila Gonen
+  - Hal Daumé III
+  - John Wieting
+  - Marzena Karpinska
+  - Mohit Iyyer
+year: 2026
+venue: null
+arxiv: null
+pdf: null
+code: https://github.com/denizbt/unmasking_authors
+demo: null
+twitter: null
+blog: /blog/who-wrote-this/
+tags:
+  - NLP
+  - Privacy
+tldr: "Given a single text and a simple zero-shot prompt (no web access, tools, candidate lists, or writing samples), frontier models can answer “who wrote this?” at three increasingly specific levels: whether an AI or human wrote it, if an AI, which lab, and if a human, often exactly who. Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public."
+awards: []
+preprint: true
+featured: true
+highlight: false
+priority: 0
+imageDescription: null
+---
