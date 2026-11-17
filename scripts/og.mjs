@@ -14,6 +14,7 @@ import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { capture } from "./capture.mjs";
+import { makeThumbs } from "./og-thumbs.mjs";
 
 const BASE = process.env.OG_BASE ?? "http://localhost:5173";
 
@@ -77,6 +78,10 @@ for (const id of recrop ? posts : []) {
     .jpeg({ quality: 84, mozjpeg: true })
     .toFile(png.replace(/\.png$/, ".jpg"));
   rmSync(png);
+}
+if (recrop) {
+  console.log("Homepage thumbnails");
+  await makeThumbs(posts);
 }
 
 console.log("Laying out cards");

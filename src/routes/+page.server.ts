@@ -11,9 +11,10 @@ export const load: PageServerLoad = () => ({
         date: post.date,
         href: post.externalUrl ?? `/blog/${post.id}/`,
         externalSite: post.externalSite ?? null,
-        // `npm run og` crops the art alongside the share card, so a post with
-        // a card has a thumbnail; one without gets a plain tile.
-        art: post.image ? `/images/og/art/${post.id}.jpg` : null,
+        // `npm run og` crops the art alongside the share card and makes a
+        // small WebP of it for here (scripts/og-thumbs.mjs), so a post with a
+        // card has a thumbnail; one without gets a plain tile.
+        art: post.image ? `/images/og/art/thumbs/${post.id}.webp` : null,
         artPosition: artPosition(post.id),
     })),
 });
