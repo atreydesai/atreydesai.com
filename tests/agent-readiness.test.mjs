@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { handle } from "../src/hooks.server.js";
+import { PAGE_CDN_CACHE } from "../src/lib/server/page-cache.js";
 import {
   appendVary,
   htmlToMarkdown,
@@ -141,6 +142,33 @@ test("missing pages keep HTTP 404 and give Markdown clients recovery links", asy
   assert.match(body, /sitemap\.xml/);
   assert.match(body, /llms\.txt/);
   assert.match(body, /\/research\//);
+});
+
+test("pages are CDN-cached at Vercel while browsers keep revalidating", async () => {
+  const cdn = (response) => response.headers.get("vercel-cdn-cache-control");
+
+  assert.equal(cdn(await runHandle("text/html")), PAGE_CDN_CACHE);
+  assert.equal(cdn(await runHandle("text/markdown")), PAGE_CDN_CACHE);
+  assert.equal(
+    cdn(await runHandle("text/html", htmlResponse(404), "/missing")),
+    PAGE_CDN_CACHE,
+  );
+  assert.equal((await runHandle("text/html")).headers.get("cache-control"), null);
+
+  // Rejections, endpoints, and anything personal or opted out stay uncached.
+  assert.equal(cdn(await runHandle("application/pdf")), null);
+  const json = new Response("{}", {
+    headers: { "Content-Type": "application/json" },
+  });
+  assert.equal(cdn(await runHandle("application/json", json, "/api/now")), null);
+  const withCookie = htmlResponse();
+  withCookie.headers.set("Set-Cookie", "a=1");
+  assert.equal(cdn(await runHandle("text/html", withCookie)), null);
+  const noStore = htmlResponse();
+  noStore.headers.set("Cache-Control", "private, no-store");
+  assert.equal(cdn(await runHandle("text/html", noStore)), null);
+  const failed = htmlResponse(500);
+  assert.equal(cdn(await runHandle("text/html", failed)), null);
 });
 
 test("HTML conversion keeps the main semantic outline and omits document chrome", () => {

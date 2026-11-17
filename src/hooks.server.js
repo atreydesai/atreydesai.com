@@ -1,4 +1,5 @@
 import { negotiateHtmlResponse } from "./lib/server/content-negotiation.js";
+import { cachePage } from "./lib/server/page-cache.js";
 
 // The paper launch page (/blog/who-wrote-this/) brings its own type (Inter) and never uses the site's Typekit face, so
 // its HTML leaves out the Typekit preconnects and stylesheet. Every other page is unchanged.
@@ -12,5 +13,8 @@ export const handle = async ({ event, resolve }) => {
     ...(takeover ? { transformPageChunk: ({ html }) => html.replace(TYPEKIT, "").replace(/[ \t]*<!-- Adobe Typekit[^>]*-->\r?\n?/, "") } : {}),
   });
 
-  return negotiateHtmlResponse(event.request, response, event.url);
+  return cachePage(
+    event.request,
+    await negotiateHtmlResponse(event.request, response, event.url),
+  );
 };
