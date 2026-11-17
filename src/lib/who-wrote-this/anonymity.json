@@ -30,7 +30,7 @@
    "t": "Refusals are rare.",
    "src": "paper/sections/06_discussion.tex",
    "more": {
-    "t": "Fable 5.2 and Opus 5.5 refuse most often, on under 2% of all documents and mostly on public peer reviews.",
+    "t": "Fable 5.2 and Opus 5.5 refuse most often, yet on under 2% of all documents and mostly on public peer reviews.",
     "src": "paper/sections/06_discussion.tex"
    }
   },
@@ -126,13 +126,11 @@
   "not_named": "Not named",
   "few": "Too few texts",
   "unit": "1 tile = 1% of texts",
-  "post_unit": "1 tile = 1 Reddit post",
   "fable": "Fable 5.2",
   "rewriter": "Gemini 4 Argon",
-  "refused": "refused",
-  "answered": "Answered",
   "posts": "posts",
-  "lt1": "<1%"
+  "lt1": "<1%",
+  "refusal_line": "Fable 5.2 returns a written refusal on only {refused} ({refused_pct}%) of {posts} Reddit posts through the batch API."
  },
  "ui": [
   "Original",
@@ -154,11 +152,9 @@
   "Not named",
   "Too few texts",
   "1 tile = 1% of texts",
-  "1 tile = 1 Reddit post",
-  "refused",
-  "Answered",
   "posts",
-  "<1%"
+  "<1%",
+  "Fable 5.2 returns a written refusal on only {refused} ({refused_pct}%) of {posts} Reddit posts through the batch API."
  ],
  "demo": [],
  "data": {

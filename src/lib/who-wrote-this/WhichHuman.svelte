@@ -26,6 +26,7 @@
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes from "./Footnotes.svelte";
+	import HoverCue from "./HoverCue.svelte";
 	import { field, chart, regions, type Mark, type Path } from "./field.svelte";
 	import { onScroll as onPageScroll, requestFrame, view as vp, lite } from "./loop";
 	import { FABLE, GRAY, INK as TONE, modelColor, deepen, TILE } from "./palette";
@@ -114,7 +115,8 @@
 	const demoState = $derived.by<DemoState>(() => (lastDemo = view === "review" ? "review" : view === "prompt" ? (ans ? "answer" : "prompt") : lastDemo));
 	const tiles = $derived(view !== "review" && view !== "prompt" && view !== "example");
 	const lit = (c: string) => cue === null || cue === c;
-	const pick = (c: string) => { cue = cue === c ? null : c; };
+	let tried = $state(false); // a reason has been picked: the cue that says to pick one goes
+	const pick = (c: string) => { cue = cue === c ? null : c; tried = true; };
 	const key = (e: KeyboardEvent, c: string) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(c); } };
 	let reduce = $state(false);
 
@@ -654,7 +656,8 @@
 							<p class="ex-note">{E.note.t}</p>
 						</div>
 						<div class="ex-side">
-							<p class="ex-src"><Icon name="book" />{E.kind.t}: <em>{E.title.t}</em></p>
+							<!-- the cue at the row's right end, the figure's top right (the highlights take a click or a tap, not a hover) -->
+							<p class="ex-src"><Icon name="book" />{E.kind.t}: <em>{E.title.t}</em><HoverCue inline hover="Click a highlight" tap="Tap a highlight" show={!tried} style="margin-left:auto; margin-block:-4px" /></p>
 							<blockquote class="ex-text">“{#each E.text as seg}{#if seg.cue}<span role="button" tabindex="0" class="cue {seg.cue}" class:dim={!lit(seg.cue)} aria-pressed={cue === seg.cue} onclick={() => pick(seg.cue!)} onkeydown={(e) => key(e, seg.cue!)}>{seg.t}</span>{:else}{seg.t}{/if}{/each}”</blockquote>
 							<div class="ex-pred">
 								<span class="ex-role">{U.role}</span>

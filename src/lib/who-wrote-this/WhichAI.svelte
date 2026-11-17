@@ -18,6 +18,7 @@
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes from "./Footnotes.svelte";
+	import HoverCue from "./HoverCue.svelte";
 	import { field, chart, regions } from "./field.svelte";
 	import { onScroll as onPageScroll, view as vp, lite, deliberate } from "./loop";
 	import { LAB, INK, GRAY } from "./palette";
@@ -229,6 +230,9 @@
 	const barSt = $derived(STEPS[bs]);
 	const barFocus = $derived(new Set(barSt.focus ?? []));
 	const grown = $derived(bs >= 1 && !!barSt.color);
+	// the hover cue (beside the key) goes once a bar's card has been seen: a bar hovered or tapped while the bars are up
+	let tried = $state(false);
+	$effect(() => { if (hov && grown) tried = true; });
 	const curEv = $derived(EVS.find((e) => e.step === ks) ?? null);
 	const kFocus = $derived(new Set(STEPS[ks].focus ?? []));
 	// the bars lit at a step: the step's models where it names some, else Anthropic, Google and OpenAI once the colour is on
@@ -394,6 +398,9 @@
 					<div class="keyw" class:on={grown}>
 						<div class="key" style:height="{keyTags.h}px"><Tags items={keyTags.items} follow /></div>
 						<p class="measure">{u("Bar height: the share of a model’s texts that Claude Fable 5.2 credits to the model’s own lab")}</p>
+						<!-- the hover cue: at the key row's right end, over the chart's top right (always in the flow, so the
+						     chart's height never changes when it fades) -->
+						<HoverCue inline hover="Hover over a bar" tap="Tap a bar" show={grown && !tried} style="margin-left:auto; margin-block:-1px" />
 					</div>
 					<div class="chart" bind:clientWidth={bw} bind:clientHeight={bh}>
 						{#if barsG}

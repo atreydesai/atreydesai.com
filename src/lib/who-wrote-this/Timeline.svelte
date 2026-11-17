@@ -32,6 +32,7 @@
 	import Reveal from "./Reveal.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
+	import HoverCue from "./HoverCue.svelte";
 	import T from "./timeline.json";
 	import D from "./timeline_rq1.json";
 
@@ -67,6 +68,10 @@
 	const PLAIN_FONT = "600 13px Inter, system-ui, sans-serif";
 	const ink2 = INK.ink2, rule = "rgba(20,32,45,.14)";
 	const PCT = Array.from({ length: 11 }, (_, i) => `${i * 10}%`);
+	// the hover cue (HoverCue): on a wide screen over the plot's right edge, beside the headline; on a phone (where the
+	// lines' names fill the plot's top right) in the card's top row, right of the dashes. Never on a name, a line or a dot.
+	const CUE_HOVER = "Hover over a model", CUE_TAP = "Tap a model";
+	const CUE_H = 28, CUE_LIFT = 40; // its height; its top over the headline's foot (its foot near the last line's baseline)
 
 	// dates at local noon, so a tick on the 1st never reads as the month before
 	const DAY = 864e5;
@@ -102,6 +107,10 @@
 	const full = $derived(wa === 0 && wb === N);
 	let hovered = $derived(field.hover ? models.find((m) => m.model === field.hover) ?? null : null);
 	let tip = $state({ x: 0, y: 0 });
+	// the hover cue: where it sits (its right edge and top, stage px; set by layout) and whether a model's card has been seen
+	let cueAt = $state<{ right: number; top: number } | null>(null);
+	let tried = $state(false);
+	$effect(() => { if (hovered && active) tried = true; });
 	let tags = $state<Tag[]>([]);
 	let drag = $state<{ x: number; a: number; b: number; w: number } | null>(null);
 	const readout = $derived.by(() => {
@@ -348,6 +357,15 @@
 			box = { ...over, x0: over.x0 + (cl.right + 52 - over.x0) * ease(side), y0: over.y0 + (foot + 34 - over.y0) * ease(down) };
 		}
 		laidW = W;
+		// the hover cue on a wide screen: its right edge on the plot's, level with the headline's last line (well over the
+		// plot, where the frontiers reach 100% on prose); the tags keep clear of it. A phone has its own in the card.
+		let cueBox: B | null = null;
+		if (!narrow) {
+			const top = hb.bottom - CUE_LIFT, w = tw(CUE_HOVER, "600 12.5px Inter, system-ui, sans-serif") + 43; // words + ring, gap, padding
+			cueBox = { x: box.x1 - w, y: top, w, h: CUE_H };
+			const right = Math.round(r.right - box.x1), at = Math.round(top - r.top);
+			if (!cueAt || cueAt.right !== right || cueAt.top !== at) cueAt = { right, top: at };
+		}
 		const inWin = (m: Model) => m.t >= t0 && m.t <= t1;
 		const y = (v: number) => box.y1 - ((v - lo) / (100 - lo)) * (box.y1 - box.y0);
 		const x = (t: number) => box.x0 + ((t - t0) / (t1 - t0)) * (box.x1 - box.x0);
@@ -454,7 +472,7 @@
 
 		// ---- tags: every colour on the picture is named on it ---------------------------------------------------
 		const S: Scene = {
-			placed: narrow ? [] : [rect(hb, 4), rect(cl, 8)], segs, dots: marks.filter((m) => (m.alpha ?? 1) > 0.3), key: new Set(LINES.map((l) => lines[l][lines[l].length - 1]?.model ?? "")),
+			placed: narrow ? [] : [rect(hb, 4), rect(cl, 8), ...(cueBox ? [cueBox] : [])], segs, dots: marks.filter((m) => (m.alpha ?? 1) > 0.3), key: new Set(LINES.map((l) => lines[l][lines[l].length - 1]?.model ?? "")),
 			bounds: { x0: box.x0 - 2, x1: narrow ? W - 4 : W - 34, y0: narrow || explore ? foot + 6 : r.top + 40, y1: box.y1 + 4 },
 		};
 		const items: Tag[] = [];
@@ -687,6 +705,7 @@
 				<div class="say" class:on={step >= 0} bind:this={card} aria-live="polite">
 					<StepDashes count={T.steps.length} current={step} {progress} {go} label={U.step} />
 					{#key step}<p class="say-t">{T.steps[Math.max(0, step)].t}</p>{/key}
+					<HoverCue class="tl-cue-narrow" hover={CUE_HOVER} tap={CUE_TAP} show={step >= 0 && !tried} style="right:12px; top:4px" />
 				</div>
 			</div>
 			<!-- the controls, on the last step: one row under the card (it scrolls sideways where it does not fit) -->
@@ -728,6 +747,8 @@
 				</Reveal>
 			</div>
 		</div>
+		<!-- the hover cue on a wide screen, beside the headline over the plot's right edge (layout() places it) -->
+		<HoverCue class="tl-cue-wide" hover={CUE_HOVER} tap={CUE_TAP} show={!!cueAt && step >= 0 && active && field.owner === "rq1" && !tried} style={cueAt ? `right:${cueAt.right}px; top:${cueAt.top}px` : "visibility:hidden"} />
 	</div>
 	{#if active && field.owner === "rq1"}<Tags items={tags} />{/if}
 	<!-- outside the sticky stage (its own stacking context), so the tooltip sits above the tags -->
@@ -751,10 +772,12 @@
 	.lead { position: absolute; left: 40px; right: 0; top: 56px; display: grid; justify-items: start; align-content: start; gap: 18px; }
 	h2 { max-width: 11.5em; font-size: clamp(34px, min(4.4vw, calc(6.8 * var(--vh, 1vh))), 60px); line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; text-wrap: balance; }
 	.col { pointer-events: auto; width: 300px; display: grid; gap: 12px; }
-	.say { padding: 14px 16px 16px; background: #fff; border-radius: 3px; opacity: 0; transform: translateY(8px); transition: opacity .45s var(--ease), transform .45s var(--ease); }
+	.say { position: relative; padding: 14px 16px 16px; background: #fff; border-radius: 3px; opacity: 0; transform: translateY(8px); transition: opacity .45s var(--ease), transform .45s var(--ease); }
 	.say.on { opacity: 1; transform: none; }
 	.say-t { margin-top: 6px; font-size: 16px; line-height: 1.5; animation: say .45s var(--ease); }
 	@keyframes say { from { opacity: 0; transform: translateY(6px); } }
+	/* the hover cue: over the plot on a wide screen, in the card's top row on a phone */
+	.tl :global(.tl-cue-narrow) { display: none; }
 
 	/* the controls: all on one row; where the row is too wide it scrolls sideways, it never wraps */
 	.bar { pointer-events: auto; max-width: 100%; min-width: 0; }
@@ -814,5 +837,7 @@
 		.ctl { gap: 8px; }
 		.seg { gap: 1px; }
 		.seg button { padding-inline: 6px; }
+		.tl :global(.tl-cue-narrow) { display: inline-flex; }
+		.tl :global(.tl-cue-wide) { display: none; }
 	}
 </style>

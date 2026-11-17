@@ -35,6 +35,7 @@
 	import StepDashes from "./StepDashes.svelte";
 	import PrintMark from "./PrintMark.svelte";
 	import Footnotes, { type Note } from "./Footnotes.svelte";
+	import HoverCue from "./HoverCue.svelte";
 	import { MODEL, GRAY, INK as INKS, SIGNED, deepen, TILE } from "./palette";
 	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 	import { field, chart, regions, type Mark, type Path, type Text } from "./field.svelte";
@@ -572,6 +573,15 @@
 	});
 
 	const hitsOn = $derived(mode === "light" || mode === "takeaway" || mode === "effort");
+	// a group hovered, focused or tapped shows its card; the hover cue goes once one has
+	let tried = $state(false);
+	const open = (i: number) => { sel = i; tried = true; };
+	// the hover cue's place: over the top-right group (the last on a wide screen, the second on a phone's 2 x 2), its right
+	// edges lined up, clear of the number over the group (stage px)
+	const cueAt = $derived.by(() => {
+		const i = narrow ? 1 : 3, g = geo.g[i];
+		return g ? { right: W - (g.x + g.gw), top: geo.numY[i] - geo.numSize / 2 - 10 - 28 } : null;
+	});
 	const tip = $derived.by(() => {
 		if (sel === null || !hitsOn) return null;
 		if (mode === "effort") { const r = erows[sel]; return { h: r.familiarity, v: `${pctLabel(r.low, r.low_tiles)} → ${pctLabel(r.high, r.high_tiles)}`, s: emodel }; }
@@ -655,18 +665,21 @@
 				</svg>
 			</div>
 
-			<!-- hover and keyboard targets over each tile group; the canvas itself is aria-hidden -->
+			<!-- hover and keyboard targets over each tile group; the canvas itself is aria-hidden. Focus opens a card
+			     only from the keyboard: a tap focuses the button too, and its click would then close the card it opened -->
 			{#if hitsOn}
 				<div class="hits">
 					{#each geo.g as g, i}
 						<button type="button" class="hit" aria-label={aria(i)}
 							style="left:{g.x - 5}px; top:{g.y - 5}px; width:{g.gw + 10}px; height:{g.gw + 10}px"
-							onpointerenter={(e) => e.pointerType === "mouse" && (sel = i)} onpointerleave={(e) => e.pointerType === "mouse" && (sel = sel === i ? null : sel)}
-							onfocus={() => (sel = i)} onblur={() => (sel = sel === i ? null : sel)}
-							onclick={(e) => deliberate(e) && (sel = sel === i ? null : i)}></button>
+							onpointerenter={(e) => e.pointerType === "mouse" && open(i)} onpointerleave={(e) => e.pointerType === "mouse" && (sel = sel === i ? null : sel)}
+							onfocus={(e) => e.currentTarget.matches(":focus-visible") && open(i)} onblur={() => (sel = sel === i ? null : sel)}
+							onclick={(e) => { if (deliberate(e)) { if (sel === i) sel = null; else open(i); } }}></button>
 					{/each}
 				</div>
 			{/if}
+			<!-- the hover cue, over the top-right group while the groups take a hover -->
+			<HoverCue hover="Hover over a group" tap="Tap a group" show={hitsOn && active && !!cueAt && !tried} style={cueAt ? `right:${cueAt.right}px; top:${cueAt.top}px` : "visibility:hidden"} />
 			{#if tip && active && sel !== null && geo.g[sel]}
 				{@const g = geo.g[sel]}
 				<div class="tip" class:flip={g.x + g.gw > W - 200} style="left:{g.x + g.gw + 12}px; top:{g.y}px; --gw:{g.gw + 24}px" role="status">

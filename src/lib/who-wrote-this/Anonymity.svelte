@@ -3,7 +3,8 @@
 	// pinned stage with its own blocking: the writers a model knows well as one large mass, a giant numeral beside it,
 	// and the narration as a caption band along the bottom. One idea per step:
 	//   known     the "very familiar" group alone, large: the share of their texts the model names, as a giant numeral
-	//   refusals  the same place holds 1,258 Reddit posts, one tile each; Fable 5.2's written refusals in its clay
+	//   refusals  the same place holds 1,258 Reddit posts, one tile each; Fable 5.2's written refusals in its clay, and one
+	//             statement under the numeral in place of colour keys (the count in clay)
 	//   rewrite   the paraphrasing test as a small diagram: original → Argon → paraphrased
 	//   para      the less familiar groups join; paraphrasing lightens the texts it hid (the lighter tint of the model's
 	//             colour), the rest stay solid, the never-named stay gray (Figure rq3_familiarity, 1 tile = 1% of texts)
@@ -26,6 +27,7 @@
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import Footnotes, { type Note } from "./Footnotes.svelte";
+	import HoverCue from "./HoverCue.svelte";
 	import { MODEL, GRAY, INK as INKS, deepen, TILE } from "./palette";
 	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 	import { field, chart, regions, type Mark, type Path, type Text } from "./field.svelte";
@@ -83,6 +85,13 @@
 		return a;
 	})();
 	const RANK = new Map(ORDER.map((p, j) => [p, j]));
+	// the refusals step's one statement, in place of colour keys (Atrey, 17 Nov): anonymity.json's template filled from
+	// data.refusals, the refused count set in Fable's clay
+	const REFUSAL = L.refusal_line.split(/(\{\w+\})/).filter(Boolean).map((p) => {
+		const k = /^\{(\w+)\}$/.exec(p)?.[1];
+		if (!k) return { t: p, em: false };
+		return { t: k === "posts" ? R.posts.toLocaleString("en-US") : String(R[k as "refused" | "refused_pct"]), em: k === "refused" };
+	});
 
 	let step = $state(0);
 	let progress = $state(0); // how far the scroll is through the shown step, 0..1 (fills the next dash)
@@ -169,10 +178,12 @@
 			t.push({ id: `g${i}`, x: X(g.cx), y: Y(g.y + g.gw), t: narrow && i !== FOCUS ? NAME2[i] : GROUPS[i].t, at: "below" });
 		});
 		if (view === "rewrite") t.push({ id: "rw", x: X(diag.c), y: Y(diag.cy + diag.av / 2 + 2), t: L.rewriter, color: REWRITER, at: "below" });
+		// the colour keys (the refusals have none: one statement says it, REFUSAL)
 		const key: { t: string; color: string; sub?: string }[] = [];
-		if (view === "refusals") key.push({ t: `${L.fable} ${L.refused}`, color: CLAY }, { t: L.answered, color: OFF, sub: L.post_unit });
-		else if (paraOn && swept) key.push({ t: `${MODELS[model]} ${L.still}`, color: mcolor }, { t: L.lost, color: mlight }, { t: L.not_named, color: OFF });
-		else key.push({ t: `${MODELS[model]} ${L.named}`, color: mcolor }, { t: L.not_named, color: OFF });
+		if (view !== "refusals") {
+			if (paraOn && swept) key.push({ t: `${MODELS[model]} ${L.still}`, color: mcolor }, { t: L.lost, color: mlight }, { t: L.not_named, color: OFF });
+			else key.push({ t: `${MODELS[model]} ${L.named}`, color: mcolor }, { t: L.not_named, color: OFF });
+		}
 		// rows of keys: left-aligned under the numeral (desktop), centred under the groups (phone)
 		const span = geo.stackKeys ? geo.num.w : W;
 		const rows: (typeof key)[] = [[]];
@@ -398,6 +409,14 @@
 	});
 
 	const hitIdx = $derived(view === "refusals" ? [] : showSmall ? [0, 1, 2, 3] : [FOCUS]);
+	// a group hovered, focused or tapped shows its card; the hover cue goes once one has
+	let tried = $state(false);
+	const open = (i: number) => { sel = i; tried = true; };
+	// the hover cue's place: over the very familiar group (top right on every screen), its right edges lined up (stage px)
+	const cueAt = $derived.by(() => {
+		const g = geo.g[FOCUS];
+		return g ? { right: W - (g.x + g.gw), top: g.y - 8 - 28 } : null;
+	});
 	const tip = $derived.by(() => {
 		if (sel === null || !hitIdx.includes(sel)) return null;
 		const b = bins[sel];
@@ -446,20 +465,25 @@
 				<svg class="lines" aria-hidden="true">{#each diag.arrows as d}<path {d} />{/each}</svg>
 			</div>
 
-			<!-- hover and keyboard targets over each tile group; the canvas itself is aria-hidden -->
+			<!-- hover and keyboard targets over each tile group; the canvas itself is aria-hidden. Focus opens a card
+			     only from the keyboard: a tap focuses the button too, and its click would then close the card it opened -->
 			<div class="hits">
 				{#each hitIdx as i (i)}
 					{@const g = geo.g[i]}
 					{#if g}
 						<button type="button" class="hit" aria-label={aria(i)}
 							style="left:{g.x - 5}px; top:{g.y - 5}px; width:{g.gw + 10}px; height:{g.gw + 10}px"
-							onpointerenter={(e) => e.pointerType === "mouse" && (sel = i)} onpointerleave={(e) => e.pointerType === "mouse" && (sel = sel === i ? null : sel)}
-							onfocus={() => (sel = i)} onblur={() => (sel = sel === i ? null : sel)}
-							onclick={(e) => deliberate(e) && (sel = sel === i ? null : i)}></button>
+							onpointerenter={(e) => e.pointerType === "mouse" && open(i)} onpointerleave={(e) => e.pointerType === "mouse" && (sel = sel === i ? null : sel)}
+							onfocus={(e) => e.currentTarget.matches(":focus-visible") && open(i)} onblur={() => (sel = sel === i ? null : sel)}
+							onclick={(e) => { if (deliberate(e)) { if (sel === i) sel = null; else open(i); } }}></button>
 					{/if}
 				{/each}
 			</div>
-			{#if view === "refusals"}<p class="sr">{L.fable} {L.refused}: {R.refused} {L.posts}</p>{/if}
+			<!-- the hover cue, over the very familiar group while the groups take a hover (not on the refusals) -->
+			<HoverCue hover="Hover over a group" tap="Tap a group" show={hitIdx.length > 0 && active && !!cueAt && !tried} style={cueAt ? `right:${cueAt.right}px; top:${cueAt.top}px` : "visibility:hidden"} />
+			<!-- the refusals in one statement, where the other steps' colour keys sit (the count in Fable's clay) -->
+			<p class="refuse" class:on={view === "refusals"} class:mid={!geo.stackKeys} aria-hidden={view !== "refusals"}
+				style="left:{geo.stackKeys ? geo.keyX : 0}px; top:{geo.keyY - 13}px; width:{geo.stackKeys ? geo.num.w : W}px">{#each REFUSAL as p}{#if p.em}<b style:color={CLAY}>{p.t}</b>{:else}{p.t}{/if}{/each}</p>
 			{#if tip && active && sel !== null && geo.g[sel]}
 				{@const g = geo.g[sel]}
 				<div class="tip" class:flip={g.x + g.gw > W - 220} style="left:{g.x + g.gw + 12}px; top:{g.y}px; --gw:{g.gw + 24}px" role="status">
@@ -545,7 +569,11 @@
 	/* a group's name on a phone keeps its line break (NAME2), centred under the group; one-line tags are unchanged */
 	.an :global(.tags .tag.at-below .t) { white-space: pre; text-align: center; }
 
-	.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+	/* the refusals' statement: one sentence under the numeral (centred under the posts on a phone) */
+	.refuse { position: absolute; margin: 0; font-size: 17px; line-height: 1.45; font-weight: 500; letter-spacing: -0.008em; color: var(--ink); text-wrap: pretty; opacity: 0; visibility: hidden; transition: opacity .4s, visibility 0s .4s; }
+	.refuse.on { opacity: 1; visibility: visible; transition: opacity .4s; }
+	.refuse.mid { text-align: center; }
+	.refuse b { font-weight: 700; }
 	.hits { position: absolute; inset: 0; pointer-events: none; }
 	.hit { position: absolute; pointer-events: auto; border-radius: 2px; background: transparent; cursor: default; }
 	.hit:focus-visible { outline: 2px solid var(--ink); outline-offset: 0; }
@@ -557,11 +585,12 @@
 		.cap { bottom: 8px; padding: 12px 14px 14px; }
 		.say-t { font-size: 15.5px; }
 		.say-m { font-size: 13.5px; }
+		.refuse { font-size: 15px; }
 		.defs { grid-template-columns: 1fr; gap: 6px; }
 		.defs li { font-size: 13.5px; }
 		.node { padding: 10px 10px; font-size: 13.5px; gap: 6px; }
 		.av { font-size: 18px; }
 	}
-	.still .say-in, .still .from, .still .big, .still .diag { animation: none; transition: none; }
-	@media (prefers-reduced-motion: reduce) { .from, .big { animation: none; } .say-in, .diag { transition: none; } }
+	.still .say-in, .still .from, .still .big, .still .diag, .still .refuse { animation: none; transition: none; }
+	@media (prefers-reduced-motion: reduce) { .from, .big { animation: none; } .say-in, .diag, .refuse { transition: none; } }
 </style>
