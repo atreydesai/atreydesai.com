@@ -22,8 +22,15 @@
 	// ?lens=park|hide  the renderer's lens parked on its print (pointer null), or moved off the canvas
 	// ?card=1          the link card: title and deck on the left, the level-0 print on the right, nothing moving
 	// ?veil=0          the page's plain dot ground instead of the hero's dimmed one
-	import { onMount } from "svelte";
+	// ?cut=results     the results cut instead (ResultsExplainer.svelte): three results, the defenses and the closing line
+	//                  as typographic diagrams on the site's research-explainer plate, the fingerprint only a motif. The
+	//                  square plate fills a square frame; a wider frame centres it. With ?clock=manual, __step seeks the
+	//                  plate's own timeline (the explainer's dev handle, window.__xp), so every frame is exact.
+	import { onMount, flushSync } from "svelte";
 	import { createPrint, type Box } from "$lib/who-wrote-this/print";
+	import ResultsExplainer, { BEATS as R_BEATS, DURATION as R_DUR } from "./ResultsExplainer.svelte";
+	import * as V2 from "./v2";
+	import { THREAD, drawThread } from "./thread";
 	import { printSprite, printAspect } from "$lib/who-wrote-this/print/sprites";
 	import RIDGE from "$lib/who-wrote-this/print_text.json";
 	import C from "$lib/who-wrote-this/content.json";
@@ -61,12 +68,101 @@
 	const FPS = 30;
 
 	let canvas: HTMLCanvasElement;
+	// the results cut
+	let cut = $state(""), frameW = $state(1080), frameH = $state(1080), dark = $state(0);
+	const plate = $derived(Math.min(frameW, frameH));
+
+	// the v2 cut (v2.ts) and the thread's images (thread.ts): the launch page's own style, on one canvas
+	function setupV2(q: URLSearchParams) {
+		const g = window as any;
+		g.__mounts = (g.__mounts ?? 0) + 1;
+		const shot = q.get("thread");
+		const W = +(q.get("w") ?? 0) || innerWidth, H = +(q.get("h") ?? 0) || innerHeight;
+		const dpr = +(q.get("dpr") ?? 0) || devicePixelRatio || 1;
+		canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+		canvas.style.width = `${W}px`; canvas.style.height = `${H}px`;
+		const ctx = canvas.getContext("2d")!;
+		let A: V2.Assets | null = null, first: HTMLCanvasElement | null = null;
+		let units = 0;
+		const now = () => units / 3000;
+		const T = shot ? 1 : V2.T_VIDEO;
+		const faces = () => [...document.fonts].filter((f) => f.family.replace(/["']/g, "") === "Inter").map((f) => ({ weight: f.weight, style: f.style, status: f.status }));
+		const draw = (tl: number) => {
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			ctx.globalAlpha = 1;
+			if (shot) { drawThread(ctx, shot, W, H, A!); return -1; }
+			return V2.frame(ctx, W, H, tl, A!, first);
+		};
+		const ready = (async () => {
+			try { await Promise.all(["500 12px Inter", "600 12px Inter", "400 12px Inter"].map((f) => document.fonts.load(f))); } catch {}
+			await document.fonts.ready;
+			A = await V2.loadAssets(V2.ICONS);
+			// beat 1's first frame, kept for the loop's seam
+			draw(0);
+			if (!shot) { first = document.createElement("canvas"); first.width = canvas.width; first.height = canvas.height; first.getContext("2d")!.drawImage(canvas, 0, 0); }
+			return { W, H, dpr, T, fps: 30, fonts: faces() };
+		})();
+		g.__ready = ready;
+		g.__info = shot ? { T: 1 / 30, start: [0], keyframes: [0], leaps: [], leap: 0, fade: 0, fps: 30, poster: 0 } : { T: V2.T_VIDEO, start: V2.BEATS, keyframes: V2.BEATS.map((b, i) => (i === 0 ? 1.0 : (V2.BEATS[i + 1] ?? V2.T_VIDEO) - (i === 5 ? 1.4 : 0.6))), leaps: [], leap: 0, fade: 0.45, fps: 30, poster: 0 };
+		g.__warm = async () => { await ready; units = 0; draw(0); return { busy: false, t0: 0, fonts: faces() }; };
+		g.__step = (dt: number) => { units += Math.round(dt * 3000); const tl = ((now() % T) + T) % T; const b = draw(tl); return { t: +now().toFixed(4), tl: +tl.toFixed(4), beat: b, enter: 0 }; };
+		g.__ground = () => { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); V2.ground(ctx, W, H, 22); return true; };
+		if (q.get("clock") !== "manual") {
+			let last = performance.now(), raf = 0;
+			const loop = (ts: number) => { raf = requestAnimationFrame(loop); units += Math.round(Math.min(0.05, (ts - last) / 1000) * 3000); last = ts; draw(((now() % T) + T) % T); };
+			ready.then(() => { last = performance.now(); raf = requestAnimationFrame(loop); });
+		}
+	}
+
+	function setupResults(q: URLSearchParams) {
+		const g = window as any;
+		g.__mounts = (g.__mounts ?? 0) + 1;
+		frameW = +(q.get("w") ?? 0) || innerWidth; frameH = +(q.get("h") ?? 0) || innerHeight;
+		cut = "results";
+		const manual = q.get("clock") === "manual";
+		let units = 0; // the clock, in 1/3000 s
+		const now = () => units / 3000;
+		const handle = () => (g.__xp ?? [])[0] as { seek(t: number): void; duration: number } | undefined;
+		const faces = () => [...document.fonts].filter((f) => f.status === "loaded").map((f) => `${f.family.replace(/["']/g, "")} ${f.style} ${f.weight}`);
+		const ready = (async () => {
+			// NHG from the site's Typekit kit; Optima is the system's
+			try { await Promise.all(['500 40px "neue-haas-grotesk-display"', '400 20px "neue-haas-grotesk-text"', "20px Optima", "italic 20px Optima"].map((f) => document.fonts.load(f))); } catch {}
+			await document.fonts.ready;
+			for (let i = 0; i < 300 && !handle(); i++) await new Promise((r) => setTimeout(r, 50));
+			if (!handle()) throw new Error("the explainer's timeline never came up");
+			return { W: frameW, H: frameH, T: R_DUR, fonts: faces(), nhg: document.fonts.check('500 40px "neue-haas-grotesk-display"') && faces().some((f) => f.startsWith("neue-haas-grotesk")) };
+		})();
+		function show() {
+			handle()!.seek(((now() % R_DUR) + R_DUR) % R_DUR);
+			flushSync();
+			// a wider frame's sides follow the plate's dark closing beat
+			const d = document.querySelector(".c-dark");
+			dark = d ? +getComputedStyle(d).opacity || 0 : 0;
+			flushSync();
+		}
+		const beatOf = (t: number) => { let k = 0; R_BEATS.forEach((b, i) => { if (t >= b.at - 1e-9) k = i; }); return k; };
+		g.__ready = ready;
+		g.__info = { T: R_DUR, start: R_BEATS.map((b) => b.at), keyframes: R_BEATS.map((b) => b.hold ?? b.at), leaps: [], leap: 0, fade: 0, fps: 30, poster: R_BEATS[2].hold };
+		if (manual) {
+			g.__warm = async () => {
+				await ready;
+				// the motif prints are images: let them decode before frame 0
+				await Promise.all([...document.querySelectorAll(".xp image")].map((im) => { const i = new Image(); i.src = im.getAttribute("href") ?? ""; return i.decode().catch(() => {}); }));
+				await new Promise((r) => setTimeout(r, 200));
+				units = 0; show();
+				return { busy: false, t0: 0, fonts: faces() };
+			};
+			g.__step = (dt: number) => { units += Math.round(dt * 3000); show(); const tl = now() % R_DUR; return { t: +now().toFixed(4), tl: +tl.toFixed(4), beat: beatOf(tl), enter: 0 }; };
+		}
+	}
 
 	const sm = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 	const beatAt = (t: number) => { let k = 0; for (let i = 1; i < BEATS.length; i++) if (t >= START[i] - 1e-9) k = i; return k; };
 
 	onMount(() => {
 		const q = new URLSearchParams(location.search);
+		if (q.get("cut") === "results") { setupResults(q); return; }
+		if (q.get("cut") === "v2" || q.has("thread")) { setupV2(q); return; }
 		const manual = q.get("clock") === "manual", card = q.has("card"), veil = q.get("veil") !== "0";
 		const hide = q.get("lens") === "hide";
 		const W = +(q.get("w") ?? 0) || innerWidth, H = +(q.get("h") ?? 0) || innerHeight;
@@ -375,9 +471,21 @@
 	{@html `<style>html,body{margin:0;overflow:hidden;height:100%;background:#E8E8E3}</style>`}
 </svelte:head>
 
-<div class="root" data-justify="off"><canvas bind:this={canvas}></canvas></div>
+{#if cut === "results"}
+	<div class="rroot" data-justify="off" style:width="{frameW}px" style:height="{frameH}px">
+		<div class="rdark" style:opacity={dark}></div>
+		<div class="rplate" style:width="{plate}px" style:left="{(frameW - plate) / 2}px" style:top="{(frameH - plate) / 2}px">
+			<ResultsExplainer size="card" label="Who wrote this? Frontier models identify AI text as well as specialized detectors, name the lab behind 98% of texts from OpenAI, Anthropic and Google, and the reviewer of 55% of anonymous ICML 2020 reviews; defenses are limited." />
+		</div>
+	</div>
+{:else}
+	<div class="root" data-justify="off"><canvas bind:this={canvas}></canvas></div>
+{/if}
 
 <style>
 	.root { position: fixed; inset: 0; z-index: 1000; background: #E8E8E3; }
 	canvas { position: absolute; left: 0; top: 0; display: block; }
+	.rroot { position: fixed; left: 0; top: 0; z-index: 1000; overflow: hidden; background: #fffdfb; }
+	.rdark { position: absolute; inset: 0; background: #383838; }
+	.rplate { position: absolute; }
 </style>
