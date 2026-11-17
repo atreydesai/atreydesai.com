@@ -402,6 +402,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 	const RECEDE = 0.6;
 	const inkOf = (it: Item) => { const a = it.rest.a; return a * lerp(1 - (1 - RECEDE) * dim, 1, it.fo) + it.fo * (1 - a) * ss(0.1, 0.4, a); };
 	let lensR = 0, lensShown = false, lensTop: Item | null = null;
+	let cueOn = false, cueX = 0, cueY = 0; // where the host's hover cue points while the lens is away
 	let readKey = "", readText: string | null = null;
 	const sway = (it: Item) => (breathing ? 0.008 * Math.sin(bt * 0.37 + it.phase * 1.7) : 0);
 	let disposed = false;
@@ -1050,16 +1051,20 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 			if (performance.now() > drawUntil) { pending = true; break; }
 		}
 
-		// the lens: where it is and how strongly it magnifies. It follows the pointer (on touch, the last tap); with no
-		// pointer, or with the pointer over the panel's copy, it rests on the most telling print of the level
+		// the lens: where it is and how strongly it magnifies. It follows the pointer (on touch, the last tap) and shows
+		// only then; with no pointer, or with the pointer over the panel's copy, it fades where it was and the host shows a
+		// hover cue on the most telling print of the level instead (Atrey, 17 Nov: an indicator to hover, not a lens that
+		// moves by itself)
 		const ptr = s.pointer;
 		let free = ptr !== null;
 		if (ptr) for (let i = 0; i < quiet.length; i++) { const q = quiet[i]; if (ptr.x > q.x && ptr.x < q.x + q.w && ptr.y > q.y && ptr.y < q.y + q.h) free = false; }
 		const lv = Math.round(e);
 		const rest = lv <= 0 ? main : lv === 1 ? ai : lv === 2 ? labs[0] : lit;
-		const want = (free || rest.rest.r > 4) && stage.w > 40 && stage.h > 40 ? 1 : 0;
-		// (at level 2 it rests high on the print, so a card hung beside it stays above the row of names)
-		const tx = free ? ptr!.x : rest.rest.x + rest.rest.r * HW * (lv === 2 ? 0.1 : 0.36), ty = free ? ptr!.y : rest.rest.y + rest.rest.r * (lv === 2 ? -0.42 : 0.34);
+		const want = free && stage.w > 40 && stage.h > 40 ? 1 : 0;
+		// the cue's point: on the telling print (at level 2 high on it, clear of the row of names)
+		cueOn = !free && rest.rest.r > 4 && stage.w > 40 && stage.h > 40;
+		cueX = rest.rest.x + rest.rest.r * HW * (lv === 2 ? 0.1 : 0.36); cueY = rest.rest.y + rest.rest.r * (lv === 2 ? -0.42 : 0.34);
+		const tx = free ? ptr!.x : lensX, ty = free ? ptr!.y : lensY;
 		let lensMoving = false;
 		if (s.reduce || free || lensA < 0.02) { lensX = tx; lensY = ty; }
 		else {
@@ -1070,12 +1075,12 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		}
 		lensA = s.reduce ? want : lensA + (want - lensA) * Math.min(1, s.dt * 10);
 		if (Math.abs(want - lensA) < 0.004) lensA = want;
-		// a smaller, quieter lens (Atrey, 16 Nov: "slightly smaller, less intrusive")
-		const rad = Math.min(70, Math.max(44, Math.min(stage.w, stage.h) * 0.098)) * (0.9 + 0.1 * lensA);
+		// a small, quiet lens: half the size it was (Atrey, 16 Nov: "slightly smaller, less intrusive"; 17 Nov: "1/2 the size")
+		const rad = Math.min(35, Math.max(22, Math.min(stage.w, stage.h) * 0.049)) * (0.9 + 0.1 * lensA);
 		if (lensA !== want) lensMoving = true;
 		if (lensA > 0.01) {
 			// magnify the print under the glass; between prints, look at the edge of the nearest one within reach
-			const top = nearest(lensX, lensY, rad * 0.6);
+			const top = nearest(lensX, lensY, rad * 1.2); // (the reach of the lens before it was halved)
 			lensTop = top;
 			let ax = 0, ay = 0;
 			if (top && !within(top, lensX, lensY)) {
@@ -1191,7 +1196,7 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 
 	const LIT_HIT = { id: "lit" };
 	function hit(x: number, y: number): Hit {
-		const it = nearest(x, y, lensR * 0.6);
+		const it = nearest(x, y, lensR * 1.2);
 		if (!it) return null;
 		if (litIndex >= 0 && it === crowd[litIndex]) return LIT_HIT;
 		return it.hit;
@@ -1205,6 +1210,9 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 
 	/** where the lens is this frame, for the host's card; null when it is not shown */
 	function lens() { return lensShown ? { x: lensX, y: lensY, r: lensR } : null; }
+
+	/** where to point the reader (the level's most telling print) while the pointer is away; null while it is on the art */
+	function cue() { return cueOn ? { x: cueX, y: cueY } : null; }
 
 	/** The words the lens is on: the nearest ridge's text around the point it looks at, as whole words (up to 12). */
 	function lensText(): string | null {
@@ -1244,5 +1252,5 @@ export const createPrint: CreatePrint = (opts: PrintOptions): Print => {
 		return (readText = words.slice(first, first + take).join(" "));
 	}
 
-	return { draw, anchors, hit, dispose, busy, lens, lensText };
+	return { draw, anchors, hit, dispose, busy, lens, lensText, cue };
 };

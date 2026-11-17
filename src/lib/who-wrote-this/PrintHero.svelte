@@ -3,11 +3,12 @@
 	// are writing transforms with the reader's scroll: one print (a text by an unknown author), then a human print and an
 	// AI print, then one print per lab, then a crowd of writers with one lit. The renderer (print/) draws ink only; every
 	// word here is HTML from content.json and hero.json, placed at the anchors the renderer returns. Rows are controls: a
-	// click scrolls to that level. The lens is an inspector: wherever it sits (the pointer, a tap, or parked by the
-	// renderer on the most telling print), a card on its edge says what that print is at this level, with the paper's
-	// evidence and numbers; the renderer brings that print forward.
+	// click scrolls to that level. The lens is an inspector: wherever the pointer (or a tap) puts it, a card on its edge
+	// says what that print is at this level, with the paper's evidence and numbers; the renderer brings that print
+	// forward. With no pointer on the art there is no lens, only a hover cue on the level's most telling print.
 	import { onMount } from "svelte";
 	import Icon from "./Icon.svelte";
+	import HoverCue from "./HoverCue.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import { field, chart, regions } from "./field.svelte";
 	import { onScroll, view as vp, lite, onTap, requestDraw, requestPaint, scrolling } from "./loop";
@@ -25,6 +26,12 @@
 	// scroll per level, in viewport heights: short enough that a slow scroller sees the prints change soon, while the
 	// renderer paces each division on its own clock so a fast scroller still sees every one (Atrey, 16 Nov)
 	const STEP = 0.65;
+	// the first split waits until the hero has the whole screen (Atrey, 17 Nov: it began with the section only partly
+	// on screen): LEAD steps of extra scroll before level 0 starts counting, so the split begins once the section is
+	// pinned and a little further; and LAG_MS, so a fast scroll that lands past that still sees the whole print for a
+	// moment before it divides
+	const LEAD = 0.3;
+	const LAG_MS = 450;
 	// level 3: each set of texts has its own colour, in hero.json's crowd order (icml, active, famous, papers, nature,
 	// inactive). Three families of two from the page palette: teal for reviews, rose for Reddit, aubergine for published
 	// writing; the writer the model finds is in ink, like the one print at level 0 (Atrey, 16 Nov: different fingerprint
@@ -50,6 +57,9 @@
 	let anchors = $state<Anchor[]>([]);
 	// what the inspector lens is on: the print's id (writers also get their kind), and the lens circle in viewport px
 	let insp = $state<{ id: string; kind: number; x: number; y: number; r: number } | null>(null);
+	// the hover cue: where it points (viewport px), and the levels where the reader has already used the lens
+	let hint = $state<{ x: number; y: number } | null>(null);
+	let tried = $state([false, false, false, false]);
 	let vw = $state(1440), vh = $state(900);
 	let print = $state.raw() as Print;
 
@@ -78,7 +88,7 @@
 	function go(n: number) {
 		const top = root.getBoundingClientRect().top + scrollY;
 		const H = vp.h || innerHeight;
-		const y = top + (STEPS.indexOf(n) + 0.3) * H * STEP - H * 0.5;
+		const y = top + (STEPS.indexOf(n) + 0.3 + LEAD) * H * STEP - H * 0.5;
 		scrollTo({ top: y, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 	}
 
@@ -132,6 +142,11 @@
 				const kind = id?.startsWith("writer:") ? CROWD_KIND[(Number(id.slice(7)) || 0) % CROWD_N] : -1;
 				const ik = id && L ? `${id}|${kind}|${Math.round(L.x / 3)}|${Math.round(L.y / 3)}|${Math.round(L.r)}` : "";
 				if (ik !== inspKey) { inspKey = ik; insp = id && L ? { id, kind, x: L.x, y: L.y, r: L.r } : null; }
+				// once the reader has the lens out at a level, that level's cue has done its job
+				if (pointer && L && !tried[level]) tried[level] = true;
+				const c = print.cue?.() ?? null;
+				const hk = c ? `${Math.round(c.x / 2)},${Math.round(c.y / 2)}` : "";
+				if (hk !== (hint ? `${Math.round(hint.x / 2)},${Math.round(hint.y / 2)}` : "")) hint = c ? { x: c.x, y: c.y } : null;
 			}
 			return print.busy?.() ?? true;
 		};
@@ -163,13 +178,26 @@
 			if (vp.w !== vw) vw = vp.w;
 			if (vp.h !== vh) vh = vp.h;
 			const r = root.getBoundingClientRect(), H = vp.h;
-			const p = Math.min(STEPS.length + 1, Math.max(0, (H * 0.5 - r.top) / (H * STEP)));
+			const p = Math.min(STEPS.length + 1, Math.max(0, (H * 0.5 - r.top) / (H * STEP) - LEAD));
 			if (Math.abs(p - pos) > 0.002) pos = p;
 			const k = Math.min(STEPS.length - 1, Math.floor(p));
 			// past two thirds of a step the next level starts, and the renderer plays the whole division smoothly
-			const want = k >= STEPS.length - 1 ? STEPS[k] : p - k > 0.66 ? STEPS[k + 1] : STEPS[k];
+			let want = k >= STEPS.length - 1 ? STEPS[k] : p - k > 0.66 ? STEPS[k + 1] : STEPS[k];
+			// the lag: the first split waits until the section has been pinned for LAG_MS (re-checked by a timer)
+			const now = performance.now();
+			if (r.top > 0.5) pinAt = 0;
+			else if (!pinAt) pinAt = now;
+			if (lv < 0.5 && want > 0) {
+				const left = pinAt ? pinAt + LAG_MS - now : LAG_MS;
+				if (left > 0) {
+					want = 0;
+					// (no scroll event comes with the timer, so it asks the canvas for a frame itself)
+					if (!lagT) lagT = window.setTimeout(() => { lagT = 0; update(); requestPaint(); }, left + 16);
+				}
+			}
 			if (Math.abs(want - lv) > 0.001) lv = want;
 		};
+		let pinAt = 0, lagT = 0;
 		const stopScroll = onScroll(update);
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;
@@ -179,13 +207,13 @@
 		io.observe(root);
 		return () => {
 			removeEventListener("pointermove", onMove); removeEventListener("pointerdown", onMove); stopTap(); document.removeEventListener("pointerleave", onLeave); 
-			io.disconnect(); stopScroll(); print.dispose?.();
+			io.disconnect(); stopScroll(); print.dispose?.(); clearTimeout(lagT);
 			if (field.owner === "hero") { field.mode = "ground"; field.dim = 0; field.owner = ""; chart.paint = null; }
 		};
 	});
 </script>
 
-<section class="ph" id="levels" bind:this={root} aria-label={L.lead.t} style="--steps:{STEPS.length}" data-level={lv.toFixed(2)} data-pos={pos.toFixed(2)}>
+<section class="ph" id="levels" bind:this={root} aria-label={L.lead.t} style="--steps:{STEPS.length}; --lead:{LEAD}" data-level={lv.toFixed(2)} data-pos={pos.toFixed(2)}>
 	<div class="stick" bind:this={stick}>
 		<div class="panel" bind:this={panel}>
 			<StepDashes count={STEPS.length} current={level} go={(i) => go(STEPS[i])} progress={step < STEPS.length - 1 ? Math.min(1, (pos - step) / 0.66) : -1} />
@@ -238,6 +266,12 @@
 					</span>
 				{/each}
 			</div>
+			{#if hint}
+				<!-- the hover cue (Atrey, 17 Nov): on the telling print, until the reader has used the lens at this level -->
+				<span class="hpos" style:transform="translate({Math.min(hint.x, vw - 210)}px, {hint.y}px)">
+					<HoverCue hover={level === 0 ? "Hover over the print" : "Hover over a print"} tap={level === 0 ? "Tap the print" : "Tap a print"} show={!tried[level] && !insp} style="left:-16px; top:0; transform:translateY(-50%)" />
+				</span>
+			{/if}
 			{#if insp && card}
 				{@const id = insp.id}
 				{@const lab = id.startsWith("lab:") ? id.slice(4) : ""}
@@ -286,7 +320,7 @@
 </section>
 
 <style>
-	.ph { position: relative; margin-top: 24px; height: calc((var(--steps) + 0.6) * 65 * var(--vh, 1vh)); }
+	.ph { position: relative; margin-top: 24px; height: calc((var(--steps) + 0.6 + var(--lead)) * 65 * var(--vh, 1vh)); }
 	.stick { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); pointer-events: none; }
 	.panel { pointer-events: auto; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: min(36%, 430px); display: grid; gap: 10px; }
 	.lead { font-size: clamp(19px, 1.9vw, 23px); line-height: 1.3; font-weight: 500; letter-spacing: -0.015em; text-wrap: balance; }
@@ -321,6 +355,7 @@
 	.tag.lit .who { display: inline-flex; align-items: center; gap: 6px; color: #046B55; }
 	.tag.lit b { color: var(--ink); }
 	@keyframes lit-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+	.hpos { position: fixed; left: 0; top: 0; z-index: 4; pointer-events: none; transition: transform .3s var(--ease); }
 	/* the inspector card, hung off the lens's edge */
 	.ipos { position: fixed; left: 0; top: 0; z-index: 5; pointer-events: none; transition: transform .25s var(--ease); }
 	.insp {

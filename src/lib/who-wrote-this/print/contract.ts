@@ -62,6 +62,8 @@ export interface Print {
 	/** where the lens is drawn this frame (viewport px, radius), or null when it is not shown; the host attaches its
 	 * information card to the lens's edge */
 	lens?(): { x: number; y: number; r: number } | null;
+	/** where the host's hover cue should point while the lens is away (the level's most telling print), or null */
+	cue?(): { x: number; y: number } | null;
 	/** the ridge sentence under the lens's centre (the text the lens is deciphering), or null */
 	lensText?(): string | null;
 }
