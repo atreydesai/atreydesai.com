@@ -1,7 +1,7 @@
 <script lang="ts">
   import "../app.css";
 
-  import { browser, dev } from "$app/environment";
+  import { browser, dev } from '$app/env';
   import { onMount } from "svelte";
 
   import { inject } from "@vercel/analytics";
@@ -16,7 +16,15 @@
   import { startClickTracking } from "$lib/analytics";
   import { afterNavigate, beforeNavigate, preloadCode, replaceState } from "$app/navigation";
   import { page } from "$app/state";
-  import { BOBA_DESKTOP_QUERY, GAMES, arcadeScreen, openArcade, type GameId } from "$lib/boba";
+
+  import {
+    BOBA_DESKTOP_QUERY,
+    GAMES,
+    arcadeScreen,
+    openArcade,
+    type GameId
+  } from "$lib/boba";
+
   import {
     PAGE_TRANSITIONS_ENABLED,
     PAGE_TRANSITION_DURATION_MS,
@@ -100,8 +108,8 @@
     // a trackpad gets attached, or the setting is flipped in System Settings.
     const touchMedia = window.matchMedia(TOUCH_QUERY);
     const motionMedia = window.matchMedia(REDUCED_MOTION_QUERY);
-    const syncTouch = () => (isTouch = touchMedia.matches);
-    const syncMotion = () => (reducedMotion = motionMedia.matches);
+    const syncTouch = () => isTouch = touchMedia.matches;
+    const syncMotion = () => reducedMotion = motionMedia.matches;
     syncTouch();
     syncMotion();
     touchMedia.addEventListener("change", syncTouch);
@@ -123,15 +131,9 @@
     injectSpeedInsights();
 
     // Easter egg #1: a greeting for anyone who cracks open the console.
-    console.log(
-      "%c👋 hey, you found the console.",
-      "color:#E85D4C;font-size:14px;font-weight:700",
-    );
-    console.log(
-      "%cHmm why are you poking around here. You should say hi: adesai10@umd.edu\n%cpsst… there's a hidden game. enter the konami code →  ↑ ↑ ↓ ↓ ← → ← → b a",
-      "color:#8a7d70;font-size:12px;line-height:1.6",
-      "color:#b0a498;font-size:11px;font-style:italic",
-    );
+    console.log("%c👋 hey, you found the console.", "color:#E85D4C;font-size:14px;font-weight:700");
+
+    console.log("%cHmm why are you poking around here. You should say hi: adesai10@umd.edu\n%cpsst… there's a hidden game. enter the konami code →  ↑ ↑ ↓ ↓ ← → ← → b a", "color:#8a7d70;font-size:12px;line-height:1.6", "color:#b0a498;font-size:11px;font-style:italic");
 
     // Easter egg #2: the konami code launches boba catch.
     const KONAMI = [
@@ -224,14 +226,10 @@
             y: PAGE_TRANSITION_OUT_Y,
             duration: swapNow ? 0 : PAGE_TRANSITION_DURATION_MS,
           }}
-        >
-          <slot />
-        </div>
+        ><slot></slot></div>
       {/key}
     {:else}
-      <div class="page-layer">
-        <slot />
-      </div>
+      <div class="page-layer"><slot></slot></div>
     {/if}
   </main>
 

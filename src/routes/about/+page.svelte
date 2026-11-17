@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
-    import { browser } from "$app/environment";
+    import { browser } from '$app/env';
     import Seo from "$lib/components/Seo.svelte";
     import { aboutData } from "$lib/content";
     import { parseInline, escapeHtml } from "$lib/utils/text";
@@ -109,16 +109,16 @@
                 const marker = document.querySelector(
                     `[data-footnote="${fn.id}"]`,
                 );
-                const note = document.getElementById(`fn-${fn.id}`);
-                if (!marker || !note) return null;
-                return {
-                    id: fn.id,
+            const note = document.getElementById(`fn-${fn.id}`);
+            if (!marker || !note) return null;
+            return {
+                id: fn.id,
                     markerTop:
                         marker.getBoundingClientRect().top +
                         window.scrollY -
                         containerTop,
                     height: note.offsetHeight,
-                };
+            };
             })
             .filter((e): e is NonNullable<typeof e> => e !== null)
             .sort((a, b) => a.markerTop - b.markerTop);
@@ -134,7 +134,7 @@
         if (!notesReady) {
             // Let the computed tops paint before fading the notes in, so the
             // (transitioned) `top` doesn't animate from its initial 0.
-            requestAnimationFrame(() => (notesReady = true));
+            requestAnimationFrame(() => notesReady = true);
         }
     }
 
@@ -151,7 +151,7 @@
         // and only one is displayed at a time. Whichever is visible owns the
         // `#fn-N` ids so a marker link always lands somewhere on screen.
         const wideMedia = window.matchMedia(SIDENOTE_QUERY);
-        const syncWide = () => (wideNotes = wideMedia.matches);
+        const syncWide = () => wideNotes = wideMedia.matches;
         syncWide();
         wideMedia.addEventListener("change", syncWide);
 
@@ -160,18 +160,17 @@
         const setupTimeout = setTimeout(() => {
             layoutNotes();
 
-            // Pointing at or focusing a marker brightens its note. Markers
-            // come from @html, so the listeners are attached here; focus is
-            // wired alongside hover so the pairing isn't pointer-only.
-            document.querySelectorAll("[data-footnote]").forEach((marker) => {
-                const id = parseInt(
-                    marker.getAttribute("data-footnote") || "0",
-                );
-                marker.addEventListener("mouseenter", () => (hovered = id));
-                marker.addEventListener("mouseleave", () => (hovered = null));
-                marker.addEventListener("focus", () => (hovered = id));
-                marker.addEventListener("blur", () => (hovered = null));
-            });
+                // Pointing at or focusing a marker brightens its note. Markers
+                // come from @html, so the listeners are attached here; focus is
+                // wired alongside hover so the pairing isn't pointer-only.
+                document.querySelectorAll("[data-footnote]").forEach((marker) => {
+                    const id = parseInt(marker.getAttribute("data-footnote") || "0");
+
+                    marker.addEventListener("mouseenter", () => hovered = id);
+                    marker.addEventListener("mouseleave", () => hovered = null);
+                    marker.addEventListener("focus", () => hovered = id);
+                    marker.addEventListener("blur", () => hovered = null);
+                });
         }, 100);
 
         // Re-measure when fonts land or the column reflows.
@@ -242,16 +241,16 @@
                     class:fn-active={hovered === footnote.id}
                     style="top: {noteTops[footnote.id] ?? 0}px"
                     id={wideNotes ? `fn-${footnote.id}` : undefined}
-                    on:mouseenter={() => (hovered = footnote.id)}
-                    on:mouseleave={() => (hovered = null)}
+                    on:mouseenter={() => hovered = footnote.id}
+                    on:mouseleave={() => hovered = null}
                 >
                     <a
                         href="#fnref-{footnote.id}"
                         class="footnote-backref text-accent-dark dark:text-accent-light"
                         aria-label="Back to reference {footnote.id}"
-                        on:focus={() => (hovered = footnote.id)}
-                        on:blur={() => (hovered = null)}>{footnote.id}.</a
-                    >
+                        on:focus={() => hovered = footnote.id}
+                        on:blur={() => hovered = null}
+                    >{footnote.id}.</a>
                     {@html liveHtml(footnote.id, footnote.content)}
                 </div>
             {/each}
@@ -282,17 +281,17 @@
                         {@html parseLinks(
                             paragraph.text,
                         )}{#if paragraph.footnote}<a
-                                    id="fnref-{paragraph.footnote}"
-                                    href="#fn-{paragraph.footnote}"
-                                    class="footnote-ref"
-                                    data-footnote={paragraph.footnote}
-                                    aria-label="Footnote {paragraph.footnote}"
-                                    on:mouseenter={() => (hovered = paragraph.footnote ?? null)}
-                                    on:mouseleave={() => (hovered = null)}
-                                    on:focus={() => (hovered = paragraph.footnote ?? null)}
-                                    on:blur={() => (hovered = null)}
-                                    >[{paragraph.footnote}]</a
-                                >{/if}
+                                id="fnref-{paragraph.footnote}"
+                                href="#fn-{paragraph.footnote}"
+                                class="footnote-ref"
+                                data-footnote={paragraph.footnote}
+                                aria-label="Footnote {paragraph.footnote}"
+                                on:mouseenter={() => hovered = paragraph.footnote ?? null}
+                                on:mouseleave={() => hovered = null}
+                                on:focus={() => hovered = paragraph.footnote ?? null}
+                                on:blur={() => hovered = null}
+                            >[{paragraph.footnote}]</a>
+                        {/if}
                     </p>
                 {/each}
 
@@ -327,12 +326,11 @@
                             class="footnote-ref"
                             data-footnote={READING_FN}
                             aria-label="Footnote {READING_FN}"
-                            on:mouseenter={() => (hovered = READING_FN)}
-                            on:mouseleave={() => (hovered = null)}
-                            on:focus={() => (hovered = READING_FN)}
-                            on:blur={() => (hovered = null)}
-                            >[{READING_FN}]</a
-                        >
+                            on:mouseenter={() => hovered = READING_FN}
+                            on:mouseleave={() => hovered = null}
+                            on:focus={() => hovered = READING_FN}
+                            on:blur={() => hovered = null}
+                        >[{READING_FN}]</a>
                     </p>
                 {/if}
 

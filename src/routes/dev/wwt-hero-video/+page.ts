@@ -1,4 +1,4 @@
-import { dev } from "$app/environment";
+import { dev } from "$app/env";
 import { error } from "@sveltejs/kit";
 
 // Recording stage for the launch video and the link card; never part of the built site.

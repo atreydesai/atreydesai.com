@@ -3,7 +3,7 @@
 	// dotted ground, Inter, Figure 1's question colours) in place of the site's header, footer and palette.
 	// All copy is paper text, from content.json (built in the private llm-detectors repo, docs/launch_20261116).
 	import { onMount, setContext } from "svelte";
-	import { dev } from "$app/environment";
+	import { dev } from '$app/env';
 	import Seo from "$lib/components/Seo.svelte";
 	import { SITE_URL } from "$lib/seo";
 	import Icon from "$lib/who-wrote-this/Icon.svelte";
@@ -85,12 +85,12 @@
 	description={post.seoDescription ?? post.excerpt}
 	image={post.image}
 	imageAlt={post.imageAlt}
-	{url}
+	url={url}
 	type="article"
 	pageType="WebPage"
 	published={post.date}
 	tags={post.tags}
-	{jsonLd}
+	jsonLd={jsonLd}
 	noindex={post.unlisted === true || post.published === false}
 />
 
@@ -117,7 +117,7 @@
 <div class="wwt" data-justify="off">
 	<header class="top">
 		<a class="brand" href="/">Atrey Desai</a>
-		<SectionNav {stops} />
+		<SectionNav stops={stops} />
 		<nav aria-label="Site">
 			{#each nav as link}<a href={link.href}>{link.name}</a>{/each}
 		</nav>
@@ -146,7 +146,13 @@
 			</div>
 		</header>
 
-		{#key art}{#if art === "print"}<PrintHero />{:else}<Levels {art} />{/if}{/key}
+		{#key art}
+			{#if art === "print"}
+				<PrintHero />
+			{:else}
+				<Levels art={art} />
+			{/if}
+		{/key}
 
 		<!-- the lede has a screen of its own: it is the paper's argument in one paragraph, so nothing above or below shares
 		     the view with it (Atrey, 16 Nov); it holds in place for a stretch of scroll, longer for a fast scroll (LedeHold,
@@ -236,14 +242,47 @@
 	}
 	/* The site's element rules set Optima and NHG on p, h1, li...; inside this page everything inherits Inter.
 	   The resets sit under :where(.wwt) so any component rule outranks them. */
-	.wwt :global(*) { font-family: inherit; }
-	:where(.wwt) :global(a) { color: inherit; }
-	:where(.wwt) :global(:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 2px; }
-	:where(.wwt) :global(:is(p, h1, h2, h3, figure, blockquote)) { margin: 0; }
-	:where(.wwt) :global(:is(ul, ol)) { list-style: none; margin: 0; padding: 0; }
-	:where(.wwt) :global(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
-	.top, article, .site-foot { max-width: 72rem; margin-inline: auto; }
+	.wwt :global(*) {
+		font-family: inherit;
+	}
+
+	:where(.wwt) :global(a) {
+		color: inherit;
+	}
+
+	:where(.wwt) :global(:focus-visible) {
+		outline: 2px solid var(--ink);
+		outline-offset: 2px;
+		border-radius: 2px;
+	}
+
+	:where(.wwt) :global(:is(p, h1, h2, h3, figure, blockquote)) {
+		margin: 0;
+	}
+
+	:where(.wwt) :global(:is(ul, ol)) {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	:where(.wwt) :global(button) {
+		font: inherit;
+		color: inherit;
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+	}
+
+	.top,
+	article,
+	.site-foot {
+		max-width: 72rem;
+		margin-inline: auto;
+	}
+
 	/* the header as it was (name left, site links right), with the section names centred between them; once the reader
 	   scrolls past it, the names fly into the dot rail on the left (SectionNav) */
 	.top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; gap: 16px; padding-block: 22px 0; }

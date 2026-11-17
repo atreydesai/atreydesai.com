@@ -46,7 +46,7 @@
   // Motion leaves one still frame (with a pile) that stays put on screen.
   // Colors are canvas rendering, so they are hard-coded.
   import { onMount } from "svelte";
-  import { dev } from "$app/environment";
+  import { dev } from '$app/env';
   import { arcadeScreen } from "$lib/boba";
 
   /** Grid cell, in CSS pixels. */
@@ -120,7 +120,7 @@
     ["#8a3251", 1], // wine
     ["#8a5a33", 2], // brown
     ["#d99a2b", 1], // amber
-    ["#e2b33a", 1], // gold
+    ["#e2b33a", 1] // gold
   ];
   // About one leaf in five hasn't finished turning: green at the stem,
   // reddening toward the tip. A leaf turns from its tip in, so these only
@@ -129,7 +129,7 @@
     ["#7d8a3a", 2], // olive
     ["#5f7a34", 1], // moss
     ["#6a8f3a", 1], // leaf green
-    ["#a3a83a", 2], // yellow-green
+    ["#a3a83a", 2] // yellow-green
   ];
   const STEMS = [...PALETTE, ...GREENS];
   const GINKGO = ["#e2b33a", "#d99a2b", "#a9a53c"];
@@ -211,8 +211,8 @@
   }
 
   const rand = (a: number, b: number) => a + Math.random() * (b - a);
-  const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
-  const weighted = <T,>(xs: readonly [T, number][]) => {
+  const pick = <T>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
+  const weighted = <T>(xs: readonly [T, number][]) => {
     let r = Math.random() * xs.reduce((a, [, w]) => a + w, 0);
     for (const [x, w] of xs) if ((r -= w) < 0) return x;
     return xs[0][0];
@@ -222,7 +222,7 @@
   const smooth = (t: number) => t * t * (3 - 2 * t);
   /** The angle nearest `angle` at which a leaf lies level. */
   const level = (angle: number) => {
-    const off = ((((angle - Math.PI / 2) % Math.PI) + Math.PI * 1.5) % Math.PI) - Math.PI / 2;
+    const off = ((angle - Math.PI / 2) % Math.PI + Math.PI * 1.5) % Math.PI - Math.PI / 2;
     return angle - off;
   };
   const bottomOf = (cols: Footprint) => {
@@ -235,7 +235,7 @@
     new Map([...cols].map(([c, e]) => [c + dc, { top: e.top + dr * CELL, bottom: e.bottom + dr * CELL }]));
   /** How much of the floor's throw a leaf keeps, by its own make, so a pile
    *  thrown together comes apart in the air. */
-  const bounce = (leaf: Leaf) => 0.8 + 0.3 * ((leaf.seed * 7.31) % 1);
+  const bounce = (leaf: Leaf) => 0.8 + 0.3 * (leaf.seed * 7.31 % 1);
 
   /** Is (u, v) inside the blade? u is across the midrib, v runs stem (0) to
    *  tip (1), both in units of the blade length. Crumpling pulls a maple's
@@ -363,7 +363,7 @@
         let hits = 0;
         for (let a = 0; a < SS; a++) {
           for (let c = 0; c < SS; c++) {
-            const [u, v] = local(i * CELL + ((a + 0.5) * CELL) / SS, j * CELL + ((c + 0.5) * CELL) / SS);
+            const [u, v] = local(i * CELL + (a + 0.5) * CELL / SS, j * CELL + (c + 0.5) * CELL / SS);
             if (inside(leaf.shape, u, v, cr)) hits++;
           }
         }
@@ -724,7 +724,7 @@
       const reach = r.leaf.len * 0.75;
       const i0 = Math.floor((r.pose.x - reach) / CELL);
       const j0 = Math.floor((r.pose.y - reach) / CELL);
-      const span = Math.ceil((reach * 2) / CELL) + 2;
+      const span = Math.ceil(reach * 2 / CELL) + 2;
       r.sprite.width = Math.ceil(span * CELL * dpr);
       r.sprite.height = Math.ceil(span * CELL * dpr);
       const sctx = r.sprite.getContext("2d")!;
@@ -774,7 +774,7 @@
       for (const r of order) {
         const { k, rows } = solve(r.cols, under, r.pose.x, r.leaf.len);
         let cols = r.cols;
-        if (rows > 0 || (k !== 0 && rows >= 0)) {
+        if (rows > 0 || k !== 0 && rows >= 0) {
           cols = shifted(r.cols, k, rows);
           const leaf = unrest(r);
           if (free) sway(leaf, rand(0.2, 0.4));
@@ -856,7 +856,7 @@
      *  leaves already falling there come into view with it, at the margin's
      *  usual density, so a long scroll never leaves the side bare. */
     function reveal(dy: number) {
-      revealed += (Math.abs(dy) * target) / Math.max(1, height);
+      revealed += Math.abs(dy) * target / Math.max(1, height);
       while (revealed >= 1) {
         revealed -= 1;
         if (inPlay() >= FALLING_MAX) continue;
@@ -966,7 +966,7 @@
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Counted over the whole height of the screen they fall through.
-      target = Math.max(FALLING_MIN, Math.min(FALLING_MAX, Math.round((height / 1000) * DENSITY * 1.4)));
+      target = Math.max(FALLING_MIN, Math.min(FALLING_MAX, Math.round(height / 1000 * DENSITY * 1.4)));
       while (inPlay() < target) falling.push(makeLeaf(true));
       if (lastWidth && Math.abs(width - lastWidth) > 1) {
         // The pile is laid out on the old grid; start a new one.
@@ -1050,7 +1050,7 @@
           leaf.vx += pointer.vx * 0.35 * fall;
           leaf.vy += pointer.vy * 0.35 * fall;
           // Brushing past one side turns it, like a push off-centre.
-          leaf.spinVel += ((pointer.vx * dy - pointer.vy * dx) / (reach * reach)) * 2 * fall;
+          leaf.spinVel += (pointer.vx * dy - pointer.vy * dx) / (reach * reach) * 2 * fall;
           leaf.flipBoost += Math.min(6, pointerSpeed / 120) * fall;
         }
 
@@ -1114,7 +1114,7 @@
       // Past the pile's capacity, a leaf on the floor slips out under the
       // screen, one at a time, falling on as it always has, and the leaves
       // it held up fall into the gap.
-      const capacity = Math.round((width / 100) * PILE_PER_100PX);
+      const capacity = Math.round(width / 100 * PILE_PER_100PX);
       if (pile.length > capacity && !falling.some((l) => l.leaving)) {
         const floored = pile.filter((r) => bottomOf(r.cols) >= floor - CELL);
         if (floored.length) {
@@ -1150,8 +1150,8 @@
         if (!fall) continue;
         release(leaf);
         const push = 190 * fall;
-        leaf.vx += (dx / d) * push;
-        leaf.vy += (dy / d) * push - 40 * fall;
+        leaf.vx += dx / d * push;
+        leaf.vy += dy / d * push - 40 * fall;
         leaf.spinVel += (Math.random() < 0.5 ? -1 : 1) * 5 * fall;
         leaf.flipBoost += 9 * fall;
       }
@@ -1286,7 +1286,7 @@
     window.addEventListener("resize", onResize);
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onDown, { passive: true });
-    requestAnimationFrame(() => (canvas.style.opacity = "1"));
+    requestAnimationFrame(() => canvas.style.opacity = "1");
     // Dev-only handle for QA: the live leaves, the pile, and the canvas.
     // Leaf and pile positions are page coordinates: one at y is on screen
     // at y - view.

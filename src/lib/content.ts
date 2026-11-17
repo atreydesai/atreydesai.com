@@ -1,4 +1,4 @@
-import { dev } from '$app/environment';
+import { dev } from '$app/env';
 import { validateFrontmatter } from '$lib/frontmatter';
 
 // Content loader utilities for markdown and YAML files. Bookshelf entries are
@@ -145,24 +145,24 @@ export interface AboutData {
 const paperModules = import.meta.glob<Paper>('/src/content/papers/*.md', { eager: true });
 export const papers: Paper[] = Object.entries(paperModules)
     .map(([path, mod]) => {
-        validateFrontmatter(path, mod, {
+    validateFrontmatter(path, mod, {
             id: 'string', title: 'string', authors: 'array', year: 'number', venue: 'string|null',
-        });
-        return mod as unknown as Paper;
+    });
+    return mod as unknown as Paper;
     })
     .sort((a, b) => {
-        if (a.year !== b.year) return b.year - a.year;
+    if (a.year !== b.year) return b.year - a.year;
         return (a.priority ?? 99) - (b.priority ?? 99);  // Secondary sort by priority (lower = higher priority)
-    });
+});
 
 // Import all post markdown files
 const postModules = import.meta.glob<Post>('/src/content/posts/*.md', { eager: true });
 const publishedPosts: Post[] = Object.entries(postModules)
     .map(([path, mod]) => {
-        validateFrontmatter(path, mod, {
+    validateFrontmatter(path, mod, {
             id: 'string', title: 'string', date: 'string', excerpt: 'string', tags: 'array',
-        });
-        return mod as unknown as Post;
+    });
+    return mod as unknown as Post;
     })
     .filter((p) => p.published !== false)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

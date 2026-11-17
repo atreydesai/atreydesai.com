@@ -3,7 +3,7 @@
 // `overflow: hidden`, which iOS Safari scrolls straight through. Both calls
 // are no-ops when the body is already in that state, so a reactive statement
 // can call them on every change and a teardown can unlock unconditionally.
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 
 let lockedScrollY = 0;
 

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { browser } from "$app/environment";
+    import { browser } from '$app/env';
     import { X } from "@jis3r/icons";
     import { explainers, type ExplainerComponent } from "$lib/explainers";
     import { focusedExplainer } from "$lib/explainers/focus";
@@ -67,7 +67,9 @@
     }
 </script>
 
-<svelte:window on:keydown={(e) => lightboxOpen && e.key === "Escape" && closeLightbox()} />
+<svelte:window
+    on:keydown={(e) => lightboxOpen && e.key === "Escape" && closeLightbox()}
+></svelte:window>
 
 {#if Explainer || paper.image}
     <div
@@ -82,12 +84,12 @@
             {#if Explainer}
             <svelte:component
                 this={Explainer}
-                size="card"
-                label={paper.imageDescription ?? paper.title}
-                paused={lightboxOpen}
-                {resting}
-            />
-            <!-- While another card has the viewer's attention, this one
+                    size="card"
+                    label={paper.imageDescription ?? paper.title}
+                    paused={lightboxOpen}
+                    resting={resting}
+                 />
+                <!-- While another card has the viewer's attention, this one
                  rests on its first frame, very faintly darkened. -->
             <span class="explainer-dim" class:explainer-dim-on={resting} aria-hidden="true"></span>
             {:else if paper.image}

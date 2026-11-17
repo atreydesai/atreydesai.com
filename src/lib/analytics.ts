@@ -1,4 +1,4 @@
-import { dev } from "$app/environment";
+import { dev } from "$app/env";
 import { track as vercelTrack } from "@vercel/analytics";
 
 // Named events for the actions that say a visit went somewhere: a paper

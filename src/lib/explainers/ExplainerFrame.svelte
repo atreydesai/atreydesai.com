@@ -12,7 +12,7 @@
 	// carry on from there.
 	import { onMount, type Snippet } from "svelte";
 	import { prefersReducedMotion } from "svelte/motion";
-	import { dev } from "$app/environment";
+	import { dev } from '$app/env';
 	import { loadGsap, type Scene, type Timeline } from "./motion";
 
 	interface Props {
@@ -54,7 +54,7 @@
 
 	const spans = $derived(
 		scene.beats.map((beat, i) => {
-			const end = scene.beats[i + 1]?.at ?? scene.duration;
+		const end = scene.beats[i + 1]?.at ?? scene.duration;
 			return { start: beat.at, end, fill: Math.min(1, Math.max(0, (time - beat.at) / (end - beat.at))) };
 		}),
 	);
@@ -62,10 +62,10 @@
 	// Rail segments: one per beat, sized to the beat's share of the loop.
 	const segments = $derived(
 		spans.map(({ start, end, fill }) => {
-			const span = RAIL_X1 - RAIL_X0;
-			const x1 = RAIL_X0 + (start / scene.duration) * span;
-			const x2 = RAIL_X0 + (end / scene.duration) * span - RAIL_GAP;
-			return { x1, x2, fill };
+		const span = RAIL_X1 - RAIL_X0;
+		const x1 = RAIL_X0 + start / scene.duration * span;
+		const x2 = RAIL_X0 + end / scene.duration * span - RAIL_GAP;
+		return { x1, x2, fill };
 		}),
 	);
 
@@ -91,18 +91,18 @@
 		if (!svg?.isConnected) return;
 		let built: Timeline | null = null;
 		context = gsap.context(() => {
-			const timeline = gsap.timeline({
-				paused: true,
-				repeat: -1,
-				onUpdate: () => (time = timeline.time()),
-			});
-			for (const beat of scene.beats) timeline.addLabel(beat.id, beat.at);
-			scene.build(timeline, svg);
-			// Pad to the declared length so every loop is the same duration.
-			if (timeline.duration() < scene.duration) {
-				timeline.set({}, {}, scene.duration);
-			}
-			built = timeline;
+				const timeline = gsap.timeline({
+					paused: true,
+					repeat: -1,
+					onUpdate: () => time = timeline.time()
+				});
+				for (const beat of scene.beats) timeline.addLabel(beat.id, beat.at);
+				scene.build(timeline, svg);
+				// Pad to the declared length so every loop is the same duration.
+				if (timeline.duration() < scene.duration) {
+					timeline.set({}, {}, scene.duration);
+				}
+				built = timeline;
 		}, svg);
 		tl = built;
 		(tl as Timeline | null)?.seek(lead, false);
@@ -136,7 +136,7 @@
 	let devHandle: object | null = null;
 
 	onMount(() => {
-		const onVisibility = () => (pageHidden = document.hidden);
+		const onVisibility = () => pageHidden = document.hidden;
 		onVisibility();
 		document.addEventListener("visibilitychange", onVisibility);
 
@@ -149,7 +149,7 @@
 			},
 			{ rootMargin: "200px" },
 		);
-		const onScreen = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+		const onScreen = new IntersectionObserver(([entry]) => visible = entry.isIntersecting);
 		near.observe(svg);
 		onScreen.observe(svg);
 
@@ -215,7 +215,14 @@
 		{#if size === "card"}
 			<g class="xp-rail" aria-hidden="true">
 				{#each segments as seg}
-					<line class="xp-rail-track" x1={seg.x1} x2={seg.x2} y1={RAIL_Y} y2={RAIL_Y} />
+					<line
+						class="xp-rail-track"
+						x1={seg.x1}
+						x2={seg.x2}
+						y1={RAIL_Y}
+						y2={RAIL_Y}
+					></line>
+
 					{#if seg.fill > 0}
 						<line
 							class="xp-rail-fill"
@@ -223,7 +230,7 @@
 							x2={seg.x1 + (seg.x2 - seg.x1) * seg.fill}
 							y1={RAIL_Y}
 							y2={RAIL_Y}
-						/>
+						></line>
 					{/if}
 				{/each}
 			</g>

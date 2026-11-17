@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { get, list, put } from '@vercel/blob';
-import { env } from '$env/dynamic/private';
+import { BLOB_READ_WRITE_TOKEN } from '$app/env/private';
 import { cleanName } from '$lib/profanity';
 import type { RequestHandler } from './$types';
 
@@ -46,18 +46,10 @@ const TOP = 20; // returned to clients
 
 // Provided automatically when a Blob store is linked to the Vercel project;
 // locally, `vercel env pull`. Without it the leaderboard is simply "offline".
-const token = env.BLOB_READ_WRITE_TOKEN;
+const token = BLOB_READ_WRITE_TOKEN;
 
-interface Entry {
-	name: string;
-	score: number;
-	t: number;
-}
-
-interface PublicEntry {
-	name: string;
-	score: number;
-}
+interface Entry { name: string; score: number; t: number }
+interface PublicEntry { name: string; score: number }
 
 function bestPerName(board: Entry[]): Entry[] {
 	const seen = new Set<string>();

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { browser } from "$app/environment";
+    import { browser } from '$app/env';
     import { afterNavigate, replaceState } from "$app/navigation";
     import { page } from "$app/state";
     import { onMount } from "svelte";
@@ -107,20 +107,16 @@
     const tagsById = new Map(books.map((book) => [book.id, bookTags(book)]));
     const searchTextById = new Map(
         books.map((book) => [
-            book.id,
-            [
-                book.title,
-                book.author,
-                book.category,
-                book.medium,
-                book.notes,
-                ...(tagsById.get(book.id) ?? []),
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase(),
-        ]),
-    );
+        book.id,
+        [
+            book.title,
+            book.author,
+            book.category,
+            book.medium,
+            book.notes,
+            ...tagsById.get(book.id) ?? []
+        ].filter(Boolean).join(" ").toLowerCase()
+    ]));
 
     type Facet = "view" | "category" | "medium" | "tag";
 
@@ -141,7 +137,7 @@
     // facet out is what gives that facet its counts: how many entries each of
     // its options would show, given everything else that's set.
     function matches(book: Book, f: typeof filters, skip?: Facet): boolean {
-        if (skip !== "view" && (book.status === "shelved") !== f.shelved) {
+        if (skip !== "view" && book.status === "shelved" !== f.shelved) {
             return false;
         }
         if (skip !== "medium") {
@@ -225,15 +221,8 @@
         { done: 0, shelved: 0 },
     );
 
-    $: mediumCounts = countBy(
-        books.filter((book) => matches(book, filters, "medium")),
-        (book) => (book.medium ? [book.medium] : []),
-    );
-
-    $: tagCounts = countBy(
-        books.filter((book) => matches(book, filters, "tag")),
-        (book) => tagsById.get(book.id) ?? [],
-    );
+    $: mediumCounts = countBy(books.filter((book) => matches(book, filters, "medium")), (book) => book.medium ? [book.medium] : []);
+    $: tagCounts = countBy(books.filter((book) => matches(book, filters, "tag")), (book) => tagsById.get(book.id) ?? []);
 
     $: mediumOptions = [
         { value: "all", label: "all mediums" },
@@ -359,7 +348,7 @@
         window.addEventListener("popstate", handlePopState);
 
         const wideMedia = window.matchMedia(WIDE_LAYOUT_QUERY);
-        const syncWide = () => (isWideLayout = wideMedia.matches);
+        const syncWide = () => isWideLayout = wideMedia.matches;
         syncWide();
         wideMedia.addEventListener("change", syncWide);
 
@@ -634,7 +623,7 @@
                     aria-pressed={!showShelved}
                     on:click={() => setShelved(false)}
                 >
-                    read &amp; watched
+                    read & watched 
                     <span class="shelf-count">{viewCounts.done}</span>
                 </button>
                 <button
@@ -660,7 +649,7 @@
                     autocomplete="off"
                     spellcheck="false"
                     bind:value={searchQuery}
-                    on:input={() => (currentPage = 1)}
+                    on:input={() => currentPage = 1}
                 />
                 {#if searchQuery}
                     <button
@@ -834,10 +823,10 @@
                                             type="button"
                                             class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
                                             on:click={() => handleSort("enjoyment")}
-                                            on:mouseenter={() => (hoveredRatingLegend = "enjoyment")}
-                                            on:mouseleave={() => (hoveredRatingLegend = null)}
-                                            on:focus={() => (hoveredRatingLegend = "enjoyment")}
-                                            on:blur={() => (hoveredRatingLegend = null)}
+                                            on:mouseenter={() => hoveredRatingLegend = "enjoyment"}
+                                            on:mouseleave={() => hoveredRatingLegend = null}
+                                            on:focus={() => hoveredRatingLegend = "enjoyment"}
+                                            on:blur={() => hoveredRatingLegend = null}
                                             aria-label="Sort by appreciation"
                                         >
                                             <Heart size={14} animate={hoveredRatingLegend === "enjoyment"} />
@@ -870,10 +859,10 @@
                                             type="button"
                                             class="mx-auto flex items-center justify-center gap-1 transition-colors hover:text-ink-900 dark:hover:text-cream-100"
                                             on:click={() => handleSort("importance")}
-                                            on:mouseenter={() => (hoveredRatingLegend = "importance")}
-                                            on:mouseleave={() => (hoveredRatingLegend = null)}
-                                            on:focus={() => (hoveredRatingLegend = "importance")}
-                                            on:blur={() => (hoveredRatingLegend = null)}
+                                            on:mouseenter={() => hoveredRatingLegend = "importance"}
+                                            on:mouseleave={() => hoveredRatingLegend = null}
+                                            on:focus={() => hoveredRatingLegend = "importance"}
+                                            on:blur={() => hoveredRatingLegend = null}
                                             aria-label="Sort by importance"
                                         >
                                             <BadgeQuestionMark size={14} />
@@ -936,74 +925,74 @@
                                      VoiceOver read the whole row as one name.
                                      The keyboard path is the title button in
                                      the first cell. -->
-                                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-                                <tr
+                                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                                    <tr
                                     class="group cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/[0.08] dark:outline-accent-light/30' : ''}"
-                                    aria-current={selectedBookId === book.id ? "true" : undefined}
-                                    on:click={(event) => onRowClick(event, book.id)}
-                                    on:mouseenter={() => (hoveredBookId = book.id)}
-                                    on:mouseleave={() => (hoveredBookId = null)}
-                                >
-                                    <td class="px-3 py-2.5 align-middle">
-                                        <div class="flex min-w-0 items-center gap-2">
-                                            <MediumIcon
-                                                medium={book.medium}
-                                                size={15}
-                                                animate={hoveredBookId === book.id || selectedBookId === book.id}
-                                                strokeWidth={1.5}
-                                                className="shrink-0 text-ink-300 transition-colors duration-150 group-hover:text-ink-500 dark:text-ink-600 dark:group-hover:text-ink-400"
-                                            />
-                                            {#if book.favorite}
-                                                <span
-                                                    class="status-icon inline-flex shrink-0 text-accent opacity-60 transition-opacity duration-150 group-hover:opacity-100 dark:text-accent-light"
-                                                    aria-label="Favorite"
+                                        aria-current={selectedBookId === book.id ? "true" : undefined}
+                                        on:click={(event) => onRowClick(event, book.id)}
+                                        on:mouseenter={() => hoveredBookId = book.id}
+                                        on:mouseleave={() => hoveredBookId = null}
+                                    >
+                                        <td class="px-3 py-2.5 align-middle">
+                                            <div class="flex min-w-0 items-center gap-2">
+                                                <MediumIcon
+                                                    medium={book.medium}
+                                                    size={15}
+                                                    animate={hoveredBookId === book.id || selectedBookId === book.id}
+                                                    strokeWidth={1.5}
+                                                    className="shrink-0 text-ink-300 transition-colors duration-150 group-hover:text-ink-500 dark:text-ink-600 dark:group-hover:text-ink-400"
+                                                />
+                                                {#if book.favorite}
+                                                    <span
+                                                        class="status-icon inline-flex shrink-0 text-accent opacity-60 transition-opacity duration-150 group-hover:opacity-100 dark:text-accent-light"
+                                                        aria-label="Favorite"
                                                 >
                                                     <Star size={13} />
                                                 </span>
-                                            {/if}
-                                            {#if isCurrent(book)}
-                                                <span
-                                                    class="status-icon inline-flex shrink-0 text-ochre-dark opacity-60 transition-opacity duration-150 group-hover:opacity-100 dark:text-ochre-light"
-                                                    aria-label={currentStatusLabel(book)}
+                                                {/if}
+                                                {#if isCurrent(book)}
+                                                    <span
+                                                        class="status-icon inline-flex shrink-0 text-ochre-dark opacity-60 transition-opacity duration-150 group-hover:opacity-100 dark:text-ochre-light"
+                                                        aria-label={currentStatusLabel(book)}
                                                 >
                                                     <Bookmark size={13} />
                                                 </span>
-                                            {/if}
-                                            <button
-                                                type="button"
-                                                class="row-open min-w-0 truncate text-left text-ink-900 dark:text-cream-100"
-                                                aria-expanded={selectedBookId === book.id}
+                                                {/if}
+                                                <button
+                                                    type="button"
+                                                    class="row-open min-w-0 truncate text-left text-ink-900 dark:text-cream-100"
+                                                    aria-expanded={selectedBookId === book.id}
                                                 on:click|stopPropagation={(event) =>
                                                     selectBook(book.id, event.currentTarget)}
-                                            >
-                                                {book.title}
-                                                {#if book.author}
+                                                >
+                                                    {book.title} 
+                                                    {#if book.author}
                                                     <span class="text-ink-400 dark:text-cream-500">
                                                         | {book.author}
                                                     </span>
-                                                {/if}
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td class="px-3 py-2.5 align-middle">
-                                        <button
-                                            type="button"
-                                            class="pill {getCategoryColor(book.category)}"
-                                            on:click|stopPropagation={() => setCategory(book.category)}
+                                                    {/if}
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td class="px-3 py-2.5 align-middle">
+                                            <button
+                                                type="button"
+                                                class="pill {getCategoryColor(book.category)}"
+                                                on:click|stopPropagation={() => setCategory(book.category)}
                                         >
                                             {book.category}
                                         </button>
-                                    </td>
-                                    <td class="px-3 py-2.5 align-middle">
-                                        {#if book.medium}
+                                        </td>
+                                        <td class="px-3 py-2.5 align-middle">
+                                            {#if book.medium}
                                             <span class="pill text-ink-600 dark:text-cream-300">
                                                 {book.medium}
                                             </span>
-                                        {:else}
+                                            {:else}
                                             <span class="font-ui text-xs text-ink-400 dark:text-ink-300">--</span>
-                                        {/if}
-                                    </td>
+                                            {/if}
+                                        </td>
                                     <td class="px-3 py-2.5 text-center align-middle">
                                         <RatingGlyph
                                             value={book.enjoyment}
@@ -1019,38 +1008,38 @@
                                     <td class="px-3 py-2.5 align-middle font-ui text-xs tabular-nums text-ink-500 dark:text-cream-400">
                                         {shortDate(book.dateAdded)}
                                     </td>
-                                    <td class="px-3 py-2.5 align-middle">
+                                        <td class="px-3 py-2.5 align-middle">
                                         <div class="flex flex-nowrap items-center gap-1 overflow-hidden">
-                                            {#each previewTags(book) as tag}
-                                                <button
-                                                    type="button"
-                                                    class="pill max-w-[9rem] truncate"
-                                                    title={tag}
-                                                    on:click|stopPropagation={() => setTag(tag)}
+                                                {#each previewTags(book) as tag}
+                                                    <button
+                                                        type="button"
+                                                        class="pill max-w-[9rem] truncate"
+                                                        title={tag}
+                                                        on:click|stopPropagation={() => setTag(tag)}
                                                 >
                                                     {tag}
                                                 </button>
-                                            {/each}
-                                            {#if tagOverflow(book) > 0}
-                                                <button
-                                                    type="button"
-                                                    class="pill shrink-0 text-ink-500 dark:text-cream-400"
-                                                    title="Open details to show all tags"
-                                                    aria-label="Open details and show {tagOverflow(book)} more tags"
+                                                {/each}
+                                                {#if tagOverflow(book) > 0}
+                                                    <button
+                                                        type="button"
+                                                        class="pill shrink-0 text-ink-500 dark:text-cream-400"
+                                                        title="Open details to show all tags"
+                                                        aria-label="Open details and show {tagOverflow(book)} more tags"
                                                     on:click|stopPropagation={(event) =>
                                                         selectBook(book.id, event.currentTarget)}
-                                                >
-                                                    <CirclePlus
-                                                        size={12}
-                                                        animate={hoveredBookId === book.id || selectedBookId === book.id}
-                                                    />
-                                                    +{tagOverflow(book)}
-                                                </button>
-                                            {/if}
-                                        </div>
-                                    </td>
-                                </tr>
-                            {/each}
+                                                    >
+                                                        <CirclePlus
+                                                            size={12}
+                                                            animate={hoveredBookId === book.id || selectedBookId === book.id}
+                                                        />
+                                                        +{tagOverflow(book)}
+                                                    </button>
+                                                {/if}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {/each}
                             {/key}
                         </tbody>
                     </table>
