@@ -1,0 +1,62 @@
+import { posts } from '$lib/content';
+import { SITE_URL } from '$lib/seo';
+import { htmlToMarkdown, markdownPath } from '$lib/server/content-negotiation.js';
+import { PAGE_CDN_CACHE } from '$lib/server/page-cache.js';
+import { SITE_PAGES } from '$lib/server/site-pages';
+import type { RequestHandler } from './$types';
+
+// Every public page as Markdown in one file, for agents that want the whole
+// site in one request (the llms-full.txt companion to /llms.txt). Rendered on
+// request from the same pages as the sitemap, then cached at the CDN like a
+// page, so it changes with every deploy and costs a render at most hourly.
+export const prerender = false;
+export const trailingSlash = 'ignore';
+
+// Who Atrey is and what he works on first.
+const ORDER = ['/', '/about/', '/research/', '/cv/', '/blog/'];
+// Left out until their Markdown carries their content: the bookshelf's titles
+// and the photo tiles sit inside <button>s, which the conversion drops.
+const LEFT_OUT = new Set(['/bookshelf/', '/photography/']);
+
+function fullSitePaths(): string[] {
+    const pages = SITE_PAGES.map((page) => page.path).filter(
+        (path) => path.endsWith('/') && !LEFT_OUT.has(path)
+    );
+    pages.sort((a, b) => rank(a) - rank(b));
+    const postPaths = posts.filter((post) => !post.externalUrl).map((post) => `/blog/${post.id}/`);
+    const blog = pages.indexOf('/blog/');
+    return [...new Set([...pages.slice(0, blog + 1), ...postPaths, ...pages.slice(blog + 1)])];
+}
+
+function rank(path: string): number {
+    const i = ORDER.indexOf(path);
+    return i === -1 ? ORDER.length : i;
+}
+
+export const GET: RequestHandler = async ({ fetch }) => {
+    const sections = await Promise.all(
+        fullSitePaths().map(async (path) => {
+            const response = await fetch(path, { headers: { accept: 'text/html' } });
+            if (!response.ok) return null;
+            const url = `${SITE_URL}${path}`;
+            const markdown = htmlToMarkdown(await response.text(), url, { footer: false });
+            return `URL: ${url}\nMarkdown: ${SITE_URL}${markdownPath(path)}\n\n${markdown}`;
+        })
+    );
+
+    const body = `# Atrey Desai: full site
+
+> Every public page of atreydesai.com as Markdown, in one file: the homepage, about, research, CV, the blog, and each post. Each page starts with its URL. For a short index with guidance on which page answers what, read ${SITE_URL}/llms.txt instead.
+
+${sections.filter(Boolean).join('\n\n---\n\n')}
+`;
+
+    return new Response(body, {
+        headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Cache-Control': 'public, max-age=0, must-revalidate',
+            'Vercel-CDN-Cache-Control': PAGE_CDN_CACHE,
+            Link: `<${SITE_URL}/llms.txt>; rel="describedby"; type="text/plain"`,
+        },
+    });
+};

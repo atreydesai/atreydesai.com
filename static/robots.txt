@@ -1,8 +1,9 @@
 # robots.txt for atreydesai.com
 #
 # Public pages are open to search engines and AI agents alike. Agent-oriented
-# guidance lives in /llms.txt, and every page serves Markdown on request
-# (Accept: text/markdown).
+# guidance lives in /llms.txt (the whole site in /llms-full.txt), and every
+# page has Markdown at its URL plus index.md, or on request with
+# Accept: text/markdown.
 
 User-agent: *
 Allow: /

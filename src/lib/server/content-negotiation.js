@@ -148,12 +148,59 @@ function absoluteUrl(value, base) {
   }
 }
 
+/**
+ * The llms.txt convention (https://llmstxt.org/): a page's Markdown lives at
+ * its URL plus `.md`, and a URL without a file name takes `index.md`. Every
+ * page here ends in a slash, so `/research/` is `/research/index.md`.
+ *
+ * @param {string} pathname a canonical page path
+ */
+export function markdownPath(pathname) {
+  return `${pathname.endsWith("/") ? pathname : `${pathname}/`}index.md`;
+}
+
+/**
+ * The page a Markdown URL stands for, or null when the path isn't one:
+ * `/index.md`, `/research/index.md`, `/research/index.html.md` and
+ * `/research.md` all name `/research/` (or `/`).
+ *
+ * @param {string} pathname
+ * @returns {string | null}
+ */
+export function markdownTarget(pathname) {
+  const page = pathname.match(/^(.*\/)index(?:\.html)?\.md$/)?.[1]
+    ?? pathname.match(/^(\/.+?)(?:\.html)?\.md$/)?.[1]?.concat("/");
+  if (!page || page.includes("//")) return null;
+  return page;
+}
+
+// Links to the site's own pages point agents at their Markdown, so an agent
+// that can't send `Accept: text/markdown` can still walk the site in it.
+// Files (PDFs, images) and non-page paths keep their URLs.
+/** @param {string} value */
+function agentLink(value) {
+  try {
+    const url = new URL(value);
+    if (url.origin !== SITE_URL) return value;
+    if (!url.pathname.endsWith("/") || /^\/(?:api|dev|_app)\//.test(url.pathname))
+      return value;
+    url.pathname = markdownPath(url.pathname);
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 /** @param {string} html @param {URL} canonical */
 function absolutizeLinks(html, canonical) {
   return html.replace(
     /\b(href|src)=(['"])(.*?)\2/gi,
-    (_match, attribute, quote, value) =>
-      `${attribute}=${quote}${absoluteUrl(value, canonical)}${quote}`,
+    (_match, attribute, quote, value) => {
+      const absolute = absoluteUrl(value, canonical);
+      const target =
+        attribute.toLowerCase() === "href" ? agentLink(absolute) : absolute;
+      return `${attribute}=${quote}${target}${quote}`;
+    },
   );
 }
 
@@ -164,8 +211,10 @@ function absolutizeLinks(html, canonical) {
  *
  * @param {string} html
  * @param {URL | string} canonical
+ * @param {{ footer?: boolean }} [options] footer: end with the source and
+ *   agent-guide links (off when pages are joined, as in llms-full.txt)
  */
-export function htmlToMarkdown(html, canonical) {
+export function htmlToMarkdown(html, canonical, { footer = true } = {}) {
   const canonicalUrl =
     canonical instanceof URL ? canonical : new URL(canonical, SITE_URL);
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ?? html;
@@ -175,6 +224,7 @@ export function htmlToMarkdown(html, canonical) {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
+  if (!footer) return `${markdown}\n`;
   const sourceUrl = new URL(canonicalUrl.pathname, SITE_URL).toString();
   return `${markdown}\n\n---\n\nSource: [${sourceUrl}](${sourceUrl})  \nAgent guide: [${SITE_URL}/llms.txt](${SITE_URL}/llms.txt)\n`;
 }
@@ -233,6 +283,12 @@ export async function negotiateHtmlResponse(request, response, url) {
     appendVary(response.headers);
     response.headers.set("Content-Type", "text/html; charset=utf-8");
     appendLink(response.headers, AGENT_GUIDE_LINK);
+    if (response.status === 200) {
+      appendLink(
+        response.headers,
+        `<${SITE_URL}${markdownPath(url.pathname)}>; rel="alternate"; type="text/markdown"`,
+      );
+    }
     return response;
   }
 
@@ -257,4 +313,40 @@ export async function negotiateHtmlResponse(request, response, url) {
     statusText: response.statusText,
     headers,
   });
+}
+
+/**
+ * Answer a Markdown URL (`/research/index.md`, `/research.md`, ...) with the
+ * Markdown of the page it names. The page is rendered through the app's own
+ * fetch, so it gets the same handling as any request for it; the response
+ * names the HTML page as canonical so search engines keep that one.
+ *
+ * @param {Request} request
+ * @param {typeof fetch} fetch the request event's fetch (served in-process)
+ * @param {string} page the page path, from markdownTarget()
+ */
+export async function serveMarkdownUrl(request, fetch, page) {
+  const pageUrl = new URL(page, SITE_URL);
+  const response = await fetch(page, { headers: { accept: "text/html" } });
+  const headers = new Headers({
+    "Content-Type": "text/markdown; charset=utf-8",
+    Link: `<${pageUrl}>; rel="canonical", ${AGENT_GUIDE_LINK}`,
+  });
+
+  if (response.status !== 200 && response.status !== 404) {
+    headers.set("Content-Type", "text/plain; charset=utf-8");
+    return new Response(
+      request.method === "HEAD" ? null : `Error ${response.status}\n`,
+      { status: response.status, headers },
+    );
+  }
+
+  let body = null;
+  if (request.method !== "HEAD") {
+    body =
+      response.status === 404
+        ? markdownNotFound(pageUrl)
+        : htmlToMarkdown(await response.text(), pageUrl);
+  }
+  return new Response(body, { status: response.status, headers });
 }

@@ -38,6 +38,9 @@
   export let tags: string[] = [];
 
   $: canonicalUrl = toCanonicalUrl(url);
+  // The page's Markdown at its own URL (llmstxt.org): `/research/` →
+  // `/research/index.md`, served by hooks.server.js.
+  $: markdownUrl = canonicalUrl.endsWith("/") ? `${canonicalUrl}index.md` : canonicalUrl;
   // `undefined` (an optional post field passed straight through) falls back
   // to the portrait card, alt text included.
   $: cardImage = image ?? "/og-image-wide.jpg";
@@ -136,7 +139,7 @@
   <!-- Additional SEO -->
   <meta name="author" content="Atrey Desai" />
   <link rel="canonical" href={canonicalUrl} />
-  <link rel="alternate" type="text/markdown" href={canonicalUrl} />
+  <link rel="alternate" type="text/markdown" href={markdownUrl} />
   <link rel="describedby" type="text/plain" href="/llms.txt" />
 
   <!-- Machine-readable identity shared by every page. -->

@@ -7,6 +7,8 @@ import { PAGE_CDN_CACHE } from "../src/lib/server/page-cache.js";
 import {
   appendVary,
   htmlToMarkdown,
+  markdownPath,
+  markdownTarget,
   preferredType,
 } from "../src/lib/server/content-negotiation.js";
 import {
@@ -28,6 +30,7 @@ function htmlResponse(status = 200) {
           <h2>Research</h2>
           <p>Research on trustworthy language models and benchmark evaluation.</p>
           <a href="/research/">Selected work</a>
+          <a href="/atreydesai_cv.pdf">CV PDF</a>
           <script>window.hydrate = true</script>
         </main>
         <footer>footer chrome</footer>
@@ -171,6 +174,85 @@ test("pages are CDN-cached at Vercel while browsers keep revalidating", async ()
   assert.equal(cdn(await runHandle("text/html", failed)), null);
 });
 
+test("Markdown URLs follow llmstxt.org: page URL plus index.md, and .md shorthands", () => {
+  assert.equal(markdownPath("/"), "/index.md");
+  assert.equal(markdownPath("/research/"), "/research/index.md");
+  assert.equal(markdownTarget("/index.md"), "/");
+  assert.equal(markdownTarget("/index.html.md"), "/");
+  assert.equal(markdownTarget("/research/index.md"), "/research/");
+  assert.equal(markdownTarget("/research/index.html.md"), "/research/");
+  assert.equal(markdownTarget("/research.md"), "/research/");
+  assert.equal(markdownTarget("/blog/prose-diff.md"), "/blog/prose-diff/");
+  assert.equal(markdownTarget("/research/"), null);
+  assert.equal(markdownTarget("/llms.txt"), null);
+  assert.equal(markdownTarget("//evil.md"), null);
+});
+
+test("a .md URL serves its page's Markdown, cached, with the HTML page as canonical", async () => {
+  const requested = [];
+  const fetch = async (path, init) => {
+    requested.push([path, init.headers.accept]);
+    return path === "/research/" ? htmlResponse() : htmlResponse(404);
+  };
+  const run = (pathname, method = "GET") => {
+    const request = new Request(`https://atreydesai.com${pathname}`, { method });
+    return handle({
+      event: { request, url: new URL(request.url), fetch },
+      resolve: () => assert.fail("a Markdown URL must not render the route itself"),
+    });
+  };
+
+  const response = await run("/research/index.md");
+  const body = await response.text();
+  assert.deepEqual(requested[0], ["/research/", "text/html"]);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+  assert.match(response.headers.get("link"), /<https:\/\/atreydesai\.com\/research\/>; rel="canonical"/);
+  assert.match(response.headers.get("link"), /llms\.txt>; rel="describedby"/);
+  assert.equal(response.headers.get("vercel-cdn-cache-control"), PAGE_CDN_CACHE);
+  assert.match(body, /^# Atrey Desai/m);
+  assert.doesNotMatch(body, /site chrome|window\./);
+
+  const missing = await run("/nope.md");
+  assert.equal(missing.status, 404);
+  assert.match(await missing.text(), /^# 404: Page not found/m);
+
+  const head = await run("/research.md", "HEAD");
+  assert.equal(head.status, 200);
+  assert.equal(await head.text(), "");
+});
+
+test("HTML pages point to their Markdown URL; missing pages don't", async () => {
+  const page = await runHandle("text/html", htmlResponse(), "/research/");
+  assert.match(
+    page.headers.get("link"),
+    /<https:\/\/atreydesai\.com\/research\/index\.md>; rel="alternate"; type="text\/markdown"/,
+  );
+  const missing = await runHandle("text/html", htmlResponse(404), "/nope/");
+  assert.doesNotMatch(missing.headers.get("link"), /rel="alternate"/);
+});
+
+test("Markdown links to site pages lead to their Markdown; files and other sites keep their URLs", () => {
+  const markdown = htmlToMarkdown(
+    `<main>
+      <a href="/research/#papers">Research</a>
+      <a href="https://atreydesai.com/blog/prose-diff/">Prose diff</a>
+      <a href="/atreydesai_cv.pdf">CV</a>
+      <a href="https://example.com/page/">Elsewhere</a>
+      <img src="/images/a.webp" alt="a">
+    </main>`,
+    "/",
+  );
+  assert.match(markdown, /\(https:\/\/atreydesai\.com\/research\/index\.md#papers\)/);
+  assert.match(markdown, /\(https:\/\/atreydesai\.com\/blog\/prose-diff\/index\.md\)/);
+  assert.match(markdown, /\(https:\/\/atreydesai\.com\/atreydesai_cv\.pdf\)/);
+  assert.match(markdown, /\(https:\/\/example\.com\/page\/\)/);
+  assert.match(markdown, /\(https:\/\/atreydesai\.com\/images\/a\.webp\)/);
+  // The footer still names the HTML page as the source.
+  assert.match(markdown, /Source: \[https:\/\/atreydesai\.com\/\]/);
+  assert.doesNotMatch(htmlToMarkdown("<main>x</main>", "/", { footer: false }), /Source:/);
+});
+
 test("HTML conversion keeps the main semantic outline and omits document chrome", () => {
   const markdown = htmlToMarkdown(
     '<nav>skip</nav><main><h1>Title</h1><h2>Section</h2><p>Useful <a href="/research/">prose</a>.</p></main><footer>skip</footer>',
@@ -196,6 +278,17 @@ test("llms.txt follows the llms.txt outline and includes specific when-to-use gu
   );
   assert.ok(links.length >= 10);
   assert.ok(links.every((link) => /^(?:https:\/\/|mailto:)/.test(link)));
+
+  // llmstxt.org: links point to Markdown versions, and an "Optional" section
+  // of skippable links comes last.
+  const sitePages = links.filter((link) => link.startsWith("https://atreydesai.com/"));
+  assert.ok(
+    sitePages.every((link) => /\.(?:md|txt|xml|pdf)$/.test(link)),
+    `site links that aren't Markdown: ${sitePages.filter((l) => !/\.(?:md|txt|xml|pdf)$/.test(l))}`,
+  );
+  assert.match(content, /llms-full\.txt/);
+  const h2s = [...content.matchAll(/^## (.+)$/gm)].map((match) => match[1]);
+  assert.equal(h2s.at(-1), "Optional");
 });
 
 test("Person JSON-LD exposes required identity fields and type-appropriate links", () => {
@@ -238,7 +331,8 @@ test("deployment and page metadata advertise machine-readable recovery resources
         header.value === "text/plain; charset=utf-8",
     ),
   );
-  assert.match(seo, /rel="alternate" type="text\/markdown"/);
+  assert.match(seo, /rel="alternate" type="text\/markdown" href=\{markdownUrl\}/);
+  assert.match(seo, /\$\{canonicalUrl\}index\.md/);
   assert.match(seo, /rel="describedby" type="text\/plain" href="\/llms\.txt"/);
   assert.match(errorPage, /noindex=\{true\}/);
   assert.match(errorPage, /href="\/sitemap\.xml"/);

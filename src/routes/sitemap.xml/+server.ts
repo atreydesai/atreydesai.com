@@ -1,14 +1,10 @@
 import { posts } from '$lib/content';
 import { SITE_URL } from '$lib/seo';
 import { execFileSync } from 'child_process';
+import { SITE_PAGES as pages } from '$lib/server/site-pages';
 import type { RequestHandler } from './$types';
 
 export const prerender = true;
-
-type SitemapPage = {
-    path: string;
-    sources: string[];
-};
 
 const postModules = import.meta.glob<Record<string, unknown>>('/src/content/posts/*.md', {
     eager: true,
@@ -16,57 +12,6 @@ const postModules = import.meta.glob<Record<string, unknown>>('/src/content/post
 const postSourcesById = Object.fromEntries(
     Object.entries(postModules).map(([path, mod]) => [String(mod.id), toGitPath(path)])
 );
-
-// Static pages. `sources` lists the files/directories that materially change
-// each page's rendered content, so <lastmod> is not just the deploy/build date.
-// <changefreq> and <priority> are omitted: Google ignores both.
-const pages: SitemapPage[] = [
-    {
-        path: '/',
-        sources: ['src/routes/+page.svelte', 'src/content/homepage.yaml', 'src/content/papers'],
-    },
-    {
-        path: '/about/',
-        sources: ['src/routes/about/+page.svelte', 'src/content/about.yaml'],
-    },
-    {
-        path: '/research/',
-        sources: ['src/routes/research/+page.svelte', 'src/content/papers', 'src/content/talks.yaml'],
-    },
-    {
-        path: '/blog/',
-        sources: ['src/routes/blog/+page.svelte', 'src/content/posts'],
-    },
-    {
-        path: '/photography/',
-        sources: [
-            'src/routes/photography/+page.svelte',
-            'src/routes/photography/+page.server.ts',
-            'static/images/photography',
-        ],
-    },
-    {
-        path: '/bookshelf/',
-        sources: [
-            'src/routes/bookshelf/+page.svelte',
-            'src/content/books',
-            'src/content/categories.yaml',
-        ],
-    },
-    {
-        path: '/atreydesai_cv.pdf',
-        sources: ['static/atreydesai_cv.pdf'],
-    },
-    {
-        path: '/cv/',
-        sources: [
-            'src/routes/cv/+page.svelte',
-            'src/routes/cv/+page.server.ts',
-            'src/content/cv.yaml',
-            'static/atreydesai_cv.pdf',
-        ],
-    },
-];
 
 export const GET: RequestHandler = () => {
     const staticUrls = pages.map(
