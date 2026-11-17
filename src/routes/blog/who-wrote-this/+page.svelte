@@ -230,6 +230,11 @@
 			<!-- credit for a linked site that a coauthor built (meta.links[].credit; Ty's model profiles, Atrey, 16 Nov) -->
 			{#each C.meta.links.filter((l) => "credit" in l && l.credit) as l}<p class="credit">{l.credit}</p>{/each}
 			<FootnoteList />
+			<!-- the paper's acknowledgements, word for word (Atrey, 17 Nov) -->
+			<section class="thanks" aria-labelledby="thanks-h">
+				<h2 id="thanks-h">Acknowledgements</h2>
+				<p>{C.meta.acknowledgements.t}</p>
+			</section>
 			<!-- how to cite the paper, with a copy button (Atrey, 17 Nov) -->
 			<section class="cite" aria-labelledby="cite-h">
 				<div class="cite-head">
@@ -383,7 +388,10 @@
 	.phd svg { overflow: visible; margin-right: -3px; transform: translateY(2px) scaleX(-1); }
 	.phd path { fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
 	.site-foot .me:hover .phd { color: var(--fable); }
-	/* the citation block at the foot of the page */
+	/* the acknowledgements and the citation block at the foot of the page */
+	.thanks { margin-top: 40px; max-width: 52rem; }
+	.thanks h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 8px; }
+	.thanks p { font-size: 14px; line-height: 1.6; color: var(--ink2); }
 	.cite { margin-top: 40px; max-width: 52rem; }
 	.cite-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 	.cite h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }

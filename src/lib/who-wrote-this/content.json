@@ -126,7 +126,7 @@
    },
    {
     "id": "code",
-    "t": "Code",
+    "t": "Code & data",
     "href": "https://github.com/denizbt/unmasking_authors",
     "icon": "github"
    },
@@ -143,7 +143,11 @@
     "icon": "ai",
     "credit": "Model profiles by Ty Brassington"
    }
-  ]
+  ],
+  "acknowledgements": {
+   "t": "We thank the University of Maryland Computational Linguistics and Information Processing (CLIP) Lab and the SFU AI lab for their feedback and support. We thank Google for HG's Gemini Academic Program award and Pangram Labs for a credit award, both of which enabled this research. MK is supported by NSERC Discovery Grant RGPIN-2026-04984 and Rajan Faculty Recruitment Award.",
+   "src": "paper/sections/08_conclusion.tex"
+  }
  },
  "lede": [
   {
