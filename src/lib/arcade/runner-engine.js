@@ -1985,6 +1985,17 @@ function respawn(state, events) {
 }
 
 /**
+ * Down on the roof: low, for SLIDE_TIME (SLIDE_MAX while down is held).
+ * @param {RunState["runner"]} r
+ * @param {RunEvent[]} events
+ */
+function startSlide(r, events) {
+  if (!r.sliding) events.push({ type: "slide", x: r.x, y: r.y });
+  r.sliding = true;
+  r.slideTime = 0;
+}
+
+/**
  * Feet meet a surface: settle, spill for the impact, or bounce off an awning.
  * @param {RunState} state
  * @param {{ surface: any, y: number }} landing
@@ -2153,7 +2164,8 @@ function railUnder(state, x) {
  * Advances the run by one fixed step. Mutates the state.
  *
  * Events, in the order they happen: jump {coyote, buffered}, slide, slideEnd,
- * glide, glideEnd, slam, land {impact, spill, slam, glide}, bounce, wall,
+ * glide, glideEnd, slam, land {impact, spill, slam, glide} (then slide, when
+ * a slam lands with down still held), bounce, wall,
  * spill {amount, cause: landing | slam}, smash {what, cause: slam | rush,
  * points}, pigeonsUp {count}, barrel, drone, creak, crumble, pearl {points,
  * combo, chain, magnet}, spare {held}, spareBonus {points}, comboLost,
@@ -2232,9 +2244,7 @@ export function step(state, input, dt = STEP) {
     }
     if (pressed.down) {
       if (r.grounded) {
-        if (!r.sliding) events.push({ type: "slide", x: r.x, y: r.y });
-        r.sliding = true;
-        r.slideTime = 0;
+        startSlide(r, events);
       } else if (!r.slamming) {
         r.slamming = true;
         r.jumpHold = 0;
@@ -2263,6 +2273,8 @@ export function step(state, input, dt = STEP) {
     }
 
     const vx = r.slamming ? r.vx * SLAM_DRIFT : r.vx;
+    // Touching down clears the slam, so remember it for the slide below.
+    const slamming = r.slamming;
     r.x += vx * dt;
     r.y += r.vy * dt;
     walls(state, prevX, prevY, events);
@@ -2281,6 +2293,9 @@ export function step(state, input, dt = STEP) {
       r.coyote = COYOTE_TIME;
       r.vy = 0;
     }
+    // A tapped slam lands standing; one still held lands straight into a
+    // slide, low before anything ahead is met this step.
+    if (slamming && r.grounded && held.down) startSlide(r, events);
     if (!r.grounded && !r.cable) catchCable(state, prevX, prevY, events);
   }
 

@@ -507,6 +507,55 @@ test("a slam drops nearly straight down, breaks crates, frees their pearls, and 
   assert.equal(kinds(events, "hit").length, 0);
 });
 
+test("down tapped in the air slams and lands standing; held through the landing, it lands sliding", () => {
+  const board = () => [obstacle("billboard", 320, 100, 80, 100, 111)];
+  /** Hops at once, slams once past x 170, and holds down after it or not. */
+  const slamInto = (hold) => {
+    const s = stage(floor(), board(), { x: 100, spare: 1 });
+    let slammed = false;
+    const steps = [];
+    for (let i = 0; i < Math.round(2.5 / H); i++) {
+      let down = false;
+      if (!s.runner.grounded && !slammed && s.runner.x > 170) down = slammed = true;
+      else if (slammed && hold) down = true;
+      steps.push(step(s, { jump: i < 2, down }, H));
+    }
+    return { s, steps, events: steps.flat() };
+  };
+
+  const tapped = slamInto(false);
+  assert.equal(kinds(tapped.events, "slam").length, 1);
+  assert.ok(kinds(tapped.events, "land")[0].x < 320, "lands short of the billboard");
+  assert.equal(kinds(tapped.events, "slide").length, 0, "a tap lands standing");
+  assert.deepEqual(kinds(tapped.events, "hit").map((e) => e.what), ["billboard"]);
+
+  const held = slamInto(true);
+  const landing = held.steps.find((ev) => kinds(ev, "land").length > 0);
+  assert.deepEqual(
+    landing.map((e) => e.type).filter((t) => t === "land" || t === "slide"),
+    ["land", "slide"],
+    "the slide starts on the step the slam lands",
+  );
+  assert.equal(kinds(held.events, "slide").length, 1);
+  assert.equal(kinds(held.events, "hit").length, 0, "under the billboard it was about to meet");
+  assert.ok(held.s.runner.x > 420);
+
+  // Held down through a crate's smash, the freed pearls are still picked up low.
+  const crate = { ...obstacle("crate", 300, 100, 20, 36), count: 2 };
+  const s = stage(floor(), [crate], { x: 160 });
+  let slamming = false;
+  const events = run(s, (st) => {
+    if (st.runner.grounded && !slamming && st.runner.x > 230 && st.runner.x < 250) return { jump: true };
+    if (!st.runner.grounded && st.runner.x >= 302) slamming = true;
+    return { jump: !slamming && !st.runner.grounded, down: slamming };
+  }, 2);
+  assert.equal(crate.broken, true);
+  assert.equal(kinds(events, "slide").length, 1);
+  const freed = s.chunks[0].items.filter((i) => i.type === "pearl");
+  assert.equal(freed.length, 2 * PEARLS_PER_CRATE);
+  assert.ok(freed.every((p) => p.taken), "every freed pearl taken while sliding");
+});
+
 test("a step within MANTLE is climbed; a tall wall stops the runner and drops it", () => {
   const curb = stage([{ x0: -2000, x1: 300, top: 100 }, { x0: 300, x1: 1e6, top: 100 + MANTLE - 2 }]);
   run(curb, IDLE, 2);

@@ -198,7 +198,7 @@
     jump: "tap jump to hop, hold it to go higher",
     glide: "holding jump on the way down glides",
     slide: "press down to slide under anything red and cream underneath",
-    slam: "press down in the air to slam, which breaks crates",
+    slam: "tap down in the air to slam crates, hold it to land sliding",
     delivery: "cross a coaster to hand the tea over",
     hit: "anything you run into costs a spare cup",
     rush: "pearls fill the sugar for a rush that smashes through",

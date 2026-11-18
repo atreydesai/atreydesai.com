@@ -598,7 +598,9 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   cup refills. A cup at nine tenths or more is a full cup and gets a stamp.
   Running dry costs a spare cup and refills it part way.
 - **Four moves that combine:** a jump whose height follows the hold, a glide
-  on the straw as a rotor, a slide, and a slam.
+  on the straw as a rotor, a slide, and a slam. Down tapped in the air
+  slams; down still held when the slam lands goes straight into a slide, so
+  a slam just before something low never lands standing into it.
 - **Sugar rush.** Pearls fill a meter of ten sugar cubes; triggering it
   smashes anything that would cost a cup (never anything lethal) for a few
   seconds, with afterimages and speed lines. The full meter is the one
