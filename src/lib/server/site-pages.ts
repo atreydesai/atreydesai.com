@@ -31,7 +31,7 @@ export const SITE_PAGES: SitePage[] = [
         sources: [
             'src/routes/photography/+page.svelte',
             'src/routes/photography/+page.server.ts',
-            'static/images/photography',
+            'photos',
         ],
     },
     {

@@ -5,16 +5,20 @@
 //
 // A photo has two kinds of file:
 // - Its original, the untouched full-resolution JPEG, offered as the
-//   download. Only ORIGINALS_BASE says where originals live, so moving them
-//   to another host (Cloudflare R2, say) is a one-line change here, plus a
-//   `Content-Disposition: attachment` header on that host: browsers ignore
-//   the `download` attribute on cross-origin links.
+//   download. Originals live in ORIGINALS_DIR in the repo, outside static/,
+//   so they are never part of a Vercel deployment (they were ~380 MB of every
+//   one, and filled the free tier's deployment storage in about 20 deploys).
+//   The site links them from a Cloudflare R2 bucket at ORIGINALS_BASE, where
+//   `npm run upload-photos` puts them with a `Content-Disposition: attachment`
+//   header: browsers ignore the `download` attribute on cross-origin links.
 // - Its renditions: WebP copies at fixed widths, made at build time, used for
 //   everything the page displays. Their names carry a hash of the original's
 //   bytes and of the settings below, so a file at a given URL never changes
 //   and is cached as immutable (vercel.json).
 
-export const ORIGINALS_BASE = "/images/photography/";
+export const ORIGINALS_DIR = "photos/";
+export const ORIGINALS_BUCKET = "atreydesai-photos";
+export const ORIGINALS_BASE = "https://pub-7a2d51110a214e50909387543cac65e7.r2.dev/";
 export const RENDITIONS_BASE = "/images/photography/thumbs/";
 
 // Grid tiles use 400–1200; the lightbox goes up to 2048, which covers a

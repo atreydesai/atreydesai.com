@@ -12,6 +12,7 @@ import sharp from "sharp";
 import {
   AVIF_QUALITY,
   ORIGINALS_BASE,
+  ORIGINALS_DIR,
   RENDITION_QUALITY,
   RENDITION_VERSION,
   RENDITION_WIDTHS,
@@ -24,6 +25,7 @@ import {
 
 const root = new URL("../", import.meta.url);
 const staticFile = (url) => new URL(`static${url}`, root);
+const originalFile = (photo) => new URL(ORIGINALS_DIR + photo.filename, root);
 const manifest = JSON.parse(
   await readFile(new URL("src/lib/generated/photo-manifest.json", root), "utf8"),
 );
@@ -35,8 +37,8 @@ const exists = (url) =>
     () => false,
   );
 
-test("every original in static/ is in the manifest, and only those", async () => {
-  const onDisk = (await readdir(staticFile(ORIGINALS_BASE)))
+test("every original in photos/ is in the manifest, and only those", async () => {
+  const onDisk = (await readdir(new URL(ORIGINALS_DIR, root)))
     .filter((f) => /\.(jpe?g|png|webp)$/i.test(f) && !f.startsWith("."))
     .sort();
   assert.deepEqual(manifest.map((p) => p.filename).sort(), onDisk);
@@ -44,7 +46,7 @@ test("every original in static/ is in the manifest, and only those", async () =>
 
 test("the download link is the original at its full size", async () => {
   for (const photo of manifest) {
-    const file = staticFile(originalUrl(photo));
+    const file = originalFile(photo);
     const { autoOrient } = await sharp(fileURLToPath(file)).metadata();
     assert.deepEqual(
       [autoOrient.width, autoOrient.height],
@@ -56,12 +58,21 @@ test("the download link is the original at its full size", async () => {
   // The lightbox's download anchor is built from originalUrl, with the
   // original's name, and never from a rendition.
   assert.match(page, /href=\{originalUrl\(currentPhoto\)\}\s+download=\{currentPhoto\.filename\}/);
+  assert.equal(originalUrl(manifest[0]), ORIGINALS_BASE + manifest[0].filename);
+});
+
+test("no original is deployed: static/ holds only renditions", async () => {
+  // Originals in static/ would be copied into every Vercel deployment.
+  const loose = (await readdir(staticFile("/images/photography/"))).filter((f) =>
+    /\.(jpe?g|png)$/i.test(f),
+  );
+  assert.deepEqual(loose, [], "originals belong in photos/, served from R2");
 });
 
 test("the manifest's rendition hashes match the originals on disk", async () => {
   // A stale manifest would point the page at renditions of an older edit.
   for (const photo of manifest) {
-    const bytes = await readFile(staticFile(originalUrl(photo)));
+    const bytes = await readFile(originalFile(photo));
     const sha = createHash("sha256").update(bytes).digest("hex");
     const v = createHash("sha256")
       .update(`${RENDITION_VERSION}:${RENDITION_QUALITY}:${AVIF_QUALITY}:${sha}`)

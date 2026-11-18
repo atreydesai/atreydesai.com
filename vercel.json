@@ -35,6 +35,11 @@
       "source": "/resume.pdf",
       "destination": "https://atreydesai.com/atreydesai_cv.pdf",
       "permanent": true
+    },
+    {
+      "source": "/images/photography/:original([^/]+\\.[A-Za-z]+)",
+      "destination": "https://pub-7a2d51110a214e50909387543cac65e7.r2.dev/:original",
+      "permanent": true
     }
   ],
   "headers": [
@@ -44,15 +49,6 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/images/photography/:original([^/]+)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400, stale-while-revalidate=2592000"
         }
       ]
     },

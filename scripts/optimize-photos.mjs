@@ -15,6 +15,7 @@ import { join } from 'path';
 import { extractPhotoMeta } from './photo-exif.mjs';
 import {
     AVIF_QUALITY,
+    ORIGINALS_DIR,
     RENDITION_QUALITY,
     RENDITION_VERSION,
     renditionFile,
@@ -22,7 +23,7 @@ import {
     renditionWidths,
 } from '../src/lib/photo-urls.js';
 
-const PHOTOS_DIR = 'static/images/photography';
+const PHOTOS_DIR = ORIGINALS_DIR;
 const THUMBS_DIR = 'static/images/photography/thumbs';
 const CACHE_DIR = 'node_modules/.cache/photo-renditions';
 const GENERATED_DIR = 'src/lib/generated';

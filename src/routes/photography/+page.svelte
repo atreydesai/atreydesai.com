@@ -405,7 +405,7 @@
             <p class="text-sm">
                 Add photos to <code
                     class="border border-ink-300 dark:border-ink-600 px-2 py-1 rounded-sm"
-                    >static/images/photography/</code
+                    >photos/</code
                 >
             </p>
         </div>
