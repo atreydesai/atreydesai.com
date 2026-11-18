@@ -7,6 +7,8 @@
 	type Item = { g: number; key: string; t: string; href?: string };
 	let items = $state<Item[]>([]);
 	let tip = $state<{ x: number; y: number; w: number; up: boolean; t: string; href?: string } | null>(null);
+	// the list is folded away until opened (Atrey, 18 Nov); a click on a mark, or a link to a note, opens it first
+	let box = $state<HTMLDetailsElement | null>(null);
 
 	const keyOf = (a: HTMLAnchorElement) => /#fn-(.+)$/.exec(a.getAttribute("data-key") ?? a.getAttribute("href") ?? "")?.[1] ?? "";
 
@@ -44,6 +46,12 @@
 			tip = { x, y: up ? r.top - 8 : r.bottom + 8, w, up, t: it.t, href: it.href };
 		};
 		const hide = (e: Event) => { if ((e.target as HTMLElement)?.closest?.(".wwt sup.fnref a")) tip = null; };
+		// (capture phase, so the list is open before the link's jump looks for the note)
+		const unfold = (e: Event) => { if (box && !box.open && (e.target as HTMLElement)?.closest?.(".wwt sup.fnref a")) box.open = true; };
+		const fromHash = () => { if (box && !box.open && /^#fn-\d+$/.test(location.hash)) { box.open = true; document.getElementById(location.hash.slice(1))?.scrollIntoView(); } };
+		document.addEventListener("click", unfold, true);
+		addEventListener("hashchange", fromHash);
+		setTimeout(fromHash, 400);
 		// a section that wakes after the page (Defer.svelte) has just put its marks back as the server wrote them
 		document.addEventListener("wwt:woke", renumber);
 		document.addEventListener("pointerover", show);
@@ -52,15 +60,15 @@
 		document.addEventListener("focusout", hide);
 		addEventListener("scroll", () => (tip = null), { passive: true });
 		renumber();
-		return () => { mo.disconnect(); clearTimeout(t); document.removeEventListener("wwt:woke", renumber); document.removeEventListener("pointerover", show); document.removeEventListener("focusin", show); document.removeEventListener("pointerout", hide); document.removeEventListener("focusout", hide); };
+		return () => { mo.disconnect(); clearTimeout(t); document.removeEventListener("wwt:woke", renumber); document.removeEventListener("pointerover", show); document.removeEventListener("focusin", show); document.removeEventListener("pointerout", hide); document.removeEventListener("focusout", hide); document.removeEventListener("click", unfold, true); removeEventListener("hashchange", fromHash); };
 	});
 	const host = (h: string) => { try { return new URL(h).hostname.replace(/^www\./, ""); } catch { return h; } };
 </script>
 
 {#if items.length}
-	<section class="fns" aria-label="Notes">
-		<h2>Notes</h2>
-		<ol>
+	<details class="fns fold" bind:this={box}>
+		<summary>Notes</summary>
+		<ol class="fold-body">
 			{#each items as f (f.key)}
 				<li id="fn-{f.g}">
 					<span class="n">{f.g}</span>
@@ -69,7 +77,7 @@
 				</li>
 			{/each}
 		</ol>
-	</section>
+	</details>
 {/if}
 {#if tip}
 	<div class="fn-tip" class:up={tip.up} style:left="{tip.x}px" style:top="{tip.y}px" style:width="{tip.w}px" role="tooltip">
@@ -78,8 +86,8 @@
 {/if}
 
 <style>
-	.fns { max-width: 46rem; margin: calc(10 * var(--vh, 1vh)) 0 0; padding-top: 18px; border-top: 1px solid #C9C9C9; }
-	h2 { font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #5A6270; margin: 0 0 12px; }
+	/* a folded row like the acknowledgements and cite below it (their shared look is in +page.svelte), close under the buttons */
+	.fns { margin-top: 28px; }
 	ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 	li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; gap: 6px; font-size: 13px; line-height: 1.55; color: #5A6270; }
 	.n { font-variant-numeric: tabular-nums; font-weight: 600; color: #14202D; }

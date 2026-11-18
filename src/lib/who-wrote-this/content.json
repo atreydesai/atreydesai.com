@@ -140,8 +140,7 @@
     "id": "profiles",
     "t": "Model profiles",
     "href": "https://model-profiles.github.io/",
-    "icon": "ai",
-    "credit": "Model profiles by Ty Brassington"
+    "icon": "ai"
    }
   ],
   "acknowledgements": {

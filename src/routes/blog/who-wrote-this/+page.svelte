@@ -73,17 +73,25 @@
 	})();
 
 
-	// the paper's BibTeX (the paper's own title and author order; accents escaped for plain BibTeX). Until there is an
-	// arXiv entry it points at this page; then swap howpublished for the eprint.
-	const BIB = `@misc{desai2026unmasking,
-  title        = {${C.meta.deck.t}},
-  author       = {Desai, Atrey and B{\\"o}l{\\"o}ni-Turgut, Deniz and Brassington, Ty and
-                  Choi, Minjoon and Russell, Jenna and Rajendhran, Rishanth and
-                  Emi, Bradley and Gonen, Hila and Daum{\\'e} III, Hal and
-                  Wieting, John and Karpinska, Marzena and Iyyer, Mohit},
-  year         = {2026},
-  howpublished = {\\url{${url}}}
-}`;
+	// the paper's BibTeX (the paper's own title and author order; accents escaped for plain BibTeX). Once the Paper
+	// button links an arXiv entry (meta.links, id "paper") it becomes an arXiv citation by itself; until then it points
+	// at this page. Keys are padded so the "=" line up.
+	const PAPER = C.meta.links.find((l) => l.id === "paper")?.href ?? "";
+	const ARXIV = /arxiv\.org\/(?:abs|pdf)\/([\w.\-\/]+?)(?:v\d+)?(?:\.pdf)?\/?$/.exec(PAPER)?.[1] ?? "";
+	const AUTHORS = [
+		'Desai, Atrey and B{\\"o}l{\\"o}ni-Turgut, Deniz and Brassington, Ty and',
+		"Choi, Minjoon and Russell, Jenna and Rajendhran, Rishanth and",
+		"Emi, Bradley and Gonen, Hila and Daum{\\'e} III, Hal and",
+		"Wieting, John and Karpinska, Marzena and Iyyer, Mohit",
+	];
+	const BIB = (() => {
+		const fields: [string, string][] = [["title", C.meta.deck.t], ["author", AUTHORS.join("\n")], ["year", "2026"]];
+		if (ARXIV) fields.push(["eprint", ARXIV], ["archivePrefix", "arXiv"], ["primaryClass", "cs.CL"], ["url", `https://arxiv.org/abs/${ARXIV}`]);
+		else fields.push(["howpublished", `\\url{${url}}`]);
+		const w = Math.max(...fields.map(([k]) => k.length));
+		const lines = fields.map(([k, v]) => `  ${k.padEnd(w)} = {${v.split("\n").join("\n" + " ".repeat(w + 6))}}`);
+		return `@misc{desai2026unmasking,\n${lines.join(",\n")}\n}`;
+	})();
 	let copied = $state(false), bibEl: HTMLElement;
 	let copiedT: ReturnType<typeof setTimeout> | undefined;
 	async function copyBib() {
@@ -247,22 +255,20 @@
 			<div class="links">
 				{#each C.meta.links as l}<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} class={l.id === "paper" ? "fable" : ""} /> {l.t}</a>{/each}
 			</div>
-			<!-- credit for a linked site that a coauthor built (meta.links[].credit; Ty's model profiles, Atrey, 16 Nov) -->
-			{#each C.meta.links.filter((l) => "credit" in l && l.credit) as l}<p class="credit">{l.credit}</p>{/each}
 			<FootnoteList />
-			<!-- the paper's acknowledgements, word for word (Atrey, 17 Nov) -->
-			<section class="thanks" aria-labelledby="thanks-h">
-				<h2 id="thanks-h">Acknowledgements</h2>
-				<p>{C.meta.acknowledgements.t}</p>
-			</section>
-			<!-- how to cite the paper, with a copy button (Atrey, 17 Nov) -->
-			<section class="cite" aria-labelledby="cite-h">
-				<div class="cite-head">
-					<h2 id="cite-h">Cite</h2>
+			<!-- the notes (above), the paper's acknowledgements, word for word, and how to cite it: each folded away until opened
+			     (Atrey, 18 Nov) -->
+			<details class="fold thanks">
+				<summary>Acknowledgements</summary>
+				<p class="fold-body">{C.meta.acknowledgements.t}</p>
+			</details>
+			<details class="fold cite">
+				<summary>Cite</summary>
+				<div class="fold-body">
 					<button type="button" class="copy" onclick={copyBib} aria-live="polite"><Icon name="files" />{copied ? "Copied" : "Copy"}</button>
+					<pre bind:this={bibEl}><code>{BIB}</code></pre>
 				</div>
-				<pre bind:this={bibEl}><code>{BIB}</code></pre>
-			</section>
+			</details>
 		</footer>
 	</article>
 
@@ -271,10 +277,10 @@
 		<!-- a pencilled note beside the name, like the homepage's "arcade" one (Atrey, 17 Nov) -->
 		<span class="me">
 			<a href="/">Atrey Desai</a>
-			<span class="phd">
+			<a class="phd" href="/">
 				<svg viewBox="0 0 26 14" width="26" height="14" aria-hidden="true" focusable="false"><path d="M1.5 9.5C6 11.8 13.5 12 19 7.5" /><path d="M15.6 6.6 19.6 7.1 18.4 10.9" /></svg>
 				I'm applying to PhDs
-			</span>
+			</a>
 		</span>
 		<span>{#each nav as link}<a href={link.href}>{link.name}</a>{/each}</span>
 	</footer>
@@ -400,7 +406,6 @@
 	/* the lede's highlights, and selection, in a deep rose (rgb 126 34 62) */
 	.lede :global(mark.hl) { color: rgb(126, 34, 62); background: linear-gradient(transparent 58%, rgba(126, 34, 62, .14) 58%); padding: 0 1px; font-weight: 500; }
 	.byline.small { font-size: 13px; color: var(--ink2); margin-top: 24px; max-width: 52rem; }
-	.credit { margin-top: 10px; font-size: 13px; color: var(--ink2); }
 	.site-foot { display: flex; justify-content: space-between; gap: 16px; padding-block: 28px 40px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink2); }
 	.site-foot span { display: flex; gap: 16px; }
 	.site-foot a { text-decoration: none; }
@@ -410,16 +415,26 @@
 	.phd { display: inline-flex; align-items: baseline; gap: 0; font-size: 12px; font-style: italic; line-height: 1; color: var(--ink2); white-space: nowrap; }
 	.phd svg { overflow: visible; margin-right: -3px; transform: translateY(2px) scaleX(-1); }
 	.phd path { fill: none; stroke: currentColor; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
-	.site-foot .me:hover .phd { color: var(--fable); }
-	/* the acknowledgements and the citation block at the foot of the page */
-	.thanks { margin-top: 40px; max-width: 52rem; }
-	.thanks h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 8px; }
-	.thanks p { font-size: 14px; line-height: 1.6; color: var(--ink2); }
-	.cite { margin-top: 40px; max-width: 52rem; }
-	.cite-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-	.cite h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+	.site-foot .me:hover .phd, .phd:focus-visible { color: var(--fable); }
+	/* the foot's folded rows (notes, acknowledgements, cite): a rule, the name and a chevron; closed by default */
+	:global(.wwt details.fold) { max-width: 52rem; border-top: 1px solid var(--rule); }
+	.cite { border-bottom: 1px solid var(--rule); }
+	:global(.wwt details.fold > summary) {
+		display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px; cursor: pointer; list-style: none;
+		font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
+	}
+	:global(.wwt details.fold > summary::-webkit-details-marker) { display: none; }
+	:global(.wwt details.fold > summary::after) {
+		content: ""; flex: none; width: 7px; height: 7px; margin-right: 4px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+		transform: translateY(-2px) rotate(45deg); transition: transform .2s var(--ease);
+	}
+	:global(.wwt details.fold[open] > summary::after) { transform: translateY(2px) rotate(-135deg); }
+	:global(.wwt details.fold > .fold-body) { padding: 0 2px 18px; }
+	.thanks .fold-body { font-size: 14px; line-height: 1.6; color: var(--ink2); }
+	.cite .fold-body { position: relative; }
+	.cite .copy { position: absolute; top: 8px; right: 10px; background: var(--field); }
 	.copy { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border: 1.25px solid var(--ink); border-radius: 2px; font-size: 13px; font-weight: 500; transition: background-color .15s, color .15s; }
-	.copy:hover { background: var(--ink); color: var(--field); }
+	.cite .copy:hover { background: var(--ink); color: var(--field); }
 	.cite pre { margin: 0; padding: 14px 16px; background: var(--field); border: 1px solid var(--rule); border-radius: 3px; overflow-x: auto; }
 	.cite code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important; font-size: 12.5px; line-height: 1.5; color: var(--ink); white-space: pre; }
 	/* the paper's icon in Fable's clay, top and bottom (Atrey, 17 Nov) */
