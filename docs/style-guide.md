@@ -657,6 +657,16 @@ No component should invent a z-index above this scale.
   PNG's size). The build reads each one's size into the page, so its place is
   held before it loads; `tests/layout-stability.test.mjs` fails if a post
   image arrives without one.
+- A page whose largest paint is an image (the homepage portrait, the first
+  photo) declares that image's preload in its `<svelte:head>` with
+  `data-hoist`. The build copies it to the top of the head and moves the
+  page's script preloads to the end of the body, so on a slow link the image
+  doesn't share the line with ~25 scripts (`src/hooks.server.js`). On the
+  photography page the lazy tiles past the first screen also wait until the
+  page has started and the first photo is in. A component that needs an
+  image the page already shows (the portrait's hover pixelation) draws from
+  that `<img>`, not a second request. `tests/load-order.test.mjs` holds the
+  order.
 - Animated research media must have a useful static first frame.
 - Hover-only media behavior must also respond to keyboard focus.
 - The paper texture stays subtle enough that it does not affect contrast.

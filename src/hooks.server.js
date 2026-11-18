@@ -31,6 +31,16 @@ const TYPEKIT = /[ \t]*(?:<noscript>)?<link[^>]*typekit\.net[^>]*>(?:<\/noscript
 // goes near the top of <head>, ahead of the scripts; the original stays where
 // Svelte hydrates it, and the browser fetches the URL once.
 const HOISTED = /<link\b[^>]*\bdata-hoist\b[^>]*>/g;
+// Going first in the head isn't enough, though: the head's ~25 script
+// preloads are asked for in the same moment, and over a slow link (a phone on
+// a weak signal, 1.6 Mbit/s) the live site often sent the image interleaved
+// with them, whatever the image's priority: in 6 of 15 loads the portrait
+// took over a second, behind up to 80 KB of script, and the first photo
+// shared the line in every one. So on these pages the scripts' preloads move
+// to the end of the body and are asked for once the HTML is in, by which time
+// the image is well under way. Pages whose largest paint is text keep them in
+// the head.
+const MODULE_PRELOAD = /[ \t]*<link\b[^>]*\brel="modulepreload"[^>]*>\r?\n?/g;
 // The justification engine's hyphenation for this page, worked out here (at
 // build time: pages are prerendered) so the browser needn't download the
 // pattern dictionary to justify it (see lib/hyphenation.js). Written after
@@ -56,6 +66,16 @@ function hoistPreloads(html) {
   return html.replace(/<meta name="viewport"[^>]*>/, (meta) => `${meta}\n  ${copies.join("\n  ")}`);
 }
 
+/** The whole page: on one that hoists an image, its script preloads move from the head to the end of the body.
+ * @param {string} html */
+function scriptsAfterImage(html) {
+  if (!html.includes(" data-hoist")) return html;
+  const links = html.match(MODULE_PRELOAD);
+  if (!links) return html;
+  const tags = links.map((link) => link.trim()).join("\n");
+  return html.replace(MODULE_PRELOAD, "").replace("</body>", `${tags}\n</body>`);
+}
+
 export const handle = async ({ event, resolve }) => {
   // `/research/index.md` and friends: the page's Markdown at its own URL, for
   // agents that can't send `Accept: text/markdown` (llmstxt.org convention).
@@ -73,7 +93,9 @@ export const handle = async ({ event, resolve }) => {
   const response = await resolve(event, {
     preload: ({ type }) => type === "font" || type === "js" || type === "css",
     transformPageChunk: ({ html, done }) => {
-      const page = done && html.includes("</body>") ? withHyphenation(hoistPreloads(html)) : hoistPreloads(html);
+      const page = done && html.includes("</body>")
+        ? withHyphenation(scriptsAfterImage(hoistPreloads(html)))
+        : hoistPreloads(html);
       return takeover
         ? page.replace(TYPEKIT, "").replace(/[ \t]*<!-- Adobe Typekit[^>]*-->\r?\n?/, "")
         : page;

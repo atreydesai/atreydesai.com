@@ -21,19 +21,26 @@
 
         prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-        image = new Image();
-        image.crossOrigin = "anonymous";
-        image.onload = () => {
+        // The pixelation draws from the <img> below, which already has the
+        // picture: a second `new Image()` with crossOrigin set was a request of
+        // a different mode, which the browser couldn't serve from the one it
+        // had, so on every visit, phones included, it went back to the server
+        // while the page was still loading. (A same-origin image never taints
+        // the canvas.)
+        const img = image;
+        const ready = () => {
             imageLoaded = true;
             if (canvas) {
-                canvas.width = image.naturalWidth;
-                canvas.height = image.naturalHeight;
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
                 drawImage(0);
             }
         };
-        image.src = src;
+        if (img.complete && img.naturalWidth > 0) ready();
+        else img.addEventListener("load", ready, { once: true });
 
         return () => {
+            img.removeEventListener("load", ready);
             if (animationFrame) cancelAnimationFrame(animationFrame);
         };
     });
@@ -153,6 +160,7 @@
          and stays transparent until the user hovers. -->
 
     <img
+        bind:this={image}
         src={src}
         alt={alt}
         class="lego-img"

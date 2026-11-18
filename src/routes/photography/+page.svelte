@@ -249,6 +249,24 @@
         return () => window.removeEventListener("popstate", onPopState);
     });
 
+    // The page is up: the photos held past the first screen (see the script
+    // above the grid) can come in once the first photo has. (A visit by in-app
+    // navigation held nothing, so this changes nothing there.)
+    onMount(() => {
+        const root = document.documentElement;
+        if (!root.classList.contains("photos-held")) return;
+        const release = () => root.classList.remove("photos-held");
+        const first = document.querySelector<HTMLImageElement>(".photo-grid img[fetchpriority=high]");
+        if (!first || first.complete) return release();
+        first.addEventListener("load", release, { once: true });
+        first.addEventListener("error", release, { once: true });
+        return () => {
+            first.removeEventListener("load", release);
+            first.removeEventListener("error", release);
+            release();
+        };
+    });
+
     // Leaving the page with the lightbox open must not leave the next page
     // pinned in place.
     onDestroy(unlockScroll);
@@ -330,6 +348,20 @@
          The frame is a size container, so the grid's rows can be sized from
          its own width (see .photo-grid). -->
     {#if photos.length > 0}
+        <!-- The photos past the first screen wait until the page is up. On
+             a slow link the server shares the line between everything asked
+             for at once, and the browser asks for the lazy tiles within a few
+             screens of the top as soon as it lays them out: a quarter of a
+             megabyte against the first photo and the page's scripts, among
+             them the ones SvelteKit fetches at start-up and waits for before
+             a tile can open (on a slow phone link, taps did nothing until
+             3.4 s; 1.9 s now). Before the grid is read, this marks the page
+             as holding them (hidden lazy images aren't fetched; see the style
+             below); the page lets them go once it has started and the first
+             photo is in (onMount, above), or this does after 6 seconds in
+             any case. Without JavaScript nothing is held, and a visit by
+             in-app navigation never runs it. -->
+        {@html `<script>try{document.documentElement.classList.add("photos-held");setTimeout(function(){document.documentElement.classList.remove("photos-held")},6000)}catch(e){}</script>`}
         <div class="photo-grid-frame">
         <div class="photo-grid">
             {#each photos as photo, index}
@@ -362,6 +394,11 @@
             {/each}
         </div>
         </div>
+        <!-- A window taller than a phone's shows more tiles than the four that
+             load at once (a 1440×1000 desktop shows five): with the grid read
+             and laid out, but before any held photo has been asked for, the
+             tiles that start on the first screen are let off the hold. -->
+        {@html `<script>try{if(document.documentElement.classList.contains("photos-held")){var v=innerHeight;document.querySelectorAll(".photo-grid img[loading=lazy]").forEach(function(i){if(i.closest(".photo-tile").getBoundingClientRect().top<v)i.setAttribute("data-first-screen","")})}}catch(e){}</script>`}
     {:else}
         <div class="text-center py-16 text-ink-500 dark:text-cream-500">
             <p class="mb-4">No photos yet.</p>
@@ -538,6 +575,14 @@
 
     .photo-grid-frame {
         container-type: inline-size;
+    }
+
+    /* Held until the page has started and the first photo is in (see the
+       scripts around the grid); tiles on the first screen are never held.
+       The tile keeps its size from the grid and shows its placeholder, as a
+       lazy tile does until its photo arrives. */
+    :global(html.photos-held .photo-grid img[loading="lazy"]:not([data-first-screen])) {
+        display: none;
     }
 
     /* Two columns, then three from 768px. A row step is 26px at the 352px
