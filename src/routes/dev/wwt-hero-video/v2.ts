@@ -2,7 +2,9 @@
 // the dotted light ground, Inter, the paper's palette (palette.ts: Slop Rose, Aubergine and Teal for labs, Fable clay for
 // Fable 5.2, neutrals for the rest), the page's tags and white cards, its deep-rose highlight, and the dark band for the
 // closing line. The fingerprint is a faint motif only. Every string is the paper's own words (checked with
-// docs/launch_20261116/tools/check_ngrams.py in the private llm-detectors repo) and every number is the paper's.
+// docs/launch_20261116/tools/check_ngrams.py in the private llm-detectors repo) and every number is the paper's, except in
+// the square cut's which-lab beat (labSquare, thread image 6's card): its headline is ours and three of its numbers come
+// from the lab-confusion record (thread.ts, p5).
 //
 // Video beats (seconds): opener 0-2.0 · human or AI 2.0-5.0 · which lab 5.0-8.2 · which human 8.2-11.6 · defenses
 // 11.6-14.6 · the closing line 14.6-18.4, whose last 0.45 s give way to the opener's first frame, so the loop is seamless.
