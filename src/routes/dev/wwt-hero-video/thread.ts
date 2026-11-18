@@ -51,14 +51,12 @@ function p4(ctx: Ctx, W: number, H: number, A: Assets) {
 	txt(ctx, "accuracy on idea detection", M, 790, LAB, { w: 500, c: P.ink });
 }
 
-// 5 · which lab, and the newest open models taken for Claude or GPT. Ty Brassington's design (his mockup is
-// llm-detectors docs/launch_20261116/media/tweet6_card/card.html; Atrey, 18 Nov: it replaces the earlier card), drawn
-// here so it shares the other images' ground, type and palette. Two strings are ours, not the paper's: the right-hand
-// headline and the note under it (NONPAPER_TEXT.md). The 77% is the paper's (Kimi K2.6); 97%, 89% and 95% are Fable
+// 5 · which lab, and the newest open models taken for Claude or GPT. Two strings are ours, not the paper's: the
+// right-hand headline and the note under it (thread.md, Non-paper text). The 77% is the paper's (Kimi K2.6); 97%, 89% and 95% are Fable
 // 5.2's answers in the lab-confusion record (E7 rq2_lab_confusion_20261114 results/confusion.json, per_writer, 75 texts
 // a writer; "Qwen Max" there is the paper's Qwen3.8 Max).
 function p5(ctx: Ctx, W: number, H: number, A: Assets) {
-	const R = W - 92; // the right edge (Ty's card keeps a little more room on the right than the others' 96)
+	const R = W - 92; // the right edge (a little closer than the others' 96, for the longest row)
 	// left: the three big labs
 	txt(ctx, "If AI, which lab?", M, 152, 62);
 	txt(ctx, "98%", M - 12, 566, 318, { ls: -0.045 });
