@@ -37,21 +37,17 @@
       "permanent": true
     },
     {
+      "source": "/images/photography/thumbs/:file",
+      "destination": "https://photos.atreydesai.com/thumbs/:file",
+      "permanent": true
+    },
+    {
       "source": "/images/photography/:original([^/]+\\.[A-Za-z]+)",
-      "destination": "https://pub-7a2d51110a214e50909387543cac65e7.r2.dev/:original",
+      "destination": "https://photos.atreydesai.com/:original",
       "permanent": true
     }
   ],
   "headers": [
-    {
-      "source": "/images/photography/thumbs/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
     {
       "source": "/llms.txt",
       "headers": [

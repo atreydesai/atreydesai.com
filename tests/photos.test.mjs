@@ -13,11 +13,15 @@ import {
   AVIF_QUALITY,
   ORIGINALS_BASE,
   ORIGINALS_DIR,
+  PHOTOS_ORIGIN,
+  RENDITIONS_BASE,
+  RENDITIONS_DIR,
   RENDITION_QUALITY,
   RENDITION_VERSION,
   RENDITION_WIDTHS,
   originalUrl,
   renditionSrcset,
+  renditionFile,
   renditionFormats,
   renditionUrl,
   renditionWidths,
@@ -26,6 +30,7 @@ import {
 const root = new URL("../", import.meta.url);
 const staticFile = (url) => new URL(`static${url}`, root);
 const originalFile = (photo) => new URL(ORIGINALS_DIR + photo.filename, root);
+const renditionPath = (photo, width, format) => new URL(RENDITIONS_DIR + renditionFile(photo, width, format), root);
 const manifest = JSON.parse(
   await readFile(new URL("src/lib/generated/photo-manifest.json", root), "utf8"),
 );
@@ -61,12 +66,17 @@ test("the download link is the original at its full size", async () => {
   assert.equal(originalUrl(manifest[0]), ORIGINALS_BASE + manifest[0].filename);
 });
 
-test("no original is deployed: static/ holds only renditions", async () => {
-  // Originals in static/ would be copied into every Vercel deployment.
-  const loose = (await readdir(staticFile("/images/photography/"))).filter((f) =>
-    /\.(jpe?g|png)$/i.test(f),
-  );
-  assert.deepEqual(loose, [], "originals belong in photos/, served from R2");
+test("no photo file is deployed: every one is served from the R2 photo host", async () => {
+  // Photos in static/ would be copied into every Vercel deployment.
+  assert.equal(await exists(staticFile("/images/photography/")), false, "static/images/photography/ is back");
+  assert.ok(ORIGINALS_BASE.startsWith(`${PHOTOS_ORIGIN}/`));
+  assert.ok(RENDITIONS_BASE.startsWith(`${PHOTOS_ORIGIN}/`));
+  for (const photo of manifest.slice(0, 3)) {
+    assert.ok(originalUrl(photo).startsWith(PHOTOS_ORIGIN));
+    assert.ok(renditionUrl(photo, 400).startsWith(PHOTOS_ORIGIN));
+  }
+  // The page opens the photo host's connection with its first-photo preload.
+  assert.match(page, /<link rel="preconnect" href=\{PHOTOS_ORIGIN\} data-hoist \/>/);
 });
 
 test("the manifest's rendition hashes match the originals on disk", async () => {
@@ -105,7 +115,7 @@ test("nothing the page displays is an original", () => {
 
 test("built renditions are on disk and much smaller than the originals", async (t) => {
   const first = manifest[0];
-  if (!(await exists(staticFile(renditionUrl(first, renditionWidths(first)[0]))))) {
+  if (!(await exists(renditionPath(first, renditionWidths(first)[0])))) {
     t.skip("renditions not built: run npm run optimize-photos");
     return;
   }
@@ -113,12 +123,12 @@ test("built renditions are on disk and much smaller than the originals", async (
     const widths = renditionWidths(photo);
     for (const width of widths) {
       for (const format of renditionFormats(width)) {
-        const url = renditionUrl(photo, width, format);
-        assert.ok(await exists(staticFile(url)), `missing ${url}`);
+        const file = renditionPath(photo, width, format);
+        assert.ok(await exists(file), `missing ${renditionFile(photo, width, format)}`);
       }
     }
     // The biggest file the lightbox can pick is a fraction of the original.
-    const largest = (await stat(staticFile(renditionUrl(photo, widths.at(-1))))).size;
+    const largest = (await stat(renditionPath(photo, widths.at(-1)))).size;
     assert.ok(
       largest < photo.bytes / 3,
       `${photo.filename}: ${largest} B rendition vs ${photo.bytes} B original`,

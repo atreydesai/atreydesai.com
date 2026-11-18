@@ -10,6 +10,7 @@
     import { formatLongDate } from "#lib/utils/date.ts";
     import { X, ChevronLeft, ChevronRight, ArrowUpRight, Download } from "@jis3r/icons";
     import {
+        PHOTOS_ORIGIN,
         originalUrl,
         photoStem,
         renditionSrcset,
@@ -312,6 +313,9 @@
          the head (data-hoist, see hooks.server.js) with the tile's own srcset
          and sizes, so the browser fetches the same file the tile will use. -->
     {#if photos[0]}
+        <!-- Every photo comes from the R2 photo host (photo-urls.js): its
+             connection opens as early as the preload can ask. -->
+        <link rel="preconnect" href={PHOTOS_ORIGIN} data-hoist />
         <link
             rel="preload"
             as="image"

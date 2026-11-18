@@ -11,9 +11,6 @@ vite.config.ts.timestamp-*
 *:Zone.Identifier
 .vercel/
 
-# Generated files
-static/images/photography/thumbs/
-
 # Local agent tooling
 .agents/
 skills-lock.json

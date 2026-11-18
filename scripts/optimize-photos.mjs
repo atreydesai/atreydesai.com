@@ -4,18 +4,25 @@
 //
 // Rendition names are content-addressed (src/lib/photo-urls.js): a file that
 // already exists is already correct, so a rebuild only encodes photos that are
-// new or changed, and stale files are swept away at the end. Encoded files are
-// kept in node_modules/.cache, which Vercel restores between builds, and
-// copied into static/ from there.
+// new or changed, and stale files are swept away at the end. Renditions are
+// encoded into RENDITIONS_DIR (node_modules/.cache) and never into static/:
+// `npm run upload-photos` puts them in the R2 bucket the site serves them from.
+//
+// On Vercel (process.env.VERCEL) nothing is encoded. The build writes the
+// manifest and then checks that the bucket holds every original and rendition
+// it names, and fails if it doesn't: a missing rendition would be a broken
+// image on the live page.
 
 import sharp from 'sharp';
 import { createHash } from 'crypto';
-import { access, copyFile, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'fs/promises';
+import { access, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { expectedObjects, missingFromHost } from './photo-bucket.mjs';
 import { extractPhotoMeta } from './photo-exif.mjs';
 import {
     AVIF_QUALITY,
     ORIGINALS_DIR,
+    RENDITIONS_DIR,
     RENDITION_QUALITY,
     RENDITION_VERSION,
     renditionFile,
@@ -24,8 +31,7 @@ import {
 } from '../src/lib/photo-urls.js';
 
 const PHOTOS_DIR = ORIGINALS_DIR;
-const THUMBS_DIR = 'static/images/photography/thumbs';
-const CACHE_DIR = 'node_modules/.cache/photo-renditions';
+const CACHE_DIR = RENDITIONS_DIR;
 const GENERATED_DIR = 'src/lib/generated';
 // Per-photo cache of EXIF, dimensions, and the content hash, keyed by mtime
 // and size, so a local rebuild doesn't re-read every full-size JPEG. It lives
@@ -110,9 +116,8 @@ function versionOf(sha) {
 }
 
 /**
- * Make sure every rendition is in static/: copied from the build cache when it
- * was encoded before, encoded into the cache first when it wasn't. Returns the
- * set of file names that should exist.
+ * Make sure every rendition is in RENDITIONS_DIR, encoding the ones that
+ * aren't. Returns the set of file names that should exist.
  */
 async function writeRenditions(entries) {
     const expected = new Set();
@@ -128,41 +133,34 @@ async function writeRenditions(entries) {
     }
 
     let encoded = 0;
-    let copied = 0;
     const errors = [];
     await Promise.all(
         jobs.map(async ({ photo, width, format, file }) => {
-            const dest = join(THUMBS_DIR, file);
-            if (await exists(dest)) return;
             const cached = join(CACHE_DIR, file);
+            if (await exists(cached)) return;
             try {
-                if (await exists(cached)) {
-                    copied++;
-                } else {
-                    // Written aside and renamed into place: the name promises
-                    // finished content, so a build killed mid-encode must not
-                    // leave a truncated file under it.
-                    const partial = `${cached}.partial`;
-                    const resized = sharp(join(PHOTOS_DIR, photo.filename))
-                        .autoOrient()
-                        .resize(width, null, { withoutEnlargement: true });
-                    await (format === 'avif'
-                        ? resized.avif({ quality: AVIF_QUALITY, effort: 4 })
-                        : resized.webp({ quality: RENDITION_QUALITY })
-                    ).toFile(partial);
-                    await rename(partial, cached);
-                    encoded++;
-                }
-                await copyFile(cached, dest);
+                // Written aside and renamed into place: the name promises
+                // finished content, so a build killed mid-encode must not
+                // leave a truncated file under it.
+                const partial = `${cached}.partial`;
+                const resized = sharp(join(PHOTOS_DIR, photo.filename))
+                    .autoOrient()
+                    .resize(width, null, { withoutEnlargement: true });
+                await (format === 'avif'
+                    ? resized.avif({ quality: AVIF_QUALITY, effort: 4 })
+                    : resized.webp({ quality: RENDITION_QUALITY })
+                ).toFile(partial);
+                await rename(partial, cached);
+                encoded++;
             } catch (err) {
                 errors.push(`${photo.filename} @${width} ${format}: ${err.message}`);
             }
         }),
     );
 
-    const current = jobs.length - encoded - copied - errors.length;
+    const current = jobs.length - encoded - errors.length;
     console.log(
-        `   ✅ Encoded: ${encoded}   📦 From cache: ${copied}   ⏭️  In place: ${current}` +
+        `   ✅ Encoded: ${encoded}   ⏭️  In place: ${current}` +
             (errors.length ? `   ❌ Errors: ${errors.length}` : ''),
     );
     for (const error of errors) console.log(`   - ${error}`);
@@ -181,9 +179,22 @@ async function sweep(dir, expected) {
     if (removed) console.log(`   🧹 Removed ${removed} stale files from ${dir}`);
 }
 
+/** On Vercel: fail the build if the bucket lacks a file the manifest links. */
+async function checkBucket(photos) {
+    const objects = expectedObjects(photos);
+    const missing = await missingFromHost(objects);
+    if (!missing.length) {
+        console.log(`   ☁️  Bucket holds all ${objects.length} files`);
+        return;
+    }
+    console.log(`   ❌ The R2 bucket is missing ${missing.length} of ${objects.length} files:`);
+    for (const { key } of missing.slice(0, 20)) console.log(`   - ${key}`);
+    console.log('   Run `npm run optimize-photos && npm run upload-photos` locally, then redeploy.');
+    process.exitCode = 1;
+}
+
 async function optimizePhotography() {
     console.log('📸 Photography renditions and manifest...');
-    await mkdir(THUMBS_DIR, { recursive: true });
     await mkdir(CACHE_DIR, { recursive: true });
     const filenames = (await readdir(PHOTOS_DIR)).filter(isPhoto);
     const meta = await readPhotos(filenames);
@@ -220,9 +231,11 @@ async function optimizePhotography() {
         return a.filename.localeCompare(b.filename);
     });
 
-    const expected = await writeRenditions(photos);
-    await sweep(THUMBS_DIR, expected);
-    await sweep(CACHE_DIR, expected);
+    if (process.env.VERCEL) {
+        await checkBucket(photos);
+    } else {
+        await sweep(CACHE_DIR, await writeRenditions(photos));
+    }
 
     await mkdir(GENERATED_DIR, { recursive: true });
     await writeFile(MANIFEST_PATH, `${JSON.stringify(photos, null, 2)}\n`);

@@ -12,7 +12,7 @@ npm run dev     # local dev server
 npm run build   # sync the bookshelf, optimize photos, build
 npm test        # node tests for the sync scripts, game engines, and agent endpoints
 npm run check   # svelte-check
-npm run upload-photos   # after adding a photo to photos/: puts its original on Cloudflare R2
+npm run upload-photos   # after adding a photo to photos/ and optimize-photos: puts it on Cloudflare R2 (photos.atreydesai.com)
 npm run og      # share cards for posts (needs `npm run dev` and Chrome)
 npm run lab -- http://localhost:4173   # throttled-phone load metrics per page (needs `npm run preview` and Chrome)
 node scripts/perf-runtime.mjs http://localhost:4173 --runs=5   # after load: idle CPU, tap/keypress latency, Back cache, render cost
