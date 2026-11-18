@@ -571,7 +571,7 @@ whole way. **Spare cups are the lives; the tea is the pay.**
 - **Spare cups are the lives.** A run starts with one and can hold two; the
   HUD shows a slot for each, the cup when held, a dashed outline when not.
   Running into anything you should have hopped or slid under (a crate, a
-  pigeon, a sign, a barrel) costs one, as does a fall into the alley or a cup
+  sign, a barrel) costs one, as does a fall into the alley or a cup
   run dry. With none left, the next of those ends the run. After a hit the
   runner stumbles and has a moment of grace (1.2 s) so one mistake is one
   cup; a fall comes back on the next proper roof.
@@ -600,7 +600,9 @@ whole way. **Spare cups are the lives; the tea is the pay.**
 - **Four moves that combine:** a jump whose height follows the hold, a glide
   on the straw as a rotor, a slide, and a slam. Down tapped in the air
   slams; down still held when the slam lands goes straight into a slide, so
-  a slam just before something low never lands standing into it.
+  a slam just before something low never lands standing into it. A slide
+  lasts as long as down is held (half a second from a tap). Flying into a
+  flock of pigeons only scatters it; it never costs a cup.
 - **Sugar rush.** Pearls fill a meter of ten sugar cubes; triggering it
   smashes anything that would cost a cup (never anything lethal) for a few
   seconds, with afterimages and speed lines. The full meter is the one

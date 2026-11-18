@@ -43,7 +43,6 @@ import {
   SKYLIGHT_H,
   SLAM_SPILL,
   SLIDE_H,
-  SLIDE_MAX,
   SLIDE_TIME,
   SPARE_BONUS,
   SPARE_RADIUS,
@@ -347,7 +346,7 @@ test("a slide ducks under a billboard that a standing runner runs into", () => {
   assert.equal(runnerBox({ ...sliding.runner, sliding: true }).y1 - sliding.runner.y, SLIDE_H);
 });
 
-test("a slide lasts SLIDE_TIME, stretches to SLIDE_MAX when held, and slides off edges", () => {
+test("a tapped slide lasts SLIDE_TIME, a held one lasts as long as down is held, and slides off edges", () => {
   const timeSlide = (input) => {
     const s = stage(floor());
     const events = run(s, input, 2, (st, ev) => kinds(ev, "slideEnd").length > 0);
@@ -355,7 +354,11 @@ test("a slide lasts SLIDE_TIME, stretches to SLIDE_MAX when held, and slides off
     return s.time;
   };
   assert.ok(Math.abs(timeSlide((_, i) => ({ down: i === 0 })) - SLIDE_TIME) < 2 * H);
-  assert.ok(Math.abs(timeSlide({ down: true }) - SLIDE_MAX) < 2 * H);
+  // Held for 3 s, then let go: low the whole time, standing the step after.
+  const held = stage(floor());
+  const events = run(held, (st) => ({ down: st.time < 3 }), 4, (st, ev) => kinds(ev, "slideEnd").length > 0);
+  assert.equal(kinds(events, "slide").length, 1);
+  assert.ok(Math.abs(held.time - 3) < 2 * H, `ended at ${held.time}`);
 
   const s = stage([{ x0: -2000, x1: 140, top: 100 }, { x0: 160, x1: 1e6, top: 60 }], [], { x: 100 });
   run(s, (_, i) => ({ down: i === 0 }), 0.4);
@@ -620,7 +623,7 @@ test("a cable is caught with a hop, ridden down, and let go of with jump", () =>
   assert.ok(early.runner.vy > 0);
 });
 
-test("pigeons are harmless underfoot but cost a cup if jumped into", () => {
+test("pigeons are harmless underfoot, and jumping into them only scatters them", () => {
   const flock = () => [600, 612, 624].map((x) => ({ type: "pigeon", x, y: 100, vx: 45, vy: 60, delay: 0, state: "sit", t: 0 }));
   const low = stage(floor(), flock(), { x: 300, spare: 1 });
   const events = run(low, IDLE, 3);
@@ -641,12 +644,10 @@ test("pigeons are harmless underfoot but cost a cup if jumped into", () => {
   let struck = 0;
   for (let lead = 0; lead <= 160; lead += 20) {
     const full = jumpAt(lead, Math.ceil(HOLD_TIME / H));
-    if (kinds(full, "hit").length) {
-      struck += 1;
-      assert.equal(kinds(full, "hit")[0].what, "pigeon");
-      assert.equal(kinds(full, "spareUsed").length, 1);
-    }
-    assert.equal(kinds(jumpAt(lead, 1), "hit").length, 0, "a tap passes under");
+    if (kinds(full, "strike").length) struck += 1;
+    assert.equal(kinds(full, "hit").length, 0, "no cup for the flock");
+    assert.equal(kinds(full, "spareUsed").length, 0);
+    assert.equal(kinds(jumpAt(lead, 1), "strike").length, 0, "a tap passes under");
   }
   assert.ok(struck > 0, "some jump into the flock strikes it");
 });

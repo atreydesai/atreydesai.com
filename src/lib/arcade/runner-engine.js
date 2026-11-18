@@ -97,9 +97,8 @@ export const GLIDE_TIME = 0.9;
 export const GLIDE_FALL = 60;
 /** How hard a glide brakes a fall that is already faster than GLIDE_FALL. */
 const GLIDE_BRAKE = 4000;
+/** A tapped slide lasts this long; a held one lasts as long as down is held. */
 export const SLIDE_TIME = 0.5;
-/** Holding down stretches a slide to this, no further (unless something is overhead). */
-export const SLIDE_MAX = 0.8;
 export const SLAM_SPEED = 950;
 /** A slam drops nearly straight down, so it lands where it is aimed. */
 export const SLAM_DRIFT = 0.5;
@@ -639,7 +638,7 @@ export const PATTERNS = Object.freeze([
   { id: "hops", min: 0, weight: 1.2, note: "ac units and, later, water tanks to hop" },
   { id: "stepUp", min: 0.05, weight: 1, bias: "up", note: "a gap up to a higher roof" },
   { id: "duck", min: 0.1, weight: 1, note: "a clothesline or billboard to slide under" },
-  { id: "pigeons", min: 0.1, weight: 0.8, note: "a flock that takes off as you come; jumping into it costs a cup" },
+  { id: "pigeons", min: 0.1, weight: 0.8, note: "a flock that takes off as you come; jumping into it scatters it" },
   { id: "longDrop", min: 0.15, weight: 1, bias: "down", note: "a long drop: glide late to save the tea" },
   { id: "crates", min: 0.15, weight: 0.9, note: "crate stacks to hop, or slam open for pearls" },
   { id: "barrels", min: 0.15, weight: 0.9, note: "barrels that roll at you as you come" },
@@ -1985,7 +1984,7 @@ function respawn(state, events) {
 }
 
 /**
- * Down on the roof: low, for SLIDE_TIME (SLIDE_MAX while down is held).
+ * Down on the roof: low, for SLIDE_TIME or for as long as down is held.
  * @param {RunState["runner"]} r
  * @param {RunEvent[]} events
  */
@@ -2167,7 +2166,7 @@ function railUnder(state, x) {
  * glide, glideEnd, slam, land {impact, spill, slam, glide} (then slide, when
  * a slam lands with down still held), bounce, wall,
  * spill {amount, cause: landing | slam}, smash {what, cause: slam | rush,
- * points}, pigeonsUp {count}, barrel, drone, creak, crumble, pearl {points,
+ * points}, pigeonsUp {count}, strike (into the flock, no cup), barrel, drone, creak, crumble, pearl {points,
  * combo, chain, magnet}, spare {held}, spareBonus {points}, comboLost,
  * rushReady, rushStart, rushEnd, delivery {points, tea, full, streak, hard},
  * miss, cableOn, cableOff {jump}, vent; a cup lost is hit {what}, fall or dry
@@ -2255,9 +2254,9 @@ export function step(state, input, dt = STEP) {
     }
     if (r.sliding) {
       r.slideTime += dt;
-      const limit = held.down ? SLIDE_MAX : SLIDE_TIME;
-      // A slide never ends with something overhead to stand up into.
-      if (r.slideTime >= limit && !lowOverhead(state)) {
+      // Held down keeps the slide going; let go and it ends once it has lasted
+      // SLIDE_TIME, never with something overhead to stand up into.
+      if (!held.down && r.slideTime >= SLIDE_TIME && !lowOverhead(state)) {
         r.sliding = false;
         events.push({ type: "slideEnd" });
       }
@@ -2518,10 +2517,10 @@ function touchItems(state, dt, events) {
             p.x + PIGEON_W / 2 > box.x0 && p.x - PIGEON_W / 2 < box.x1 &&
             p.y + PIGEON_H > box.y0 && p.y < box.y1
           ) {
+            // Flying into the flock only scatters it: feathers, never a cup.
             item.state = "struck";
-            if (rushing || r.grace > 0) break;
             state.stats.strikes += 1;
-            loseCup(state, "hit", "pigeon", events);
+            events.push({ type: "strike", x: p.x, y: p.y });
           }
           break;
         }
