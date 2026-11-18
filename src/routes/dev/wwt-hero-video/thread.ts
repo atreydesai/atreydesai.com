@@ -1,7 +1,8 @@
 // The tweet thread's images, posts 2-9: one point each, at 1600x900 (X shows 16:9 uncropped), in the launch page's style
 // (v2.ts). Sized for a phone feed, where an image is about 600 px wide: nothing below 34 px here (about 13 px there).
-// Every string is the paper's own words (check_ngrams.py) and every number is the paper's.
-import { P, type Assets, ground, txt, lines, wrap, hl, card, chip, tick, cross, half, hbar, review, motif, stroke, measure } from "./v2";
+// Every string is the paper's own words (check_ngrams.py) and every number is the paper's, except in post 6's card (p5),
+// whose headline and note are ours and three of whose numbers come from the lab-confusion record (see p5).
+import { P, type Assets, ground, txt, lines, wrap, hl, card, chip, cross, half, hbar, review, motif, stroke, measure } from "./v2";
 
 export const THREAD = ["p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"];
 type Ctx = CanvasRenderingContext2D;
@@ -50,33 +51,54 @@ function p4(ctx: Ctx, W: number, H: number, A: Assets) {
 	txt(ctx, "accuracy on idea detection", M, 790, LAB, { w: 500, c: P.ink });
 }
 
-// 5 · which lab, and what the detectors mistake
+// 5 · which lab, and the newest open models taken for Claude or GPT. Ty Brassington's design (his mockup is
+// llm-detectors docs/launch_20261116/media/tweet6_card/card.html; Atrey, 18 Nov: it replaces the earlier card), drawn
+// here so it shares the other images' ground, type and palette. Two strings are ours, not the paper's: the right-hand
+// headline and the note under it (NONPAPER_TEXT.md). The 77% is the paper's (Kimi K2.6); 97%, 89% and 95% are Fable
+// 5.2's answers in the lab-confusion record (E7 rq2_lab_confusion_20261114 results/confusion.json, per_writer, 75 texts
+// a writer; "Qwen Max" there is the paper's Qwen3.8 Max).
 function p5(ctx: Ctx, W: number, H: number, A: Assets) {
-	txt(ctx, "If an AI, which lab", M, 160, HEAD * 0.9);
-	txt(ctx, "98%", M - 10, 500, 300, { ls: -0.04 });
-	txt(ctx, "accuracy or more", M, 585, LAB, { w: 500, c: P.ink2 });
-	const labs = [{ n: "OpenAI", i: "openai" as const, c: P.openai }, { n: "Anthropic", i: "anthropic", c: P.anthropic }, { n: "Google", i: "google", c: P.google }];
-	let y = 675;
-	for (const l of labs) {
-		const c = chip(ctx, M, y, l.n, LAB, { icon: A.icon(l.i, l.c) });
-		tick(ctx, M + c.w + 18, y - 20, 40, 1);
-		y += 76;
-	}
-	// right: the detectors' mistakes
-	ctx.fillStyle = P.rule; ctx.fillRect(820, 110, 2, 720);
-	hl(ctx, "usually mistaken for", 880, 200, 56);
-	const rows = [
-		{ from: "Kimi K3", sub: "Moonshot", to: "Claude", i: "anthropic", c: P.anthropic, y: 380 },
-		{ from: "Qwen3.8", sub: "Alibaba", to: "GPT", i: "openai", c: P.openai, y: 620 },
+	const R = W - 92; // the right edge (Ty's card keeps a little more room on the right than the others' 96)
+	// left: the three big labs
+	txt(ctx, "If AI, which lab?", M, 152, 62);
+	txt(ctx, "98%", M - 12, 566, 318, { ls: -0.045 });
+	txt(ctx, "accuracy or more on", M, 745, 38, { w: 500, c: P.ink2 });
+	const labs = [{ n: "OpenAI", i: "openai", c: P.openai }, { n: "Anthropic", i: "anthropic", c: P.anthropic }, { n: "Google", i: "google", c: P.google }];
+	let x = M;
+	labs.forEach((l, i) => {
+		const ic = A.icon(l.i, l.c); if (ic) ctx.drawImage(ic, x, 788 - 17, 34, 34);
+		x += 34 + 11;
+		x += txt(ctx, l.n, x, 800, 36, { c: l.c }) + 13;
+		if (i < labs.length - 1) x += txt(ctx, "·", x, 800, 36, { c: P.ink2, w: 500 }) + 13;
+	});
+	ctx.fillStyle = P.rule; ctx.fillRect(800, 96, 2, 708);
+	// right: two Moonshot and two Alibaba releases, the earlier one named for its own lab and the newest one not
+	const X = 856;
+	hl(ctx, "Fable 5.2 mistakes other labs’", X, 140, 42);
+	hl(ctx, "newest models for Claude or GPT", X, 194, 42);
+	const groups = [
+		{ lab: "Moonshot", y: 296, rows: [
+			{ from: "Kimi K2.6", to: "Moonshot", v: "77%", c: P.ink },
+			{ from: "Kimi K3", to: "Claude", i: "anthropic", v: "97%", c: P.anthropic },
+		] },
+		{ lab: "Alibaba", y: 534, rows: [
+			{ from: "Qwen3.6", to: "Alibaba", v: "89%", c: P.ink },
+			{ from: "Qwen3.8 Max", to: "GPT", i: "openai", v: "95%", c: P.openai },
+		] },
 	];
-	for (const r of rows) {
-		const a = chip(ctx, 880, r.y, r.from, SUB, {});
-		txt(ctx, r.sub, 880, r.y + 96, SMALL, { w: 500, c: P.ink2 });
-		const x0 = 880 + a.w + 24, x1 = 1220;
-		stroke(ctx, [[x0, r.y], [x1 - 14, r.y]], 1, r.c, 6);
-		stroke(ctx, [[x1 - 36, r.y - 18], [x1 - 12, r.y], [x1 - 36, r.y + 18]], 1, r.c, 6);
-		chip(ctx, x1 + 10, r.y, r.to, SUB, { icon: A.icon(r.i, r.c), tc: r.c });
+	for (const g of groups) {
+		txt(ctx, g.lab, X, g.y, 34, { w: 500, c: P.ink2 });
+		g.rows.forEach((r, j) => {
+			const y = g.y + 56 + j * 80;
+			const a = chip(ctx, X, y, r.from, 36, {});
+			const x0 = X + a.w + 12, x1 = x0 + 42;
+			stroke(ctx, [[x0, y], [x1, y]], 1, r.c, 4);
+			stroke(ctx, [[x1 - 14, y - 13], [x1, y], [x1 - 14, y + 13]], 1, r.c, 4);
+			chip(ctx, x1 + 12, y, r.to, 36, { icon: "i" in r && r.i ? A.icon(r.i, r.c) : undefined, tc: r.c });
+			txt(ctx, r.v, R, y + 19, 54, { c: r.c, al: "right", ls: -0.03 });
+		});
 	}
+	lines(ctx, ["This is despite Fable recognizing", "the earlier releases."], X, 762, SMALL, 42, { w: 500, c: P.ink2 });
 }
 
 // 6 · how the detectors describe each lab's writing (the paper's own sentences)
