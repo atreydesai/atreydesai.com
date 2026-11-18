@@ -9,7 +9,7 @@
 <script lang="ts">
 	// Section 5, Implications for anonymity. A chapter opener (one writer's print, as written and paraphrased), then a
 	// pinned stage with its own blocking: the writers a model knows well as one large mass, a giant numeral beside it,
-	// and the narration as a caption band along the bottom. One idea per step:
+	// and the narration as a caption band along the top (placed as section 4's). One idea per step:
 	//   known     the "very familiar" group alone, large: the share of their texts the model names, as a giant numeral
 	//   refusals  the same place holds 1,258 Reddit posts, one tile each; Fable 5.2's written refusals in its clay, and one
 	//             statement under the numeral in place of colour keys (the count in clay)
@@ -134,31 +134,54 @@
 	// where everything sits, in stage coordinates; it depends on the size only, so nothing moves between steps
 	const geo = $derived.by(() => {
 		const g: G[] = [];
-		const o = { g, num: { x: 0, y: 0, w: 0 }, numSize: 150, keyX: 0, keyY: 0, stackKeys: true, wall: { x: 0, y: 0, w: 0, h: 0 },
-			slot: { x: 0, y: 0, w: 0, h: 0 }, smallNumSize: 20 };
+		const o = { g, cap: { x: 0, y: 0, w: 0 }, num: { x: 0, y: 0, w: 0 }, numSize: 150, keyX: 0, keyY: 0, refY: 0, stackKeys: true,
+			wall: { x: 0, y: 0, w: 0, h: 0 }, slot: { x: 0, y: 0, w: 0, h: 0 }, smallNumSize: 20 };
 		if (!W || !H) return o;
-		// the band: its tallest text, plus the dashes, gaps and padding around it, plus Explore's rows under it
-		// (on a phone, the controls' measured rows and the band's gap above them, so the key under the groups clears the
-		// band once Explore opens)
-		const exploreH = narrow ? Math.max(50, ctlH + 10) : 50, capFull = (capMax || (narrow ? 170 : 110)) + (narrow ? 54 : 58);
-		const zT = narrow ? 60 : 76, zB = H - 16 - capFull - exploreH - (narrow ? 8 : 20), zh = zB - zT;
+		// the caption band on top, where section 4 puts its card: 76px down and centred (at most 800px wide, not 760: the
+		// Explore controls' one row is 750px); on a phone 60px down, the stage's full width
+		const cw = narrow ? W : Math.min(800, W), top = narrow ? 60 : 76;
+		o.cap = { x: (W - cw) / 2, y: top, w: cw };
+		// the band at its tallest: its tallest text, plus the dashes, gaps and padding around it (capText), plus Explore's
+		// rows, which open inside it on the last step (measured; on a phone they wrap to three rows). The picture starts
+		// under it, so the band covers nothing at any step; on a desktop the gap holds the hover cue over the very
+		// familiar group (28px tall, 8px over it)
+		const capText = (capMax || (narrow ? 170 : 110)) + (narrow ? 64 : 68), exploreH = ctlH || (narrow ? 128 : 40);
+		let zT = top + capText + exploreH + (narrow ? 10 : 48);
+		const zB = H - (narrow ? 8 : 16);
 		if (!narrow) {
+			// a short screen (under about 650px) would leave the left column too short for the picture (below): the
+			// guided steps keep it whole, and Explore's row, once open, covers only the hover cue
+			zT = Math.min(zT, Math.max(top + capText + 48, zB - 44 - 260));
+			const zh = zB - zT;
 			// left: the giant numeral over the less familiar groups; right: the very familiar group, large
 			const ph = Math.floor(Math.max(10, Math.min(40, (zh - 44) / 10))), gh = 10 * ph;
-			const ps = Math.max(8, Math.min(16, Math.floor(ph * 0.42))), gs = 10 * ps, gapS = 28;
-			const LW = Math.max(3 * gs + 2 * gapS, 420), colGap = 72, x0 = (W - (LW + colGap + gh)) / 2;
+			// the left column, within the very familiar group's height: the numeral; the keys, up to two rows (26px tall
+			// around their lines, 30px apart, the first 52px under the numeral's baseline); a gap; the less familiar
+			// groups' numbers (20px, centred 16px over them); the groups. Where that is short the groups get smaller (and,
+			// at the smallest, the numeral, down to 56px: below that height the column is tight, as it was before)
+			const COL = 52 + 30 + 13 + 8 + 26, room = (s: number) => Math.floor((gh - s * 0.86 - COL) / 10);
+			let numSize = Math.round(Math.min(124, gh * 0.31));
+			const ps = Math.max(8, Math.min(16, Math.floor(ph * 0.42), room(numSize))), gs = 10 * ps;
+			if (room(numSize) < ps) numSize = Math.max(Math.min(numSize, 56), Math.floor((gh - gs - COL) / 0.86));
+			// the column keeps room for the paraphrasing diagram's arrows; smaller groups spread across it
+			const LW = Math.max(3 * gs + 2 * 28, 480), gapS = (LW - 3 * gs) / 2, colGap = 72, x0 = (W - (LW + colGap + gh)) / 2;
 			const hy = zT + Math.max(0, (zh - 44 - gh) / 2), hx = x0 + LW + colGap;
 			for (let i = 0; i < 3; i++) { const x = x0 + i * (gs + gapS); g.push({ x, y: hy + gh - gs, cx: x + gs / 2, p: ps, gw: gs }); }
 			g.push({ x: hx, y: hy, cx: hx + gh / 2, p: ph, gw: gh });
-			o.numSize = Math.round(Math.min(124, gh * 0.31));
+			o.numSize = numSize;
 			o.num = { x: x0, y: hy - 6, w: LW };
-			o.keyX = x0; o.keyY = hy + o.numSize * 0.86 + 52;
+			o.keyX = x0; o.keyY = hy + o.numSize * 0.86 + 52; o.refY = o.keyY - 13;
 			o.wall = { x: hx, y: hy, w: gh, h: gh };
 			o.slot = { x: x0, y: hy + gh - gs, w: LW, h: gs };
 		} else {
 			// row 1: the numeral | the very familiar group; row 2: the three less familiar groups; row 3: the key
 			const names = 8 + NAME2_H + 3, keysH = 62, row2 = 32 + 70 + names; // the groups' numbers, tiles and names
-			const ph = Math.floor(Math.max(10, Math.min(21, (W - 140) / 10, (zh - 34 - row2 - keysH) / 10))), gh = 10 * ph;
+			// a short phone (667px) has no room for all of it at the smallest tiles: the guided steps keep the whole
+			// picture, and only Explore's rows, once open, lie over the top of it (before, they lay over its bottom)
+			const fixed = 34 + row2 + keysH;
+			zT = Math.min(zT, Math.max(top + capText + 10, zB - fixed - 100));
+			const zh = zB - zT;
+			const ph = Math.floor(Math.max(10, Math.min(21, (W - 140) / 10, (zh - fixed) / 10))), gh = 10 * ph;
 			const hx = W - gh, hy = zT;
 			g.length = 0;
 			const pitch = W / 3, ps = 7, gs = 70, sy = hy + gh + 34 + 32;
@@ -168,6 +191,9 @@
 			o.num = { x: 0, y: hy + 4, w: W - gh - 12 };
 			o.stackKeys = false; o.keyY = sy + gs + names + 18;
 			o.wall = { x: 140, y: hy, w: W - 140, h: gh + 34 + 32 + gs };
+			// the refusals' statement just under the posts (where the groups' names are in the other steps): on a narrow
+			// phone it takes three lines, which from the keys' place ran to the screen's edge
+			o.refY = o.wall.y + o.wall.h + 24;
 			o.slot = { x: 0, y: sy, w: W, h: gs };
 		}
 		return o;
@@ -416,10 +442,13 @@
 	// a group hovered, focused or tapped shows its card; the hover cue goes once one has
 	let tried = $state(false);
 	const open = (i: number) => { sel = i; tried = true; };
-	// the hover cue's place: over the very familiar group (top right on every screen), its right edges lined up (stage px)
+	// the hover cue's place (stage px): over the very familiar group (top right), its right edges lined up; on a phone
+	// beside it on the left, level with its bottom, under the numeral (over it, the caption band's Explore rows would
+	// cover it, and the room it needs there would shrink every tile)
 	const cueAt = $derived.by(() => {
 		const g = geo.g[FOCUS];
-		return g ? { right: W - (g.x + g.gw), top: g.y - 8 - 28 } : null;
+		if (!g) return null;
+		return narrow ? { right: W - g.x + 10, top: g.y + g.gw - 28 } : { right: W - (g.x + g.gw), top: g.y - 8 - 28 };
 	});
 	const tip = $derived.by(() => {
 		if (sel === null || !hitIdx.includes(sel)) return null;
@@ -483,23 +512,24 @@
 					{/if}
 				{/each}
 			</div>
-			<!-- the hover cue, over the very familiar group while the groups take a hover (not on the refusals) -->
+			<!-- the hover cue, by the very familiar group while the groups take a hover (not on the refusals) -->
 			<HoverCue hover="Hover over a group" tap="Tap a group" show={hitIdx.length > 0 && active && !!cueAt && !tried} style={cueAt ? `right:${cueAt.right}px; top:${cueAt.top}px` : "visibility:hidden"} />
-			<!-- the refusals in one statement, where the other steps' colour keys sit (the count in Fable's clay) -->
+			<!-- the refusals in one statement, where the other steps' colour keys sit (on a phone, just under the posts; the
+		     count in Fable's clay) -->
 			<p class="refuse" class:on={view === "refusals"} class:mid={!geo.stackKeys} aria-hidden={view !== "refusals"}
-				style="left:{geo.stackKeys ? geo.keyX : 0}px; top:{geo.keyY - 13}px; width:{geo.stackKeys ? geo.num.w : W}px">{#each REFUSAL as p}{#if p.em}<b style:color={CLAY}>{p.t}</b>{:else}{p.t}{/if}{/each}</p>
+				style="left:{geo.stackKeys ? geo.keyX : 0}px; top:{geo.refY}px; width:{geo.stackKeys ? geo.num.w : W}px">{#each REFUSAL as p}{#if p.em}<b style:color={CLAY}>{p.t}</b>{:else}{p.t}{/if}{/each}</p>
 			{#if tip && active && sel !== null && geo.g[sel]}
 				{@const g = geo.g[sel]}
-				<!-- on a narrow screen the card docks over the caption band at the bottom, like the hero's phone card: beside a
-				     middle group it ran off the screen's edge, and under the groups the keys' layer covered it -->
+				<!-- on a narrow screen the card docks over the caption band at the top, covering it exactly (never the groups):
+				     beside a middle group it ran off the screen's edge, and under the groups the keys' layer covered it -->
 				{@const below = W < 600}
-				<div class="tip" class:flip={!below && g.x + g.gw > W - 220} class:below style={below ? `min-height:${capH}px` : `left:${g.x + g.gw + 12}px; top:${g.y}px; --gw:${g.gw + 24}px`} role="status">
+				<div class="tip" class:flip={!below && g.x + g.gw > W - 220} class:below style={below ? `left:${geo.cap.x}px; top:${geo.cap.y}px; width:${geo.cap.w}px; min-height:${capH}px` : `left:${g.x + g.gw + 12}px; top:${g.y}px; --gw:${g.gw + 24}px`} role="status">
 					<b>{tip.h}</b><span class="tv">{tip.v}</span>{#each tip.s as s}<span>{s}</span>{/each}
 				</div>
 			{/if}
 
-			<!-- the narration: a caption band along the bottom; the dashes jump to a step; the controls open inside it -->
-			<div class="cap" bind:this={cap} bind:clientHeight={capH}>
+			<!-- the narration: a caption band along the top; the dashes jump to a step; the controls open inside it -->
+			<div class="cap" class:unsized={!W} style="left:{geo.cap.x}px; top:{geo.cap.y}px; width:{geo.cap.w}px" bind:this={cap} bind:clientHeight={capH}>
 				<StepDashes count={STEPS.length} current={step} {progress} {go} />
 				<div class="say" aria-live="polite" bind:clientHeight={capMax}>
 					{#each STEPS as s, i}
@@ -538,8 +568,10 @@
 	.scrolly { position: relative; height: calc(var(--span) + calc(100 * var(--vh, 1vh))); }
 	.stick { position: sticky; top: 0; height: calc(100 * var(--vh, 1vh)); pointer-events: none; }
 
-	/* the caption band, along the bottom */
-	.cap { position: absolute; z-index: 2; left: 50%; bottom: 16px; width: min(800px, 100%); transform: translateX(-50%); pointer-events: auto; padding: 14px 18px 16px; background: #fff; border-radius: 3px; box-shadow: 0 2px 14px rgba(20, 32, 45, .06); display: grid; gap: 10px; }
+	/* the caption band, along the top (placed by geo.cap; before the stage is measured, where it will be on a desktop); over
+	   the hover cue, which only a short phone's open Explore rows reach */
+	.cap { position: absolute; z-index: 4; pointer-events: auto; padding: 14px 18px 16px; background: #fff; border-radius: 3px; box-shadow: 0 2px 14px rgba(20, 32, 45, .06); display: grid; gap: 10px; }
+	.cap.unsized { left: 50% !important; top: 76px !important; width: min(800px, 100%) !important; transform: translateX(-50%); }
 	.say { display: grid; margin-top: 4px; }
 	.say-in { grid-area: 1 / 1; display: grid; align-content: start; gap: 6px; opacity: 0; visibility: hidden; transform: translateY(6px); transition: opacity .4s, transform .45s var(--ease), visibility 0s .4s; }
 	.say-in.on { opacity: 1; visibility: visible; transform: none; transition: opacity .4s, transform .45s var(--ease), visibility 0s; }
@@ -586,11 +618,11 @@
 	.hit:focus-visible { outline: 2px solid var(--ink); outline-offset: 0; }
 	.tip { position: absolute; z-index: 5; display: grid; gap: 2px; min-width: 150px; padding: 9px 12px; background: #fff; border-radius: 3px; box-shadow: 0 6px 20px rgba(20, 32, 45, .14); font-size: 12.5px; color: var(--ink2); pointer-events: none; white-space: nowrap; }
 	.tip.flip { transform: translateX(calc(-100% - var(--gw))); }
-	.tip.below { z-index: 40; left: 0; right: 0; bottom: 16px; align-content: start; min-width: 0; padding: 12px 16px; white-space: normal; box-shadow: 0 8px 26px rgba(20, 32, 45, .18); }
+	.tip.below { z-index: 40; align-content: start; min-width: 0; padding: 12px 16px; white-space: normal; box-shadow: 0 8px 26px rgba(20, 32, 45, .18); }
 	.tip b { font-size: 13.5px; color: var(--ink); }
 	.tv { font-size: 20px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 	@media (max-width: 759px) {
-		.cap { bottom: 8px; padding: 12px 14px 14px; }
+		.cap { padding: 12px 14px 14px; }
 		.say-t { font-size: 15.5px; }
 		.say-m { font-size: 13.5px; }
 		.refuse { font-size: 15px; }
