@@ -2,9 +2,13 @@
     import { onMount, tick } from "svelte";
     import { browser } from '$app/env';
     import Seo from "#lib/components/Seo.svelte";
-    import { aboutData } from "#lib/content.ts";
+    import type { PageData } from "./$types";
     import { parseInline, escapeHtml } from "#lib/utils/text.ts";
     import type { ManifoldNow, ReadingNow } from "../api/now/+server";
+
+    export let data: PageData;
+    // From the page's server load (prerendered), not the content modules.
+    const { aboutData } = data;
 
     // Sidenote layout: each footnote floats in the right margin beside its
     // marker, faint until you hover the note or the marker.

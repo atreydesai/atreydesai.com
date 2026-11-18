@@ -1,9 +1,12 @@
 // Pages render the same bytes for everyone until the next deploy (live data
-// such as /api/now loads in the browser), so Vercel's CDN can serve them
-// instead of running a function on every view. A new deployment starts with
-// an empty cache. The CDN keys on Accept, so HTML and Markdown are cached
+// such as /api/now loads in the browser, and relative times are computed
+// there), so Vercel's CDN can serve them instead of running a function on
+// every view. A new deployment starts with an empty cache, so the CDN may
+// keep a page for as long as it likes: a shorter lifetime only sends a quiet
+// page's next visitor back to a cold render for bytes that cannot have
+// changed. The CDN keys on Accept, so HTML and Markdown are cached
 // separately. This header stays at Vercel: browsers keep revalidating.
-export const PAGE_CDN_CACHE = "max-age=3600, stale-while-revalidate=86400";
+export const PAGE_CDN_CACHE = "max-age=31536000";
 
 const PAGE_TYPES = /^text\/(?:html|markdown)\b/i;
 

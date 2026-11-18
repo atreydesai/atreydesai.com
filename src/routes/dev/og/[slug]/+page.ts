@@ -1,5 +1,8 @@
 import { dev } from "$app/env";
 import { error } from "@sveltejs/kit";
+
+// Development only: never built (it answers 404 outside `vite dev`).
+export const prerender = false;
 import { posts, unlistedPosts, draftPosts } from "#lib/content.ts";
 import type { PageLoad } from "./$types";
 

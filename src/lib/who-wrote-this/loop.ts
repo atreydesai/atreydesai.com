@@ -26,6 +26,12 @@ const readers = new Set<Fn>();
 let jobs: Fn[] = [];
 let drawer: Fn | null = null;
 let raf = 0, scrolled = true, started = false, before = false; // before: in this loop, the drawer has yet to run
+// The viewport may have moved since it was last read. Reading scrollY (or a probe's height, below, or on a phone even
+// innerWidth, whose zoom depends on the layout) lays the page out if anything has changed it since the last frame, and
+// a frame that then writes lays it out again: twice a frame, all through the page's start-up, while the sections
+// mount. The scroll position moves only with a scroll event and the viewport only with a resize, so `view` is read
+// again only after one.
+let stale = true;
 
 // one section's error must not stop the others (or the loop)
 const call = (fn: Fn, now: number) => { try { fn(now); } catch (err) { console.error(err); } };
@@ -35,9 +41,15 @@ const call = (fn: Fn, now: number) => { try { fn(now); } catch (err) { console.e
 // and resize the page canvas mid-scroll. So a touch screen keeps one height: the largest the viewport can be (the large
 // viewport, as CSS's lvh has it, or innerHeight if larger), measured again only when the width changes (a turn of the
 // phone) or the height changes by more than a quarter (a split screen). The page's CSS takes the same height through
-// --vh (and the small viewport's through --svh), so its pinned stages and scroll lengths hold still too; elsewhere the
-// variables are unset and the CSS falls back to plain vh.
-let probes: [HTMLElement, HTMLElement] | null = null, measuredW = -1, coarse: MediaQueryList | null = null, varsSet = false;
+// --vh (and the small viewport's through --svh), so its pinned stages and scroll lengths hold still too. Mostly it needn't
+// be told: a phone's vh is its large viewport already, and svh its small one (--svh falls back to it). So --vh is set only
+// where the CSS's own 100vh measures differently from the height kept here, and --svh (as 1vh) only in a browser without
+// svh. Setting either on the root restyles every element on the page, which on a phone's start-up was most of a frame.
+// The large viewport can still change without a turn (leaving full screen, say), and the CSS's vh follows it, so the
+// height kept here is measured again then too: a ResizeObserver on the probe says when, without laying the page out.
+// The address bar, the usual change, moves neither.
+let probes: [HTMLElement, HTMLElement] | null = null, measuredW = -1, coarse: MediaQueryList | null = null, vhSet = false;
+let largeMoved = false, largeSeen = -1;
 function viewportHeights(): [number, number] {
 	if (!probes) {
 		const mk = (unit: string) => {
@@ -48,9 +60,19 @@ function viewportHeights(): [number, number] {
 			document.body.appendChild(el);
 			return el;
 		};
-		probes = [mk("lvh"), mk("svh")];
+		probes = [mk("lvh"), mk("vh")];
+		new ResizeObserver(([entry]) => {
+			const h = entry.contentRect.height;
+			if (largeSeen >= 0 && Math.abs(h - largeSeen) > 0.5) { largeMoved = true; onResizeEvent(); }
+			largeSeen = h;
+		}).observe(probes[0]);
 	}
-	return [probes[0].offsetHeight, probes[1].offsetHeight];
+	// unrounded, as the CSS's units are
+	return [probes[0].getBoundingClientRect().height, probes[1].getBoundingClientRect().height];
+}
+function setVh(px: number) {
+	if (px) { vhSet = true; document.documentElement.style.setProperty("--vh", `${px / 100}px`); }
+	else if (vhSet) { vhSet = false; document.documentElement.style.removeProperty("--vh"); }
 }
 function measureView() {
 	const w = innerWidth, h = innerHeight;
@@ -59,17 +81,15 @@ function measureView() {
 	view.w = w;
 	if (!lite.touch) {
 		view.h = h;
-		if (varsSet) { varsSet = false; document.documentElement.style.removeProperty("--vh"); document.documentElement.style.removeProperty("--svh"); }
+		setVh(0);
 		return;
 	}
-	if (w !== measuredW || !view.h || Math.abs(h - view.h) > view.h * 0.25) {
+	if (w !== measuredW || !view.h || largeMoved || Math.abs(h - view.h) > view.h * 0.25) {
 		measuredW = w;
-		const [large, small] = viewportHeights();
+		largeMoved = false;
+		const [large, vh] = viewportHeights();
 		view.h = Math.max(h, large);
-		const root = document.documentElement.style;
-		root.setProperty("--vh", `${view.h / 100}px`);
-		root.setProperty("--svh", `${Math.min(view.h, small || h) / 100}px`);
-		varsSet = true;
+		setVh(Math.abs(view.h - vh) > 0.5 ? view.h : 0);
 	}
 	// a height-only change under a quarter (the address bar): ignored
 }
@@ -77,7 +97,7 @@ function measureView() {
 function run(now: number) {
 	raf = 0;
 	before = true;
-	view.y = scrollY; measureView();
+	if (stale) { stale = false; view.y = scrollY; measureView(); }
 	if (scrolled) { scrolled = false; for (const fn of readers) call(fn, now); }
 	const due = jobs;
 	jobs = []; // asked for during this phase: the next frame
@@ -87,15 +107,23 @@ function run(now: number) {
 }
 const schedule = () => { if (!raf) raf = requestAnimationFrame(run); };
 let scrollAt = -1e9;
-const onScrollEvent = () => { scrolled = true; scrollAt = performance.now(); if (down) down.scrolled = true; schedule(); };
-const onResizeEvent = () => { scrolled = true; schedule(); };
+const onScrollEvent = () => { scrolled = stale = true; scrollAt = performance.now(); if (down) down.scrolled = true; schedule(); };
+const onResizeEvent = () => { scrolled = stale = true; schedule(); };
 function start() {
 	if (started || typeof window === "undefined") return;
 	started = true;
 	coarse = matchMedia("(pointer: coarse)");
-	view.y = scrollY; measureView();
+	if (!CSS.supports("height", "1svh")) document.documentElement.style.setProperty("--svh", "1vh");
+	// The sizes and the mode now, as the sections read them while they mount; the scroll position in the first frame,
+	// not in the middle of the mounting, where reading it lays out a page that is still being built. (A desktop's
+	// start-up then forces no layout; a phone's innerWidth still needs one, and its probes then cost nothing.)
+	measureView();
+	schedule();
 	addEventListener("scroll", onScrollEvent, { passive: true });
 	addEventListener("resize", onResizeEvent, { passive: true });
+	// A phone can settle its layout viewport (the zoom that fits a page still laid out for the old width, after a turn)
+	// without a window resize; the visual viewport reports it.
+	visualViewport?.addEventListener("resize", onResizeEvent, { passive: true });
 	coarse.addEventListener?.("change", onResizeEvent);
 	// taps (below)
 	addEventListener("pointerdown", onDown, { passive: true, capture: true });

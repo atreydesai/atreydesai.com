@@ -1,5 +1,7 @@
 <script lang="ts">
-    import { onDestroy } from "svelte";
+    import { onDestroy, onMount } from "svelte";
+    import { goto } from "$app/navigation";
+    import { page } from "$app/state";
     import PageShell from "#lib/components/PageShell.svelte";
     import OptimizedImage from "#lib/components/OptimizedImage.svelte";
     import Mark from "#lib/components/Mark.svelte";
@@ -9,6 +11,7 @@
     import { X, ChevronLeft, ChevronRight, ArrowUpRight, Download } from "@jis3r/icons";
     import {
         originalUrl,
+        photoStem,
         renditionSrcset,
         renditionUrl,
     } from "#lib/photo-urls.js";
@@ -100,9 +103,14 @@
         square: "min(70vw, 600px)",
     };
 
+    // Below 640px every orientation may take the full width less the
+    // gutters (see .lightbox-* below).
     function lightboxSizes(photo: PhotoData): string {
         const byHeight = ((70 * photo.width) / photo.height).toFixed(2);
-        return `min(${LIGHTBOX_WIDTH_CAP[photo.orientation]}, 100vw - 32px, 992px, ${byHeight}vh)`;
+        return (
+            `(max-width: 639px) min(100vw - 32px, ${byHeight}vh), ` +
+            `min(${LIGHTBOX_WIDTH_CAP[photo.orientation]}, 100vw - 32px, 992px, ${byHeight}vh)`
+        );
     }
 
     // The download is the untouched original; its label says what that means.
@@ -145,40 +153,114 @@
         }
     }
 
-    function openLightbox(index: number, trigger: HTMLElement) {
+    // The open photo lives in the URL (?photo=<its file name, no extension>),
+    // so Back closes the lightbox the way it closes any full-screen view on a
+    // phone, and a photo can be linked to. Opening adds one history entry,
+    // stepping between photos replaces it, and closing from the page goes
+    // back over it: the history moves first and the lightbox follows the URL
+    // (syncFromUrl), so every way of closing takes the same path.
+    const PHOTO_PARAM = "photo";
+    // Whether the current history entry is the one opening pushed. A photo
+    // opened from a link has no entry of ours behind it to go back to.
+    let pushedEntry = false;
+
+    function urlFor(photo: PhotoData | null): string {
+        const url = new URL(window.location.href);
+        if (photo) url.searchParams.set(PHOTO_PARAM, photoStem(photo.filename));
+        else url.searchParams.delete(PHOTO_PARAM);
+        return `${url.pathname}${url.search}${url.hash}`;
+    }
+
+    // Through SvelteKit (shallow: no load reruns), not history.pushState(),
+    // which would overwrite the router's own entry state.
+    function writeUrl(photo: PhotoData | null, replace: boolean) {
+        goto(urlFor(photo), { shallow: true, replace, state: page.state }).catch(() => {
+            // The router isn't ready yet; the lightbox works without the URL.
+        });
+    }
+
+    function showLightbox(index: number) {
+        // Already showing it: its image has loaded and won't fire again.
+        if (lightboxOpen && index === currentPhotoIndex) return;
         currentPhotoIndex = index;
-        lightboxOpen = true;
         lightboxImageLoaded = false;
-        triggerElement = trigger;
-        lockScroll();
         preloadNeighbours(index);
+        if (lightboxOpen) return;
+        lightboxOpen = true;
+        lockScroll();
         // Move focus into dialog on next tick after it renders
         setTimeout(() => dialogElement?.focus(), 0);
     }
 
-    function closeLightbox() {
+    function hideLightbox() {
+        if (!lightboxOpen) return;
         lightboxOpen = false;
         unlockScroll();
-        // Return focus to the photo button that opened the lightbox
-        triggerElement?.focus();
+        // Return focus to the photo button that opened the lightbox; one
+        // opened from a link returns it to the last photo's tile.
+        const tile =
+            triggerElement ??
+            document.querySelectorAll<HTMLElement>(".photo-tile")[currentPhotoIndex];
+        tile?.focus();
         triggerElement = null;
     }
+
+    function openLightbox(index: number, trigger: HTMLElement) {
+        triggerElement = trigger;
+        showLightbox(index);
+        pushedEntry = true;
+        writeUrl(photos[index], false);
+    }
+
+    function closeLightbox() {
+        if (pushedEntry) {
+            history.back(); // syncFromUrl closes it when the entry pops
+        } else {
+            hideLightbox();
+            writeUrl(null, true);
+        }
+    }
+
+    // On load (a shared link) and on Back/Forward between this page's own
+    // entries. An entry with a photo reached through history is one opening
+    // pushed: only that one is ever added with the parameter.
+    function syncFromUrl(fromHistory: boolean) {
+        const stem = new URLSearchParams(window.location.search).get(PHOTO_PARAM);
+        const index = stem
+            ? photos.findIndex((photo) => photoStem(photo.filename) === stem)
+            : -1;
+        if (index >= 0) {
+            pushedEntry = fromHistory;
+            showLightbox(index);
+        } else {
+            pushedEntry = false;
+            hideLightbox();
+        }
+    }
+
+    onMount(() => {
+        syncFromUrl(false);
+        // A popstate that is leaving for another page is the router's.
+        const { pathname } = window.location;
+        const onPopState = () => {
+            if (window.location.pathname === pathname) syncFromUrl(true);
+        };
+        window.addEventListener("popstate", onPopState);
+        return () => window.removeEventListener("popstate", onPopState);
+    });
 
     // Leaving the page with the lightbox open must not leave the next page
     // pinned in place.
     onDestroy(unlockScroll);
 
     function nextPhoto() {
-        lightboxImageLoaded = false;
-        currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
-        preloadNeighbours(currentPhotoIndex);
+        showLightbox((currentPhotoIndex + 1) % photos.length);
+        writeUrl(photos[currentPhotoIndex], true);
     }
 
     function prevPhoto() {
-        lightboxImageLoaded = false;
-        currentPhotoIndex =
-            (currentPhotoIndex - 1 + photos.length) % photos.length;
-        preloadNeighbours(currentPhotoIndex);
+        showLightbox((currentPhotoIndex - 1 + photos.length) % photos.length);
+        writeUrl(photos[currentPhotoIndex], true);
     }
 
     // Swiping between full-screen photos is the gesture people reach for first
@@ -206,6 +288,23 @@
 
     $: currentPhoto = photos[currentPhotoIndex];
 </script>
+
+<svelte:head>
+    <!-- The first photo is this page's largest paint: requested first thing in
+         the head (data-hoist, see hooks.server.js) with the tile's own srcset
+         and sizes, so the browser fetches the same file the tile will use. -->
+    {#if photos[0]}
+        <link
+            rel="preload"
+            as="image"
+            type="image/avif"
+            imagesrcset={renditionSrcset(photos[0], GRID_MAX_WIDTH, "avif")}
+            imagesizes={tileSizes(photos[0], mosaicVariant(0))}
+            fetchpriority="high"
+            data-hoist
+        />
+    {/if}
+</svelte:head>
 
 <PageShell
     title="Photography | Atrey Desai"
@@ -250,6 +349,7 @@
                         <OptimizedImage
                             src={renditionUrl(photo, 800)}
                             srcset={renditionSrcset(photo, GRID_MAX_WIDTH)}
+                            avifSrcset={renditionSrcset(photo, GRID_MAX_WIDTH, "avif")}
                             sizes={tileSizes(photo, variant)}
                             alt={photo.alt}
                             aspectRatio={photo.orientation}
@@ -309,7 +409,7 @@
         {#if photos.length > 1}
             <button
                 type="button"
-                class="lightbox-control absolute left-1 top-1/2 -translate-y-1/2 text-cream-100 hover:text-cream-300 transition-colors z-10"
+                class="lightbox-control lightbox-step absolute left-1 top-1/2 -translate-y-1/2 text-cream-100 hover:text-cream-300 transition-colors z-10"
                 on:click|stopPropagation={prevPhoto}
                 aria-label="Previous photo"
             >
@@ -318,7 +418,7 @@
 
             <button
                 type="button"
-                class="lightbox-control absolute right-1 top-1/2 -translate-y-1/2 text-cream-100 hover:text-cream-300 transition-colors z-10"
+                class="lightbox-control lightbox-step absolute right-1 top-1/2 -translate-y-1/2 text-cream-100 hover:text-cream-300 transition-colors z-10"
                 on:click|stopPropagation={nextPhoto}
                 aria-label="Next photo"
             >
@@ -522,6 +622,35 @@
     }
     .lightbox-square {
         max-width: min(70vw, 600px);
+    }
+
+    /* On a phone the photo takes the full width less the gutters (60vw left
+       a portrait 225px wide on a 375px screen), and its height leaves room
+       for the caption, the download link, and the controls. The arrows move
+       from the photo's edges to the bottom corners beside the counter, off
+       the photo; swiping is the main way through on a touchscreen. */
+    @media (max-width: 639px) {
+        .lightbox-landscape,
+        .lightbox-portrait,
+        .lightbox-square {
+            max-width: calc(100vw - 32px);
+        }
+
+        .lightbox-frame,
+        .lightbox-image {
+            max-height: min(70vh, 100dvh - 280px);
+        }
+
+        .lightbox-step {
+            top: auto;
+            bottom: var(--space-1);
+            translate: none;
+        }
+
+        .lightbox-step :global(svg) {
+            width: 32px;
+            height: 32px;
+        }
     }
 
     /* The download is a text control on the lightbox's dark surface in both

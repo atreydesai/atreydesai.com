@@ -2,7 +2,8 @@
     import { onMount } from "svelte";
 
     let frame: HTMLIFrameElement;
-    let height = 1100;
+    // The height the page reports, once it has (until then the CSS's, below).
+    let height: number | null = null;
 
     function syncTheme() {
         const style = getComputedStyle(document.documentElement);
@@ -44,7 +45,7 @@
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
         loading="lazy"
         on:load={syncTheme}
-        style:height="{height}px"
+        style:height={height === null ? undefined : `${height}px`}
     ></iframe>
 </div>
 
@@ -52,10 +53,25 @@
     .fruit-studies {
         margin: var(--space-8) 0;
         width: 100%;
+        container-type: inline-size;
     }
+    /* Before the page reports its height, the height it lays itself out at
+       for this width (it has its own breakpoint at 540px), measured from it:
+       so the post doesn't move when the report arrives. */
     iframe {
         display: block;
         width: 100%;
+        height: 963px;
         border: 0;
+    }
+    @container (min-width: 540px) {
+        iframe {
+            height: 860px;
+        }
+    }
+    @container (max-width: 300px) {
+        iframe {
+            height: 1082px;
+        }
     }
 </style>

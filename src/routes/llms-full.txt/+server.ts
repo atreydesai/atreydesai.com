@@ -7,10 +7,9 @@ import { SITE_PAGES } from '#lib/server/site-pages.ts';
 import type { RequestHandler } from './$types';
 
 // Every public page as Markdown in one file, for agents that want the whole
-// site in one request (the llms-full.txt companion to /llms.txt). Rendered on
-// request from the same pages as the sitemap, then cached at the CDN like a
-// page, so it changes with every deploy and costs a render at most hourly.
-export const prerender = false;
+// site in one request (the llms-full.txt companion to /llms.txt). Built from
+// the same pages as the sitemap, once per deploy, like the pages themselves.
+export const prerender = true;
 export const trailingSlash = 'ignore';
 
 // Who Atrey is and what he works on first; the long lists last, in their

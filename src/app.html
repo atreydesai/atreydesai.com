@@ -3,9 +3,17 @@
 
 <head>
   <meta charset="utf-8" />
-  <!-- Preconnects for font origins (kept <= 4) -->
+  <!-- Before anything that depends on it: until the browser has read the
+       viewport, it lays out at a 980px desktop width, and an image preload's
+       `imagesizes` resolved then picks a desktop-sized file. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Preconnects for font origins (kept <= 4). A browser keeps separate
+       connections for CORS and non-CORS requests: the kit's stylesheets load
+       without CORS and its font files with it, so the font host is warmed
+       both ways. -->
   <link rel="preconnect" href="https://use.typekit.net" />
-  <link rel="preconnect" href="https://p.typekit.net" crossorigin />
+  <link rel="preconnect" href="https://use.typekit.net" crossorigin />
+  <link rel="preconnect" href="https://p.typekit.net" />
   <!-- Adobe Typekit - Neue Haas Grotesk (async, non-blocking) -->
   <link rel="preload" as="style" href="https://use.typekit.net/nsg3mxc.css?display=swap" onload="this.onload=null;this.rel='stylesheet'" />
   <noscript><link rel="stylesheet" href="https://use.typekit.net/nsg3mxc.css?display=swap" /></noscript>
@@ -20,7 +28,6 @@
   <link rel="icon" type="image/png" sizes="192x192" href="%sveltekit.assets%/favicon-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
   <link rel="manifest" href="%sveltekit.assets%/site.webmanifest" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="format-detection" content="telephone=no" />
   <!-- Theme color for mobile browsers. Deliberately NOT gated on
        prefers-color-scheme: the page theme is a saved choice, not the system

@@ -25,13 +25,14 @@
 		}
 		return out;
 	});
-	// prints are sized for the screen they land on (drawn after mount, so a phone never gets the desktop size)
-	let mounted = $state(false);
-	$effect(() => { mounted = true; });
-
-	let wide = $state(true);
-	$effect(() => { wide = innerWidth >= 980; });
-	const px = $derived(prints.length > 3 ? (wide ? 150 : 96) : prints.length > 2 ? (wide ? 190 : 110) : wide ? 300 : 160);
+	// The prints' size, [wide, narrow] at the 980px line. They are in the page as it arrives, so it is laid out at its
+	// full height before the script runs: on a phone they stack under the text, and arriving later they pushed every
+	// section below down by a third of a screen (and a link to one of those sections stopped that far short). The CSS
+	// picks the box's size (--pm, from these two); the script draws the print at the same size.
+	const SIZES = $derived(prints.length > 3 ? [150, 96] : prints.length > 2 ? [190, 110] : [300, 160]);
+	// the CSS's own query (it reads no layout); the server lays out for a wide screen
+	const wide = typeof matchMedia === "function" ? !matchMedia("(max-width: 979px)").matches : true;
+	const px = $derived(SIZES[wide ? 0 : 1]);
 </script>
 
 <header class="opener" style:--accent={accent}>
@@ -41,11 +42,11 @@
 		<p class="o-t">{takeaway}</p>
 		{#if context}<p class="o-d">{#each parts as p}{#if p.hl}<mark>{p.t}</mark>{:else}{p.t}{/if}{/each}</p>{/if}
 	</div>
-	{#if prints.length && mounted}
-		<div class="o-prints" class:many={prints.length > 2} style:--cols={prints.length} aria-hidden="true">
+	{#if prints.length}
+		<div class="o-prints" class:many={prints.length > 2} style:--cols={prints.length} style:--pm-wide="{SIZES[0]}px" style:--pm-narrow="{SIZES[1]}px" aria-hidden="true">
 			{#each prints as p, i}
 				<figure class="o-p" style:--drop="calc({prints.length <= 2 && i % 2 ? 18 : 0} * var(--vh, 1vh))">
-					<PrintMark family={p.family} index={p.index ?? 0} color={p.color} {px} clarity={p.clarity ?? 1} text={px >= 120} />
+					<PrintMark family={p.family} index={p.index ?? 0} color={p.color} {px} fit clarity={p.clarity ?? 1} text={px >= 120} />
 					{#if p.label}<figcaption>{#if p.icon}<Icon name={p.icon} />{/if}{p.label}</figcaption>{/if}
 				</figure>
 			{/each}
@@ -62,13 +63,14 @@
 	.o-q { margin-top: 18px; font-size: clamp(44px, 7vw, 108px); line-height: .95; font-weight: 600; letter-spacing: -0.045em; color: #fff; text-wrap: balance; }
 	.o-t { margin-top: 28px; max-width: 22ch; font-size: clamp(22px, 2.3vw, 32px); line-height: 1.2; font-weight: 500; letter-spacing: -0.02em; color: #F3F3EF; text-wrap: balance; }
 	.o-d { margin-top: 18px; max-width: 46ch; font-size: 16px; line-height: 1.55; color: rgba(243, 243, 239, .62); }
-	.o-prints { display: flex; justify-content: center; align-items: center; gap: 2vw; }
+	.o-prints { --pm: var(--pm-wide); display: flex; justify-content: center; align-items: center; gap: 2vw; }
 	.o-prints.many { display: grid; grid-template-columns: repeat(var(--cols), auto); justify-content: center; gap: 2vw; }
 	.o-d :global(mark) { color: #fff; background: linear-gradient(transparent 55%, rgba(220, 137, 167, .35) 55%); font-weight: 500; }
 	.o-p { display: grid; justify-items: center; gap: 14px; margin: var(--drop) 0 0; }
 	.o-p figcaption { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; letter-spacing: .02em; color: #F3F3EF; }
 	@media (max-width: 979px) {
 		.opener { grid-template-columns: 1fr; min-height: 0; padding-top: calc(10 * var(--vh, 1vh)); gap: calc(8 * var(--vh, 1vh)); }
+		.o-prints { --pm: var(--pm-narrow); }
 		.o-p { margin-top: calc(var(--drop) / 2); }
 		.o-prints.many { grid-template-columns: repeat(min(var(--cols), 2), auto); }
 	}

@@ -12,7 +12,6 @@
   import Header from "#lib/components/Header.svelte";
   import Footer from "#lib/components/Footer.svelte";
   import CustomCursor from "#lib/components/CustomCursor.svelte";
-  import { startJustify } from "#lib/justify.ts";
   import { startClickTracking } from "#lib/analytics.ts";
   import { afterNavigate, beforeNavigate, goto, preloadCode } from "$app/navigation";
   import { page } from "$app/state";
@@ -99,8 +98,26 @@
   });
 
   onMount(() => {
-    // Knuth–Plass justification for running prose, site-wide.
-    const stopJustify = startJustify();
+    // Knuth–Plass justification for running prose, site-wide. The engine
+    // (Justice) is no longer part of the page's own script: it starts
+    // downloading once the page has hydrated, and justification runs when the
+    // browser is next idle, or
+    // half a second after hydration at the latest (a page that animates is
+    // never idle). The page's hyphenation comes with the page (worked out at
+    // build time), so the dictionary only loads for text that arrives later.
+    // Any later, the reflow landed after the content below had settled into
+    // view and counted as a layout shift.
+    let stopJustify = () => {};
+    let justifyDisposed = false;
+    const justifyModule = import("#lib/justify.ts");
+    const loadJustify = () =>
+      justifyModule.then(({ startJustify }) => {
+        if (!justifyDisposed) stopJustify = startJustify();
+      });
+    const justifyIdle =
+      "requestIdleCallback" in window
+        ? (window as any).requestIdleCallback(loadJustify, { timeout: 500 })
+        : setTimeout(loadJustify, 300);
     const stopClickTracking = startClickTracking();
 
     // Catch needs a mouse; if the pointer stops qualifying mid-game (a
@@ -167,9 +184,30 @@
     };
     window.addEventListener("keydown", onKey);
 
-    // Google Analytics: production only, deferred to idle time.
+    // Google Analytics: production only, and only once the visitor does
+    // something (scrolls, clicks, taps, types). gtag.js is ~180 KB gzipped,
+    // more than this site's own script on any page, so a visit that lands and
+    // leaves never downloads it; Vercel Analytics still counts that visit.
+    // The first interaction starts the download; the script runs once the
+    // reader pauses (a second with no taps or keys, then an idle moment), so
+    // its ~100 ms of evaluation never lands between a tap and what it shows.
+    // The landing page view is sent when it runs.
+    let stopGa = () => {};
     if (!dev) {
-      const loadGa = () => {
+      const GA_SRC = "https://www.googletagmanager.com/gtag/js?id=G-4NTR1HXBLW";
+      const ENGAGED = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
+      const INPUT = ["pointerdown", "keydown"] as const;
+      const QUIET_MS = 1000;
+      const idle = (fn: () => void) =>
+        "requestIdleCallback" in window
+          ? (window as any).requestIdleCallback(fn, { timeout: 1000 })
+          : setTimeout(fn, 0);
+      const cancelIdle = (handle: number) =>
+        "cancelIdleCallback" in window ? (window as any).cancelIdleCallback(handle) : clearTimeout(handle);
+      let quietTimer: ReturnType<typeof setTimeout> | undefined;
+      let idleHandle = 0;
+      const runGa = () => {
+        stopGa();
         const w = window as any;
         w.dataLayer = w.dataLayer || [];
         function gtag(..._args: any[]) {
@@ -180,17 +218,38 @@
         gtag("config", "G-4NTR1HXBLW");
         const s = document.createElement("script");
         s.async = true;
-        s.src = "https://www.googletagmanager.com/gtag/js?id=G-4NTR1HXBLW";
+        s.src = GA_SRC;
         document.head.appendChild(s);
       };
-      if ("requestIdleCallback" in window) {
-        (window as any).requestIdleCallback(loadGa, { timeout: 3000 });
-      } else {
-        setTimeout(loadGa, 1500);
-      }
+      const waitForQuiet = () => {
+        clearTimeout(quietTimer);
+        cancelIdle(idleHandle);
+        quietTimer = setTimeout(() => (idleHandle = idle(runGa)), QUIET_MS);
+      };
+      const engage = () => {
+        for (const type of ENGAGED) window.removeEventListener(type, engage);
+        const preload = document.createElement("link");
+        preload.rel = "preload";
+        preload.as = "script";
+        preload.href = GA_SRC;
+        document.head.appendChild(preload);
+        for (const type of INPUT) window.addEventListener(type, waitForQuiet, { passive: true });
+        waitForQuiet();
+      };
+      stopGa = () => {
+        for (const type of ENGAGED) window.removeEventListener(type, engage);
+        for (const type of INPUT) window.removeEventListener(type, waitForQuiet);
+        clearTimeout(quietTimer);
+        cancelIdle(idleHandle);
+      };
+      for (const type of ENGAGED) window.addEventListener(type, engage, { passive: true });
     }
 
     return () => {
+      stopGa();
+      justifyDisposed = true;
+      if ("cancelIdleCallback" in window) (window as any).cancelIdleCallback(justifyIdle);
+      else clearTimeout(justifyIdle);
       stopJustify();
       stopClickTracking();
       window.removeEventListener("keydown", onKey);
@@ -224,24 +283,26 @@
        grid cell while the transition runs, so the outgoing page can't stack
        below the incoming one and double the page height mid-navigation. -->
   <main id="main-content" class="page-stack flex-1">
-    {#if animatePages}
-      {#key data.pathname}
-        <div
-          class="page-layer"
-          in:fly={{
-            x: PAGE_TRANSITION_IN_X,
-            duration: swapNow ? 0 : PAGE_TRANSITION_DURATION_MS,
-            delay: swapNow ? 0 : PAGE_TRANSITION_IN_DELAY_MS,
-          }}
-          out:fly={{
-            y: PAGE_TRANSITION_OUT_Y,
-            duration: swapNow ? 0 : PAGE_TRANSITION_DURATION_MS,
-          }}
-        ><slot></slot></div>
-      {/key}
-    {:else}
-      <div class="page-layer"><slot></slot></div>
-    {/if}
+    <!-- One structure on every device. The prerendered page can't know the
+         reader's pointer or motion setting, so it is built as for a mouse;
+         a different branch on a phone (or under Reduce Motion) made hydration
+         discard the whole page and build it again. Without transitions the
+         key stays put, so the page is kept across navigations as before, and
+         a layer that does change swaps at once. -->
+    {#key animatePages ? data.pathname : null}
+      <div
+        class="page-layer"
+        in:fly={{
+          x: PAGE_TRANSITION_IN_X,
+          duration: swapNow || !animatePages ? 0 : PAGE_TRANSITION_DURATION_MS,
+          delay: swapNow || !animatePages ? 0 : PAGE_TRANSITION_IN_DELAY_MS,
+        }}
+        out:fly={{
+          y: PAGE_TRANSITION_OUT_Y,
+          duration: swapNow || !animatePages ? 0 : PAGE_TRANSITION_DURATION_MS,
+        }}
+      ><slot></slot></div>
+    {/key}
   </main>
 
   {#if !takeover}<Footer />{/if}

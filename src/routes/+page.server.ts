@@ -1,10 +1,17 @@
-import { posts } from "#lib/content.ts";
+import { homepageData, papers, posts } from "#lib/content.ts";
 import { artPosition } from "#lib/og-art.ts";
 import type { PageServerLoad } from "./$types";
 
 // The homepage's "lately" section: the three newest posts, with only the
 // fields it renders.
+// Everything else it reads from the content too, so the site's papers, posts
+// and talks never ship in the page's script.
 export const load: PageServerLoad = () => ({
+    homepage: homepageData,
+    featuredPapers: papers
+        .filter((p) => p.featured)
+        .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+        .slice(0, 3),
     lately: posts.slice(0, 3).map((post) => ({
         id: post.id,
         title: post.title,

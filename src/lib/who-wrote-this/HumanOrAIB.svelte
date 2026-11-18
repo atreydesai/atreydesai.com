@@ -1,3 +1,13 @@
+<script lang="ts" module>
+	// Its footnotes, which the page registers before the section wakes (Defer.svelte), so the notes list and the marks' numbers
+	// are complete from the start.
+	type Seg = { t: string; cue?: string; slip?: string }; // (here for the snippet below the markup)
+	export const FOOTNOTES = {
+		id: "s1",
+		notes: [{ n: 1, t: "The example is the paper's first table entry: a story whose ideas came from a model and whose prose a person wrote." }],
+	};
+</script>
+
 <script lang="ts">
 	// Section 1 (Human or AI?), in its own blocking (this began as the ?mock=s1 composition mock). Same paper text and
 	// data as HumanOrAI.svelte (s1.json):
@@ -55,7 +65,7 @@
 		const t = i === 0 ? at(1) * 0.5 : at(i) + 0.4 * u;
 		scrollTo({ top: r.top + scrollY + t, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 	}
-	const NOTES = [{ n: 1, t: "The example is the paper's first table entry: a story whose ideas came from a model and whose prose a person wrote." }];
+	const NOTES = FOOTNOTES.notes;
 	// every displayed string that is not paper text is listed in s1.json's ui (an entry may carry a note in brackets)
 	const u = (t: string) => (S.ui.some((x) => x === t || x.startsWith(t + " (")) ? t : (console.warn("s1: ui string not listed:", t), t));
 	// the slip Fable's prose explanation cites ("mistook greatness with size"): the word is marked in the story, and our
@@ -64,7 +74,6 @@
 	const GLOSS = u("The idiom is “mistook … for”, not “with”.").split(`“${SLIP}”`);
 	// the full story (TwiceTold, s1.json sources): its paragraphs, with the excerpt's cue spans found and marked
 	const CUES = E.text.filter((s) => s.cue);
-	type Seg = { t: string; cue?: string; slip?: string };
 	function marked(p: string): Seg[] {
 		const out: Seg[] = [];
 		let rest = p;
@@ -337,8 +346,8 @@
 	   the width, the two notes sit side by side under it (prose left, ideas right, both left-aligned), and the bottom
 	   is kept clear of the section rail (SectionNav sits bottom-left below 980px). */
 	@media (max-width: 979px) {
-		.ms { height: calc(100 * var(--vh, 1vh) + var(--run)); height: calc(100 * var(--svh, 1vh) + var(--run)); }
-		.pin { box-sizing: border-box; height: calc(100 * var(--vh, 1vh)); height: calc(100 * var(--svh, 1vh)); padding-bottom: 56px; grid-template-columns: repeat(2, minmax(0, 19rem)); grid-template-rows: auto auto; justify-content: center; align-content: center; gap: 22px 20px; }
+		.ms { height: calc(100 * var(--vh, 1vh) + var(--run)); height: calc(100 * var(--svh, 1svh) + var(--run)); }
+		.pin { box-sizing: border-box; height: calc(100 * var(--vh, 1vh)); height: calc(100 * var(--svh, 1svh)); padding-bottom: 56px; grid-template-columns: repeat(2, minmax(0, 19rem)); grid-template-rows: auto auto; justify-content: center; align-content: center; gap: 22px 20px; }
 		.page { grid-column: 1 / -1; grid-row: 1; gap: 14px; }
 		.quote { gap: 10px; }
 		.story { font-size: clamp(23px, 3.2vw, 30px); line-height: 1.45; }
@@ -353,7 +362,7 @@
 		.from { gap: 2px 14px; font-size: 13px; }
 		.more { font-size: 13px; }
 		.sc-nums { grid-template-columns: 1fr; gap: 28px; }
-		.full { width: calc(100vw - 24px); max-height: calc(100 * var(--svh, 1vh) - 48px); }
+		.full { width: calc(100vw - 24px); max-height: calc(100 * var(--svh, 1svh) - 48px); }
 		.f-h { padding: 14px 12px 12px 18px; gap: 10px; }
 		.f-h h2 { font-size: 18px; }
 		.f-x span { display: none; }

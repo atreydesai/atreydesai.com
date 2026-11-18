@@ -13,7 +13,25 @@ npm run build   # sync the bookshelf, optimize photos, build
 npm test        # node tests for the sync scripts, game engines, and agent endpoints
 npm run check   # svelte-check
 npm run og      # share cards for posts (needs `npm run dev` and Chrome)
+npm run lab -- http://localhost:4173   # throttled-phone load metrics per page (needs `npm run preview` and Chrome)
+node scripts/perf-runtime.mjs http://localhost:4173 --runs=5   # after load: idle CPU, tap/keypress latency, Back cache, render cost
 ```
+
+## How it's served
+
+Every page is prerendered: the build is the server. Vercel answers page
+requests from static files, and only `/api/*` and the not-found fallback run as
+functions. Each page also gets a Markdown twin at `…/index.md`, and the route
+table (written by `src/lib/server/static-routes.js` after the adapter runs)
+sends `Accept: text/markdown` requests to it. A page that reads the request
+(its query string, headers, or cookies) fails the build; read those in the
+browser instead.
+
+Nothing holds a page's first paint but its HTML: each page carries its CSS
+inline (`inlineStyleThreshold` in `vite.config.ts`), and the font services'
+stylesheets (Typekit, Google Fonts) load without blocking, their fonts
+swapping in when they arrive. `tests/render-blocking.test.mjs` fails if a
+stylesheet starts blocking a page again.
 
 ## Bookshelf sources
 

@@ -1,3 +1,10 @@
+<script lang="ts" module>
+	// Its footnotes, which the page registers before the section wakes (Defer.svelte), so the notes list and the marks' numbers
+	// are complete from the start.
+	import S from "./rq3.json";
+	export const FOOTNOTES = { id: S.id, notes: S.notes.map((f, i) => ({ n: i + 1, t: f.t })) };
+</script>
+
 <script lang="ts">
 	// If human, which human? Section 3, in the blocking of the section 1 mock (HumanOrAIB.svelte):
 	//   1. the chapter opener (SectionOpener): the question, the takeaway, a crowd of writers' prints with one lit;
@@ -30,7 +37,6 @@
 	import { field, chart, regions, type Mark, type Path } from "./field.svelte";
 	import { onScroll as onPageScroll, requestFrame, view as vp, lite } from "./loop";
 	import { FABLE, GRAY, INK as TONE, modelColor, deepen, TILE } from "./palette";
-	import S from "./rq3.json";
 	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 
 	type View = "review" | "prompt" | "icml" | "models" | "domains" | "confidence" | "example";
@@ -71,7 +77,7 @@
 	const ICON: Record<string, string> = { famous: "book", nature: "nature", papers: "arxiv", active: "reddit", inactive: "reddit" };
 	const U: Record<string, string> = Object.fromEntries(S.ui.map((u) => [u.id, u.t]));
 	const D: Record<string, string> = Object.fromEntries(S.demo.map((u) => [u.id, u.t]));
-	const NOTES = S.notes.map((f, i) => ({ n: i + 1, t: f.t }));
+	const NOTES = FOOTNOTES.notes;
 	const FN: Record<string, number> = Object.fromEntries(S.notes.map((f, i) => [f.id, i + 1]));
 	// each footnote's return point: the step whose picture or sentence marks it
 	const FN_STEP: Record<number, number> = Object.fromEntries(S.notes.map((f, i) => [i + 1, f.id === "demo" ? 0 : f.id === "placeholder" ? 1 : f.id === "privacy" ? 2 : 4]));

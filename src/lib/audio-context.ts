@@ -23,6 +23,11 @@ export function sharedAudioContext(): AudioContext | null {
   return shared;
 }
 
+/** Whether sound can play now, without creating the context to find out. */
+export function audioRunning() {
+  return shared?.state === "running";
+}
+
 export function holdAudioClock(value: boolean) {
   held = value;
 }

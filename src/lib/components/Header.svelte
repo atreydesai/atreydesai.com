@@ -10,6 +10,7 @@
     WORDMARK_SPLIT,
     WORDMARK_VIEWBOX,
   } from "#lib/wordmark.ts";
+  import { MORPH_A, MORPH_D } from "#lib/wordmark-morph.ts";
 
   const links = [
     { name: "about", href: "/about/" },
@@ -36,16 +37,16 @@
   const PHONE_QUERY = "(max-width: 767px)";
   const PHONE_COLLAPSE_DELAY_MS = 400;
 
-  // A true shape morph (GSAP MorphSVG). The a and the d are the anchors: each
+  // A true shape morph (designed with GSAP MorphSVG, now precomputed and
+  // played natively, see below). The a and the d are the anchors: each
   // bends into its capital, the a into the A and the d into the D, the d
   // travelling left as it goes. The rest of each word is absorbed into its
   // anchor: "trey" and "esai" ride in with it and squeeze to nothing,
   // so nothing crossfades. At the very end the two morphed letters hand over
   // to the monogram paths, which are identical, so the swap is invisible.
-  // Expanding is the same timeline reversed, so turning around mid-way just
+  // Expanding is the same morph played back, so turning around mid-way just
   // carries on from wherever it is.
   const MORPH_S = 0.46;
-  const MORPH_DELAY_S = 0;
   // Share of the morph over which the absorbed letters squeeze to nothing.
   const SQUEEZE_SHARE = 0.7;
   const EXPAND_SPEED = 1.15; // a touch quicker on the way back out
@@ -60,7 +61,10 @@
   let scrollY = 0;
   let phoneCollapsed = false;
   let svgEl: SVGSVGElement;
-  let timeline: gsap.core.Timeline | null = null;
+  // Set once the morph is wired up on mount; until then (and without script)
+  // the SVG shows the full name, or the still monogram where the header
+  // starts collapsed.
+  let ready = false;
   let reduceMotion = false;
   // Tracked by hand: a legacy `$:` statement does not see page changes.
   let pathname = page.url.pathname;
@@ -72,71 +76,117 @@
   });
 
   $: collapsed = pathname === "/" || phoneCollapsed || scrollY > COLLAPSE_AT_PX;
-  $: if (timeline) play(collapsed);
+  $: if (ready) play(collapsed);
+
+  // The morph was designed in GSAP with power3.inOut (a quartic) for the
+  // travel and the shape change, and power2.in (a cubic) for the squeeze; it
+  // now runs on its own, with those same curves. MorphSVG's part, rewriting
+  // each letter and its capital into matching segments, is precomputed
+  // (scripts/wordmark-morph.mjs), which leaves interpolating numbers.
+  const easeInOutQuart = (t: number) => (t < 0.5 ? 8 * t ** 4 : 1 - (-2 * t + 2) ** 4 / 2);
+  const easeInCubic = (t: number) => t ** 3;
+
+  /** A morph between two outlines that share their segments, at 0..1. */
+  function interpolator([from, to]: readonly [string, string]) {
+    const NUMBER = /-?\d*\.?\d+(?:e-?\d+)?/g;
+    const a = (from.match(NUMBER) ?? []).map(Number);
+    const b = (to.match(NUMBER) ?? []).map(Number);
+    const parts = from.split(NUMBER);
+    return (t: number) => {
+      let d = parts[0];
+      for (let i = 0; i < a.length; i++) d += +(a[i] + (b[i] - a[i]) * t).toFixed(2) + parts[i + 1];
+      return d;
+    };
+  }
+
+  // One number drives the whole morph, like the timeline it replaces:
+  // 0 is the full name, 1 the monogram. Collapsing plays it forward over
+  // MORPH_S; expanding plays it back, EXPAND_SPEED times as fast, from
+  // wherever it is, so turning around mid-way just carries on.
+  let progress = 0;
+  let goal = 0;
+  let frame = 0;
+  let last = 0;
+  let render: (p: number) => void = () => {};
 
   function play(collapse: boolean) {
-    if (!timeline) return;
+    goal = collapse ? 1 : 0;
     if (reduceMotion) {
-      timeline.progress(collapse ? 1 : 0).pause();
-    } else if (collapse) {
-      timeline.timeScale(1).play();
-    } else {
-      timeline.timeScale(EXPAND_SPEED).reverse();
+      progress = goal;
+      render(progress);
+    } else if (!frame && progress !== goal) {
+      last = performance.now();
+      frame = requestAnimationFrame(step);
     }
+  }
+
+  function step(now: number) {
+    const elapsed = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    const rate = (goal > progress ? 1 : EXPAND_SPEED) / MORPH_S;
+    progress =
+      goal > progress ? Math.min(goal, progress + elapsed * rate) : Math.max(goal, progress - elapsed * rate);
+    render(progress);
+    frame = progress === goal ? 0 : requestAnimationFrame(step);
   }
 
   onMount(() => {
     reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let disposed = false;
 
-    // GSAP only loads after the page is up; until then (and without script)
-    // the SVG shows the full name, or the still monogram where the header
-    // starts collapsed.
-    Promise.all([import("gsap"), import("gsap/MorphSVGPlugin")]).then(
-      ([{ gsap }, { MorphSVGPlugin }]) => {
-      if (disposed) return;
-      gsap.registerPlugin(MorphSVGPlugin);
-        const letters = [...svgEl.querySelectorAll<SVGPathElement>(".wordmark-letter")];
-      const marks = [...svgEl.querySelectorAll<SVGPathElement>(".wordmark-mark")];
-      const centre = (el: SVGGraphicsElement) => {
-        const box = el.getBBox();
-        return box.x + box.width / 2;
+    const letters = [...svgEl.querySelectorAll<SVGPathElement>(".wordmark-letter")];
+    const marks = [...svgEl.querySelectorAll<SVGPathElement>(".wordmark-mark")];
+    const centre = (box: DOMRect) => box.x + box.width / 2;
+    const targets = marks.map((mark) => centre(mark.getBBox()));
+    const morphs = [interpolator(MORPH_A), interpolator(MORPH_D)];
+    const plans = letters.map((letter, i) => {
+      const box = letter.getBBox();
+      return {
+        letter,
+        word: i < WORDMARK_SPLIT ? 0 : 1,
+        // The a and the d bend into their capitals; the rest of each word
+        // travels in lockstep with its anchor (same timing and curve), so it
+        // rides in rather than overtaking it, and squeezes to nothing on the
+        // way, about a point 50% across and 70% down its own box.
+        anchor: i === A_INDEX || i === D_INDEX,
+        outline: letter.getAttribute("d") ?? "",
+        dx: targets[i < WORDMARK_SPLIT ? 0 : 1] - centre(box),
+        ox: box.x + box.width * 0.5,
+        oy: box.y + box.height * 0.7,
       };
-      const targets = marks.map(centre);
-      const morph = { duration: MORPH_S, ease: "power3.inOut" };
-      const tl = gsap.timeline({ paused: true });
-      letters.forEach((letter, i) => {
-        const word = i < WORDMARK_SPLIT ? 0 : 1;
-        if (i === A_INDEX || i === D_INDEX) {
-          tl.to(
-            letter,
-              { morphSVG: { shape: marks[word], shapeIndex: "auto" }, ...morph },
-              MORPH_DELAY_S,
-          );
+    });
+
+    render = (p) => {
+      const travel = easeInOutQuart(p);
+      const squeeze = easeInCubic(Math.min(1, p / SQUEEZE_SHARE));
+      // At the very end the morphed letters hand over to the monogram paths,
+      // which are identical, so the swap is invisible.
+      const done = p >= 1;
+      for (const plan of plans) {
+        if (plan.anchor) {
+          plan.letter.setAttribute("d", p === 0 ? plan.outline : morphs[plan.word](travel));
+        } else if (p === 0) {
+          plan.letter.removeAttribute("transform");
         } else {
-          // Travel in lockstep with the anchor (same timing and curve), so
-          // these letters ride into the a or the d rather than overtaking
-          // it, and squeeze out before they arrive.
-          tl.to(letter, { x: targets[word] - centre(letter), ...morph }, MORPH_DELAY_S).to(
-            letter,
-            {
-              scaleX: 0,
-              scaleY: 0.6,
-              transformOrigin: "50% 70%",
-              duration: MORPH_S * SQUEEZE_SHARE,
-                ease: "power2.in",
-            },
-              MORPH_DELAY_S,
+          plan.letter.setAttribute(
+            "transform",
+            `translate(${plan.dx * travel + plan.ox} ${plan.oy}) scale(${1 - squeeze} ${1 - 0.4 * squeeze}) translate(${-plan.ox} ${-plan.oy})`,
           );
         }
-      });
-      tl.to(svgEl, { "--mark-drop": 1, ...morph }, MORPH_DELAY_S);
-      tl.set(letters, { autoAlpha: 0 }).set(marks, { autoAlpha: 1 }, "<");
-      timeline = tl;
-      // A page that loads already scrolled starts collapsed, without playing.
-      if (collapsed) tl.progress(1);
-      },
-    );
+        plan.letter.style.visibility = done ? "hidden" : "";
+        plan.letter.style.opacity = done ? "0" : "";
+      }
+      for (const mark of marks) {
+        mark.style.visibility = done ? "visible" : "";
+        mark.style.opacity = done ? "1" : "";
+      }
+      svgEl.style.setProperty("--mark-drop", String(travel));
+    };
+
+    // A page that loads already collapsed (the home page, or scrolled) starts
+    // at the monogram, without playing.
+    progress = goal = collapsed ? 1 : 0;
+    render(progress);
+    ready = true;
 
     const phone = window.matchMedia(PHONE_QUERY);
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -151,10 +201,9 @@
     syncPhone();
     phone.addEventListener("change", syncPhone);
     return () => {
-      disposed = true;
+      cancelAnimationFrame(frame);
       clearTimeout(timer);
       phone.removeEventListener("change", syncPhone);
-      timeline?.kill();
     };
   });
 </script>
@@ -184,7 +233,7 @@
           viewBox={WORDMARK_VIEWBOX}
           aria-hidden="true"
           focusable="false"
-          class:wordmark-still-mark={collapsed && !timeline}
+          class:wordmark-still-mark={collapsed && !ready}
           style="--mark-shift: {MARK_DROP / 100}em"
           bind:this={svgEl}
         >
@@ -195,9 +244,9 @@
           </g>
           <path class="wordmark-mark" d={MONOGRAM_A}></path>
           <path class="wordmark-mark" d={MONOGRAM_D}></path>
-          <!-- The monogram before GSAP arrives, for a header that starts
-               collapsed (the home page). Kept apart from the morph's own paths
-               so the timeline reads their true resting state. -->
+          <!-- The monogram before the morph is wired up, for a header that
+               starts collapsed (the home page). Kept apart from the morph's own
+               paths so it reads their true resting state. -->
 
           <g
             class="wordmark-still"
@@ -284,7 +333,7 @@
     visibility: hidden;
   }
 
-  /* Only until the timeline takes over; it then sets the collapsed state on
+  /* Only until the morph is wired up; it then sets the collapsed state on
      the morph's own paths. */
   .wordmark-still-mark .wordmark-letters {
     opacity: 0;

@@ -2,7 +2,6 @@
   import Seo from "#lib/components/Seo.svelte";
   import ResearchCard from "#lib/components/ResearchCard.svelte";
   import LegoImage from "#lib/components/LegoImage.svelte";
-  import { papers, homepageData } from "#lib/content.ts";
   import { parseInline } from "#lib/utils/text.ts";
   import ScrollReveal from "#lib/components/ScrollReveal.svelte";
   import HyperText from "#lib/components/HyperText.svelte";
@@ -12,13 +11,16 @@
   import FallingLeaves from "#lib/components/FallingLeaves.svelte";
   import { onDestroy, onMount } from "svelte";
   import { arcadeScreen, openArcade } from "#lib/boba.ts";
-  import { unlockAudio } from "#lib/audio-context.ts";
+  import { audioRunning, unlockAudio } from "#lib/audio-context.ts";
   import { track } from "#lib/analytics.ts";
   import Lately from "#lib/components/home/Lately.svelte";
   import BannerUpdates from "#lib/components/home/BannerUpdates.svelte";
   import type { PageData } from "./$types";
 
   export let data: PageData;
+  // From the page's server load (prerendered), not the content modules, so
+  // the page's script doesn't carry every paper, post and talk.
+  const homepageData = data.homepage;
 
   // Little pixel boba tucked in the photo corner: a random drink + straw
   // orientation on each page load. Click to open the boba arcade.
@@ -56,6 +58,17 @@
   let bobaNudge = false;
   // Loaded on the first click (see onMount), never with the page.
   let sfx: typeof import("#lib/sfx.ts") | null = null;
+  let sfxLoading: Promise<typeof import("#lib/sfx.ts")> | null = null;
+  const loadSfx = () => (sfxLoading ??= import("#lib/sfx.ts").then((module) => (sfx = module)));
+
+  // A finger has no hover, so on a phone the press is the boba's jingle, and
+  // the gesture that lets the arcade it opens make sound. (A mouse has had
+  // both since its first click anywhere: see onMount.)
+  function bobaPress(event: PointerEvent) {
+    if (event.pointerType === "mouse") return;
+    unlockAudio();
+    void loadSfx().then((module) => module.sfxBoba());
+  }
 
   onMount(() => {
     let nudgeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -83,14 +96,26 @@
     bobaGrid = [...straw, ...CUP_BODY];
     bobaPal = { ...bobaPal, L: DRINKS[Math.floor(Math.random() * DRINKS.length)] };
 
-    // Resume audio on the first click anywhere, so the boba's hover jingle
-    // plays. No sound can play before that click, so it is also when the
-    // arcade's sound code (with its soundtrack) loads, off the first paint.
-    const unlock = () => {
-      unlockAudio();
-      void import("#lib/sfx.ts").then((module) => (sfx = module));
+    // Resume audio on the first mouse click anywhere, so the boba's hover
+    // jingle plays. No sound can play before that click, so it is also when
+    // the arcade's sound code (with its soundtrack) loads, off the first
+    // paint. A tap elsewhere does neither (bobaPress handles fingers): opening
+    // an AudioContext costs ~100 ms on a phone, which would sit between the
+    // tap and whatever it shows. Even for a mouse it waits for the click to
+    // paint; a timer started inside the gesture still counts as the gesture.
+    // Safari may refuse the deferred start; the next click tries again.
+    const unlock = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse") return;
+      if (audioRunning()) {
+        window.removeEventListener("pointerdown", unlock);
+        return;
+      }
+      setTimeout(() => {
+        unlockAudio();
+        void loadSfx();
+      }, 0);
     };
-    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("pointerdown", unlock, { passive: true });
     return () => {
       stopNudge();
       window.removeEventListener("pointerdown", unlock);
@@ -108,10 +133,7 @@
     ? { pre: bannerLeadMatch[1], label: bannerLeadMatch[2], post: bannerLeadMatch[3] }
     : { pre: homepageData.banner?.lead ?? "", label: "ongoing projects", post: "" };
 
-  const featuredPapers = papers
-    .filter((p) => p.featured)
-    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
-    .slice(0, 3);
+  const featuredPapers = data.featuredPapers;
 
   const parseLinks = (text: string) => parseInline(text, { italic: true });
   const parseInterestText = (text: string) =>
@@ -227,9 +249,9 @@
 </script>
 
 <svelte:head>
-  <!-- The portrait is this page's largest paint. Requested from the head, ahead
-       of the inline stylesheet, rather than when the parser reaches it. -->
-  <link rel="preload" as="image" href="/images/profile.webp" fetchpriority="high" />
+  <!-- The portrait is this page's largest paint: requested first thing in the
+       head (data-hoist, see hooks.server.js), ahead of the page's scripts. -->
+  <link rel="preload" as="image" href="/images/profile.webp" fetchpriority="high" data-hoist />
 </svelte:head>
 
 <Seo
@@ -318,8 +340,13 @@
               type="button"
               class="boba-launcher"
               class:is-nudging={bobaNudge}
-              on:click={() => openArcade("menu")}
-              on:mouseenter={() => sfx?.sfxBoba()}
+              on:pointerdown={bobaPress}
+              on:click={() => {
+                // Inside the gesture, so the arcade's first sound can play.
+                unlockAudio();
+                openArcade("menu");
+              }}
+              on:pointerenter={(event) => event.pointerType === "mouse" && sfx?.sfxBoba()}
               on:animationend={() => (bobaNudge = false)}
               aria-label="Open the boba arcade"
               title="seven small games"

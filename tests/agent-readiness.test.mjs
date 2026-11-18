@@ -343,10 +343,17 @@ test("Person JSON-LD exposes required identity fields and type-appropriate links
   );
 });
 
-test("homepage routes opt into SSR instead of static prerendering", async () => {
-  const layout = await readFile(new URL("src/routes/+layout.ts", root), "utf8");
-  assert.match(layout, /export const prerender = false/);
+test("pages are prerendered, and the route table answers Accept for them", async () => {
+  // Markdown negotiation for prerendered pages moved from this hook to the
+  // Vercel route table (tests/static-routes.test.mjs holds it to the hook's
+  // answers); the hook still negotiates anything a function renders.
+  const [layout, config] = await Promise.all([
+    readFile(new URL("src/routes/+layout.ts", root), "utf8"),
+    readFile(new URL("vite.config.ts", root), "utf8"),
+  ]);
+  assert.match(layout, /export const prerender = true/);
   assert.match(layout, /export const ssr = true/);
+  assert.match(config, /withStaticRoutes\(adapter\(/);
 });
 
 test("deployment and page metadata advertise machine-readable recovery resources", async () => {

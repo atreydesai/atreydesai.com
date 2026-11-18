@@ -7,6 +7,7 @@ import { load } from "js-yaml";
 import { dataToEsm } from "@rollup/pluginutils";
 import { execSync } from "child_process";
 import type { UserConfig } from "vite";
+import { withStaticRoutes } from "./src/lib/server/static-routes.js";
 
 // Get the last commit date from git
 let gitDate: string;
@@ -20,6 +21,9 @@ try {
   gitDate = new Date().toISOString();
   cvDate = gitDate;
 }
+
+// Reported once per build (see prerender.handleMissingId below).
+let footnoteWarned = false;
 
 /** A custom Markdown plugin for Vite, with YAML frontmatter support. */
 function markdown() {
@@ -58,12 +62,43 @@ const config: UserConfig = {
     tailwindcss(),
     sveltekit({
       preprocess: vitePreprocess(),
-      adapter: adapter({ runtime: 'nodejs26.x' }),
-      // Inline CSS chunks under ~64 KB (uncompressed) directly into the HTML
+      // Pages are prerendered; the wrapper adds the route table that serves
+      // their Markdown twins and headers (src/lib/server/static-routes.js).
+      adapter: withStaticRoutes(adapter({ runtime: 'nodejs26.x' })),
+      // Inline CSS chunks under ~96 KB (uncompressed) directly into the HTML
       // response to eliminate render-blocking stylesheet requests on the
       // critical path. The threshold is uncompressed bytes; Tailwind output
-      // gzips ~4x, so 64 KB here covers chunks that PSI reports as ~15 KiB.
-      inlineStyleThreshold: 65536
+      // gzips ~4x, so 96 KB here covers chunks that PSI reports as ~22 KiB.
+      // At 64 KB the paper launch page's own CSS (81 KB) was a separate
+      // render-blocking request, and the site layout's (65.2 KB) sat 300
+      // bytes under the line. tests/render-blocking.test.mjs holds it.
+      inlineStyleThreshold: 98304,
+      // The site's own origin while prerendering, so `url.origin` and the
+      // absolute links the pages print (canonical, the Markdown alternate)
+      // are its own: the crawler follows those to build every page's twin.
+      paths: { origin: "https://atreydesai.com" },
+      prerender: {
+        // Broken links fail the build, with one known exception that is
+        // reported on every build until it is fixed: the paper launch page's
+        // Paper and Thread buttons still point at placeholders (#PAPER_URL,
+        // #THREAD_URL in src/lib/who-wrote-this/content.json).
+        // Its footnote links (#fn-…) also point at ids the footnote list
+        // only renders in the browser, so they dangle in the static HTML.
+        handleMissingId: ({ path, id, message }) => {
+          if (path === "/blog/who-wrote-this/" && /^[A-Z]+_URL$/.test(id)) {
+            console.warn(`⚠️  Placeholder link #${id} on ${path}: replace it in src/lib/who-wrote-this/content.json`);
+            return;
+          }
+          if (path === "/blog/who-wrote-this/" && id.startsWith("fn-")) {
+            if (!footnoteWarned) {
+              footnoteWarned = true;
+              console.warn(`⚠️  Footnote links on ${path} point at ids rendered only in the browser`);
+            }
+            return;
+          }
+          throw new Error(message);
+        },
+      },
     }),
     pluginYaml() as any,
     markdown()

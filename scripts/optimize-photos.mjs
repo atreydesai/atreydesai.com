@@ -14,9 +14,11 @@ import { access, copyFile, mkdir, readdir, readFile, rename, stat, unlink, write
 import { join } from 'path';
 import { extractPhotoMeta } from './photo-exif.mjs';
 import {
+    AVIF_QUALITY,
     RENDITION_QUALITY,
     RENDITION_VERSION,
     renditionFile,
+    renditionFormats,
     renditionWidths,
 } from '../src/lib/photo-urls.js';
 
@@ -101,7 +103,7 @@ async function readPhotos(filenames) {
 /** The rendition hash: the original's bytes plus the encoding settings. */
 function versionOf(sha) {
     return createHash('sha256')
-        .update(`${RENDITION_VERSION}:${RENDITION_QUALITY}:${sha}`)
+        .update(`${RENDITION_VERSION}:${RENDITION_QUALITY}:${AVIF_QUALITY}:${sha}`)
         .digest('hex')
         .slice(0, 10);
 }
@@ -116,9 +118,11 @@ async function writeRenditions(entries) {
     const jobs = [];
     for (const photo of entries) {
         for (const width of renditionWidths(photo)) {
-            const file = renditionFile(photo, width);
-            expected.add(file);
-            jobs.push({ photo, width, file });
+            for (const format of renditionFormats(width)) {
+                const file = renditionFile(photo, width, format);
+                expected.add(file);
+                jobs.push({ photo, width, format, file });
+            }
         }
     }
 
@@ -126,7 +130,7 @@ async function writeRenditions(entries) {
     let copied = 0;
     const errors = [];
     await Promise.all(
-        jobs.map(async ({ photo, width, file }) => {
+        jobs.map(async ({ photo, width, format, file }) => {
             const dest = join(THUMBS_DIR, file);
             if (await exists(dest)) return;
             const cached = join(CACHE_DIR, file);
@@ -138,17 +142,19 @@ async function writeRenditions(entries) {
                     // finished content, so a build killed mid-encode must not
                     // leave a truncated file under it.
                     const partial = `${cached}.partial`;
-                    await sharp(join(PHOTOS_DIR, photo.filename))
+                    const resized = sharp(join(PHOTOS_DIR, photo.filename))
                         .autoOrient()
-                        .resize(width, null, { withoutEnlargement: true })
-                        .webp({ quality: RENDITION_QUALITY })
-                        .toFile(partial);
+                        .resize(width, null, { withoutEnlargement: true });
+                    await (format === 'avif'
+                        ? resized.avif({ quality: AVIF_QUALITY, effort: 4 })
+                        : resized.webp({ quality: RENDITION_QUALITY })
+                    ).toFile(partial);
                     await rename(partial, cached);
                     encoded++;
                 }
                 await copyFile(cached, dest);
             } catch (err) {
-                errors.push(`${photo.filename} @${width}: ${err.message}`);
+                errors.push(`${photo.filename} @${width} ${format}: ${err.message}`);
             }
         }),
     );

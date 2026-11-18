@@ -1346,6 +1346,18 @@ body:has(.photo-lightbox) .custom-cursor {
   }
 }
 
+/* A theme switch (DarkModeToggle.svelte) restyles the page once, with no
+   transitions: links and buttons would otherwise each animate their colour,
+   restyled every frame. Where supported, the page cross-fades instead. A data
+   attribute, not a class: observers of <html>'s class (the falling leaves'
+   theme redraw) shouldn't fire twice more for it. */
+[data-theme-switching],
+[data-theme-switching] *,
+[data-theme-switching] *::before,
+[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,

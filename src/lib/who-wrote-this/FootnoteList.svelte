@@ -44,13 +44,15 @@
 			tip = { x, y: up ? r.top - 8 : r.bottom + 8, w, up, t: it.t, href: it.href };
 		};
 		const hide = (e: Event) => { if ((e.target as HTMLElement)?.closest?.(".wwt sup.fnref a")) tip = null; };
+		// a section that wakes after the page (Defer.svelte) has just put its marks back as the server wrote them
+		document.addEventListener("wwt:woke", renumber);
 		document.addEventListener("pointerover", show);
 		document.addEventListener("focusin", show);
 		document.addEventListener("pointerout", hide);
 		document.addEventListener("focusout", hide);
 		addEventListener("scroll", () => (tip = null), { passive: true });
 		renumber();
-		return () => { mo.disconnect(); clearTimeout(t); document.removeEventListener("pointerover", show); document.removeEventListener("focusin", show); document.removeEventListener("pointerout", hide); document.removeEventListener("focusout", hide); };
+		return () => { mo.disconnect(); clearTimeout(t); document.removeEventListener("wwt:woke", renumber); document.removeEventListener("pointerover", show); document.removeEventListener("focusin", show); document.removeEventListener("pointerout", hide); document.removeEventListener("focusout", hide); };
 	});
 	const host = (h: string) => { try { return new URL(h).hostname.replace(/^www\./, ""); } catch { return h; } };
 </script>

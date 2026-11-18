@@ -15,6 +15,10 @@
     type Version = { id: string; label: string };
     type Doc = { id: string; title: string; versions: Version[] };
     type Picked = { path: string; file: File };
+    type Sample = { title: string; versions: { id: string; label: string; text: string }[] };
+
+    /** The sample (from the post's data, so only this post carries it). */
+    export let sample: Sample;
 
     const SOURCES: Source[] = ["sample", "paste", "files"];
     // Set on the first visit, which shows the sample; every visit after that
@@ -26,8 +30,14 @@
     let source: Source = "sample";
     let mounted = false;
 
-    let sampleDocs: Doc[] = [];
-    let sampleTexts = new Map<string, string>();
+    // The sample comes with the page's data, and its first diff (the first
+    // version against the latest, as a new document starts) is in the
+    // prerendered HTML: a first visit opens on it, with nothing to wait for
+    // and nothing under it moving when it arrives.
+    const sampleTexts = new Map(sample.versions.map((v) => [v.id, v.text] as [string, string]));
+    const sampleDocs: Doc[] = [
+        { id: "sample", title: sample.title, versions: sample.versions.map(({ id, label }) => ({ id, label })) },
+    ];
     let fileDocs: Doc[] = [];
     let filesByPath = new Map<string, File>();
     let fileTexts = new Map<string, string>();
@@ -51,7 +61,22 @@
     // steps paragraph by paragraph; off, every matched word is kept.
     let smart = true;
 
-    let result: DiffResult | null = null;
+    const diffOptions = (clean: boolean, smartDiff: boolean) => ({
+        showDeletions: !clean,
+        headingShift: 1,
+        mode: smartDiff ? ("smart" as const) : ("exact" as const),
+    });
+    const firstVersion = sampleDocs[0].versions[0].id;
+    const latestVersion = sampleDocs[0].versions[sampleDocs[0].versions.length - 1].id;
+    const sampleKey = (base: string, compare: string, clean: boolean, smartDiff: boolean) =>
+        `${base}\0${compare}\0${clean}\0${smartDiff}`;
+    let result: DiffResult | null = diffDocuments(
+        sampleTexts.get(firstVersion) ?? "",
+        sampleTexts.get(latestVersion) ?? "",
+        diffOptions(cleanRead, smart),
+    );
+    // The sample diff on screen, so mounting doesn't work the same one out again.
+    let shownSample = sampleKey(firstVersion, latestVersion, cleanRead, smart);
     let message = "";
     let failed = false;
     let focusIdx = -1;
@@ -157,11 +182,11 @@
             pairKey = key;
             focusIdx = -1;
         }
-        result = diffDocuments(oldText, newText, {
-            showDeletions: !clean,
-            headingShift: 1,
-            mode: smartDiff ? "smart" : "exact",
-        });
+        const sampleShown = src === "sample" ? sampleKey(base, compare, clean, smartDiff) : "";
+        if (!result || !sampleShown || sampleShown !== shownSample) {
+            result = diffDocuments(oldText, newText, diffOptions(clean, smartDiff));
+        }
+        shownSample = sampleShown;
         message = "";
         await tick();
         drawQuietSquiggles();
@@ -353,12 +378,6 @@
             // Storage blocked: every visit is a first one.
         }
         mounted = true;
-        import("#lib/prose-diff/sample.json").then(({ default: sample }) => {
-            sampleTexts = new Map(sample.versions.map((v) => [v.id, v.text] as [string, string]));
-            sampleDocs = [
-                { id: "sample", title: sample.title, versions: sample.versions.map(({ id, label }) => ({ id, label })) },
-            ];
-        });
         return () => {
             clearTimeout(timer);
             clearSquiggle?.();
@@ -370,7 +389,12 @@
 
 <svelte:window on:keydown={onKeydown} />
 
-<section class="pdv" aria-label="Prose diff viewer">
+<section class="pdv" class:pdv-ready={mounted} aria-label="Prose diff viewer">
+    <!-- A returning reader opens on paste (see onMount). The page arrives
+         showing the sample; this marks the page before it paints, so the CSS
+         shows the paste fields instead until the script takes over, and
+         nothing moves when it does. -->
+    {@html `<script>try{localStorage.getItem("${VISITED_KEY}")&&document.documentElement.setAttribute("data-pdv-paste","")}catch(e){}</script>`}
     <!-- Roughening for the pen squiggles, as on the homepage's interest loops. -->
     <svg width="0" height="0" class="pdv-defs" aria-hidden="true">
         <filter id="pdv-squiggle-rough" x="-60%" y="-5%" width="220%" height="110%">
@@ -388,6 +412,7 @@
                     <button
                         type="button"
                         class="control-text"
+                        data-source={option}
                         aria-pressed={source === option}
                         on:click={() => (source = option)}>{option}</button
                     >
@@ -396,7 +421,7 @@
         </div>
 
         {#if source !== "paste" && doc}
-            <div class="pdv-group">
+            <div class="pdv-group pdv-doc-only">
                 <span class="meta-label">versions</span>
                 <div class="pdv-pickers" class:with-document={docs.length > 1}>
                     {#if docs.length > 1}
@@ -450,7 +475,7 @@
         {/if}
 
         {#if result}
-            <div class="pdv-group">
+            <div class="pdv-group pdv-doc-only">
                 <span class="pdv-summary">
                     {#if changes.length}
                         <span class="pdv-fig pdv-fig-add">{result.wordsAdded}</span>
@@ -492,7 +517,7 @@
             </div>
 
             {#if changes.length}
-                <div class="pdv-group pdv-changes">
+                <div class="pdv-group pdv-changes pdv-doc-only">
                     <div class="pdv-changes-head">
                         <span class="meta-label">changes</span>
                         <span class="pdv-stepper">
@@ -544,24 +569,25 @@
     </aside>
 
     <div class="pdv-main">
-        {#if source === "paste"}
-            <div class="pdv-paste" data-justify="off">
-                <label class="pdv-field">
-                    <span class="pdv-field-head">
-                        <span class="control-label">from</span>
-                        {#if before.trim()}<span class="pdv-field-count">{plural(wordCount(before), "word")}</span>{/if}
-                    </span>
-                    <textarea bind:value={before} rows="9" placeholder="The earlier draft…" spellcheck="false"></textarea>
-                </label>
-                <label class="pdv-field">
-                    <span class="pdv-field-head">
-                        <span class="control-label">to</span>
-                        {#if after.trim()}<span class="pdv-field-count">{plural(wordCount(after), "word")}</span>{/if}
-                    </span>
-                    <textarea bind:value={after} rows="9" placeholder="…and the later one." spellcheck="false"></textarea>
-                </label>
-            </div>
-        {:else if source === "files"}
+        <!-- Always in the page (shown only when pasting), so a returning
+             reader's first paint can show it. -->
+        <div class="pdv-paste" data-justify="off" class:pdv-off={source !== "paste"}>
+            <label class="pdv-field">
+                <span class="pdv-field-head">
+                    <span class="control-label">from</span>
+                    {#if before.trim()}<span class="pdv-field-count">{plural(wordCount(before), "word")}</span>{/if}
+                </span>
+                <textarea bind:value={before} rows="9" placeholder="The earlier draft…" spellcheck="false"></textarea>
+            </label>
+            <label class="pdv-field">
+                <span class="pdv-field-head">
+                    <span class="control-label">to</span>
+                    {#if after.trim()}<span class="pdv-field-count">{plural(wordCount(after), "word")}</span>{/if}
+                </span>
+                <textarea bind:value={after} rows="9" placeholder="…and the later one." spellcheck="false"></textarea>
+            </label>
+        </div>
+        {#if source === "files"}
             <div
                 class="pdv-drop"
                 class:dragging
@@ -980,6 +1006,42 @@
         .pdv-paste {
             grid-template-columns: 1fr 1fr;
         }
+    }
+
+    /* Off by a class, not `hidden`: the base styles hold [hidden] with an
+       !important nothing here can override for the returning reader. */
+    .pdv-paste.pdv-off {
+        display: none;
+    }
+
+    /* A returning reader before the script runs (the inline script at the
+       top marks the page): the paste fields it will open on, not the sample,
+       with paste the pressed source. */
+    :global(html[data-pdv-paste]) .pdv:not(.pdv-ready) .pdv-paste.pdv-off {
+        display: grid;
+    }
+
+    :global(html[data-pdv-paste]) .pdv:not(.pdv-ready) :is(.pdv-doc-only, .pdv-reading) {
+        display: none;
+    }
+
+    :global(html[data-pdv-paste]) .pdv:not(.pdv-ready) [data-source="sample"] {
+        color: var(--color-ink-700);
+        background-color: transparent;
+    }
+
+    :global(html[data-pdv-paste]) .pdv:not(.pdv-ready) [data-source="paste"] {
+        color: var(--color-ink-900);
+        background-color: rgb(26 26 26 / 0.07);
+    }
+
+    :global(html.dark[data-pdv-paste]) .pdv:not(.pdv-ready) [data-source="sample"] {
+        color: var(--color-cream-300);
+    }
+
+    :global(html.dark[data-pdv-paste]) .pdv:not(.pdv-ready) [data-source="paste"] {
+        color: var(--color-cream-100);
+        background-color: rgb(253 248 243 / 0.1);
     }
 
     .pdv-field {

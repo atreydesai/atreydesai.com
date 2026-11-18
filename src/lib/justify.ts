@@ -20,14 +20,17 @@
 // links still land, and hover/focus events are forwarded back to the source so
 // component listeners (the about page's footnote markers) keep working.
 //
-// Words are hyphenated with Liang's TeX patterns for US English (loaded as a
-// separate chunk); Justice weighs each discretionary break against spacing,
-// so a hyphen only appears where it rescues a line. A block (or ancestor) set
+// Words are hyphenated with Liang's TeX patterns for US English; Justice
+// weighs each discretionary break against spacing, so a hyphen only appears
+// where it rescues a line. The breaks for a page's own words are worked out
+// at build time and written into the page (lib/hyphenation.js); the pattern
+// dictionary loads only for words that map doesn't know. A block (or ancestor) set
 // to `hyphens: none` is never hyphenated, not even at a hyphen in the text.
 //
 // Opt a block (or a whole subtree) out with `data-justify="off"`.
 
 import { prepare, solve, withHyphenation, type Line, type Prepared } from "@kitlangton/justice";
+import { hyphenatable, hyphenParts } from "./hyphenation.js";
 
 const CANDIDATES = "p, li";
 const EXCLUDED =
@@ -114,6 +117,14 @@ let resizeObserver: ResizeObserver;
 let bodyObserver: MutationObserver;
 let sourceObserver: MutationObserver;
 let hyphenateSync: ((text: string, options?: { hyphenChar?: string }) => string) | null = null;
+// This page's words and their breaks, from the build (lib/hyphenation.js).
+let pageHyphens: Map<string, string | 0> | null = null;
+// Blocks with a word neither the page's map nor a loaded dictionary knows wait
+// for the dictionary, unjustified, rather than reflow twice.
+const awaitingDictionary = new Set<HTMLElement>();
+let dictionaryRequested = false;
+let dictionaryFailed = false;
+let missedWord = false;
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function startJustify(): () => void {
@@ -150,15 +161,22 @@ export function startJustify(): () => void {
 	document.fonts?.ready.then(invalidateAll);
 	document.fonts?.addEventListener?.("loadingdone", invalidateAll);
 
-	// Hold the first pass for the dictionary so paragraphs don't reflow twice.
-	let stopped = false;
-	import("hyphen/en-us")
-		.then((module) => (hyphenateSync = module.hyphenateSync))
-		.catch(() => {})
-		.finally(() => !stopped && scheduleScan());
+	// The page's own hyphenation, written in at build time: no dictionary
+	// needed to justify what the page arrived with.
+	const embedded = document.getElementById("j-hyphens")?.textContent;
+	if (embedded) {
+		try {
+			pageHyphens = new Map(Object.entries(JSON.parse(embedded)));
+		} catch {
+			pageHyphens = null;
+		}
+	}
+	stopped = false;
+	scheduleScan();
 
 	return () => {
 		stopped = true;
+		awaitingDictionary.clear();
 		cancelAnimationFrame(frame);
 		resizeObserver.disconnect();
 		bodyObserver.disconnect();
@@ -170,6 +188,24 @@ export function startJustify(): () => void {
 		blocks.clear();
 		queued.clear();
 	};
+}
+
+// Set by the stop function startJustify returns.
+let stopped = false;
+
+/** Load the pattern dictionary once, then justify the blocks that waited. */
+function awaitDictionary(host: HTMLElement) {
+	awaitingDictionary.add(host);
+	if (dictionaryRequested) return;
+	dictionaryRequested = true;
+	import("hyphen/en-us")
+		.then((module) => (hyphenateSync = module.hyphenateSync))
+		.catch(() => (dictionaryFailed = true))
+		.finally(() => {
+			if (stopped) return;
+			for (const waiting of awaitingDictionary) enqueue(waiting);
+			awaitingDictionary.clear();
+		});
 }
 
 function insideJustified(node: Node): boolean {
@@ -376,7 +412,7 @@ function buildModel(block: Block): Model | null {
 			)
 			.join(" ");
 		let prepared = prepare(text, (fragment) => measure(fragment, base));
-		const hyphenate = hyphenateSync && !unhyphenated;
+		const hyphenate = !unhyphenated;
 		if (prepared.words.length !== words.length) return null;
 
 		// Replace the base-font word widths with ones measured per segment in
@@ -406,6 +442,11 @@ function buildModel(block: Block): Model | null {
 	}
 
 	if (!paragraphs.length) return null;
+	if (missedWord) {
+		missedWord = false;
+		awaitDictionary(block.host);
+		return null;
+	}
 	return {
 		paragraphs,
 		wordCount,
@@ -487,23 +528,13 @@ function wordFont(word: Word, base: FontSpec): FontSpec {
 	return el && word.segments.every((s) => s.chain.at(-1) === el) ? fontSpec(el) : base;
 }
 
-const LETTER = /\p{L}/gu;
-
 function hyphenateWord(word: string): string[] {
-	// Leave names, acronyms, numbers, and URLs whole.
-	if (word.length < 6 || /^\P{L}*\p{Lu}|[\d@/:\u00ad]/u.test(word)) return [word];
-	const letters = (text: string) => text.match(LETTER)?.length ?? 0;
-	const parts = hyphenateSync!(word, { hyphenChar: "\u00ad" }).split("\u00ad");
-	if (parts.join("") !== word) return [word];
-	// TeX's English minimums: two letters before a break, three after.
-	const out = [parts[0]];
-	let offset = parts[0].length;
-	for (const part of parts.slice(1)) {
-		if (letters(word.slice(0, offset)) >= 2 && letters(word.slice(offset)) >= 3) out.push(part);
-		else out[out.length - 1] += part;
-		offset += part.length;
-	}
-	return out;
+	if (!hyphenatable(word)) return [word];
+	const known = pageHyphens?.get(word);
+	if (known !== undefined) return known === 0 ? [word] : known.split("\u00ad");
+	if (hyphenateSync) return hyphenParts(hyphenateSync, word);
+	if (!dictionaryFailed) missedWord = true;
+	return [word];
 }
 
 function commonChain(a: Element[], b: Element[]): Element[] {

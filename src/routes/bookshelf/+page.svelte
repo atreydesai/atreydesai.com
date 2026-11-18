@@ -754,13 +754,16 @@
                 {sortDirection === "asc" ? "ascending" : "descending"}.
             </p>
 
-            <!-- The table needs ~1080px to stay readable, so it only appears
-                 from `md`. Narrower screens get the same entries as a stacked
-                 list instead of a sideways-scrolling table. -->
-            <div class="surface-ledger hidden max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 md:block dark:border-ink-800 dark:bg-ink-900/45">
+            <!-- One row per entry, rendered once. The table needs ~1080px to
+                 stay readable, so from `md` it is a table; narrower screens
+                 restack the same cells into a card (see .entry below) rather
+                 than scroll a table sideways. The column headers, which hold
+                 the sort controls, are a desktop affordance and are hidden
+                 there; every cell is labelled by its own content. -->
+            <div class="surface-ledger max-w-full overflow-hidden border border-ink-200/90 bg-cream-50/60 dark:border-ink-800 dark:bg-ink-900/45 {sortedBooks.length === 0 ? 'max-md:hidden' : ''}">
                 <div class="w-full max-w-full overflow-x-auto">
-                    <table class="w-full min-w-[1080px] table-fixed text-sm">
-                        <thead class="border-b border-ink-200/90 bg-cream-200/60 font-ui text-xs font-normal text-ink-500 [&_th]:font-normal dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
+                    <table class="shelf-table w-full table-fixed md:min-w-[1080px] md:text-sm">
+                        <thead class="border-b border-ink-200/90 bg-cream-200/60 font-ui text-xs font-normal text-ink-500 max-md:hidden [&_th]:font-normal dark:border-ink-800 dark:bg-ink-900/95 dark:text-cream-400">
                             <tr>
                                 <th class="w-[35%] px-3 py-2 text-left" aria-sort={ariaSort("title")}>
                                     <button
@@ -930,14 +933,14 @@
                                     <!-- svelte-ignore a11y_click_events_have_key_events -->
                                     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                                     <tr
-                                    class="group cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline-solid outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/8 dark:outline-accent-light/30' : ''}"
+                                    class="entry group cursor-pointer transition-colors duration-150 hover:bg-white/60 dark:hover:bg-ink-800/70 {selectedBookId === book.id ? 'bg-blush-100/70 outline-solid outline-1 -outline-offset-1 outline-accent/35 dark:bg-accent/8 dark:outline-accent-light/30' : ''}"
                                         aria-current={selectedBookId === book.id ? "true" : undefined}
                                         on:click={(event) => onRowClick(event, book.id)}
                                         on:mouseenter={() => hoveredBookId = book.id}
                                         on:mouseleave={() => hoveredBookId = null}
                                     >
-                                        <td class="px-3 py-2.5 align-middle">
-                                            <div class="flex min-w-0 items-center gap-2">
+                                        <td class="entry-title px-3 py-2.5 align-middle">
+                                            <div class="entry-title-row flex min-w-0 items-center gap-2">
                                                 <MediumIcon
                                                     medium={book.medium}
                                                     size={15}
@@ -963,21 +966,19 @@
                                                 {/if}
                                                 <button
                                                     type="button"
-                                                    class="row-open min-w-0 truncate text-left text-ink-900 dark:text-cream-100"
+                                                    class="row-open min-w-0 text-left text-ink-900 md:truncate dark:text-cream-100"
                                                     aria-expanded={selectedBookId === book.id}
                                                 on:click|stopPropagation={(event) =>
                                                     selectBook(book.id, event.currentTarget)}
                                                 >
-                                                    {book.title} 
+                                                    <span class="entry-name">{book.title}</span>
                                                     {#if book.author}
-                                                    <span class="text-ink-400 dark:text-cream-500">
-                                                        | {book.author}
-                                                    </span>
+                                                    <span class="entry-author max-md:type-body-small"><span class="entry-author-mark">|</span> {book.author}</span>
                                                     {/if}
                                                 </button>
                                             </div>
                                         </td>
-                                        <td class="px-3 py-2.5 align-middle">
+                                        <td class="entry-category px-3 py-2.5 align-middle">
                                             <button
                                                 type="button"
                                                 class="pill {getCategoryColor(book.category)}"
@@ -986,7 +987,7 @@
                                             {book.category}
                                         </button>
                                         </td>
-                                        <td class="px-3 py-2.5 align-middle">
+                                        <td class="entry-medium px-3 py-2.5 align-middle" class:entry-empty={!book.medium}>
                                             {#if book.medium}
                                             <span class="pill text-ink-600 dark:text-cream-300">
                                                 {book.medium}
@@ -995,23 +996,27 @@
                                             <span class="font-ui text-xs text-ink-400 dark:text-ink-300">--</span>
                                             {/if}
                                         </td>
-                                    <td class="px-3 py-2.5 text-center align-middle">
+                                    <!-- On a phone the column headers are hidden, so each
+                                         rating carries its header's icon. -->
+                                    <td class="entry-rating px-3 py-2.5 text-center align-middle">
+                                        <span class="entry-rating-key"><Heart size={12} /></span>
                                         <RatingGlyph
                                             value={book.enjoyment}
                                             type="enjoyment"
                                         />
                                     </td>
-                                    <td class="px-3 py-2.5 text-center align-middle">
+                                    <td class="entry-rating px-3 py-2.5 text-center align-middle">
+                                        <span class="entry-rating-key"><BadgeQuestionMark size={12} /></span>
                                         <RatingGlyph
                                             value={book.importance}
                                             type="importance"
                                         />
                                     </td>
-                                    <td class="px-3 py-2.5 align-middle font-ui text-xs tabular-nums text-ink-500 dark:text-cream-400">
+                                    <td class="entry-date px-3 py-2.5 align-middle font-ui text-xs tabular-nums text-ink-500 dark:text-cream-400">
                                         {shortDate(book.dateAdded)}
                                     </td>
-                                        <td class="px-3 py-2.5 align-middle">
-                                        <div class="flex flex-nowrap items-center gap-1 overflow-hidden">
+                                        <td class="entry-tags px-3 py-2.5 align-middle">
+                                        <div class="entry-tag-list flex flex-nowrap items-center gap-1 overflow-hidden">
                                                 {#each previewTags(book) as tag}
                                                     <button
                                                         type="button"
@@ -1047,139 +1052,6 @@
                     </table>
                 </div>
             </div>
-
-            <!-- Narrow screens: the same entries, stacked. Every column of the
-                 table is still here, just arranged vertically instead of
-                 behind a horizontal scroll. -->
-            <ul
-                class="stagger-children surface-ledger max-w-full divide-y divide-ink-200/70 overflow-hidden border border-ink-200/90 bg-cream-50/60 md:hidden dark:divide-ink-800 dark:border-ink-800 dark:bg-ink-900/45"
-                class:hidden={sortedBooks.length === 0}
-            >
-                {#key viewKey}
-                    {#each paginatedBooks as book (book.id)}
-                        <li
-                            class="p-3 transition-colors duration-150 {selectedBookId ===
-                            book.id
-                                ? 'bg-blush-100/70 dark:bg-accent/8'
-                                : ''}"
-                            aria-current={selectedBookId === book.id
-                                ? "true"
-                                : undefined}
-                        >
-                            <div class="flex min-w-0 items-start gap-2">
-                                <MediumIcon
-                                    medium={book.medium}
-                                    size={15}
-                                    strokeWidth={1.5}
-                                    className="mt-1 shrink-0 text-ink-300 dark:text-ink-600"
-                                />
-                                {#if book.favorite}
-                                    <span
-                                        class="status-icon mt-1 inline-flex shrink-0 text-accent opacity-60 dark:text-accent-light"
-                                        aria-label="Favorite"
-                                    >
-                                        <Star size={13} />
-                                    </span>
-                                {/if}
-                                {#if isCurrent(book)}
-                                    <span
-                                        class="status-icon mt-1 inline-flex shrink-0 text-ochre-dark opacity-60 dark:text-ochre-light"
-                                        aria-label={currentStatusLabel(book)}
-                                    >
-                                        <Bookmark size={13} />
-                                    </span>
-                                {/if}
-                                <button
-                                    type="button"
-                                    class="card-open min-w-0 flex-1 text-left"
-                                    aria-expanded={selectedBookId === book.id}
-                                    on:click={(event) =>
-                                        selectBook(book.id, event.currentTarget)}
-                                >
-                                    <span
-                                        class="block text-ink-900 dark:text-cream-100"
-                                        >{book.title}</span
-                                    >
-                                    {#if book.author}
-                                        <span
-                                            class="block type-body-small text-ink-500 dark:text-cream-500"
-                                            >{book.author}</span
-                                        >
-                                    {/if}
-                                </button>
-                            </div>
-
-                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                <button
-                                    type="button"
-                                    class="pill {getCategoryColor(book.category)}"
-                                    on:click={() => setCategory(book.category)}
-                                >
-                                    {book.category}
-                                </button>
-                                {#if book.medium}
-                                    <span class="pill text-ink-600 dark:text-cream-300">
-                                        {book.medium}
-                                    </span>
-                                {/if}
-                                {#each previewTags(book) as tag}
-                                    <button
-                                        type="button"
-                                        class="pill max-w-36 truncate"
-                                        on:click={() => setTag(tag)}
-                                    >
-                                        {tag}
-                                    </button>
-                                {/each}
-                                {#if tagOverflow(book) > 0}
-                                    <button
-                                        type="button"
-                                        class="pill shrink-0 text-ink-500 dark:text-cream-400"
-                                        aria-label="Open details and show {tagOverflow(
-                                            book,
-                                        )} more tags"
-                                        on:click={(event) =>
-                                            selectBook(book.id, event.currentTarget)}
-                                    >
-                                        <CirclePlus size={12} />
-                                        +{tagOverflow(book)}
-                                    </button>
-                                {/if}
-                            </div>
-
-                            <!-- The icon-only rating columns don't survive the
-                                 loss of their headers, so label them inline. -->
-                            <div
-                                class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 type-meta text-ink-500 dark:text-cream-400"
-                            >
-                                <span class="inline-flex items-center gap-1.5">
-                                    <span class="sr-only"
-                                        >{ratingLegend.enjoyment.title}</span
-                                    >
-                                    <Heart size={12} />
-                                    <RatingGlyph
-                                        value={book.enjoyment}
-                                        type="enjoyment"
-                                    />
-                                </span>
-                                <span class="inline-flex items-center gap-1.5">
-                                    <span class="sr-only"
-                                        >{ratingLegend.importance.title}</span
-                                    >
-                                    <BadgeQuestionMark size={12} />
-                                    <RatingGlyph
-                                        value={book.importance}
-                                        type="importance"
-                                    />
-                                </span>
-                                <span class="ml-auto tabular-nums">
-                                    {shortDate(book.dateAdded)}
-                                </span>
-                            </div>
-                        </li>
-                    {/each}
-                {/key}
-            </ul>
 
             {#if sortedBooks.length === 0}
                 <div class="border-x border-b border-t border-ink-200/90 bg-cream-50/60 py-12 text-center text-ink-500 md:border-t-0 dark:border-ink-800 dark:bg-ink-900/45 dark:text-cream-400">
@@ -1311,8 +1183,7 @@
     /* The title is a real button so the row has a keyboard path, but it should
        still read as the row's text, not as a control. Titles are scanned, not
        read, so they take the interface face at the row's size, regular. */
-    .row-open,
-    .card-open {
+    .row-open {
         font: inherit;
         font-family: var(--font-ui);
         color: inherit;
@@ -1320,6 +1191,129 @@
         border: 0;
         padding: 0;
         cursor: pointer;
+    }
+
+    /* Below 768px an entry's row restacks into a card: the title (wrapping,
+       author beneath) on top, then its pills, then the ratings and the date.
+       Rows sit 0 apart and lines are spaced by margins instead, so the empty
+       break that starts the last line adds no gap of its own. */
+    .entry-author {
+        color: var(--color-ink-400);
+    }
+
+    .entry-rating-key {
+        display: none;
+    }
+
+    @media (max-width: 767px) {
+        .shelf-table,
+        .shelf-table > tbody {
+            display: block;
+        }
+
+        .entry {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            column-gap: var(--space-1-5);
+            padding: var(--space-3);
+        }
+
+        .entry > td {
+            padding: 0;
+        }
+
+        .entry-title {
+            flex: 0 0 100%;
+            margin-bottom: 5px;
+        }
+
+        .entry-title-row {
+            align-items: flex-start;
+        }
+
+        .entry-title-row > :global(:not(.row-open)) {
+            margin-top: 4px;
+        }
+
+        .row-open {
+            flex: 1;
+        }
+
+        .entry-name,
+        .entry-author {
+            display: block;
+        }
+
+        .entry-author {
+            color: var(--color-ink-500);
+        }
+
+        .entry-author-mark {
+            display: none;
+        }
+
+        /* Category, medium and tags share one wrapping line of pills. The
+           cells are flex boxes so the row's 17px text line doesn't pad them
+           taller than the pills inside. */
+        .entry-category,
+        .entry-medium {
+            display: flex;
+            margin-block: 3px;
+        }
+
+        .entry-empty {
+            display: none;
+        }
+
+        .entry-tags,
+        .entry-tag-list {
+            display: contents;
+        }
+
+        .entry-tag-list > :global(*) {
+            order: 1;
+            margin-block: 3px;
+        }
+
+        .entry::after {
+            content: "";
+            flex: 0 0 100%;
+            order: 2;
+        }
+
+        .entry-rating,
+        .entry-date {
+            order: 3;
+            margin-top: 5px;
+        }
+
+        .entry-rating {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1-5);
+        }
+
+        .entry-rating + .entry-rating {
+            margin-left: 10px;
+        }
+
+        .entry-rating-key {
+            display: inline-flex;
+            color: var(--color-ink-500);
+        }
+
+        .entry-date {
+            margin-left: auto;
+        }
+    }
+
+    :global(.dark) .entry-author {
+        color: var(--color-cream-500);
+    }
+
+    :global(.dark) .entry-rating-key {
+        color: var(--color-cream-400);
     }
 
     .shelf-toolbar {

@@ -10,12 +10,14 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import {
+  AVIF_QUALITY,
   ORIGINALS_BASE,
   RENDITION_QUALITY,
   RENDITION_VERSION,
   RENDITION_WIDTHS,
   originalUrl,
   renditionSrcset,
+  renditionFormats,
   renditionUrl,
   renditionWidths,
 } from "../src/lib/photo-urls.js";
@@ -62,7 +64,7 @@ test("the manifest's rendition hashes match the originals on disk", async () => 
     const bytes = await readFile(staticFile(originalUrl(photo)));
     const sha = createHash("sha256").update(bytes).digest("hex");
     const v = createHash("sha256")
-      .update(`${RENDITION_VERSION}:${RENDITION_QUALITY}:${sha}`)
+      .update(`${RENDITION_VERSION}:${RENDITION_QUALITY}:${AVIF_QUALITY}:${sha}`)
       .digest("hex")
       .slice(0, 10);
     assert.equal(photo.v, v, `${photo.filename}: run npm run optimize-photos`);
@@ -73,13 +75,14 @@ test("nothing the page displays is an original", () => {
   const top = RENDITION_WIDTHS[RENDITION_WIDTHS.length - 1];
   for (const photo of manifest) {
     const original = originalUrl(photo);
-    const candidates = renditionSrcset(photo)
+    const candidates = [renditionSrcset(photo), renditionSrcset(photo, Infinity, "avif")]
+      .join(", ")
       .split(", ")
       .map((entry) => entry.split(" "));
     assert.ok(candidates.length > 0);
     for (const [url, descriptor] of candidates) {
       assert.notEqual(url, original);
-      assert.ok(url.endsWith(".webp"), url);
+      assert.ok(/\.(webp|avif)$/.test(url), url);
       assert.ok(parseInt(descriptor) <= top, `${url} is wider than ${top}px`);
     }
   }
@@ -98,8 +101,10 @@ test("built renditions are on disk and much smaller than the originals", async (
   for (const photo of manifest) {
     const widths = renditionWidths(photo);
     for (const width of widths) {
-      const file = staticFile(renditionUrl(photo, width));
-      assert.ok(await exists(file), `missing ${renditionUrl(photo, width)}`);
+      for (const format of renditionFormats(width)) {
+        const url = renditionUrl(photo, width, format);
+        assert.ok(await exists(staticFile(url)), `missing ${url}`);
+      }
     }
     // The biggest file the lightbox can pick is a fraction of the original.
     const largest = (await stat(staticFile(renditionUrl(photo, widths.at(-1))))).size;

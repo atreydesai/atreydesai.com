@@ -1,3 +1,11 @@
+<script lang="ts" module>
+	// Its footnotes, which the page registers before the section wakes (Defer.svelte), so the notes list and the marks' numbers
+	// are complete from the start.
+	import F from "./familiarity.json";
+	import type { Note } from "./Footnotes.svelte";
+	export const FOOTNOTES = { id: "s4", notes: F.notes as Note[] };
+</script>
+
 <script lang="ts">
 	// Section 4, Who can be identified? A chapter opener (the same writer's print at four clarities, one per familiarity
 	// group, set large and layered), then a pinned stage with its own blocking: the narration as a caption band on top,
@@ -34,13 +42,12 @@
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
 	import PrintMark from "./PrintMark.svelte";
-	import Footnotes, { type Note } from "./Footnotes.svelte";
+	import Footnotes from "./Footnotes.svelte";
 	import HoverCue from "./HoverCue.svelte";
 	import { MODEL, GRAY, INK as INKS, SIGNED, deepen, TILE } from "./palette";
 	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 	import { field, chart, regions, type Mark, type Path, type Text } from "./field.svelte";
 	import { onScroll as onPageScroll, requestFrame, view as vp, lite, deliberate, pointerKind } from "./loop";
-	import F from "./familiarity.json";
 
 	type Bin = { bin: string; shown: boolean; pct: number; tiles: number };
 	type ERow = { familiarity: string; low: number; high: number; low_tiles: number; high_tiles: number };
@@ -73,7 +80,7 @@
 	const MODELS = L.models as Record<string, string>;
 	const EMODELS = L.effort_models as string[];
 	const GROUPS = L.groups as { bin: string; t: string }[];
-	const NOTES = F.notes as Note[];
+	const NOTES = FOOTNOTES.notes;
 	const SAYS = [...STEPS.map((s) => s.t), F.explore.effort.t]; // the narration, and the effort view's caption last
 	const col = (name: string) => MODEL[name] ?? GRAY.strong;
 	const OPUS = col(MODELS.Opus);
@@ -101,8 +108,9 @@
 	let ox = $state(0), oy = $state(0); // the stage's viewport offset
 	let wl = $state<Pt | null>(null); // where the writer's label sits (stage coordinates), while it is shown
 	let reduce = $state(false);
-	let ready = $state(false); // mounted: the opener's prints are sized for this screen
-	let opx = $state(236); // the opener prints' height
+	// the opener prints' height, as drawn: 236px, or 150px under the 980px line, by the CSS's own query (which sizes
+	// their boxes, so the page arrives at its full height; a media query reads no layout)
+	let opx = $state(typeof matchMedia === "function" && matchMedia("(max-width: 979px)").matches ? 150 : 236);
 	let phase = $state(99); // seconds since the reader arrived at this step from the one before (99: all shown)
 	let stage: HTMLElement;
 	let root: HTMLElement; // the pinned part (the opener and footnotes sit outside it)
@@ -539,9 +547,8 @@
 		still = new URLSearchParams(location.search).has("still");
 		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || still;
 		const stopWarm = warmTilesNear(root, "writer", 48, 14, 26); // the tiles' prints' ridges, traced ahead in idle moments
-		const size = () => { opx = innerWidth >= 980 ? 236 : 150; vhPx = root.offsetHeight / (STEPS.length * STEP_VH + 1); };
+		const size = () => { opx = matchMedia("(max-width: 979px)").matches ? 150 : 236; vhPx = root.offsetHeight / (STEPS.length * STEP_VH + 1); };
 		size();
-		ready = true;
 		const onScroll = () => {
 			sync();
 			// the lighter mode: a scroll closes a card a finger opened
@@ -604,19 +611,17 @@
 	     second, offset impression for depth -->
 	<div class="op">
 		<SectionOpener n={F.n} title={F.title.t} takeaway={F.takeaway.t} context={F.context.t} accent={GRAY.mid} />
-		{#if ready}
-			<div class="op-prints" aria-hidden="true">
-				{#each GROUPS as g, i}
-					<figure class="op-p">
-						<span class="op-stack">
-							<span class="op-under"><PrintMark family="writer" index={PRINT} color={INK2} px={opx} clarity={CLARITY[i]} text /></span>
-							<PrintMark family="writer" index={PRINT} color={INKS.field} px={opx} clarity={CLARITY[i]} text />
-						</span>
-						<figcaption>{g.t}</figcaption>
-					</figure>
-				{/each}
-			</div>
-		{/if}
+		<div class="op-prints" aria-hidden="true">
+			{#each GROUPS as g, i}
+				<figure class="op-p">
+					<span class="op-stack">
+						<span class="op-under"><PrintMark family="writer" index={PRINT} color={INK2} px={opx} fit clarity={CLARITY[i]} text /></span>
+						<PrintMark family="writer" index={PRINT} color={INKS.field} px={opx} fit clarity={CLARITY[i]} text />
+					</span>
+					<figcaption>{g.t}</figcaption>
+				</figure>
+			{/each}
+		</div>
 	</div>
 
 	<div class="scrolly" class:still={reduce} bind:this={root} style="--steps:{STEPS.length}; --step-vh:calc({STEP_VH * 100} * var(--vh, 1vh))">
@@ -697,13 +702,13 @@
 	.fa { position: relative; }
 	/* the opener's prints: in the opener's right column (its grid is 1.1fr : 1fr with a 4vw gap); under it on a phone */
 	.op { position: relative; }
-	.op-prints { position: absolute; top: 0; bottom: 0; right: 0; width: calc((100% - 4vw) / 2.1); display: grid; grid-template-columns: repeat(2, auto); place-content: center; gap: calc(4 * var(--vh, 1vh)) 3.4vw; pointer-events: none; }
+	.op-prints { --pm: 236px; position: absolute; top: 0; bottom: 0; right: 0; width: calc((100% - 4vw) / 2.1); display: grid; grid-template-columns: repeat(2, auto); place-content: center; gap: calc(4 * var(--vh, 1vh)) 3.4vw; pointer-events: none; }
 	.op-p { display: grid; justify-items: center; gap: 14px; margin: 0; }
 	.op-stack { position: relative; display: block; }
 	.op-under { position: absolute; left: 7px; top: 8px; opacity: .6; }
 	.op-p figcaption { position: relative; font-size: 15px; font-weight: 600; letter-spacing: .02em; color: #F3F3EF; white-space: nowrap; }
 	@media (max-width: 979px) {
-		.op-prints { position: relative; width: 100vw; margin: calc(-4 * var(--vh, 1vh)) 0 0 calc(50% - 50vw); padding: 0 16px calc(10 * var(--vh, 1vh)); background: #14202D; gap: 28px 24px; }
+		.op-prints { --pm: 150px; position: relative; width: 100vw; margin: calc(-4 * var(--vh, 1vh)) 0 0 calc(50% - 50vw); padding: 0 16px calc(10 * var(--vh, 1vh)); background: #14202D; gap: 28px 24px; }
 		.op-under { left: 5px; top: 6px; }
 		.op-p figcaption { font-size: 14px; }
 	}

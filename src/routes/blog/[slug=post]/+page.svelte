@@ -4,8 +4,6 @@
     import ShaderCanvas from "#lib/components/ShaderCanvas.svelte";
     import ProseDiff from "#lib/components/ProseDiff.svelte";
     import { formatLongDate } from "#lib/utils/date.ts";
-    import { marked } from "marked";
-    import { withMarks } from "#lib/marks.ts";
     import { ArrowLeft, CalendarDays } from "@jis3r/icons";
     import { SITE_URL } from "#lib/seo.ts";
     import { blogPostingStructuredData } from "#lib/structured-data.js";
@@ -18,47 +16,8 @@
     $: prevPost = data.prevPost;
     $: nextPost = data.nextPost;
 
-    // Interleave interactive artwork and images with rendered Markdown.
-    type Segment =
-        | { type: "html"; content: string }
-        | { type: "shader"; variant: "mound" | "nebula" }
-        | { type: "fruits" }
-        | { type: "prose-diff" }
-        | { type: "image"; src: string; caption: string };
-
-    function parseSegments(src: string): Segment[] {
-        const re = /\[\[fruits\]\]|\[\[prose-diff\]\]|\[\[shader:(mound|nebula)\]\]|\[\[image:([^\]|]+)\|([^\]]+)\]\]/g;
-        const out: Segment[] = [];
-        let last = 0;
-        let match: RegExpExecArray | null;
-        while ((match = re.exec(src)) !== null) {
-            if (match.index > last) {
-                out.push({ type: "html", content: withMarks(marked(src.slice(last, match.index)) as string) });
-            }
-            if (match[0] === "[[fruits]]") {
-                out.push({ type: "fruits" });
-            } else if (match[0] === "[[prose-diff]]") {
-                out.push({ type: "prose-diff" });
-            } else if (match[1]) {
-                out.push({ type: "shader", variant: match[1] as "mound" | "nebula" });
-            } else {
-                out.push({ type: "image", src: match[2], caption: match[3] });
-            }
-            last = match.index + match[0].length;
-        }
-        if (last < src.length) {
-            out.push({ type: "html", content: withMarks(marked(src.slice(last)) as string) });
-        }
-        return out;
-    }
-
-    $: segments = parseSegments(post.content);
-
-    function readingTime(content: string): string {
-        const words = content.trim().split(/\s+/).length;
-        const mins = Math.max(1, Math.round(words / 250));
-        return `${mins} min read`;
-    }
+    // The body, rendered when the page was built (see #lib/post-segments.ts).
+    $: segments = data.segments;
 </script>
 
 <Seo
@@ -129,7 +88,7 @@
                 {/if}
 
                 <span class="text-ink-400 dark:text-cream-500">
-                    {readingTime(post.content)}
+                    {data.readingTime}
                 </span>
             </div>
         </header>
@@ -139,7 +98,7 @@
     <article class="prose-custom type-longform">
         {#each segments as seg}
             {#if seg.type === "prose-diff"}
-                <ProseDiff />
+                {#if data.proseDiffSample}<ProseDiff sample={data.proseDiffSample} />{/if}
             {:else}
                 <div class="post-column">
                     <div class="measure-reading">
@@ -151,7 +110,7 @@
                             <FruitStudies />
                         {:else}
                             <figure class="blog-figure">
-                                <img src={seg.src} alt={seg.caption} />
+                                <img src={seg.src} alt={seg.caption} width={seg.width} height={seg.height} loading="lazy" decoding="async" />
                                 <figcaption>{seg.caption}</figcaption>
                             </figure>
                         {/if}
@@ -164,7 +123,7 @@
     {#if post.published !== false && !post.unlisted}
         <div class="post-column">
             <div class="measure-reading">
-                <PostFooter postId={post.id} />
+                <PostFooter postId={post.id} email={data.social.email} x={data.social.twitter} />
             </div>
         </div>
     {/if}
@@ -322,6 +281,7 @@
 
     .blog-figure img {
         width: 100%;
+        height: auto;
         border-radius: var(--radius-media);
     }
 

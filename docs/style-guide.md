@@ -467,6 +467,14 @@ to repair an unclear page-flow API.
 Design mobile first. Breakpoints respond to available width, not a presumed
 device.
 
+Pages are prerendered, so a phone lays out the HTML before any script runs.
+Size anything that depends on the screen in CSS, with a media query, rather
+than in script after mount: content that arrives later and changes the height
+of what is above the reader moves the page under them, and a link to a section
+lands short of it. Nor may a pointer, width, or motion setting change which
+markup a component renders on its first pass; hydration that finds different
+markup throws the page away and builds it again.
+
 ### Containers
 
 | Variant    |                    Maximum width | Gutters          | Use                                |
@@ -503,7 +511,9 @@ sideways between routes, and lets task-specific content expand.
   width: the row unit scales with the column, the `16px` gaps do not. A tile
   that grows taller while its column narrows crops its photo to a sliver.
 - The Bookshelf may use horizontal table overflow, but controls and pagination
-  must remain usable without horizontal page scrolling.
+  must remain usable without horizontal page scrolling. Each entry renders
+  once: a table row from `md`, restacked as a card below it by CSS, never a
+  second copy of the list hidden at the other size.
 - Align related baselines and repeated control heights optically.
 
 ### Page shell and page header
@@ -642,6 +652,11 @@ No component should invent a z-index above this scale.
   order of precedence.
 - Format metadata before displaying it. Raw EXIF is not display copy: a focal
   length arrives as `6.764999866485596 mm` and must be rounded.
+- A post's images (`[[image:/images/…|caption]]`) live in `static/images/`,
+  as WebP (lossless for screenshots, which keeps them exact at a sixth of a
+  PNG's size). The build reads each one's size into the page, so its place is
+  held before it loads; `tests/layout-stability.test.mjs` fails if a post
+  image arrives without one.
 - Animated research media must have a useful static first frame.
 - Hover-only media behavior must also respond to keyboard focus.
 - The paper texture stays subtle enough that it does not affect contrast.
@@ -705,6 +720,14 @@ target are never duplicated.
   the user-agent string. A UA test reads iPad and touch laptops as desktop.
 - The boba arcade may use bespoke physical timing, but menus and controls still
   honor reduced motion.
+- A theme switch never sets off element transitions: every link and button
+  would animate its colour at once, restyled every frame. Switch with
+  transitions held off (`data-theme-switching`) and cross-fade the whole page
+  with a View Transition, which the compositor blends. Reduced motion switches
+  instantly. A press on the toggle during the fade still counts.
+- Work a tap doesn't need before its next frame waits until after it: no
+  `AudioContext` opened in a tap that plays nothing, no third-party script run
+  between an input and what it shows (analytics runs once the reader pauses).
 
 ## Components
 
@@ -985,6 +1008,12 @@ through `<Mark kind="…" />` or `markHtml()`.
   text selection is never read as navigation.
 - Announce position changes through a live region; a visual `3 / 132` counter
   is decorative and should be `aria-hidden`.
+- A full-screen lightbox is a place in history: opening it adds one entry (the
+  photo lightbox writes `?photo=`), stepping between items replaces it, and
+  Back closes it. Closing from the page goes back over that entry, so a second
+  Back leaves the page as expected.
+- On phones the photo takes the full width less the gutters, and the arrows sit
+  in the bottom corners beside the counter rather than over the photo.
 
 ### Empty, error, loading, and disabled states
 

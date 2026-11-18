@@ -18,9 +18,17 @@ export const ORIGINALS_BASE = "/images/photography/";
 export const RENDITIONS_BASE = "/images/photography/thumbs/";
 
 // Grid tiles use 400–1200; the lightbox goes up to 2048, which covers a
-// landscape photo at the lightbox's 992px cap on a 2x display.
-export const RENDITION_WIDTHS = [400, 800, 1200, 2048];
+// landscape photo at the lightbox's 992px cap on a 2x display. The 600 step
+// is for phones: a half-width tile on a 1.75x screen needs ~410 px, which
+// without it rounds up to the 800 (twice the pixels).
+export const RENDITION_WIDTHS = [400, 600, 800, 1200, 2048];
 export const RENDITION_QUALITY = 80;
+// The grid's sizes also come as AVIF, about 40% smaller than WebP for the same
+// look; browsers that can't read it fall back to the WebP. The lightbox's
+// 2048 stays WebP only: AVIF that large is slow to encode for a view that is
+// opened one photo at a time.
+export const AVIF_QUALITY = 60;
+export const AVIF_MAX_WIDTH = 1200;
 // Part of every rendition's hash: bump it when the encoding changes (format,
 // quality, resizing) so every URL changes with it.
 export const RENDITION_VERSION = 1;
@@ -50,32 +58,48 @@ export function renditionWidths(photo) {
   return [...RENDITION_WIDTHS.filter((w) => w < top), top];
 }
 
+/** @typedef {"webp" | "avif"} RenditionFormat */
+
 /**
- * @param {Pick<PhotoFiles, "filename" | "v">} photo
+ * The formats a rendition of this width comes in.
+ *
  * @param {number} width
+ * @returns {RenditionFormat[]}
  */
-export function renditionFile(photo, width) {
-  return `${photoStem(photo.filename)}-${width}.${photo.v}.webp`;
+export function renditionFormats(width) {
+  return width <= AVIF_MAX_WIDTH ? ["webp", "avif"] : ["webp"];
 }
 
 /**
  * @param {Pick<PhotoFiles, "filename" | "v">} photo
  * @param {number} width
+ * @param {RenditionFormat} [format]
  */
-export function renditionUrl(photo, width) {
-  return RENDITIONS_BASE + renditionFile(photo, width);
+export function renditionFile(photo, width, format = "webp") {
+  return `${photoStem(photo.filename)}-${width}.${photo.v}.${format}`;
 }
 
 /**
- * A `srcset` of this photo's renditions up to `maxWidth`.
+ * @param {Pick<PhotoFiles, "filename" | "v">} photo
+ * @param {number} width
+ * @param {RenditionFormat} [format]
+ */
+export function renditionUrl(photo, width, format = "webp") {
+  return RENDITIONS_BASE + renditionFile(photo, width, format);
+}
+
+/**
+ * A `srcset` of this photo's renditions up to `maxWidth`, in one format.
  *
  * @param {PhotoFiles} photo
  * @param {number} [maxWidth]
+ * @param {RenditionFormat} [format]
  */
-export function renditionSrcset(photo, maxWidth = Infinity) {
+export function renditionSrcset(photo, maxWidth = Infinity, format = "webp") {
   return renditionWidths(photo)
     .filter((w, i) => i === 0 || w <= maxWidth)
-    .map((w) => `${renditionUrl(photo, w)} ${w}w`)
+    .filter((w) => renditionFormats(w).includes(format))
+    .map((w) => `${renditionUrl(photo, w, format)} ${w}w`)
     .join(", ");
 }
 

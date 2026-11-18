@@ -12,13 +12,17 @@
 	import { printSpriteLater, printAspect, type SpriteOpts } from "./print/sprites";
 	import { FONT } from "./print/fingerprint";
 
-	let { family, index = 0, color, px, clarity = 1, text = false, label = "" }:
-		{ family: SpriteOpts["family"]; index?: number; color: string; px: number; clarity?: number; text?: boolean; label?: string } = $props();
+	// `fit`: the box takes its height from the CSS variable --pm, which the page sets per screen width, so the layout is
+	// right before the script runs (a section's opener, whose prints stack under its text on a phone); `px` is then only
+	// the size the print is drawn at, and has to agree with --pm.
+	let { family, index = 0, color, px, clarity = 1, text = false, label = "", fit = false }:
+		{ family: SpriteOpts["family"]; index?: number; color: string; px: number; clarity?: number; text?: boolean; label?: string; fit?: boolean } = $props();
 
 	let el: HTMLCanvasElement;
 	let wrap: HTMLSpanElement; // observed instead of the canvas: a fully clipped element never counts as in view
 	let shown = $state(false);
 	const w = $derived(Math.round(px * printAspect()));
+	const boxW = `calc(var(--pm) * ${printAspect()})`;
 
 	onMount(() => {
 		let alive = true;
@@ -42,7 +46,7 @@
 	});
 </script>
 
-<span class="pmw" bind:this={wrap} style:width="{w}px" style:height="{px}px"><canvas bind:this={el} class="pm" class:shown style:width="{w}px" style:height="{px}px" role={label ? "img" : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : "true"}></canvas></span>
+<span class="pmw" bind:this={wrap} style:width={fit ? boxW : `${w}px`} style:height={fit ? "var(--pm)" : `${px}px`}><canvas bind:this={el} class="pm" class:shown style:width={fit ? boxW : `${w}px`} style:height={fit ? "var(--pm)" : `${px}px`} role={label ? "img" : undefined} aria-label={label || undefined} aria-hidden={label ? undefined : "true"}></canvas></span>
 
 <style>
 	.pmw { display: block; flex: none; }

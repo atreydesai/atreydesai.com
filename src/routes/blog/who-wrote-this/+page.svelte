@@ -14,16 +14,28 @@
 	import ShareBlock from "#lib/who-wrote-this/ShareBlock.svelte";
 	import PrintHero from "#lib/who-wrote-this/PrintHero.svelte";
 	import Timeline from "#lib/who-wrote-this/Timeline.svelte";
-	import HumanOrAIB from "#lib/who-wrote-this/HumanOrAIB.svelte";
-	import WhichAI from "#lib/who-wrote-this/WhichAI.svelte";
-	import WhichHuman from "#lib/who-wrote-this/WhichHuman.svelte";
-	import Familiar from "#lib/who-wrote-this/Familiar.svelte";
-	import Anonymity from "#lib/who-wrote-this/Anonymity.svelte";
+	import HumanOrAIB, { FOOTNOTES as HB_NOTES } from "#lib/who-wrote-this/HumanOrAIB.svelte";
+	import WhichAI, { FOOTNOTES as WA_NOTES } from "#lib/who-wrote-this/WhichAI.svelte";
+	import WhichHuman, { FOOTNOTES as WH_NOTES } from "#lib/who-wrote-this/WhichHuman.svelte";
+	import Familiar, { FOOTNOTES as FA_NOTES } from "#lib/who-wrote-this/Familiar.svelte";
+	import Anonymity, { FOOTNOTES as AN_NOTES } from "#lib/who-wrote-this/Anonymity.svelte";
+	import { register } from "#lib/who-wrote-this/fnstore.svelte.ts";
+	import { onDestroy } from "svelte";
 	import LedeHold from "#lib/who-wrote-this/LedeHold.svelte";
+	import Defer from "#lib/who-wrote-this/Defer.svelte";
 	import C from "#lib/who-wrote-this/content.json";
+
+	const INTER_CSS = "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400;1,14..32,500&amp;display=swap";
 	import type { PageData } from "./$types";
 
 	let { data }: { data: PageData } = $props();
+
+	// The sections below the lede hydrate after the page, one by one (Defer.svelte). Their footnotes are registered here,
+	// before any of them wakes, so the notes list and the marks' numbers are whole from the start.
+	if (typeof window !== "undefined") {
+		const off = [HB_NOTES, WA_NOTES, WH_NOTES, FA_NOTES, AN_NOTES].map((f) => register(f.id, f.notes));
+		onDestroy(() => off.forEach((fn) => fn()));
+	}
 	const post = $derived(data.post);
 	const url = `${SITE_URL}/blog/who-wrote-this/`;
 	const affIndex = Object.fromEntries(C.meta.affiliations.map((a, i) => [a.key, i + 1]));
@@ -119,9 +131,27 @@
 <svelte:head>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-	<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400;1,14..32,500&display=swap" />
+	<!-- Inter's stylesheet comes from another origin, so as a plain stylesheet it held the first paint for a new connection
+	     and a round trip (~900 ms on a slow phone, against ~300 for every other page). Loaded without blocking, the page
+	     paints at once in the metric-matched fallback below, and Inter swaps in as it would have anyway (display=swap). -->
+	{@html `<link rel="preload" as="style" href="${INTER_CSS}" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="${INTER_CSS}"></noscript>`}
 	<!-- This route owns the whole page: our ground behind everything, light only. -->
 	{@html `<style>
+	/* Inter arrives from Google Fonts after the page has painted (display=swap).
+	   Until then the text is set in local Arial scaled to Inter's metrics, so the
+	   swap changes letterforms, not layout: with the plain fallback it reflowed
+	   every block on the page (a 0.22 layout shift, and the largest paint moved
+	   to the swap at ~2.5 s on a slow phone). The overrides are Inter's own
+	   ascent and descent and its average width over Arial's. */
+	@font-face {
+		font-family: "Inter Fallback";
+		src: local("Arial"), local("ArialMT"), local("Helvetica");
+		ascent-override: 90.49%;
+		descent-override: 22.56%;
+		line-gap-override: 0%;
+		size-adjust: 107.06%;
+	}
+
 		html, html.dark { color-scheme: light; }
 		html body, html.dark body {
 			background-color: #E8E8E3;
@@ -152,13 +182,13 @@
 			<p class="deck" data-lag="1">{C.meta.deck.t}</p>
 			<p class="byline" data-lag="2">
 				{#each C.meta.authors as a, i}
-					<span class="author">{a.name}<sup>{#each a.aff as k}{affIndex[k]}{/each}{#if a.equal}*{/if}{#if a.corresponding}†{/if}</sup>{#if i < C.meta.authors.length - 1}{", "}{/if}</span>
+					<span class="author">{a.name}<sup>{#each a.aff as k}{affIndex[k]}{/each}{#if a.equal}*{/if}{#if a.corresponding}<span class="dag">†</span>{/if}</sup>{#if i < C.meta.authors.length - 1}{", "}{/if}</span>
 				{/each}
 			</p>
 			<p class="affs" data-lag="2">
 				{#each C.meta.affiliations as aff, i}<span><sup>{i + 1}</sup>{aff.t}</span>{/each}
 				<span><sup>*</sup>{C.meta.equal_note}</span>
-				<span><sup>†</sup>{C.meta.corresponding_note}</span>
+				<span><sup><span class="dag">†</span></sup>{C.meta.corresponding_note}</span>
 			</p>
 			<div class="links" data-lag="3">
 				{#each C.meta.links as l}
@@ -180,22 +210,24 @@
 		</LedeHold>
 
 		<!-- each section ends with a share control: the blog, or a link to that section (Atrey, 17 Nov) -->
-		<Timeline />
+		<!-- the sections hydrate after the page, each on its own (Defer.svelte), so one of them takes nothing from the page
+		     (no props or context) and its footnotes are registered above, from its module's FOOTNOTES -->
+		<Defer component={Timeline} />
 		<ShareBlock {url} id={stops[1].id} name={stops[1].short} />
 		<div class="breath" aria-hidden="true"></div>
-		<HumanOrAIB />
+		<Defer component={HumanOrAIB} />
 		<ShareBlock {url} id={stops[2].id} name={stops[2].short} />
 		<div class="breath" aria-hidden="true"></div>
-		<WhichAI />
+		<Defer component={WhichAI} />
 		<ShareBlock {url} id={stops[3].id} name={stops[3].short} />
 		<div class="breath" aria-hidden="true"></div>
-		<WhichHuman />
+		<Defer component={WhichHuman} />
 		<ShareBlock {url} id={stops[4].id} name={stops[4].short} />
 		<div class="breath" aria-hidden="true"></div>
-		<Familiar />
+		<Defer component={Familiar} />
 		<ShareBlock {url} id={stops[5].id} name={stops[5].short} />
 		<div class="breath" aria-hidden="true"></div>
-		<Anonymity />
+		<Defer component={Anonymity} />
 		<ShareBlock {url} id={stops[6].id} name={stops[6].short} />
 		<div class="breath" aria-hidden="true"></div>
 
@@ -260,7 +292,7 @@
 		--cue-teal: #0A2B34; --cue-teal-bg: #DCEBEF; --cue-clay: #7A3410; --cue-clay-bg: #FBEDE4;
 		--human: #C85A82; --model: #461E47; --ok: #046B55; --gray: #898989; --gray-mid: #B0B0B0;
 		--ease: cubic-bezier(0.16, 1, 0.3, 1);
-		--font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+		--font: "Inter", "Inter Fallback", system-ui, -apple-system, "Segoe UI", sans-serif;
 		color: var(--ink);
 		font: 400 16px/1.6 var(--font);
 		font-kerning: normal;
@@ -329,6 +361,9 @@
 	.deck { margin-top: 12px; font-size: clamp(18px, 2vw, 22px); line-height: 1.35; font-weight: 500; letter-spacing: -0.01em; color: var(--ink); text-wrap: balance; }
 	.byline { margin-top: 22px; font-size: 15px; line-height: 1.7; }
 	.byline sup, .affs sup { font-size: 10px; margin-left: 1px; color: var(--ink2); font-feature-settings: "tnum"; }
+	/* Google files the dagger under Inter's latin-ext subset, 131 KB to download for one mark: it is set in the
+	   metric-matched fallback instead, which every reader already has. */
+	.dag { font-family: "Inter Fallback", system-ui, sans-serif; }
 	.affs { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12.5px; color: var(--ink2); }
 	.links { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 	.btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 1.25px solid var(--ink); border-radius: 2px; font-size: 13px; font-weight: 500; text-decoration: none; transition: background-color .15s, color .15s; }

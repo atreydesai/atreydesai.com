@@ -1,3 +1,10 @@
+<script lang="ts" module>
+	// Its footnotes, which the page registers before the section wakes (Defer.svelte), so the notes list and the marks' numbers
+	// are complete from the start.
+	import S from "./which_ai.json";
+	export const FOOTNOTES = { id: "wa", notes: S.notes };
+</script>
+
 <script lang="ts">
 	// If AI, which AI? (fourth pass, after Atrey's user testing, 16 Nov: "collapse square blocks into bars", "bring the
 	// hovered info out", "emphasize timeline x axis is model releases", "there's no headline number", "threads like in a
@@ -22,7 +29,6 @@
 	import { field, chart, regions } from "./field.svelte";
 	import { onScroll as onPageScroll, view as vp, lite, deliberate } from "./loop";
 	import { LAB, INK, GRAY } from "./palette";
-	import S from "./which_ai.json";
 	import R from "./rq2_writers.json";
 
 	type W = (typeof R.writers)[number];
@@ -101,13 +107,13 @@
 
 	// text widths for layout, measured once per string and font
 	const widths = new Map<string, number>();
-	let mctx: CanvasRenderingContext2D | null = null;
+	let mctx: CanvasRenderingContext2D | null = null, mfont = "";
 	function tw(t: string, font: string) {
 		const key = font + "|" + t;
 		let v = widths.get(key);
 		if (v === undefined) {
 			mctx ??= document.createElement("canvas").getContext("2d")!;
-			mctx.font = font;
+			if (font !== mfont) { mctx.font = font; mfont = font; } // (setting a font parses it, even the same one)
 			v = mctx.measureText(t).width;
 			widths.set(key, v);
 		}
@@ -319,7 +325,7 @@
 
 	onMount(() => {
 		still = matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).has("still");
-		narrow = innerWidth <= 860;
+		narrow = (vp.w || innerWidth) <= 860; // the loop's width where it has one: innerWidth lays a phone's page out
 		// scroll and resize, in the page's loop (loop.ts)
 		const onScroll = () => { if ((vp.w <= 860) !== narrow) narrow = vp.w <= 860; readStep(); sync(); if (hov && tapType !== "mouse") hov = null; };
 		// a reader's own scroll ends a jump at once
@@ -334,7 +340,8 @@
 		document.addEventListener("mouseout", outOfPage);
 		addEventListener("blur", unhover);
 		document.documentElement.addEventListener("mouseleave", unhover);
-		document.fonts?.ready.then(() => { widths.clear(); fontsV++; });
+		// measured again once the face has loaded (not when it already has: the layouts would all be worked out twice)
+		if (document.fonts && document.fonts.status !== "loaded") document.fonts.ready.then(() => { widths.clear(); mfont = ""; fontsV++; });
 		// the canvas is this section's while it is on screen (the dimmed ground behind its pictures)
 		const io = new IntersectionObserver((es) => es.forEach((e) => {
 			active = e.isIntersecting;

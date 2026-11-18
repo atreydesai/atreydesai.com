@@ -25,4 +25,4 @@ This was originally in green, hence the name mound (like a grass mound). I tried
 
 This is the better one haha. It's nice to stare into over a longer period of time because the mixing is a little more gradual.
 
-[[image:/images/claudelimit.png|welp already hit my claude design limit an hour in, so maybe I'll look at better use cases next week!]]
+[[image:/images/claudelimit.webp|welp already hit my claude design limit an hour in, so maybe I'll look at better use cases next week!]]

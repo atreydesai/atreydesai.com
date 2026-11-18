@@ -33,7 +33,7 @@
 		const canvas = document.createElement("canvas");
 		canvas.className = "wwt-field";
 		canvas.setAttribute("aria-hidden", "true");
-		// (its height is the page's steady viewport height on a touch screen: loop.ts sets --vh)
+		// (its height is the page's steady viewport height on a touch screen: the large viewport, which is what vh is there)
 		Object.assign(canvas.style, { position: "fixed", left: "0", top: "0", width: "100vw", height: "calc(100 * var(--vh, 1vh))", zIndex: "0", pointerEvents: "none" });
 		document.body.prepend(canvas);
 		const ctx = canvas.getContext("2d")!;

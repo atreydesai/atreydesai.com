@@ -1,8 +1,11 @@
 <script lang="ts">
     import PageShell from "#lib/components/PageShell.svelte";
     import Mark from "#lib/components/Mark.svelte";
-    import { posts } from "#lib/content.ts";
     import { formatShortDate } from "#lib/utils/date.ts";
+    import type { PageData } from "./$types";
+
+    export let data: PageData;
+    $: posts = data.posts;
 </script>
 
 <PageShell

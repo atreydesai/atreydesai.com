@@ -1,3 +1,11 @@
+<script lang="ts" module>
+	// Its footnotes, which the page registers before the section wakes (Defer.svelte), so the notes list and the marks' numbers
+	// are complete from the start.
+	import A from "./anonymity.json";
+	import type { Note } from "./Footnotes.svelte";
+	export const FOOTNOTES = { id: "s5", notes: A.notes as Note[] };
+</script>
+
 <script lang="ts">
 	// Section 5, Implications for anonymity. A chapter opener (one writer's print, as written and paraphrased), then a
 	// pinned stage with its own blocking: the writers a model knows well as one large mass, a giant numeral beside it,
@@ -26,13 +34,12 @@
 	import Tags, { type Tag } from "./Tags.svelte";
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
-	import Footnotes, { type Note } from "./Footnotes.svelte";
+	import Footnotes from "./Footnotes.svelte";
 	import HoverCue from "./HoverCue.svelte";
 	import { MODEL, GRAY, INK as INKS, deepen, TILE } from "./palette";
 	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 	import { field, chart, regions, type Mark, type Path, type Text } from "./field.svelte";
 	import { onScroll as onPageScroll, requestFrame, view as vp, lite, deliberate, pointerKind } from "./loop";
-	import A from "./anonymity.json";
 
 	type Bin = { bin: string; shown: boolean; pct: number; tiles: number; pct_rw: number; tiles_rw: number };
 	type Step = { view: string; t: string; fn?: number; more?: { t: string }; items?: { icon: string; t: string }[] };
@@ -60,7 +67,7 @@
 	// break before their last word there (the tags keep the break; see the style)
 	const NAME2 = GROUPS.map((g) => g.t.replace(/ (?=\S+$)/, "\n"));
 	const NAME2_H = 6 + 2 * 12.5 * 1.6; // such a name's height: the tag's padding and two lines of its 12.5px type
-	const NOTES = A.notes as Note[];
+	const NOTES = FOOTNOTES.notes;
 	const col = (name: string) => MODEL[name] ?? GRAY.strong;
 	const CLAY = col(L.fable), REWRITER = col(L.rewriter);
 	const pctLabel = (pct: number, tiles: number) => (pct > 0 && pct < 1 ? L.lt1 : `${tiles}%`);
@@ -109,9 +116,6 @@
 	let capH = $state(0); // the caption band's height: the phone's group card covers it exactly
 	let ox = $state(0), oy = $state(0); // the stage's viewport offset
 	let reduce = $state(false);
-	// the opener's prints arrive once mounted: SectionOpener sizes them for a wide screen on its first render, and on a
-	// phone that overflow would widen the page for a moment, just as the field canvas measures it
-	let ready = $state(false);
 	let stage: HTMLElement;
 	let root: HTMLElement; // the pinned part (the opener and footnotes sit outside it)
 
@@ -358,7 +362,6 @@
 
 	onMount(() => {
 		reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || new URLSearchParams(location.search).has("still");
-		ready = true;
 		const stopWarm = warmTilesNear(root, "writer", 48, 14, 26); // the tiles' prints' ridges, traced ahead in idle moments
 		// While the stage is on screen the shown step walks toward the scroll's step one at a time, holding each for
 		// HOLD_MS (a timer, not a frame loop); off screen, or on arriving from off screen, it jumps there at once.
@@ -440,7 +443,7 @@
 </script>
 
 <section class="an" id={A.id} data-rq="0" data-step={step}>
-	<SectionOpener n={A.n} title={A.title.t} takeaway={A.takeaway.t} context={A.context.t} accent={GRAY.mid} prints={ready ? OPENER : []} />
+	<SectionOpener n={A.n} title={A.title.t} takeaway={A.takeaway.t} context={A.context.t} accent={GRAY.mid} prints={OPENER} />
 
 	<div class="scrolly" class:still={reduce} bind:this={root} style="--span:calc({SPAN_VH * 100} * var(--vh, 1vh))">
 		<div class="stick" bind:this={stage} bind:clientWidth={W} bind:clientHeight={H}>

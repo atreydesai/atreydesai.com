@@ -9,11 +9,16 @@
     // Responsive candidate set (e.g. "img-400.webp 400w, img-800.webp 800w").
     // Without it `sizes` is inert and the browser always loads the single src.
     export let srcset: string = "";
+    // The same candidates as AVIF, offered first; browsers that can't read it
+    // use `srcset`.
+    export let avifSrcset: string = "";
     // How wide the image is drawn, for choosing from `srcset`. The caller
     // knows the slot; the default is a grid tile (2 columns, then 3).
     export let sizes = "(max-width: 767px) 50vw, 33vw";
     // Images in the first screenful load at once, and the very first one ahead
-    // of everything else, since it is usually the largest paint.
+    // of everything else, since it is usually the largest paint. The rest are
+    // marked low so that Chrome, which promotes images it finds on screen,
+    // doesn't split a slow link between them and the first.
     export let eager = false;
     export let priority = false;
 
@@ -53,6 +58,10 @@
         class:opacity-0={loaded}
     ></div>
 
+    <picture class="contents">
+    {#if avifSrcset}
+        <source type="image/avif" srcset={avifSrcset} {sizes} />
+    {/if}
     <img
         bind:this={imgElement}
         {src}
@@ -61,7 +70,7 @@
         srcset={srcset || undefined}
         loading={eager || priority ? "eager" : "lazy"}
         decoding="async"
-        fetchpriority={priority ? "high" : "auto"}
+        fetchpriority={priority ? "high" : "low"}
         on:load={handleLoad}
         class="relative h-full w-full object-cover {fades
             ? 'transition-[opacity,transform] duration-400'
@@ -69,4 +78,5 @@
         class:opacity-0={fades && !loaded}
         class:scale-105={fades && !loaded}
     />
+    </picture>
 </div>

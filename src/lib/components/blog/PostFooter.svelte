@@ -1,11 +1,10 @@
 <script lang="ts">
   import Mark from "#lib/components/Mark.svelte";
-  import { homepageData } from "#lib/content.ts";
 
   export let postId: string;
-
-  const email = homepageData.social.email;
-  const x = homepageData.social.twitter;
+  // From the post's page data (homepage.yaml's social links).
+  export let email: string;
+  export let x: string;
 </script>
 
 <!-- What follows the last paragraph: one quiet line asking the reader back.

@@ -4,12 +4,17 @@
     import { onDestroy, tick } from "svelte";
     import ResearchCard from "#lib/components/ResearchCard.svelte";
     import CustomSelect from "#lib/components/CustomSelect.svelte";
-    import { papers, talks } from "#lib/content.ts";
+    import type { PageData } from "./$types";
     import {
         PAGE_TRANSITION_DURATION_MS,
         PAGE_TRANSITION_SCROLL_BUFFER_MS,
     } from "#lib/motion.ts";
     import { formatMonthYear } from "#lib/utils/date.ts";
+
+    export let data: PageData;
+    // The page's server load (prerendered) supplies these, not the content
+    // modules, which would ship every post in the page's script.
+    const { papers, talks } = data;
     import { paperListStructuredData } from "#lib/structured-data.js";
 
     const paperJsonLd = paperListStructuredData(papers);

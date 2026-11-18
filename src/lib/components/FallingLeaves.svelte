@@ -274,6 +274,16 @@
     }
   }
 
+  /** How far each blade reaches in leaf space (u across, v from stem to
+   *  tip), read off inside() above: outside these no point is inside. */
+  const BLADE: Record<Shape, { u: number; vMin: number; vMax: number }> = {
+    ovate: { u: 0.34, vMin: 0, vMax: 1 },
+    oak: { u: 0.34, vMin: 0.02, vMax: 1 },
+    maple: { u: 0.5, vMin: 0, vMax: 1 },
+    // A fan of radius 0.86 from (0, 0.02), at most 0.8 rad off the axis.
+    ginkgo: { u: 0.62, vMin: 0.02, vMax: 0.88 },
+  };
+
   /** Shade at (u, v): darker along the midrib and the side veins. */
   function shade(shape: Shape, u: number, v: number): number {
     const au = Math.abs(u);
@@ -312,6 +322,11 @@
     // The blade's centre sits at the pose; v runs along the rotated y axis,
     // from the stem end (v = 0) to the tip (v = 1). Crumpling ripples the
     // blade, roughens its edge, and curls its far half in toward the midrib.
+    // Written to lu/lv rather than returned as a pair: this runs for every
+    // sample of every cell of every falling leaf, every frame, and a fresh
+    // array each time kept the garbage collector busy.
+    let lu = 0;
+    let lv = 0;
     const local = (sx: number, sy: number) => {
       const dx = sx - pose.x;
       const dy = sy - pose.y;
@@ -324,7 +339,29 @@
         v += cr * 0.04 * Math.sin((u + v) * 17 + s * 2.3);
         u *= 1 + cr * (0.5 * Math.max(0, v - 0.45) + 0.12 * Math.sin(v * 23 + u * 31 + s));
       }
-      return [u, v] as const;
+      lu = u;
+      lv = v;
+    };
+    // Most cells of the square scanned below are well clear of the blade.
+    // A cell whose centre is farther outside the blade's extent (BLADE) than
+    // any of its samples can reach, allowing for the cell's half-diagonal and
+    // for the most crumpling can move a point, holds none of it, so its
+    // samples are skipped: the same picture for a fraction of the work.
+    const extent = BLADE[leaf.shape];
+    const spread = (CELL * Math.SQRT1_2) / L;
+    const du = spread / squash + 0.05 * cr;
+    const dv = spread + 0.04 * cr;
+    const shrink = Math.max(0, 1 - 0.12 * cr);
+    const clear = (cx: number, cy: number) => {
+      const dx = cx - pose.x;
+      const dy = cy - pose.y;
+      const u = (dx * cos + dy * sin) / L / squash;
+      const v = (-dx * sin + dy * cos) / L + 0.5;
+      return (
+        Math.max(0, Math.abs(u) - du) * shrink >= extent.u ||
+        v + dv <= extent.vMin ||
+        v - dv >= extent.vMax
+      );
     };
     // The stem: from a little inside the blade's base (blades taper to
     // nothing there, so it would float free), back along the axis.
@@ -361,10 +398,12 @@
         const cx = (i + 0.5) * CELL;
         const cy = (j + 0.5) * CELL;
         let hits = 0;
-        for (let a = 0; a < SS; a++) {
-          for (let c = 0; c < SS; c++) {
-            const [u, v] = local(i * CELL + (a + 0.5) * CELL / SS, j * CELL + (c + 0.5) * CELL / SS);
-            if (inside(leaf.shape, u, v, cr)) hits++;
+        if (!clear(cx, cy)) {
+          for (let a = 0; a < SS; a++) {
+            for (let c = 0; c < SS; c++) {
+              local(i * CELL + (a + 0.5) * CELL / SS, j * CELL + (c + 0.5) * CELL / SS);
+              if (inside(leaf.shape, lu, lv, cr)) hits++;
+            }
           }
         }
         if (hits === 0) {
@@ -380,7 +419,9 @@
         }
         mark(i, j);
         if (!ctx) continue;
-        const [u, v] = local(cx, cy);
+        local(cx, cy);
+        const u = lu;
+        const v = lv;
         // Crumpled leaves are a little drier and darker.
         const k = shade(leaf.shape, u, v) * grain(i, j, s) * (1 - 0.12 * cr);
         // Turning toward the tip colour along the blade.
