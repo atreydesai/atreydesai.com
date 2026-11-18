@@ -355,7 +355,7 @@
              megabyte against the first photo and the page's scripts, among
              them the ones SvelteKit fetches at start-up and waits for before
              a tile can open (on a slow phone link, taps did nothing until
-             3.4 s; 1.9 s now). Before the grid is read, this marks the page
+             3.4 s; 2.4 s now). Before the grid is read, this marks the page
              as holding them (hidden lazy images aren't fetched; see the style
              below); the page lets them go once it has started and the first
              photo is in (onMount, above), or this does after 6 seconds in
