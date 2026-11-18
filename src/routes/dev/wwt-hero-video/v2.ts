@@ -258,7 +258,50 @@ function detect({ ctx, wide, t, A }: V, S: Sz) {
 	}
 }
 
-function lab({ ctx, wide, t, A }: V, S: Sz) {
+/** the square cut's which-lab beat: thread image 6's card (thread.ts p5) stacked for a square, in the beat's same 3.2 s.
+ * Top: 98% for the three big labs. Below: two releases each from Moonshot and Alibaba, the earlier one named for its
+ * own lab and the newest one taken for Claude or GPT (Fable 5.2's answers; numbers as on the card). */
+function labSquare({ ctx, t, A }: V, S: Sz) {
+	const M = S.M, R = 1080 - S.M;
+	const h1 = arrive(t, 0), big = arrive(t, 0.12), acc = arrive(t, 0.3), rule = arrive(t, 0.55), hd1 = arrive(t, 0.6), hd2 = arrive(t, 0.66);
+	txt(ctx, "If AI, which lab?", M, 150 + h1.dy * 20, 84, { a: h1.a });
+	txt(ctx, "98%", M - 10, 440 + big.dy * 20, 270, { ls: -0.045, a: big.a });
+	// beside the 98%: what it is and for whom
+	const X = 680;
+	lines(ctx, ["accuracy", "or more on"], X, 250 + acc.dy * 16, 38, 44, { w: 500, c: P.ink2, a: acc.a });
+	const labs = [{ n: "OpenAI", i: "openai", c: P.openai }, { n: "Anthropic", i: "anthropic", c: P.anthropic }, { n: "Google", i: "google", c: P.google }];
+	labs.forEach((l, i) => {
+		const la = arrive(t, 0.38 + i * 0.05), y = 352 + i * 46 + la.dy * 16;
+		ctx.save(); ctx.globalAlpha *= la.a;
+		const ic = A.icon(l.i, l.c); if (ic) ctx.drawImage(ic, X, y - 30, 38, 38);
+		ctx.restore();
+		txt(ctx, l.n, X + 50, y, 38, { c: l.c, a: la.a });
+	});
+	ctx.save(); ctx.globalAlpha *= rule.a; ctx.fillStyle = P.rule; ctx.fillRect(M, 512, (R - M) * out3((t - 0.55) / 0.4), 2); ctx.restore();
+	hl(ctx, "Fable 5.2 mistakes other labs’", M, 574 + hd1.dy * 16, 46, { a: hd1.a });
+	hl(ctx, "newest models for Claude or GPT", M, 630 + hd2.dy * 16, 46, { a: hd2.a });
+	const rows = [
+		{ g: "Moonshot", from: "Kimi K2.6", to: "Moonshot", v: "77%", c: P.ink, y: 722 },
+		{ from: "Kimi K3", to: "Claude", i: "anthropic", v: "97%", c: P.anthropic, y: 804 },
+		{ g: "Alibaba", from: "Qwen3.6", to: "Alibaba", v: "89%", c: P.ink, y: 902 },
+		{ from: "Qwen3.8 Max", to: "GPT", i: "openai", v: "95%", c: P.openai, y: 984 },
+	];
+	const RX = M + 186; // the rows, right of the lab names
+	rows.forEach((r, i) => {
+		const at = 0.85 + i * 0.14, ra = arrive(t, at), ta = arrive(t, at + 0.24), va = arrive(t, at + 0.3);
+		if (r.g) txt(ctx, r.g, M, r.y + 14, 36, { w: 500, c: P.ink2, a: ra.a });
+		const a = chip(ctx, RX, r.y, r.from, 40, { a: ra.a });
+		const x0 = RX + a.w + 12, x1 = x0 + 44, p = (t - at - 0.08) / 0.2;
+		stroke(ctx, [[x0, r.y], [x1, r.y]], p, r.c, 4.5);
+		stroke(ctx, [[x1 - 15, r.y - 14], [x1, r.y], [x1 - 15, r.y + 14]], p * 2 - 1, r.c, 4.5);
+		chip(ctx, x1 + 12, r.y, r.to, 40, { icon: r.i ? A.icon(r.i, r.c) : undefined, tc: r.c, a: ta.a });
+		txt(ctx, r.v, R, r.y + 21, 60, { c: r.c, al: "right", ls: -0.03, a: va.a });
+	});
+}
+
+function lab(v: V, S: Sz) {
+	if (!v.wide) return labSquare(v, S);
+	const { ctx, wide, t, A } = v;
 	const h1 = arrive(t, 0), cd = arrive(t, 0.12), big = arrive(t, 1.45), acc = arrive(t, 1.55);
 	const labs = [{ n: "OpenAI", i: "openai", c: P.openai }, { n: "Anthropic", i: "anthropic", c: P.anthropic }, { n: "Google", i: "google", c: P.google }];
 	const models = [{ n: "Fable 5.2", c: P.clay }, { n: "Opus 5.5", c: P.opus }, { n: "Argon", c: P.argon }];
