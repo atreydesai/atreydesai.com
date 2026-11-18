@@ -200,7 +200,7 @@
 			</p>
 			<div class="links" data-lag="3">
 				{#each C.meta.links as l}
-					<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} class={l.id === "paper" ? "fable" : ""} /> {l.t}</a>
+					<a class="btn" class:paper={l.id === "paper"} href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>
 				{/each}
 				<time datetime={C.meta.date}>{new Date(C.meta.date + "T12:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</time>
 			</div>
@@ -253,7 +253,7 @@
 				{#each C.meta.authors as a, i}<span>{a.name}{#if a.equal}*{/if}{#if i < C.meta.authors.length - 1}{", "}{/if}</span>{/each}
 			</p>
 			<div class="links">
-				{#each C.meta.links as l}<a class="btn" href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} class={l.id === "paper" ? "fable" : ""} /> {l.t}</a>{/each}
+				{#each C.meta.links as l}<a class="btn" class:paper={l.id === "paper"} href={l.href} target="_blank" rel="noopener"><Icon name={l.icon} /> {l.t}</a>{/each}
 			</div>
 			<FootnoteList />
 			<!-- the notes (above), the paper's acknowledgements, word for word, and how to cite it: each folded away until opened
@@ -437,8 +437,9 @@
 	.cite .copy:hover { background: var(--ink); color: var(--field); }
 	.cite pre { margin: 0; padding: 14px 16px; background: var(--field); border: 1px solid var(--rule); border-radius: 3px; overflow-x: auto; }
 	.cite code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace !important; font-size: 12.5px; line-height: 1.5; color: var(--ink); white-space: pre; }
-	/* the paper's icon in Fable's clay, top and bottom (Atrey, 17 Nov) */
-	.btn :global(.ic.fable) { color: var(--fable); }
+	/* the Paper button filled in Fable's clay, top and bottom (Atrey, 18 Nov: the box, not the icon) */
+	.btn.paper { background: var(--fable); border-color: var(--fable); color: #fff; }
+	.btn.paper:hover { background: #8F3F16; border-color: #8F3F16; color: #fff; }
 
 	@media (max-width: 760px) {
 		.finale { height: calc(160 * var(--vh, 1vh)); }
