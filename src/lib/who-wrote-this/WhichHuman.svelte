@@ -8,8 +8,9 @@
 <script lang="ts">
 	// If human, which human? Section 3, in the blocking of the section 1 mock (HumanOrAIB.svelte):
 	//   1. the chapter opener (SectionOpener): the question, the takeaway, a crowd of writers' prints with one lit;
-	//   2. a pinned stage with a caption band at its foot (the narration card, its step dashes on top). The picture
-	//      above the band changes composition by step:
+	//   2. a pinned stage with a caption band on top (the narration card, its step dashes on top), placed as section 4's
+	//      (Familiar.svelte): 76px down and 760px wide on a wide screen, 60px down and full width on a phone. The
+	//      picture under the band changes composition by step:
 	//        - the demo, a centred column: an illustrative review, then the paper's prompt closing around it, then the
 	//          model's answer under a placeholder name (John Doe); the few words that matter are highlighted, the rest
 	//          is quiet gray, so the point reads without reading every word;
@@ -411,11 +412,11 @@
 	}
 
 	// build the current view's tiles, labels and tags once for these inputs
-	function build(rs: DOMRect, narrow: boolean, k: string, h: number) {
+	function build(rs: DOMRect, narrow: boolean, k: string, top: number, h: number) {
 		G = blank(k, rs.left, rs.top);
 		L = [];
 		used = new Set();
-		const A: Box = { x0: rs.left, x1: rs.right, y0: rs.top + padT, y1: rs.top + padT + h };
+		const A: Box = { x0: rs.left, x1: rs.right, y0: rs.top + top, y1: rs.top + top + h };
 		if (view === "icml") drawIcml(A, narrow);
 		else if (view === "models") drawModels(A, narrow);
 		else if (view === "domains") drawDomains(A, narrow);
@@ -429,18 +430,23 @@
 	}
 
 	// one frame of work; true while a lit count is still easing
-	let padT = 0, padB = 0;
-	// the picture ends above the caption card at its tallest, so a shorter sentence never moves the tiles; measured
-	// when the card's size changes (a ResizeObserver, after layout), not every frame
-	let room = -1;
-	const roomOf = () => card.offsetHeight + Math.max(0, sizer.offsetHeight - says.offsetHeight);
+	let padT = 0, padB = 0, gapY = 0;
+	// the picture starts under the caption card as it is at each step (the card on top hugs its sentence, and each step
+	// is its own view, so a view's tiles never move while it is shown): the card's height with each step's sentence,
+	// measured when the card's size changes (a ResizeObserver, after layout), not every frame
+	let rooms: number[] = [];
+	const roomsOf = () => {
+		const base = card.offsetHeight - says.offsetHeight; // the padding and the dashes
+		return [...sizer.children].map((p) => base + (p as HTMLElement).offsetHeight);
+	};
 	function layout(dt: number) {
 		const rs = stick.getBoundingClientRect();
-		const narrow = rs.width < 700, gap = narrow ? 12 : 18;
-		if (room < 0) room = roomOf();
-		const h = Math.max(120, rs.height - padB - room - gap - padT);
-		const k = `${view}|${rs.width | 0}x${h | 0}`;
-		if (!geo || geo.key !== k) build(rs, narrow, k, h);
+		const narrow = rs.width < 700;
+		if (!rooms.length) rooms = roomsOf();
+		const top = padT + (rooms[step] ?? 0) + gapY;
+		const h = Math.max(120, rs.height - padB - top);
+		const k = `${view}|${rs.width | 0}x${h | 0}|${top | 0}`;
+		if (!geo || geo.key !== k) build(rs, narrow, k, top, h);
 		else if (geo.ox !== rs.left || geo.oy !== rs.top) shift(rs.left - geo.ox, rs.top - geo.oy);
 		if (chart.marks !== geo!.marks) { chart.marks = geo!.marks; chart.paths = geo!.paths; chart.texts = []; }
 		return tween(dt);
@@ -477,7 +483,7 @@
 		starts = els.map((e) => e.offsetTop);
 		end = starts[LAST] + els[LAST].offsetHeight;
 		const cs = getComputedStyle(stick);
-		padT = parseFloat(cs.paddingTop) || 0; padB = parseFloat(cs.paddingBottom) || 0;
+		padT = parseFloat(cs.paddingTop) || 0; padB = parseFloat(cs.paddingBottom) || 0; gapY = parseFloat(cs.rowGap) || 0;
 	}
 	// the beat the scroll position names; true while the track is off screen
 	function read() {
@@ -561,10 +567,10 @@
 			onScroll();
 		});
 		regions[OWNER] = track;
-		// the card's height sets the picture's foot
-		const ro = new ResizeObserver(() => { room = roomOf(); kick(); });
+		// the card's height sets the picture's top
+		const ro = new ResizeObserver(() => { rooms = roomsOf(); kick(); });
 		for (const el of [band, card, says, sizer]) ro.observe(el);
-		document.fonts?.ready.then(() => { geo = null; kick(); });
+		document.fonts?.ready.then(() => { geo = null; rooms = []; kick(); });
 		// the page's footnote list renumbers every mark and sends its back link to "#fnref-<number>"; a mark here sits on
 		// a pinned stage (wherever the stage is when the reader returns), so the back link goes to the step that shows
 		// it instead: that step's anchor takes the id
@@ -683,7 +689,8 @@
 				</div>
 			{/if}
 
-			<!-- the caption band: the narration card, its step dashes on top -->
+			<!-- the caption band, on top of the stage (its grid row; it stays last here so the tab order is unchanged): the
+			     narration card, its step dashes on top -->
 			<div class="band" bind:this={band}>
 				<div class="card" bind:this={card}>
 					<StepDashes count={STEPS.length} current={step} {go} progress={prog} />
@@ -694,8 +701,8 @@
 								<p class="say" hidden={i !== step}>{#if s.head}<b>{s.head.t}</b>{" "}{/if}{#each parts(s) as pt}{#if pt.fn}{@render mark(pt.fn)}{:else}{pt.t}{/if}{/each}</p>
 							{/each}
 						</div>
-						<!-- every sentence in one cell, unseen: the tallest sets the room the picture leaves for the card, so
-						     the tiles never move when the sentence changes -->
+						<!-- every sentence in one cell, unseen: each one's height sets the room its step's picture leaves for
+						     the card (read when the card resizes, not every frame) -->
 						<div class="sizer" aria-hidden="true" bind:this={sizer}>
 							{#each STEPS as s}<p class="say">{#if s.head}<b>{s.head.t}</b>{" "}{/if}{#each parts(s) as pt}{#if pt.fn}<sup class="fnref">{pt.fn}</sup>{:else}{pt.t}{/if}{/each}</p>{/each}
 						</div>
@@ -720,8 +727,11 @@
 <style>
 	.wh { position: relative; }
 	.track { position: relative; height: calc((var(--len) + 100) * var(--vh, 1vh)); }
-	.stick { position: sticky; top: 0; z-index: 1; height: calc(100 * var(--vh, 1vh)); display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 18px; padding: 28px 0 22px; pointer-events: none; }
-	.area { position: relative; min-height: 0; }
+	/* the caption band on top (76px down, as section 4's card), the picture under it. Above the tags' layer (Tags.svelte,
+	   z-index 3; the stage itself is see-through), so a tag still sliding from its last place never shows over the card
+	   as the card grows at a step change */
+	.stick { position: sticky; top: 0; z-index: 4; height: calc(100 * var(--vh, 1vh)); display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 18px; padding: 76px 0 22px; pointer-events: none; }
+	.area { grid-row: 2; position: relative; min-height: 0; }
 	.steps { position: absolute; inset: 0 0 auto; pointer-events: none; }
 	.step { position: relative; }
 	.fnback { position: absolute; left: 0; width: 1px; height: 1px; }
@@ -736,12 +746,13 @@
 	.lab.knock { line-height: .9; font-weight: 600; letter-spacing: -0.05em; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 1px rgba(20, 32, 45, .55), 0 1px 4px rgba(20, 32, 45, .4), 0 2px 22px rgba(20, 32, 45, .3); }
 
 	/* the caption band */
-	.band { pointer-events: auto; position: relative; z-index: 2; display: grid; justify-self: center; width: min(100%, 52rem); }
-	.card { display: grid; gap: 8px; padding: 14px 18px 16px; background: #fff; border-radius: 3px; }
+	.band { grid-row: 1; align-self: start; pointer-events: auto; position: relative; z-index: 2; display: grid; justify-self: center; width: min(100%, 760px); }
+	.card { display: grid; gap: 8px; padding: 14px 18px 16px; background: #fff; border-radius: 3px; box-shadow: 0 2px 14px rgba(20, 32, 45, .06); }
 	.says { position: relative; }
 	.say { font-size: 19px; line-height: 1.5; letter-spacing: -0.008em; color: var(--ink); text-wrap: pretty; animation: say .45s var(--ease); }
 	.say b { font-weight: 600; }
-	.sizer { position: absolute; inset: 0 0 auto; display: grid; visibility: hidden; pointer-events: none; }
+	/* (each sentence at its own height, start-aligned in the shared cell, so its step's room reads true) */
+	.sizer { position: absolute; inset: 0 0 auto; display: grid; align-items: start; visibility: hidden; pointer-events: none; }
 	.sizer .say { grid-area: 1 / 1; animation: none; }
 	@keyframes say { from { opacity: 0; transform: translateY(6px); } }
 
@@ -818,13 +829,13 @@
 	.cue.dim { background: transparent; color: var(--ink); opacity: .55; text-decoration-color: transparent; }
 
 	@media (min-width: 701px) and (max-height: 780px) {
-		.stick { padding-top: 18px; gap: 12px; }
+		.stick { gap: 12px; }
 		.say { font-size: 17px; }
 		.d-par { font-size: 18px; }
 		.ex-x { font-size: 21px; }
 	}
 	@media (max-width: 700px) {
-		.stick { padding: 14px 0 12px; gap: 12px; }
+		.stick { padding: 60px 0 12px; gap: 12px; }
 		.card { padding: 12px 14px 14px; gap: 6px; }
 		.say { font-size: 15px; line-height: 1.45; }
 		.d-review { padding: 14px 16px; gap: 8px; }
