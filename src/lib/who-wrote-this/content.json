@@ -131,12 +131,6 @@
     "icon": "github"
    },
    {
-    "id": "thread",
-    "t": "Thread",
-    "href": "#THREAD_URL",
-    "icon": "x"
-   },
-   {
     "id": "profiles",
     "t": "Model profiles",
     "href": "https://model-profiles.github.io/",

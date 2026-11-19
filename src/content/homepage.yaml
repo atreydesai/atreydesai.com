@@ -42,7 +42,7 @@ banner:
   updates:
     # Hidden with its paper (unmasking-authors.md, `hidden: true`) until the
     # launch; set the date to the launch day when it goes up.
-    - date: "2026-11-17"
+    - date: "2026-11-19"
       kind: paper
       paper: unmasking-authors
       text: "New paper: [Frontier models need only one text to unmask its human or AI author](/research/#unmasking-authors), with an [interactive explainer](/blog/who-wrote-this/)."
