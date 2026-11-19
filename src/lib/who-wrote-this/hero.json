@@ -291,12 +291,12 @@
  },
  "crowd": [
   {
-   "id": "icml",
-   "label": "ICML 2020 reviewers",
-   "rate": 55,
-   "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
+   "id": "private",
+   "label": "Private reviewers",
+   "rate": 56,
+   "rate_src": "paper/figures/data/rq3_sep22_view.json domains.private_reviews.fable52.all",
    "t": {
-    "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
+    "t": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
     "src": "paper/sections/01_abstract.tex"
    },
    "layout_share": 0.34
@@ -358,8 +358,8 @@
   }
  ],
  "privacy": {
-  "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
-  "src": "paper/sections/05_rq3_human_vs_human.tex"
+  "t": "The private reviews were contributed voluntarily by their own authors.",
+  "src": "paper/sections/08_conclusion.tex"
  },
  "lit": {
   "name": "Joyce Carol Oates",

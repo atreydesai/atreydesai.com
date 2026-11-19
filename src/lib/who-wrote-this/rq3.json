@@ -27,12 +27,12 @@
    "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
-   "view": "icml",
-   "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
+   "view": "reviews",
+   "t": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
    "src": "paper/sections/01_abstract.tex",
    "marks": [
     {
-     "after": "never made public.",
+     "after": "written by our lab.",
      "note": "privacy"
     }
    ]
@@ -124,47 +124,47 @@
    }
   ]
  },
- "icml": {
-  "n": 15136,
-  "per_tile": 10,
-  "tiles": 1514,
-  "src": "paper/figures/data/rq3_icml.json"
+ "reviews": {
+  "n": 398,
+  "per_tile": 1,
+  "tiles": 398,
+  "src": "paper/figures/data/rq3_sep22_view.json domains.private_reviews"
  },
  "models": [
   {
    "id": "fable52",
    "name": "Claude Fable 5.2",
    "short": "Fable 5.2",
-   "pct": 55.4,
-   "lit": 839
+   "pct": 56.0,
+   "lit": 223
   },
   {
    "id": "opus",
    "name": "Claude Opus 5.5",
    "short": "Opus 5.5",
-   "pct": 48.8,
-   "lit": 739
+   "pct": 41.2,
+   "lit": 164
   },
   {
    "id": "argon",
    "name": "Gemini 4 Argon",
    "short": "Argon",
-   "pct": 37.7,
-   "lit": 571
+   "pct": 40.7,
+   "lit": 162
   },
   {
    "id": "sol",
    "name": "GPT-6.1 Sol",
    "short": "Sol",
-   "pct": 22.3,
-   "lit": 338
+   "pct": 9.3,
+   "lit": 37
   },
   {
    "id": "deepseek",
    "name": "DeepSeek V4.1 Flash",
    "short": "DeepSeek",
-   "pct": 5.4,
-   "lit": 82
+   "pct": 2.5,
+   "lit": 10
   }
  ],
  "domains": [
@@ -412,12 +412,12 @@
   },
   {
    "id": "privacy",
-   "t": "We report only aggregate results and do not reveal any text from individual peer reviews or reviewer identities.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex"
+   "t": "The private reviews were contributed voluntarily by their own authors.",
+   "src": "paper/sections/08_conclusion.tex"
   },
   {
    "id": "nature",
-   "t": "On private peer reviews, Fable 5.2 also leads with 56% accuracy, while on public reviews from the Nature journal family it reaches 76%.",
+   "t": "On private peer reviews, Fable 5.2 leads with 56% accuracy, while on public reviews from the Nature journal family it reaches 76%.",
    "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
@@ -433,12 +433,12 @@
  ],
  "ui": [
   {
-   "id": "title.icml",
-   "t": "ICML 2020 reviews"
+   "id": "title.reviews",
+   "t": "Private reviews"
   },
   {
-   "id": "unit.icml",
-   "t": "1 tile = 10 reviews"
+   "id": "unit.reviews",
+   "t": "1 tile = 1 review"
   },
   {
    "id": "unit.text",
@@ -511,18 +511,13 @@
    "note": "abridged: two clauses dropped (not only grammar); the claim is unchanged"
   },
   {
-   "paper": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public",
-   "shown": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
+   "paper": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab",
+   "shown": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
    "src": "paper/sections/01_abstract.tex"
   },
   {
    "paper": "Fable 5.2, the best performing model in all domains (), exhibits considerable gains over Opus 5.5, which was released less than two months prior.",
    "shown": "Fable 5.2, the best performing model in all domains, exhibits considerable gains over Opus 5.5, which was released less than two months prior.",
-   "src": "paper/sections/05_rq3_human_vs_human.tex"
-  },
-  {
-   "paper": "When Fable 5.2's confidence is 25% or more (28% of responses), its predictions are 89% correct",
-   "shown": "When Fable 5.2's confidence is 25% or more (28% of responses), its predictions are 89% correct.",
    "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
@@ -533,25 +528,11 @@
  ],
  "numbers": [
   {
-   "key": "icml_n",
-   "value": 15136,
-   "shown": "15K",
-   "data": "paper/figures/data/rq3_icml.json n",
+   "key": "reviews_n",
+   "value": 398,
+   "shown": "398",
+   "data": "paper/figures/data/rq3_sep22_view.json domains.private_reviews.fable52.all.requests",
    "text": "paper/sections/01_abstract.tex"
-  },
-  {
-   "key": "icml_fable_lenient",
-   "value": 55.4,
-   "shown": "55%",
-   "data": "paper/figures/data/rq3_icml.json fable52.lenient (8,387 / 15,136)",
-   "text": "paper/sections/01_abstract.tex; paper/sections/05_rq3_human_vs_human.tex"
-  },
-  {
-   "key": "icml_opus",
-   "value": 48.8,
-   "shown": "49% (whole percent of the paper's 48.8%)",
-   "data": "paper/figures/data/rq3_icml.json acc_percent.opus",
-   "text": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
    "key": "dom_famous",
@@ -618,15 +599,17 @@
    "text": "paper/sections/06_discussion.tex"
   },
   {
-   "key": "icml_other_models",
+   "key": "reviews_models",
    "value": {
-    "argon": 37.7,
-    "sol": 22.3,
-    "deepseek": 5.4
+    "fable52": 56.0,
+    "opus": 41.2,
+    "argon": 40.7,
+    "sol": 9.3,
+    "deepseek": 2.5
    },
-   "shown": "38% / 22% / 5% (whole percents of the paper's 37.7% / 22.3% / 5.4%)",
-   "data": "paper/figures/data/rq3_icml.json acc_percent",
-   "text": "paper/sections/05_rq3_human_vs_human.tex"
+   "shown": "56% / 41% / 41% / 9% / 3% (whole percents)",
+   "data": "paper/figures/data/rq3_sep22_view.json domains.private_reviews.<model>.all.acc",
+   "text": "paper/sections/05_rq3_human_vs_human.tex (the RQ3 domains figure, Private reviews panel; the text prints Fable 5.2's 56%)"
   },
   {
    "key": "conf_answers",

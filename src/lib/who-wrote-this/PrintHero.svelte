@@ -32,12 +32,12 @@
 	// moment before it divides
 	const LEAD = 0.3;
 	const LAG_MS = 450;
-	// level 3: each set of texts has its own colour, in hero.json's crowd order (icml, active, famous, papers, nature,
+	// level 3: each set of texts has its own colour, in hero.json's crowd order (private, active, famous, papers, nature,
 	// inactive). Three families of two from the page palette: teal for reviews, rose for Reddit, aubergine for published
 	// writing; the writer the model finds is in ink, like the one print at level 0 (Atrey, 16 Nov: different fingerprint
 	// colours for different sets of texts; one teal ramp read as one grey crowd)
 	// which kind each crowd writer is: the kinds mixed evenly through the crowd in proportion to their shares, not in bands
-	// (Jenna, 16 Nov: spread the datasets instead of all ICML on the left). A golden-ratio walk spreads each kind out.
+	// (Jenna, 16 Nov: spread the datasets instead of one set on the left). A golden-ratio walk spreads each kind out.
 	const CROWD_N = 400;
 	const CROWD_KIND = (() => {
 		const tot = H.crowd.reduce((a, c) => a + c.layout_share, 0);
@@ -303,7 +303,7 @@
 						<h3>{kind.label}</h3>
 						<p class="stat"><b style:color={FABLE}>{kind.rate}%</b><span>named correctly by<br /><em>Claude Fable 5.2</em></span></p>
 						<p class="ex">{kindSentence(kind.t.t)}</p>
-						{#if kind.id === "icml" || kind.id === "nature"}<p class="ex small">{H.privacy.t}</p>{/if}
+						{#if kind.id === "private"}<p class="ex small">{H.privacy.t}</p>{/if}
 					{:else if id === "lit"}
 						<p class="k"><Icon name="book" />{H.lit.source}</p>
 						<blockquote>“{H.lit.excerpt.t}”</blockquote>

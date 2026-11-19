@@ -92,7 +92,7 @@
     "corresponding": true
    }
   ],
-  "authors_src": "paper/main.tex icmlauthorlist (order, equal marks, affiliations, corresponding authors)",
+  "authors_src": "paper/main.tex author list (order, equal marks, affiliations, corresponding authors)",
   "affiliations": [
    {
     "key": "umd",
@@ -282,8 +282,8 @@
    }
   ],
   "punchline": {
-   "v": "55%",
-   "t": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public",
+   "v": "56%",
+   "t": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab",
    "src": "paper/sections/01_abstract.tex"
   },
   "steps": [
@@ -592,8 +592,8 @@
     "target": "which-human",
     "icon": "human",
     "t": "If a human, often exactly who",
-    "v": "55%",
-    "fact": "Fable 5.2 correctly names the human reviewer of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
+    "v": "56%",
+    "fact": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
     "src": "paper/sections/01_abstract.tex"
    }
   ]

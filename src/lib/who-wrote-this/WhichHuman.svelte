@@ -14,7 +14,7 @@
 	//        - the demo, a centred column: an illustrative review, then the paper's prompt closing around it, then the
 	//          model's answer under a placeholder name (John Doe); the few words that matter are highlighted, the rest
 	//          is quiet gray, so the point reads without reading every word;
-	//        - the ICML 2020 reviews as a full-width wall of tiles (1 tile = 10 reviews), the lit share large on it;
+	//        - the private reviews as a full-width wall of tiles (1 tile = 1 review), the lit share large on it;
 	//        - the five models as five columns on one baseline, their shares above them;
 	//        - Figure 1's other sets of writers as a skyline of blocks (1 tile = 1 text);
 	//        - stated confidence as two blocks side by side (1 tile = 1 answer);
@@ -40,7 +40,7 @@
 	import { FABLE, GRAY, INK as TONE, modelColor, deepen, TILE } from "./palette";
 	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 
-	type View = "review" | "prompt" | "icml" | "models" | "domains" | "confidence" | "example";
+	type View = "review" | "prompt" | "reviews" | "models" | "domains" | "confidence" | "example";
 	type Model = (typeof S.models)[number];
 	type Dom = (typeof S.domains)[number];
 	type Order = "up" | "col"; // lit first: from the bottom row up, or column by column from the left
@@ -297,38 +297,38 @@
 		return out;
 	}
 
-	// ICML 2020: one model's result on the reviews, as a wall of tiles; the lit share large on the lit tiles
-	function drawIcml(A: Box, narrow: boolean) {
+	// Private reviews: one model's result on the reviews, as a wall of tiles; the lit share large on the lit tiles
+	function drawReviews(A: Box, narrow: boolean) {
 		const m = FAB;
-		const top = header(A, { title: U["title.icml"], icon: "icml", unit: U["unit.icml"] });
-		const W = A.x1 - A.x0, f = fit(S.icml.tiles, W, A.y1 - top, 22);
+		const top = header(A, { title: U["title.reviews"], icon: "incognito", unit: U["unit.reviews"] });
+		const W = A.x1 - A.x0, f = fit(S.reviews.tiles, W, A.y1 - top, 44); // a few hundred reviews: larger tiles, so the share fits on them
 		const gw = f.cols * f.s, gh = f.rows * f.s, gx = A.x0 + (W - gw) / 2, gy = top + Math.max(0, (A.y1 - top - gh) / 2), bottom = gy + gh;
-		place({ id: "icml", n: S.icml.tiles, k: m.lit, x: gx, y: gy, cols: f.cols, rows: f.rows, s: f.s, alpha: 1, color: hue(m), order: "up" }, 0);
+		place({ id: "reviews", n: S.reviews.tiles, k: m.lit, x: gx, y: gy, cols: f.cols, rows: f.rows, s: f.s, alpha: 1, color: hue(m), order: "up" }, 0);
 		const litH = (m.lit / f.cols) * f.s, cx = gx + gw / 2, np = Math.round(Math.min(narrow ? 72 : 128, gw / (narrow ? 5.2 : 7)));
 		const k = fill(U["key.correct"], { model: m.short });
 		const knock = f.s * 0.9 >= 14 && litH >= np + STRONG_H + 40;
 		if (knock) {
 			// knocked out of the lit tiles, its key under it
 			const cy = bottom - litH / 2 - (8 + STRONG_H) / 2;
-			L.push({ id: "icml:num", x: cx, y: cy, t: pct(m.pct), k: "knock", ax: 0.5, ay: 0.5, size: np });
-			G.tags.push({ id: "icml:lit", x: cx, y: cy + np / 2 + 8 + STRONG_H / 2, at: "center", color: hue(m), t: k, strong: true });
+			L.push({ id: "reviews:num", x: cx, y: cy, t: pct(m.pct), k: "knock", ax: 0.5, ay: 0.5, size: np });
+			G.tags.push({ id: "reviews:lit", x: cx, y: cy + np / 2 + 8 + STRONG_H / 2, at: "center", color: hue(m), t: k, strong: true });
 		} else {
 			// too few lit tiles to hold it, or plain squares with the ground between them: just above the lit tiles, in
 			// the model's colour (full size where the pale tiles leave room)
 			const ey = bottom - Math.ceil(m.lit / f.cols) * f.s - 10, big = gh - litH >= np + STRONG_H + 90;
-			G.tags.push({ id: "icml:lit", x: cx, y: ey - STRONG_H / 2, at: "center", color: hue(m), t: k, strong: true });
-			L.push({ id: "icml:num", x: cx, y: ey - STRONG_H - 6, t: pct(m.pct), k: "num", ax: 0.5, ay: 1, size: Math.round(np * (big ? 1 : 0.6)), color: deepen(hue(m), 0.15) });
+			G.tags.push({ id: "reviews:lit", x: cx, y: ey - STRONG_H / 2, at: "center", color: hue(m), t: k, strong: true });
+			L.push({ id: "reviews:num", x: cx, y: ey - STRONG_H - 6, t: pct(m.pct), k: "num", ax: 0.5, ay: 1, size: Math.round(np * (big ? 1 : 0.6)), color: deepen(hue(m), 0.15) });
 		}
 		const uy = gy + (gh - litH) / 2;
-		if (uy - gy > TAG_H) G.tags.push({ id: "icml:unlit", x: cx, y: knock ? uy : gy + (gh - litH) * 0.25, at: "center", color: UNLIT, t: U["key.wrong"] });
+		if (uy - gy > TAG_H) G.tags.push({ id: "reviews:unlit", x: cx, y: knock ? uy : gy + (gh - litH) * 0.25, at: "center", color: UNLIT, t: U["key.wrong"] });
 	}
 
 	// the five models on the same reviews: five columns on one baseline, each share above its column
 	function drawModels(A: Box, narrow: boolean) {
-		const top = header(A, { title: U["title.icml"], icon: "icml", keys: "wrong", unit: U["unit.icml"] });
-		const n = S.models.length, N = S.icml.tiles;
+		const top = header(A, { title: U["title.reviews"], icon: "incognito", keys: "wrong", unit: U["unit.reviews"] });
+		const n = S.models.length, N = S.reviews.tiles;
 		if (narrow) {
-			bars(A, top, S.models.map((m, i) => ({ id: i === 0 ? "icml" : `m:${m.id}`, n: N, k: m.lit, color: hue(m), t: m.short, strong: i === 0, num: pct(m.pct) })), 6);
+			bars(A, top, S.models.map((m, i) => ({ id: i === 0 ? "reviews" : `m:${m.id}`, n: N, k: m.lit, color: hue(m), t: m.short, strong: i === 0, num: pct(m.pct) })), 6);
 			return;
 		}
 		const W = A.x1 - A.x0, gap = Math.round(Math.max(20, W * 0.028)), cw = (W - gap * (n - 1)) / n;
@@ -337,7 +337,7 @@
 		const ch = f.rows * f.s, y = A.y1 - NAME - ch;
 		S.models.forEach((m, i) => {
 			const x = A.x0 + i * (cw + gap);
-			place({ id: i === 0 ? "icml" : `m:${m.id}`, n: N, k: m.lit, x, y, cols: f.cols, rows: f.rows, s: f.s, alpha: 1, color: hue(m), order: "up" }, i * N);
+			place({ id: i === 0 ? "reviews" : `m:${m.id}`, n: N, k: m.lit, x, y, cols: f.cols, rows: f.rows, s: f.s, alpha: 1, color: hue(m), order: "up" }, i * N);
 			L.push({ id: `n:${m.id}`, x, y: y - 10, t: pct(m.pct), k: "num", ax: 0, ay: 1, size: np, color: deepen(hue(m), 0.15) });
 			G.tags.push({ id: `m:${m.id}`, x: x - 10, y: y + ch + 10 + (i === 0 ? STRONG_H : TAG_H) / 2, at: "right", color: hue(m), t: m.short, strong: i === 0 });
 		});
@@ -417,7 +417,7 @@
 		L = [];
 		used = new Set();
 		const A: Box = { x0: rs.left, x1: rs.right, y0: rs.top + top, y1: rs.top + top + h };
-		if (view === "icml") drawIcml(A, narrow);
+		if (view === "reviews") drawReviews(A, narrow);
 		else if (view === "models") drawModels(A, narrow);
 		else if (view === "domains") drawDomains(A, narrow);
 		else if (view === "confidence") drawConfidence(A, narrow);
