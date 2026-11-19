@@ -59,11 +59,11 @@ export function ground(ctx: Ctx, W: number, H: number, pitch: number) {
 	const r = pitch * 0.075;
 	for (let y = pitch / 2; y < H; y += pitch) for (let x = pitch / 2; x < W; x += pitch) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
 }
-export function setFont(ctx: Ctx, px: number, w = 600, ls = -0.02) { ctx.font = `${w} ${px}px ${FONT}`; (ctx as any).letterSpacing = `${(ls * px).toFixed(2)}px`; }
+export function setFont(ctx: Ctx, px: number, w = 600, ls = -0.02, it = false) { ctx.font = `${it ? "italic " : ""}${w} ${px}px ${FONT}`; (ctx as any).letterSpacing = `${(ls * px).toFixed(2)}px`; }
 export function measure(ctx: Ctx, s: string, px: number, w = 600, ls = -0.02) { setFont(ctx, px, w, ls); return ctx.measureText(s).width; }
-type TOpt = { w?: number; c?: string; al?: CanvasTextAlign; ls?: number; a?: number };
+type TOpt = { w?: number; c?: string; al?: CanvasTextAlign; ls?: number; a?: number; it?: boolean };
 export function txt(ctx: Ctx, s: string, x: number, y: number, px: number, o: TOpt = {}) {
-	setFont(ctx, px, o.w ?? 600, o.ls ?? -0.02);
+	setFont(ctx, px, o.w ?? 600, o.ls ?? -0.02, o.it);
 	ctx.fillStyle = o.c ?? P.ink; ctx.textAlign = o.al ?? "left"; ctx.textBaseline = "alphabetic";
 	const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * (o.a ?? 1);
 	ctx.fillText(s, x, y);
@@ -219,6 +219,7 @@ function opener({ ctx, W, H, wide, A }: V, S: Sz) {
 		txt(ctx, "56%", S.M - 8, 600, 330, { c: P.clay, ls: -0.04 });
 		lines(ctx, ["of 398 private", "peer reviews"], S.M, 700, S.sub, S.sub * 1.22, { w: 500 });
 		hl(ctx, "never made public", S.M, 880, S.sub * 1.12);
+		lines(ctx, ["A study across thousands of anonymous", "peer reviews is underway."], S.M, 975, 38, 48, { w: 400, c: P.ink2, it: true, ls: 0 });
 	} else {
 		lines(ctx, ["Who wrote", "this?"], S.M, 300, 168, 180);
 		hl(ctx, "never made public", S.M, 760, S.sub * 1.08);
@@ -226,6 +227,7 @@ function opener({ ctx, W, H, wide, A }: V, S: Sz) {
 		lines(ctx, ["Fable 5.2 names", "the reviewer of"], x, 210, S.sub, S.sub * 1.2, { w: 500 });
 		txt(ctx, "56%", x - 10, 700, 430, { c: P.clay, ls: -0.04 });
 		lines(ctx, ["of 398 private", "peer reviews"], x, 830, S.sub, S.sub * 1.2, { w: 500 });
+		lines(ctx, ["A study across thousands of", "anonymous peer reviews", "is underway."], S.M, 870, 44, 54, { w: 400, c: P.ink2, it: true, ls: 0 });
 	}
 }
 
