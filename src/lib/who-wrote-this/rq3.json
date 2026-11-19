@@ -44,11 +44,11 @@
   },
   {
    "view": "domains",
-   "t": "On texts published after its training cutoff, it also names the reviewer of 78% of Nature-family reviews, the writer of all 15 stories by authors with >1M Goodreads ratings, at least one author of 46% of arXiv papers, and the username behind 69% of comments made by active Redditors.",
+   "t": "On texts published after its training cutoff, it also names the reviewer of 78% of Nature journal reviews, the writer of all 15 stories by authors with >1M Goodreads ratings, at least one author of 46% of arXiv papers, and the username behind 69% of comments made by active Redditors.",
    "src": "paper/sections/02_introduction.tex",
    "marks": [
     {
-     "after": "Nature-family reviews,",
+     "after": "Nature journal reviews,",
      "note": "nature"
     },
     {

@@ -124,7 +124,7 @@ function p7(ctx: Ctx, W: number, H: number, A: Assets) {
 	const c = chip(ctx, M, 120, "Claude Fable 5.2", LAB, { sw: P.clay });
 	hl(ctx, "after its training cutoff", M + c.w + 30, 134, 58);
 	const cells = [
-		{ i: "nature", v: "78%", t: ["Nature-family reviews"] },
+		{ i: "nature", v: "78%", t: ["Nature journal reviews"] },
 		{ i: "book", v: "15/15", t: ["stories by authors with", ">1M Goodreads ratings"] },
 		{ i: "arxiv", v: "46%", t: ["arXiv papers", "at least one author"] },
 		{ i: "reddit", v: "69%", t: ["comments made by", "active Redditors"] },

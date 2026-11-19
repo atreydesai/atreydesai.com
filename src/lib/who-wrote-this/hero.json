@@ -340,7 +340,7 @@
    "rate": 78,
    "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
    "t": {
-    "t": "The reviewer of 78% of Nature-family reviews.",
+    "t": "The reviewer of 78% of Nature journal reviews.",
     "src": "paper/sections/02_introduction.tex"
    },
    "layout_share": 0.12
