@@ -24,6 +24,7 @@
 	// or out) marks the chart dirty and asks for one frame; the frame loop keeps going only while a line is tracing or
 	// the plot is moving over for Explore.
 	import { onMount } from "svelte";
+	import { registerSteps, stepShown } from "./steplinks.ts";
 	import { field, chart, type Mark, type Path, type Text } from "./field.svelte";
 	import { onScroll as onPageScroll, requestFrame, view as vp, lite } from "./loop";
 	import { regions } from "./field.svelte";
@@ -636,9 +637,13 @@
 		if (p !== progress) progress = p;
 	}
 	// a dash scrolls to the middle of its step
-	function go(i: number) {
+	// links to a step (steplinks.ts): #{id}/<step>, and the address bar follows the step in view
+	onMount(() => registerSteps(T.id, T.steps.map((_, i) => String(i + 1)), (i, instant) => go(i, instant)));
+	$effect(() => stepShown(T.id, step));
+
+	function go(i: number, instant = false) {
 		const el = root.querySelectorAll<HTMLElement>(".step")[i];
-		if (el) scrollTo({ top: el.getBoundingClientRect().top + scrollY + el.offsetHeight / 2 - TRIG * innerHeight, behavior: reduce ? "instant" : "smooth" });
+		if (el) scrollTo({ top: el.getBoundingClientRect().top + scrollY + el.offsetHeight / 2 - TRIG * innerHeight, behavior: instant || reduce ? "instant" : "smooth" });
 	}
 
 	// ---- the date window: two thumbs on one track, and the window between them can be dragged or moved by keys ----

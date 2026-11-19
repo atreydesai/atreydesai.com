@@ -29,6 +29,7 @@
 	// rebuilt only when an input changes and, while a tween moves, on animation frames that stop when it ends. Marks
 	// are pooled; the geometry depends on the size only, so tiles never re-lay out on scroll.
 	import { onMount } from "svelte";
+	import { registerSteps, stepShown } from "./steplinks.ts";
 	import Icon from "./Icon.svelte";
 	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
@@ -381,9 +382,13 @@
 		e.preventDefault();
 		go(i);
 	}
-	function go(i: number) {
+	// links to a step (steplinks.ts): #{id}/<step>, and the address bar follows the step in view
+	onMount(() => registerSteps(A.id, STEPS.map((s) => s.view), (i, instant) => go(i, instant)));
+	$effect(() => stepShown(A.id, step));
+
+	function go(i: number, instant = false) {
 		const top = root.getBoundingClientRect().top + scrollY;
-		scrollTo({ top: top + (AT[i] + STEP_VH[i] / 2) * innerHeight, behavior: reduce ? "instant" : "smooth" });
+		scrollTo({ top: top + (AT[i] + STEP_VH[i] / 2) * innerHeight, behavior: instant || reduce ? "instant" : "smooth" });
 	}
 
 	onMount(() => {

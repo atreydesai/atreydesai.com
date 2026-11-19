@@ -23,6 +23,7 @@
 	// leaders are measured only when the step or the size changes. Reveal order: the opener's headline, then the
 	// story's steps (prose first, then ideas).
 	import { onMount } from "svelte";
+	import { registerSteps, stepShown } from "./steplinks.ts";
 	import Icon from "./Icon.svelte";
 	import SectionOpener from "./SectionOpener.svelte";
 	import StepDashes from "./StepDashes.svelte";
@@ -60,10 +61,14 @@
 		return { r, u, at: (i: number) => (LEAD + i - 1) * u };
 	}
 	// a dash click scrolls to that step's place in the pinned story (step 0: pinned, before the first highlight)
-	function go(i: number) {
+	// links to a step (steplinks.ts): #{id}/<step>, and the address bar follows the step in view
+	onMount(() => registerSteps(S.id, [...STEPS], (i, instant) => go(i, instant)));
+	$effect(() => stepShown(S.id, step));
+
+	function go(i: number, instant = false) {
 		const { r, u, at } = geo();
 		const t = i === 0 ? at(1) * 0.5 : at(i) + 0.4 * u;
-		scrollTo({ top: r.top + scrollY + t, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+		scrollTo({ top: r.top + scrollY + t, behavior: instant || matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 	}
 	const NOTES = FOOTNOTES.notes;
 	// every displayed string that is not paper text is listed in s1.json's ui (an entry may carry a note in brackets)

@@ -28,6 +28,7 @@
 	// each step has about 60vh of scroll (75vh when it animates). Strings and numbers come from rq3.json, built in the
 	// private llm-detectors repo by docs/launch_20261116/tools/build_rq3_data.py.
 	import { onMount } from "svelte";
+	import { registerSteps, stepShown } from "./steplinks.ts";
 	import { fade } from "svelte/transition";
 	import Icon from "./Icon.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
@@ -535,10 +536,14 @@
 		if (active) kick();
 	}
 	// a dash scrolls to the middle of its step (the dev route's ?step=N does the same), showing that step at once
-	function go(i: number) {
+	// links to a step (steplinks.ts): #{id}/<step>, and the address bar follows the step in view
+	onMount(() => registerSteps(S.id, STEPS.map((s) => s.view), (i, instant) => go(i, instant)));
+	$effect(() => stepShown(S.id, step));
+
+	function go(i: number, instant = false) {
 		const a = starts[i], b = i < LAST ? starts[i + 1] : end;
 		hold(beatOf(i, LAND[i]));
-		scrollTo({ top: track.getBoundingClientRect().top + scrollY + a + (b - a) * LAND[i], behavior: reduce ? "instant" : "smooth" });
+		scrollTo({ top: track.getBoundingClientRect().top + scrollY + a + (b - a) * LAND[i], behavior: instant || reduce ? "instant" : "smooth" });
 	}
 
 	onMount(() => {

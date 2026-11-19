@@ -20,13 +20,20 @@
 	import Familiar, { FOOTNOTES as FA_NOTES } from "#lib/who-wrote-this/Familiar.svelte";
 	import Anonymity, { FOOTNOTES as AN_NOTES } from "#lib/who-wrote-this/Anonymity.svelte";
 	import { register } from "#lib/who-wrote-this/fnstore.svelte.ts";
-	import { onDestroy } from "svelte";
+	import { onDestroy, onMount } from "svelte";
+	import { followHash } from "#lib/who-wrote-this/steplinks.ts";
 	import LedeHold from "#lib/who-wrote-this/LedeHold.svelte";
 	import Defer from "#lib/who-wrote-this/Defer.svelte";
 	import C from "#lib/who-wrote-this/content.json";
 
 	const INTER_CSS = "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400;1,14..32,500&amp;display=swap";
 	import type { PageData } from "./$types";
+	// a link to a step (#anonymity/rewrite) opens the page there, and so does such a hash set later (steplinks.ts)
+	onMount(() => {
+		followHash();
+		addEventListener("hashchange", followHash);
+		return () => removeEventListener("hashchange", followHash);
+	});
 
 	let { data }: { data: PageData } = $props();
 

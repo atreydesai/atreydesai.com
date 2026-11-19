@@ -20,6 +20,7 @@
 	// only, never the step; steps change colour, opacity and which labels show. The shown step follows the scroll one
 	// step at a time, each held at least HOLD ms, and snaps when the section is off screen or a dash is clicked.
 	import { onMount } from "svelte";
+	import { registerSteps, stepShown } from "./steplinks.ts";
 	import Icon from "./Icon.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
 	import SectionOpener from "./SectionOpener.svelte";
@@ -304,6 +305,10 @@
 		prog = want === step ? p : want > step ? 1 : 0;
 	}
 	// a dash (or a footnote's ↩) scrolls to the middle of its step and shows it at once
+	// links to a step (steplinks.ts): #{id}/<step>, and the address bar follows the step in view
+	onMount(() => registerSteps(S.id, STEPS.map((_, i) => String(i + 1)), (i, instant) => go(i, instant)));
+	$effect(() => stepShown(S.id, step));
+
 	function go(i: number, instant = false) {
 		const board = i >= NB, c = board ? KC : BC, k = board ? i - NB : i, blk = board ? boardBlk : barsBlk;
 		goal = i; clearTimeout(goalT); clearTimeout(holdT);

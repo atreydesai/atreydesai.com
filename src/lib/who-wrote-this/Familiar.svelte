@@ -36,6 +36,7 @@
 	// and, while a tween moves, on animation frames that stop when it ends. Marks are pooled and placed exactly (snap),
 	// and the geometry never changes with the step, so tiles never fly or re-lay out on scroll.
 	import { onMount, untrack } from "svelte";
+	import { registerSteps, stepShown } from "./steplinks.ts";
 	import Icon from "./Icon.svelte";
 	import Reveal from "./Reveal.svelte";
 	import Tags, { type Tag } from "./Tags.svelte";
@@ -526,10 +527,14 @@
 		fillDash();
 	}
 	// a dash click scrolls to the middle of that step's stretch of the pinned stage, showing that step at once
-	function go(i: number) {
+	// links to a step (steplinks.ts): #{id}/<step>, and the address bar follows the step in view
+	onMount(() => registerSteps(F.id, STEPS.map((s) => s.view), (i, instant) => go(i, instant)));
+	$effect(() => stepShown(F.id, step));
+
+	function go(i: number, instant = false) {
 		hold(i);
 		const top = root.getBoundingClientRect().top + scrollY;
-		scrollTo({ top: top + (i + LAND) * STEP_VH * vhPx, behavior: reduce ? "instant" : "smooth" });
+		scrollTo({ top: top + (i + LAND) * STEP_VH * vhPx, behavior: instant || reduce ? "instant" : "smooth" });
 	}
 	// a footnote's ↩ (the page's list): the citing words live in the pinned stage, so go to the step that cites the note
 	function back(e: MouseEvent) {
