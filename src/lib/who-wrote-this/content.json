@@ -131,6 +131,12 @@
     "icon": "github"
    },
    {
+    "id": "thread",
+    "t": "Thread",
+    "href": "https://x.com/atreydesai/status/2123473074230292737",
+    "icon": "x"
+   },
+   {
     "id": "profiles",
     "t": "Model profiles",
     "href": "https://model-profiles.github.io/",

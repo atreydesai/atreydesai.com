@@ -25,7 +25,7 @@ arxiv: null
 pdf: "https://www.alphaxiv.org/pdf/2611.frontier-models-authorship-attribution"
 code: https://github.com/denizbt/unmasking_authors
 demo: null
-twitter: null
+twitter: "https://x.com/atreydesai/status/2123473074230292737"
 blog: /blog/who-wrote-this/
 tags:
   - NLP
