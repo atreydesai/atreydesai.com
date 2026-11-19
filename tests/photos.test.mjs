@@ -49,6 +49,13 @@ test("every original in photos/ is in the manifest, and only those", async () =>
   assert.deepEqual(manifest.map((p) => p.filename).sort(), onDisk);
 });
 
+test("pinned photos lead the page, in their order, then newest first", async () => {
+  const { pinned } = JSON.parse(await readFile(new URL("scripts/photo-pins.json", root), "utf8"));
+  assert.deepEqual(manifest.slice(0, pinned.length).map((p) => p.filename), pinned);
+  const rest = manifest.slice(pinned.length).map((p) => p.exif.date).filter(Boolean);
+  assert.deepEqual(rest, [...rest].sort().reverse(), "after the pins, newest first");
+});
+
 test("the download link is the original at its full size", async () => {
   for (const photo of manifest) {
     const file = originalFile(photo);

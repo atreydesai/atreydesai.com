@@ -40,6 +40,11 @@ missing or a different size, so rerunning it is cheap; it never deletes. If
 Wrangler is signed out, ask the user to run `npx wrangler login`; do not paste
 or ask for Cloudflare tokens.
 
+The page shows photos newest first, except those listed in
+`scripts/photo-pins.json`, which lead in that order; the first fills the large
+top-left tile. To pin or unpin a photo, edit that list and rerun
+`npm run optimize-photos` (it regenerates the committed manifest).
+
 DNS for atreydesai.com is on Cloudflare (moved from Vercel DNS). The site's
 records (apex, `www`, `*`) must stay "DNS only", pointing at Vercel; only
 `photos.atreydesai.com` (the R2 custom domain) goes through Cloudflare's proxy.

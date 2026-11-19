@@ -1,0 +1,4 @@
+{
+  "_readme": "Photos pinned to the top of the photography page, in this order, keyed by their filename in photos/. Every other photo follows, newest first. The first one fills the large feature tile at the top left (and is the photo the page preloads). A name that matches no photo fails the build.",
+  "pinned": ["152-IDG_20251109_145157_722-103.jpg"]
+}

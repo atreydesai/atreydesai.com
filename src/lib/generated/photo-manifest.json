@@ -1,5 +1,23 @@
 [
   {
+    "filename": "152-IDG_20251109_145157_722-103.jpg",
+    "v": "ddff47673b",
+    "alt": "The white dome of the US Capitol rising above green trees and a lawn under a blue sky with soft clouds.",
+    "bytes": 5608390,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/9600",
+      "iso": "ISO 50",
+      "focalLength": "6.8 mm",
+      "date": "2025-11-09"
+    },
+    "orientation": "portrait",
+    "width": 2981,
+    "height": 4000
+  },
+  {
     "filename": "228-IDG_20261106_165510_556-179.jpg",
     "v": "8b5badfb58",
     "alt": "An orange sunset lights the clouds above a street with tracks and construction barriers.",
@@ -483,24 +501,6 @@
     },
     "orientation": "portrait",
     "width": 3000,
-    "height": 4000
-  },
-  {
-    "filename": "152-IDG_20251109_145157_722-103.jpg",
-    "v": "ddff47673b",
-    "alt": "The white dome of the US Capitol rising above green trees and a lawn under a blue sky with soft clouds.",
-    "bytes": 5608390,
-    "exif": {
-      "camera": "Apple iPhone 15 Pro",
-      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
-      "aperture": "f/1.8",
-      "shutter": "1/9600",
-      "iso": "ISO 50",
-      "focalLength": "6.8 mm",
-      "date": "2025-11-09"
-    },
-    "orientation": "portrait",
-    "width": 2981,
     "height": 4000
   },
   {

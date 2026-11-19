@@ -46,6 +46,8 @@ const CAPTIONS_PATH = 'scripts/photo-captions.json';
 // alt text only (what a screen reader or an AI agent gets); unlike a caption
 // they never appear as a visible title.
 const ALTS_PATH = 'scripts/photo-alts.json';
+// Photos held at the top of the page, in order, ahead of the newest-first rest.
+const PINS_PATH = 'scripts/photo-pins.json';
 // Bump when the cached fields change shape so the cache re-extracts instead
 // of serving stale ones.
 const META_VERSION = 3;
@@ -224,7 +226,14 @@ async function optimizePhotography() {
         };
     });
 
+    const pinned = (await readJson(PINS_PATH, {})).pinned ?? [];
+    const unknown = pinned.filter((f) => !filenames.includes(f));
+    if (unknown.length) throw new Error(`${PINS_PATH} names photos that aren't in ${PHOTOS_DIR}: ${unknown.join(', ')}`);
+    const pinRank = (f) => (pinned.includes(f) ? pinned.indexOf(f) : pinned.length);
+
     photos.sort((a, b) => {
+        const pin = pinRank(a.filename) - pinRank(b.filename);
+        if (pin) return pin;
         if (a.exif.date && b.exif.date) return b.exif.date.localeCompare(a.exif.date);
         if (a.exif.date) return -1;
         if (b.exif.date) return 1;
