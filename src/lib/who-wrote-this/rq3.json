@@ -28,11 +28,11 @@
   },
   {
    "view": "reviews",
-   "t": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
-   "src": "paper/sections/01_abstract.tex",
+   "t": "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews whose authorship was never made public.",
+   "src": "paper/sections/02_introduction.tex",
    "marks": [
     {
-     "after": "written by our lab.",
+     "after": "never made public.",
      "note": "privacy"
     }
    ]
@@ -44,7 +44,7 @@
   },
   {
    "view": "domains",
-   "t": "On texts published after its training cutoff, it also names the reviewer of 76% of Nature-family reviews, the writer of all 15 stories by authors with >1M Goodreads ratings, at least one author of 46% of arXiv papers, and the username behind 69% of comments made by active Redditors.",
+   "t": "On texts published after its training cutoff, it also names the reviewer of 78% of Nature-family reviews, the writer of all 15 stories by authors with >1M Goodreads ratings, at least one author of 46% of arXiv papers, and the username behind 69% of comments made by active Redditors.",
    "src": "paper/sections/02_introduction.tex",
    "marks": [
     {
@@ -67,7 +67,7 @@
     "t": "Confident answers are almost always right.",
     "src": "paper/sections/05_rq3_human_vs_human.tex"
    },
-   "t": "When Fable 5.2's confidence is 25% or more (28% of responses), its predictions are 89% correct.",
+   "t": "When Fable 5.2's confidence is 25% or more (25% of responses), its predictions are 87% correct.",
    "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
@@ -190,9 +190,9 @@
     "src": "paper/figures/data/figure1.json"
    },
    "sub": null,
-   "k": 48,
-   "n": 63,
-   "pct": 76,
+   "k": 63,
+   "n": 81,
+   "pct": 78,
    "unit": "reviews"
   },
   {
@@ -240,8 +240,8 @@
      "t": "Fable 5.2 reports under 25% confidence",
      "src": "ui (the complement of the intro's group)"
     },
-    "n": 1587,
-    "k": 124
+    "n": 2324,
+    "k": 165
    },
    {
     "id": "hi",
@@ -249,17 +249,17 @@
      "t": "Fable 5.2 reports 25% or higher confidence",
      "src": "paper/sections/02_introduction.tex"
     },
-    "n": 603,
-    "k": 535,
-    "pct": 89,
-    "share": 28,
+    "n": 775,
+    "k": 671,
+    "pct": 87,
+    "share": 25,
     "says": {
-     "t": "It predicts the right author 89% of the time",
+     "t": "It predicts the right author 87% of the time",
      "src": "paper/sections/02_introduction.tex"
     }
    }
   ],
-  "src": "paper/figures/data/rq3_confidence.json sets.public.fable52"
+  "src": "paper/figures/data/rq3_confidence_pooled_expanded.json sets.public.fable52"
  },
  "example": {
   "kind": {
@@ -417,7 +417,7 @@
   },
   {
    "id": "nature",
-   "t": "On private peer reviews, Fable 5.2 leads with 56% accuracy, while on public reviews from the Nature journal family it reaches 76%.",
+   "t": "On private peer reviews, Fable 5.2 leads with 56% accuracy, while on public reviews from the Nature journal family it reaches 78%.",
    "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
@@ -489,8 +489,13 @@
    "src": "paper/sections/06_discussion.tex"
   },
   {
-   "paper": "it predicts the right author 89% of the time",
-   "shown": "It predicts the right author 89% of the time",
+   "paper": "When Fable 5.2's confidence is 25% or more (25% of responses), its predictions are 87% correct",
+   "shown": "When Fable 5.2's confidence is 25% or more (25% of responses), its predictions are 87% correct.",
+   "src": "paper/sections/05_rq3_human_vs_human.tex"
+  },
+  {
+   "paper": "it predicts the right author 87% of the time",
+   "shown": "It predicts the right author 87% of the time",
    "src": "paper/sections/02_introduction.tex"
   },
   {
@@ -511,11 +516,6 @@
    "note": "abridged: two clauses dropped (not only grammar); the claim is unchanged"
   },
   {
-   "paper": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab",
-   "shown": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
-   "src": "paper/sections/01_abstract.tex"
-  },
-  {
    "paper": "Fable 5.2, the best performing model in all domains (), exhibits considerable gains over Opus 5.5, which was released less than two months prior.",
    "shown": "Fable 5.2, the best performing model in all domains, exhibits considerable gains over Opus 5.5, which was released less than two months prior.",
    "src": "paper/sections/05_rq3_human_vs_human.tex"
@@ -532,7 +532,7 @@
    "value": 398,
    "shown": "398",
    "data": "paper/figures/data/rq3_sep22_view.json domains.private_reviews.fable52.all.requests",
-   "text": "paper/sections/01_abstract.tex"
+   "text": "paper/sections/02_introduction.tex"
   },
   {
    "key": "dom_famous",
@@ -543,8 +543,8 @@
   },
   {
    "key": "dom_nature",
-   "value": 76,
-   "shown": "76% (the tiles draw 48 of 63 lit; the counts are not shown as text)",
+   "value": 78,
+   "shown": "78% (the tiles draw 63 of 81 lit; the counts are not shown as text)",
    "data": "paper/figures/data/figure1_fable_sources.json rq3.rows 'Nature reviewers'",
    "text": "paper/sections/02_introduction.tex"
   },
@@ -613,39 +613,39 @@
   },
   {
    "key": "conf_answers",
-   "value": 2190,
-   "shown": "2,190 tiles",
-   "data": "paper/figures/data/rq3_confidence.json sets.public.fable52 (sum of n)",
+   "value": 3099,
+   "shown": "3,099 tiles",
+   "data": "paper/figures/data/rq3_confidence_pooled_expanded.json sets.public.fable52 (sum of n)",
    "text": "(tile count; not printed)"
   },
   {
    "key": "conf_share25",
-   "value": 27.5,
-   "shown": "28%",
-   "data": "paper/figures/data/rq3_confidence.json sets.public.fable52 bins >= 25 (603 / 2,190); table.public.fable52.share25",
+   "value": 25.0,
+   "shown": "25%",
+   "data": "paper/figures/data/rq3_confidence_pooled_expanded.json sets.public.fable52 bins >= 25 (775 / 3,099); table.public.fable52.share25",
    "text": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
    "key": "conf_acc25",
-   "value": 88.7,
-   "shown": "89%",
-   "data": "paper/figures/data/rq3_confidence.json sets.public.fable52 bins >= 25 (535 / 603); table.public.fable52.acc25",
+   "value": 86.6,
+   "shown": "87%",
+   "data": "paper/figures/data/rq3_confidence_pooled_expanded.json sets.public.fable52 bins >= 25 (671 / 775); table.public.fable52.acc25",
    "text": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
    "key": "conf_counts_drawn_only",
    "value": {
     "under25": [
-     124,
-     1587
+     165,
+     2324
     ],
     "25plus": [
-     535,
-     603
+     671,
+     775
     ]
    },
-   "shown": "not shown as text: the two groups' tiles (124 of 1,587 lit; 535 of 603 lit)",
-   "data": "paper/figures/data/rq3_confidence.json sets.public.fable52 (non-Nature public texts; the appendix figure now uses rq3_confidence_pooled_nature_20261116.json)",
+   "shown": "not shown as text: the two groups' tiles (165 of 2,324 lit; 671 of 775 lit)",
+   "data": "paper/figures/data/rq3_confidence_pooled_expanded.json sets.public.fable52",
    "text": "not printed in text"
   },
   {

@@ -296,7 +296,7 @@
    "rate": 56,
    "rate_src": "paper/figures/data/rq3_sep22_view.json domains.private_reviews.fable52.all",
    "t": {
-    "t": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
+    "t": "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews whose authorship was never made public.",
     "src": "paper/sections/01_abstract.tex"
    },
    "layout_share": 0.34
@@ -337,10 +337,10 @@
   {
    "id": "nature",
    "label": "Nature reviewers",
-   "rate": 76,
+   "rate": 78,
    "rate_src": "paper/figures/data/figure1_fable_sources.json (rq3 rows; Figure 1)",
    "t": {
-    "t": "The reviewer of 76% of Nature-family reviews.",
+    "t": "The reviewer of 78% of Nature-family reviews.",
     "src": "paper/sections/02_introduction.tex"
    },
    "layout_share": 0.12

@@ -283,8 +283,8 @@
   ],
   "punchline": {
    "v": "56%",
-   "t": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab",
-   "src": "paper/sections/01_abstract.tex"
+   "t": "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews whose authorship was never made public",
+   "src": "paper/sections/02_introduction.tex"
   },
   "steps": [
    {
@@ -593,8 +593,8 @@
     "icon": "human",
     "t": "If a human, often exactly who",
     "v": "56%",
-    "fact": "Fable 5.2 correctly names the human reviewer of 56% of 398 private peer reviews written by our lab.",
-    "src": "paper/sections/01_abstract.tex"
+    "fact": "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews whose authorship was never made public.",
+    "src": "paper/sections/01_abstract.tex (the level); paper/sections/02_introduction.tex (the fact)"
    }
   ]
  },
