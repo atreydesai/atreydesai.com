@@ -3,8 +3,8 @@
 "sample": "860-document sample",
 "refs": {
 "prose": {
-"t": "Pangram 4",
-"v": 97.7
+"t": "Pangram 4.1",
+"v": 98.3
 },
 "ideas": {
 "t": "IdeaLens",
@@ -625,6 +625,15 @@
 "both": 82.4
 },
 {
+"model": "Gemini 4 Hydrogen",
+"lab": "Google",
+"line": "closed",
+"release": "2026-11-12",
+"prose": 97.7,
+"ideas": 80.6,
+"both": 72.4
+},
+{
 "model": "GPT-6.2 Astra",
 "lab": "OpenAI",
 "line": "closed",
@@ -641,6 +650,15 @@
 "prose": 97.6,
 "ideas": 86.8,
 "both": 80.1
+},
+{
+"model": "Gemini 4 Neon",
+"lab": "Google",
+"line": "closed",
+"release": "2026-11-18",
+"prose": 98.1,
+"ideas": 94.9,
+"both": 88.7
 }
 ]
 }
