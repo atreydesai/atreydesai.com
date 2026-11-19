@@ -485,7 +485,7 @@
    ],
    "climb_label": "Accuracy on both labels",
    "detectors": {
-    "t": "On 38K documents from 24 benchmark datasets, Gemini 4 Carbon detects 97% of fully AI-generated texts vs. 96% for Pangram 4, at the same false positive rate (0.01% of English human texts).",
+    "t": "On 36K documents from 24 benchmark datasets, Gemini 4 Carbon detects 97% of fully AI-generated texts vs. 96% for Pangram 4, at the same false positive rate (0.01% of English human texts).",
     "src": "paper/sections/02_introduction.tex"
    },
    "case_note": "Claude Fable 5.2, 860-document sample"
