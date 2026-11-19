@@ -1,5 +1,491 @@
 [
   {
+    "filename": "228-IDG_20261106_165510_556-179.jpg",
+    "v": "8b5badfb58",
+    "alt": "An orange sunset lights the clouds above a street with tracks and construction barriers.",
+    "bytes": 5278743,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/310",
+      "iso": "ISO 50",
+      "focalLength": "6.8 mm",
+      "date": "2026-11-06"
+    },
+    "orientation": "portrait",
+    "width": 2998,
+    "height": 4000
+  },
+  {
+    "filename": "227-IDG_20261105_131523_967-178.jpg",
+    "v": "66825ba19f",
+    "alt": "An asphalt trail curves between trees with orange autumn foliage.",
+    "bytes": 10303147,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/1600",
+      "iso": "ISO 50",
+      "focalLength": "6.8 mm",
+      "date": "2026-11-05"
+    },
+    "orientation": "portrait",
+    "width": 3200,
+    "height": 4000
+  },
+  {
+    "filename": "182-DSC09364-133.jpg",
+    "v": "7350ccda33",
+    "alt": "A smiling man in glasses and an embroidered cream sherwani stands outdoors beneath autumn leaves.",
+    "bytes": 3655648,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "16mm F1.4 DC DN | Contemporary 017",
+      "aperture": "f/1.8",
+      "shutter": "1/500",
+      "iso": "ISO 100",
+      "focalLength": "16 mm",
+      "date": "2026-10-17"
+    },
+    "orientation": "portrait",
+    "width": 2667,
+    "height": 4000
+  },
+  {
+    "filename": "183-DSC09965-134.jpg",
+    "v": "be25ec8323",
+    "alt": "A couple in red and cream engagement outfits look at each other in front of hanging yellow flowers.",
+    "bytes": 5704234,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 18-135mm F3.5-5.6 OSS",
+      "aperture": "f/5.6",
+      "shutter": "1/100",
+      "iso": "ISO 6400",
+      "focalLength": "31 mm",
+      "date": "2026-10-17"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "226-NDM00219-177.jpg",
+    "v": "b6bf50ed34",
+    "alt": "A woman in a blue sari reaches toward a seated couple in red and cream engagement outfits.",
+    "bytes": 3786084,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "30mm F1.4 DC DN | Contemporary 016",
+      "aperture": "f/4.0",
+      "shutter": "1/160",
+      "iso": "ISO 3200",
+      "focalLength": "30 mm",
+      "date": "2026-10-17"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "225-IMG_6945-176.jpg",
+    "v": "bb2dfd9fbc",
+    "alt": "Yellow ceiling lights cross above a row of green seats in an interior.",
+    "bytes": 3411881,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/120",
+      "iso": "ISO 64",
+      "focalLength": "6.8 mm",
+      "date": "2026-10-11"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "224-IDG_20260920_192457_273-175.jpg",
+    "v": "d3f1e10576",
+    "alt": "A small moon hangs in a deep blue sky above a city of dark rooftops and warm windows.",
+    "bytes": 5562281,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/45",
+      "iso": "ISO 200",
+      "focalLength": "6.8 mm",
+      "date": "2026-09-20"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "222-IDG_20260917_192236_293-173.jpg",
+    "v": "aa3959fe54",
+    "alt": "A glass façade reflects orange sunset light against a darkening sky.",
+    "bytes": 4916402,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 9mm f/2.8",
+      "aperture": "f/2.8",
+      "shutter": "1/80",
+      "iso": "ISO 200",
+      "focalLength": "9 mm",
+      "date": "2026-09-17"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "223-IDG_20260917_192253_847-174.jpg",
+    "v": "4958465d70",
+    "alt": "A lit glass building stands against a blue and pink twilight sky.",
+    "bytes": 4562235,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/90",
+      "iso": "ISO 50",
+      "focalLength": "6.8 mm",
+      "date": "2026-09-17"
+    },
+    "orientation": "portrait",
+    "width": 2998,
+    "height": 4000
+  },
+  {
+    "filename": "221-IMG_6567-172.jpg",
+    "v": "d6dfdc49a8",
+    "alt": "Two overlapping human shadows fall across a wall in black and white.",
+    "bytes": 3667195,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/9",
+      "iso": "ISO 640",
+      "focalLength": "6.8 mm",
+      "date": "2026-07-19"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "219-IDG_20260712_131431_327-170.jpg",
+    "v": "e955276ff9",
+    "alt": "An elevated view of a bright library atrium shows visitors, tall bookshelves, and large wooden columns.",
+    "bytes": 7563586,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/850",
+      "iso": "ISO 50",
+      "focalLength": "6.8 mm",
+      "date": "2026-07-12"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "220-IMG_6498-171.jpg",
+    "v": "05acd950ed",
+    "alt": "An escalator crosses a library atrium beside a sculptural wooden column and a wall of books.",
+    "bytes": 4812874,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 9mm f/2.8",
+      "aperture": "f/2.8",
+      "shutter": "1/120",
+      "iso": "ISO 100",
+      "focalLength": "9 mm",
+      "date": "2026-07-12"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "218-IMG_6447-169.jpg",
+    "v": "36099f054a",
+    "alt": "High-rise buildings frame a lower building with curved rooflines under a gray sky.",
+    "bytes": 4144499,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/120",
+      "iso": "ISO 160",
+      "focalLength": "6.8 mm",
+      "date": "2026-07-10"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "215-IMG_6421-166.jpg",
+    "v": "bbe5b84a92",
+    "alt": "Birds gather on pale coastal rocks beneath a blue sky, with a low shore beyond.",
+    "bytes": 4623162,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/8000",
+      "iso": "ISO 80",
+      "focalLength": "6.8 mm",
+      "date": "2026-07-07"
+    },
+    "orientation": "portrait",
+    "width": 3200,
+    "height": 4000
+  },
+  {
+    "filename": "216-IMG_6422-167.jpg",
+    "v": "36a4d03401",
+    "alt": "Seabirds cluster on pale rocks next to churning surf.",
+    "bytes": 6903567,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 9mm f/2.8",
+      "aperture": "f/2.8",
+      "shutter": "1/1050",
+      "iso": "ISO 25",
+      "focalLength": "9 mm",
+      "date": "2026-07-07"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "217-IMG_6429-168.jpg",
+    "v": "07797bf04f",
+    "alt": "A snow-covered mountain rises into clouds tinted pink by evening light.",
+    "bytes": 3460658,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 9mm f/2.8",
+      "aperture": "f/2.8",
+      "shutter": "1/60",
+      "iso": "ISO 200",
+      "focalLength": "9 mm",
+      "date": "2026-07-07"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "214-IMG_6406-165.jpg",
+    "v": "f377727e25",
+    "alt": "The weathered bow of a ship rises above still water under a clear blue sky.",
+    "bytes": 3380886,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/1000",
+      "iso": "ISO 80",
+      "focalLength": "6.8 mm",
+      "date": "2026-07-06"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "212-IDG_20260703_195912_153-163.jpg",
+    "v": "c080862908",
+    "alt": "A silhouetted person lifts a camera to photograph the sunset over the water.",
+    "bytes": 3195306,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/3200",
+      "iso": "ISO 50",
+      "focalLength": "6.8 mm",
+      "date": "2026-07-03"
+    },
+    "orientation": "portrait",
+    "width": 2998,
+    "height": 4000
+  },
+  {
+    "filename": "213-IDG_20260703_201112_339-164.jpg",
+    "v": "2ed79084db",
+    "alt": "Dark clouds edged with orange and pink stretch across a sunset sky.",
+    "bytes": 4116951,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 9mm f/2.8",
+      "aperture": "f/2.8",
+      "shutter": "1/180",
+      "iso": "ISO 80",
+      "focalLength": "9 mm",
+      "date": "2026-07-03"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 3000
+  },
+  {
+    "filename": "211-IMG_6288-162.jpg",
+    "v": "a12c34241e",
+    "alt": "A person descends an escalator beneath the golden barrel vault of a station.",
+    "bytes": 4143159,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 2.22mm f/2.2",
+      "aperture": "f/2.2",
+      "shutter": "1/60",
+      "iso": "ISO 400",
+      "focalLength": "2.2 mm",
+      "date": "2026-06-20"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "210-IDG_20260527_230634_551-161.jpg",
+    "v": "c36ce73d8e",
+    "alt": "A ribbed white ceiling fans out above a railway platform and tracks.",
+    "bytes": 4568027,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/90",
+      "iso": "ISO 250",
+      "focalLength": "6.8 mm",
+      "date": "2026-05-27"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "209-IMG_6041-160.jpg",
+    "v": "ec1c8d7889",
+    "alt": "A close-up shows repeating rows of gold and dark threads in a woven surface.",
+    "bytes": 2738987,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 2.22mm f/2.2",
+      "aperture": "f/2.2",
+      "shutter": "1/4",
+      "iso": "ISO 3200",
+      "focalLength": "2.2 mm",
+      "date": "2026-04-27"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "208-IMG_5899-159.jpg",
+    "v": "009aba80d9",
+    "alt": "Layers of colorful graffiti overlap on a rough wall, with green lettering across a red stripe.",
+    "bytes": 3522948,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/60",
+      "iso": "ISO 800",
+      "focalLength": "6.8 mm",
+      "date": "2026-04-04"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "207-IMG_45ED59C0-345A-47A5-B24D-1D2187A490EF-158.jpg",
+    "v": "505e71dd55",
+    "alt": "Thin amber streaks of light cut across a dark blue surface.",
+    "bytes": 5230612,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 2.22mm f/2.2",
+      "aperture": "f/2.2",
+      "shutter": "1/60",
+      "iso": "ISO 640",
+      "focalLength": "2.2 mm",
+      "date": "2026-03-14"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 3000
+  },
+  {
+    "filename": "206-IDG_20260208_170126_369-157.jpg",
+    "v": "4dc4157484",
+    "alt": "A bare winter canopy arches over a path bordered by snow in black and white.",
+    "bytes": 6851662,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/35",
+      "iso": "ISO 250",
+      "focalLength": "6.8 mm",
+      "date": "2026-02-08"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "205-IMG_5367-156.jpg",
+    "v": "dde68eda5b",
+    "alt": "An overhead view of a table laid with plates, bowls, and colorful food.",
+    "bytes": 6081840,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/3000",
+      "iso": "ISO 80",
+      "focalLength": "6.8 mm",
+      "date": "2025-12-05"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
+    "filename": "204-IMG_5339-155.jpg",
+    "v": "d20dd8bdd4",
+    "alt": "Red and blue lights reflect in a wet city street at night.",
+    "bytes": 3699737,
+    "exif": {
+      "camera": "Apple iPhone 15 Pro",
+      "lens": "iPhone 15 Pro back triple camera 6.765mm f/1.78",
+      "aperture": "f/1.8",
+      "shutter": "1/60",
+      "iso": "ISO 500",
+      "focalLength": "6.8 mm",
+      "date": "2025-11-27"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
     "filename": "152-IDG_20251109_145157_722-103.jpg",
     "v": "ddff47673b",
     "alt": "The white dome of the US Capitol rising above green trees and a lawn under a blue sky with soft clouds.",
@@ -630,6 +1116,24 @@
     "height": 4000
   },
   {
+    "filename": "203-DSC07834-154.jpg",
+    "v": "0142a79624",
+    "alt": "A metallic sphere sculpture and the buildings around it reflect in a pool at night.",
+    "bytes": 3205572,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 50mm F1.8 OSS",
+      "aperture": "f/1.8",
+      "shutter": "1/80",
+      "iso": "ISO 1000",
+      "focalLength": "50 mm",
+      "date": "2024-01-11"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
     "filename": "153-IMG_0116-104.jpg",
     "v": "c00fae90f5",
     "alt": "A young man in a denim jacket leans against a rust-brown wooden railing on a bridge at night, gazing off to the side.",
@@ -1134,6 +1638,24 @@
     "height": 4000
   },
   {
+    "filename": "202-DSC06309-153.jpg",
+    "v": "f1623f53b0",
+    "alt": "A yellow taxi crosses a wet city street at night with its headlights on.",
+    "bytes": 6737768,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 50mm F1.8 OSS",
+      "aperture": "f/5.6",
+      "shutter": "1/40",
+      "iso": "ISO 6400",
+      "focalLength": "50 mm",
+      "date": "2023-11-25"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
     "filename": "102-DSC06027-53.jpg",
     "v": "4fbbc415b9",
     "alt": "Two smiling young men embrace for the camera, one wearing a maroon hoodie with his arm around the other, in warm light.",
@@ -1253,6 +1775,24 @@
       "shutter": "1/60",
       "iso": "ISO 100",
       "focalLength": "18 mm",
+      "date": "2023-10-07"
+    },
+    "orientation": "portrait",
+    "width": 3200,
+    "height": 4000
+  },
+  {
+    "filename": "201-DSC04962-152.jpg",
+    "v": "2e95a67dfc",
+    "alt": "Slender reeds show in silhouette against bright ripples on the water.",
+    "bytes": 3901557,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 18-135mm F3.5-5.6 OSS",
+      "aperture": "f/5.6",
+      "shutter": "1/160",
+      "iso": "ISO 320",
+      "focalLength": "88 mm",
       "date": "2023-10-07"
     },
     "orientation": "portrait",
@@ -1386,6 +1926,42 @@
     "height": 2667
   },
   {
+    "filename": "200-DSC04230-151.jpg",
+    "v": "835c689505",
+    "alt": "White steam pours from a curved outdoor vent in a black-and-white night photograph.",
+    "bytes": 2448196,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 18-135mm F3.5-5.6 OSS",
+      "aperture": "f/5.0",
+      "shutter": "1/60",
+      "iso": "ISO 6400",
+      "focalLength": "56 mm",
+      "date": "2023-09-20"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "199-DSC04169-Enhanced-NR-150.jpg",
+    "v": "d5a69f72f3",
+    "alt": "A woman is seen through a brightly lit window in a brick wall at night.",
+    "bytes": 3492543,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 18-135mm F3.5-5.6 OSS",
+      "aperture": "f/5.6",
+      "shutter": "1/6",
+      "iso": "ISO 800",
+      "focalLength": "109 mm",
+      "date": "2023-09-18"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
     "filename": "92-DSC04089-Enhanced-NR-43.jpg",
     "v": "7284bd614c",
     "alt": "Tall stadium floodlight tower beams blue light into a dark night sky above the edge of a grandstand.",
@@ -1402,6 +1978,24 @@
     "orientation": "portrait",
     "width": 2667,
     "height": 4000
+  },
+  {
+    "filename": "198-IMG_7109-149.jpg",
+    "v": "e1fc85f6d8",
+    "alt": "Red stadium lights illuminate a packed crowd at night.",
+    "bytes": 4592151,
+    "exif": {
+      "camera": "Apple iPhone 6s",
+      "lens": "iPhone 6s back camera 4.15mm f/2.2",
+      "aperture": "f/2.2",
+      "shutter": "1/15",
+      "iso": "ISO 200",
+      "focalLength": "4.2 mm",
+      "date": "2023-09-15"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 3000
   },
   {
     "filename": "91-DSC03910-42.jpg",
@@ -1452,6 +2046,42 @@
       "iso": "ISO 2500",
       "focalLength": "135 mm",
       "date": "2023-08-30"
+    },
+    "orientation": "portrait",
+    "width": 2667,
+    "height": 4000
+  },
+  {
+    "filename": "196-DSC02890-Enhanced-NR-147.jpg",
+    "v": "a1b7960dc1",
+    "alt": "A street vendor’s stand displays colorful clothing and souvenirs.",
+    "bytes": 3664752,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 18-135mm F3.5-5.6 OSS",
+      "aperture": "f/5.6",
+      "shutter": "1/160",
+      "iso": "ISO 100",
+      "focalLength": "38 mm",
+      "date": "2023-08-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "197-DSC03098-Enhanced-NR-148.jpg",
+    "v": "d032e6fe0f",
+    "alt": "Visitors stand before a large circular, multicolored artwork in a gallery.",
+    "bytes": 4388103,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 18-135mm F3.5-5.6 OSS",
+      "aperture": "f/5.0",
+      "shutter": "1/80",
+      "iso": "ISO 3200",
+      "focalLength": "41 mm",
+      "date": "2023-08-23"
     },
     "orientation": "portrait",
     "width": 2667,
@@ -1620,6 +2250,24 @@
     "height": 2667
   },
   {
+    "filename": "195-DSC02421-146.jpg",
+    "v": "fcb9e84b8c",
+    "alt": "A man in profile stands in front of a passing train blurred into horizontal streaks of light.",
+    "bytes": 2803090,
+    "exif": {
+      "camera": "SONY ILCE-6400",
+      "lens": "E 18-135mm F3.5-5.6 OSS",
+      "aperture": "f/4.0",
+      "shutter": "1/4",
+      "iso": "ISO 100",
+      "focalLength": "19 mm",
+      "date": "2023-08-17"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
     "filename": "74-DSC01792-25.jpg",
     "v": "647ecea764",
     "alt": "Lone pedestrian walks beside the sweeping curved white ribs of a modern building in cool blue dusk light.",
@@ -1758,6 +2406,18 @@
     "height": 4000
   },
   {
+    "filename": "194-IMG_6617-edited-145.jpg",
+    "v": "ef7038a819",
+    "alt": "A silhouetted figure reaches out below a spray of bright droplets in a black-and-white photograph.",
+    "bytes": 4854247,
+    "exif": {
+      "date": "2023-07-21"
+    },
+    "orientation": "portrait",
+    "width": 3000,
+    "height": 4000
+  },
+  {
     "filename": "179-IMG_6583-edited-130.jpg",
     "v": "cafc982995",
     "alt": "Clusters of pale purple trumpet-shaped blossoms on branches against a soft blue sky.",
@@ -1872,6 +2532,156 @@
     "bytes": 1381115,
     "exif": {
       "date": "2023-05-25"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "185-183A9343-136.jpg",
+    "v": "70da5507aa",
+    "alt": "A large fish turns toward the camera in green-blue aquarium water.",
+    "bytes": 3282571,
+    "exif": {
+      "camera": "Canon Canon EOS 5DS R",
+      "lens": "EF70-200mm f/2.8L IS USM",
+      "aperture": "f/2.8",
+      "shutter": "1/160",
+      "iso": "ISO 500",
+      "focalLength": "155 mm",
+      "date": "2023-05-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "186-183A9363-137.jpg",
+    "v": "afbb9079f7",
+    "alt": "Three brown rocks break the surface of rippling water.",
+    "bytes": 4044922,
+    "exif": {
+      "camera": "Canon Canon EOS 5DS R",
+      "lens": "EF70-200mm f/2.8L IS USM",
+      "aperture": "f/5.0",
+      "shutter": "1/640",
+      "iso": "ISO 100",
+      "focalLength": "200 mm",
+      "date": "2023-05-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "187-183A9365-138.jpg",
+    "v": "4bba8f813a",
+    "alt": "A small motorboat leaves a white wake on a gray sea in a black-and-white photograph.",
+    "bytes": 3910264,
+    "exif": {
+      "camera": "Canon Canon EOS 5DS R",
+      "lens": "EF70-200mm f/2.8L IS USM",
+      "aperture": "f/5.0",
+      "shutter": "1/1000",
+      "iso": "ISO 100",
+      "focalLength": "200 mm",
+      "date": "2023-05-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "188-183A9387-139.jpg",
+    "v": "10c2663fb2",
+    "alt": "A school of small fish streams diagonally across a black-and-white frame.",
+    "bytes": 2993641,
+    "exif": {
+      "camera": "Canon Canon EOS 5DS R",
+      "lens": "EF70-200mm f/2.8L IS USM",
+      "aperture": "f/3.2",
+      "shutter": "1/125",
+      "iso": "ISO 6400",
+      "focalLength": "70 mm",
+      "date": "2023-05-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "189-183A9401-140.jpg",
+    "v": "85f1462a37",
+    "alt": "A translucent white jellyfish drifts in vivid blue water.",
+    "bytes": 7013630,
+    "exif": {
+      "camera": "Canon Canon EOS 5DS R",
+      "lens": "EF70-200mm f/2.8L IS USM",
+      "aperture": "f/3.2",
+      "shutter": "1/400",
+      "iso": "ISO 6400",
+      "focalLength": "130 mm",
+      "date": "2023-05-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "190-183A9172-edited-141.jpg",
+    "v": "20cc005e8d",
+    "alt": "A dark fish swims beside a rock wall in an aquarium lit by teal water.",
+    "bytes": 2559354,
+    "exif": {
+      "date": "2023-05-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "191-183A9540-142.jpg",
+    "v": "a5d334cd2a",
+    "alt": "Bright yellow and blue reef fish cross a blue aquarium with coral along the edges.",
+    "bytes": 2794040,
+    "exif": {
+      "camera": "Canon Canon EOS 5DS R",
+      "lens": "EF70-200mm f/2.8L IS USM",
+      "aperture": "f/2.8",
+      "shutter": "1/250",
+      "iso": "ISO 100",
+      "focalLength": "200 mm",
+      "date": "2023-05-23"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
+  },
+  {
+    "filename": "192-183A9546-143.jpg",
+    "v": "b4b6c4d4f6",
+    "alt": "A blue and yellow fish swims along a reef wall under deep purple aquarium light.",
+    "bytes": 2936619,
+    "exif": {
+      "camera": "Canon Canon EOS 5DS R",
+      "lens": "EF70-200mm f/2.8L IS USM",
+      "aperture": "f/2.8",
+      "shutter": "1/200",
+      "iso": "ISO 200",
+      "focalLength": "200 mm",
+      "date": "2023-05-23"
+    },
+    "orientation": "portrait",
+    "width": 2667,
+    "height": 4000
+  },
+  {
+    "filename": "193-183A9238-edited-144.jpg",
+    "v": "3cf6e55504",
+    "alt": "A sea turtle swims near the bottom of a blue-lit aquarium.",
+    "bytes": 2867476,
+    "exif": {
+      "date": "2023-05-23"
     },
     "orientation": "landscape",
     "width": 4000,
@@ -2242,6 +3052,18 @@
     "orientation": "portrait",
     "width": 3000,
     "height": 4000
+  },
+  {
+    "filename": "184-183A8114-edited-135.jpg",
+    "v": "8c1f04f836",
+    "alt": "A crown-shaped splash and suspended water droplets catch the light against a dark background.",
+    "bytes": 2654296,
+    "exif": {
+      "date": "2023-03-29"
+    },
+    "orientation": "landscape",
+    "width": 4000,
+    "height": 2667
   },
   {
     "filename": "51-183A8137-1.jpg",
