@@ -6,7 +6,7 @@
 	// Three results, the defenses, and the closing line, one beat each. Every string is the paper's own words (checked
 	// with that repo's tools/check_ngrams.py) and every number is the paper's:
 	//   1. detect: "Frontier models now identify AI text as well as specialized detectors" (02_introduction.tex);
-	//      "Gemini 4 Carbon detects 97% of fully AI-generated texts vs. 96% for Pangram 4" (02_introduction.tex)
+	//      "Gemini 4 Carbon detects 97% of fully AI-generated texts vs. 97% for Pangram 4.1" (02_introduction.tex)
 	//   2. lab: "Fable 5.2, Opus 5.5 and Argon can identify text from OpenAI, Anthropic, and Google with 98% accuracy or
 	//      more" (04_rq2_ai_vs_ai.tex)
 	//   3. human: "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews" (02_introduction.tex);
@@ -28,11 +28,11 @@
 	];
 	export const DURATION = 19.4;
 
-	// 1 · two bars on one axis, 97% and 96% (fully AI-generated texts detected)
+	// 1 · two bars on one axis, 97% and 97% (fully AI-generated texts detected)
 	const BASE = 168, PER = 0.62;
 	const BARS = [
 		{ name: "Gemini 4 Carbon", v: 97, x: 22, color: "var(--xp-accent)" },
-		{ name: "Pangram 4", v: 96, x: 128, color: "var(--xp-human)" },
+		{ name: "Pangram 4.1", v: 97, x: 128, color: "var(--xp-human)" },
 	];
 	const BAR_W = 90;
 	// 2 · the three labs, in the paper's order

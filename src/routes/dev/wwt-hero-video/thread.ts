@@ -39,7 +39,7 @@ function pair(ctx: Ctx, a: { v: number; n: string; c: string }, b: { v: number; 
 function p3(ctx: Ctx, W: number, H: number, A: Assets) {
 	chip(ctx, M, 112, "Human or AI?", LAB, { icon: A.icon("ai", P.ink) });
 	hl(ctx, "as well as specialized detectors", M, 240, 64);
-	pair(ctx, { v: 97, n: "Gemini 4 Carbon", c: P.carbon }, { v: 96, n: "Pangram 4", c: P.gray }, 560);
+	pair(ctx, { v: 97, n: "Gemini 4 Carbon", c: P.carbon }, { v: 97, n: "Pangram 4.1", c: P.gray }, 560);
 	txt(ctx, "of fully AI-generated texts", M, 790, LAB, { w: 500, c: P.ink });
 	txt(ctx, "at the same false positive rate (0.01% of English human texts)", M, 845, SMALL, { w: 500, c: P.ink2 });
 }

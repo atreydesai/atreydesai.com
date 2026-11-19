@@ -237,7 +237,7 @@ function detect({ ctx, wide, t, A }: V, S: Sz) {
 	if (!wide) {
 		chip(ctx, S.M, 120, "Human or AI?", S.lab * 0.86, { icon: A.icon("ai", P.ink), a: c1.a });
 		lines(ctx, ["Frontier models now", "identify AI text"], S.M, 265 + h1.dy * 20, S.head, S.head * 1.08, { a: h1.a });
-		const cols = [{ x: S.M, v: 97, c: P.carbon, n: "Gemini 4 Carbon" }, { x: 560, v: 96, c: P.gray, n: "Pangram 4" }];
+		const cols = [{ x: S.M, v: 97, c: P.carbon, n: "Gemini 4 Carbon" }, { x: 560, v: 97, c: P.gray, n: "Pangram 4.1" }];
 		for (const col of cols) {
 			txt(ctx, val(col.v), col.x - 6, 625, 196, { c: col.c, ls: -0.04, a: vis });
 			txt(ctx, col.n, col.x, 690, S.lab, { c: col.c, a: nl.a });
@@ -250,7 +250,7 @@ function detect({ ctx, wide, t, A }: V, S: Sz) {
 		lines(ctx, ["Frontier models", "now identify", "AI text"], S.M, 330 + h1.dy * 20, S.head * 0.92, S.head, { a: h1.a });
 		hl(ctx, "as well as", S.M, 760, S.sub, { a: ll.a });
 		hl(ctx, "specialized detectors", S.M, 760 + S.sub * 1.3, S.sub, { a: ll.a });
-		const rows = [{ y: 330, v: 97, c: P.carbon, n: "Gemini 4 Carbon" }, { y: 700, v: 96, c: P.gray, n: "Pangram 4" }];
+		const rows = [{ y: 330, v: 97, c: P.carbon, n: "Gemini 4 Carbon" }, { y: 700, v: 97, c: P.gray, n: "Pangram 4.1" }];
 		for (const r of rows) {
 			txt(ctx, val(r.v), 1000, r.y, 300, { c: r.c, ls: -0.04, a: vis });
 			txt(ctx, r.n, 1004, r.y + 80, S.lab, { c: r.c, a: nl.a });

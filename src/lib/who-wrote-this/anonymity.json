@@ -30,7 +30,7 @@
    "t": "Refusals are rare.",
    "src": "paper/sections/06_discussion.tex",
    "more": {
-    "t": "Fable 5.2 and Opus 5.5 refuse most often, yet on under 2% of all documents and mostly on public peer reviews.",
+    "t": "Fable 5.2 and Opus 5.5 refuse most often, on under 2% of all documents (counting provider blocks and written refusals that decline to do the task at all) and mostly on public peer reviews.",
     "src": "paper/sections/06_discussion.tex"
    }
   },
@@ -71,7 +71,7 @@
  "notes": [
   {
    "n": 1,
-   "t": "Refusals are far rarer through the Anthropic API than through Claude Code. Claude Fable 5.2 returns a written refusal on 323 of 1,258 Reddit posts through Claude Code but only 3 (0.2%) through the batch API, which our results use.",
+   "t": "Refusals are far rarer through the API than through Claude Code. Claude Fable 5.2 gives no answer on 323 of 1,258 Reddit comments through Claude Code but on only 14 (1.1%, 3 blocked by the provider, 11 written refusals) through OpenRouter batches pinned to Anthropic, which our results use.",
    "src": "paper/sections/06_discussion.tex"
   },
   {
@@ -128,9 +128,9 @@
   "unit": "1 tile = 1% of texts",
   "fable": "Fable 5.2",
   "rewriter": "Gemini 4 Argon",
-  "posts": "posts",
+  "posts": "comments",
   "lt1": "<1%",
-  "refusal_line": "Fable 5.2 returns a written refusal on only {refused} ({refused_pct}%) of {posts} Reddit posts through the batch API."
+  "refusal_line": "Fable 5.2 gives no answer on only {refused} ({refused_pct}%) of {posts} Reddit comments through the API."
  },
  "ui": [
   "Original",
@@ -152,9 +152,9 @@
   "Not named",
   "Too few texts",
   "1 tile = 1% of texts",
-  "posts",
+  "comments",
   "<1%",
-  "Fable 5.2 returns a written refusal on only {refused} ({refused_pct}%) of {posts} Reddit posts through the batch API."
+  "Fable 5.2 gives no answer on only {refused} ({refused_pct}%) of {posts} Reddit comments through the API."
  ],
  "demo": [],
  "data": {
@@ -450,8 +450,8 @@
    "source": "paper/sections/06_discussion.tex",
    "under_pct": 2.0,
    "posts": 1258,
-   "refused": 3,
-   "refused_pct": 0.2
+   "refused": 14,
+   "refused_pct": 1.1
   }
  }
 }
