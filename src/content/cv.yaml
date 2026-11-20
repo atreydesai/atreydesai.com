@@ -18,12 +18,12 @@ experience:
     role_html: 'Undergraduate Researcher, <a href="https://wiki.umiacs.umd.edu/clip/index.php/Main_Page" class="link">CLIP Lab</a>'
     advisors_html: 'Advisors: <a href="https://www.cs.umd.edu/people/rudinger" class="link">Rachel Rudinger</a>, <a href="https://www.cs.umd.edu/~jbg/" class="link">Jordan Boyd-Graber</a>, & <a href="https://www.cs.umd.edu/~miyyer" class="link">Mohit Iyyer</a>'
     bullets:
+      - Authorship detection and deanonymization with frontier models
       - AI agent feedback for long-form text generation
       - Calibrating human reliance and susceptibility to VQA model explanations
       - Artifacts and distractor quality in human-written vs. LLM-generated MCQs
       - Adversarial benchmarking of VLMs on out-of-context video misinformation
       - Causal interpretability of syntactic learning in data-constrained LMs
-      - Authorship detection and deanonymization with frontier models
 
   - organization: The University of Texas at Arlington
     dates: Feb 2024 – present
