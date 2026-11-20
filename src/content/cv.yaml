@@ -23,6 +23,7 @@ experience:
       - Artifacts and distractor quality in human-written vs. LLM-generated MCQs
       - Adversarial benchmarking of VLMs on out-of-context video misinformation
       - Causal interpretability of syntactic learning in data-constrained LMs
+      - Authorship detection and deanonymization with frontier models
 
   - organization: The University of Texas at Arlington
     dates: Feb 2024 – present
@@ -55,8 +56,9 @@ experience:
 
 publications:
   groups:
-    - heading: Under Submission
+    - heading: Preprints & Under Submission
       items:
+        - '<a href="https://arxiv.org/abs/2611.26216" class="link"><span class="cv-title">Frontier models need only one text to unmask its human or AI author</span></a><br />arXiv preprint, 2026<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>*, Deniz Bölöni-Turgut*, Ty Brassington*, Minjoon Choi*, Jenna Russell*, Rishanth Rajendhran*, Bradley Emi, Hila Gonen, Hal Daumé III, John Wieting, Marzena Karpinska & Mohit Iyyer.'
         - '<span class="cv-title">Harder Benchmarks Are Not Always Better: Evaluating LLM Distractors for Multiple-Choice Benchmarks</span><br />Under review at ACL Rolling Review (ARR)<br /><span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>, Nishant Balepur & Rachel Rudinger.'
         - '<a href="/papers/adversarial-multimodal-questions.pdf" class="link"><span class="cv-title">Asking About Occluded Content Marks Adversarial Multimodal Questions</span></a><br />Under review at ACL Rolling Review (ARR)<br />HyoJung Han*, <span class="text-ink-900 dark:text-cream-100">Atrey Desai</span>*, Ishan Upadhyay, Tianyi Zheng, Eve Fleisig, Aparna Garimella, Marine Carpuat & Jordan Boyd-Graber.'
     - heading: Peer-reviewed Proceedings
@@ -144,4 +146,4 @@ skills:
   - label: Languages
     items: English (Native), Gujarati (Native), Spanish (Intermediate), Korean (Beginner).
   - label: Forecasting
-    items: "#1 global forecaster on Manifold Markets (Aug 2026); Top-3 (Mar–July, Sept 2026); Top 8 all-time in AI; #2 automated bot forecaster on Manifold Markets (Sept–Oct 2026)."
+    items: "#1 global forecaster on Manifold Markets (Aug 2026); Top-3 (Mar–July, Sept–Nov 2026); Top 8 all-time in AI; #2 automated bot forecaster on Manifold Markets (Sept–Oct 2026)."
