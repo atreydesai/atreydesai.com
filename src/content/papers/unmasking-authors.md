@@ -21,8 +21,8 @@ authors:
   - Mohit Iyyer
 year: 2026
 venue: null
-arxiv: null
-pdf: "https://www.alphaxiv.org/pdf/2611.frontier-models-authorship-attribution"
+arxiv: "https://arxiv.org/abs/2611.26216"
+pdf: "https://arxiv.org/pdf/2611.26216"
 code: https://github.com/denizbt/unmasking_authors
 demo: null
 twitter: "https://x.com/atreydesai/status/2123473074230292737"
