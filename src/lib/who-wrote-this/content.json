@@ -282,9 +282,9 @@
    }
   ],
   "punchline": {
-   "v": "56%",
-   "t": "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews whose authorship was never made public",
-   "src": "paper/sections/02_introduction.tex"
+   "v": "55%",
+   "t": "Fable 5.2 correctly names the author of 55% of 15K anonymous ICML 2020 reviews that were never made public",
+   "src": "paper/sections/01_abstract.tex"
   },
   "steps": [
    {
@@ -592,9 +592,9 @@
     "target": "which-human",
     "icon": "human",
     "t": "If a human, often exactly who",
-    "v": "56%",
-    "fact": "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews whose authorship was never made public.",
-    "src": "paper/sections/01_abstract.tex (the level); paper/sections/02_introduction.tex (the fact)"
+    "v": "55%",
+    "fact": "Fable 5.2 correctly names the author of 55% of 15K anonymous ICML 2020 reviews that were never made public.",
+    "src": "paper/sections/01_abstract.tex"
    }
   ]
  },

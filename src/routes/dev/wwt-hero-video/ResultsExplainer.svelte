@@ -9,7 +9,7 @@
 	//      "Gemini 4 Carbon detects 97% of fully AI-generated texts vs. 97% for Pangram 4.1" (02_introduction.tex)
 	//   2. lab: "Fable 5.2, Opus 5.5 and Argon can identify text from OpenAI, Anthropic, and Google with 98% accuracy or
 	//      more" (04_rq2_ai_vs_ai.tex)
-	//   3. human: "Claude Fable 5.2 names the reviewer of 56% of 398 private peer reviews" (02_introduction.tex);
+	//   3. human: "Claude Fable 5.2 names the reviewer of 55% of 15K anonymous ICML 2020 reviews" (02_introduction.tex);
 	//      the name never shows: a redacted bar resolves to a tick
 	//   4. defenses: "Defenses are limited, since models rarely refuse, writing cannot be deleted from existing weights, and
 	//      AI rewriting only partly helps" (08_conclusion.tex); the second row is cut to "writing cannot be deleted"
@@ -235,8 +235,8 @@
 	</g>
 	<path class="xp-later h-tick" d="M206 120 l4 4 l8 -9" fill="none" stroke="var(--xp-truth)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
 	<text class="xp-mono xp-later h-lead" x="14" y="152" font-size={T.label}>names the reviewer of</text>
-	<text class="xp-display xp-later h-hero" x="12" y="191" font-size={HERO} style="color: var(--xp-accent-text)">56%</text>
-	<text class="xp-prose xp-caption xp-later h-cap" style="color: var(--xp-accent-text)"><tspan x="14" y="212">of 398 private</tspan><tspan x="14" y="231">peer reviews</tspan></text>
+	<text class="xp-display xp-later h-hero" x="12" y="191" font-size={HERO} style="color: var(--xp-accent-text)">55%</text>
+	<text class="xp-prose xp-caption xp-later h-cap" style="color: var(--xp-accent-text)"><tspan x="14" y="212">of 15K anonymous</tspan><tspan x="14" y="231">ICML 2020 reviews</tspan></text>
 
 	<!-- 4 · defenses -->
 	<text class="xp-prose xp-later f-head" x="14" y="34" font-size={T.body}>Defenses are limited</text>

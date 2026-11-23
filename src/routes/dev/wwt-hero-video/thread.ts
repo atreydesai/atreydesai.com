@@ -1,8 +1,7 @@
 // The tweet thread's images, posts 2-9: one point each, at 1600x900 (X shows 16:9 uncropped), in the launch page's style
 // (v2.ts). Sized for a phone feed, where an image is about 600 px wide: nothing below 34 px here (about 13 px there).
-// Every string is the paper's own words (check_ngrams.py) and every number is the paper's, except post 3's closing line
-// (p2), which is ours, and post 6's card (p5), whose headline and note are ours and three of whose numbers come from the
-// lab-confusion record (see p5).
+// Every string is the paper's own words (check_ngrams.py) and every number is the paper's, except in post 6's card (p5),
+// whose headline and note are ours and three of whose numbers come from the lab-confusion record (see p5).
 import { P, type Assets, ground, txt, lines, wrap, hl, card, chip, cross, half, hbar, review, motif, stroke, measure } from "./v2";
 
 export const THREAD = ["p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9"];
@@ -18,11 +17,11 @@ export function drawThread(ctx: Ctx, id: string, W: number, H: number, A: Assets
 function p2(ctx: Ctx, W: number, H: number, A: Assets) {
 	motif(ctx, A.motif, -140, 60, 980, 0.05);
 	txt(ctx, "Claude Fable 5.2 names the reviewer of", M, 150, SUB, { w: 500 });
-	txt(ctx, "56%", M - 16, 600, 450, { c: P.clay, ls: -0.045 });
-	txt(ctx, "of 398 private peer reviews", M, 705, 58, { w: 600 });
+	txt(ctx, "55%", M - 16, 600, 450, { c: P.clay, ls: -0.045 });
+	txt(ctx, "of 15K anonymous ICML 2020 reviews", M, 705, 58, { w: 600 });
 	hl(ctx, "never made public", M, 820, 68);
-	review(ctx, 1040, 205, 464, 400, 1.0, { anon: 0, redact: 1, ok: 1, tickP: 1, tag: "Peer review" });
-	lines(ctx, ["A study across thousands of anonymous", "peer reviews is underway."], 1504, 776, SMALL, SMALL * 1.3, { w: 500, c: P.ink2, al: "right" });
+	review(ctx, 1040, 205, 464, 400, 1.0, { anon: 0, redact: 1, ok: 1, tickP: 1, tag: "ICML 2020" });
+	txt(ctx, "studied with IRB approval", 1504, 820, SMALL, { w: 500, c: P.ink2, al: "right" });
 }
 
 /** two results side by side: big number, name, a bar */
@@ -119,7 +118,7 @@ function p6(ctx: Ctx, W: number, H: number, A: Assets) {
 	});
 }
 
-// 7 · beyond the private reviews, after the training cutoff (the post drops the Redditors line, so the image keeps it)
+// 7 · beyond ICML, after the training cutoff (the post drops the Redditors line, so the image keeps it)
 function p7(ctx: Ctx, W: number, H: number, A: Assets) {
 	const c = chip(ctx, M, 120, "Claude Fable 5.2", LAB, { sw: P.clay });
 	hl(ctx, "after its training cutoff", M + c.w + 30, 134, 58);

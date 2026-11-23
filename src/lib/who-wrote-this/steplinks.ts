@@ -1,5 +1,6 @@
 // Links to a step inside a pinned section: /blog/who-wrote-this/#anonymity/rewrite opens the page at the anonymity
-// section's paraphrasing step. A step is named by its view (anonymity.json, rq3.json, familiarity.json steps[].view)
+// section's paraphrasing step. A link to a whole section (#which-ai, what its Share button copies) opens at the
+// section's top. A step is named by its view (anonymity.json, rq3.json, familiarity.json steps[].view)
 // or, in a section whose steps have no names, by its number from 1 (#which-ai/3, #recent/2).
 //
 // Each stepped section registers its step names and its own `go` (the same jump its step dashes use). The page calls
@@ -33,31 +34,45 @@ function index(e: Entry, key: string) {
 	return Number.isInteger(n) && n >= 1 && n <= e.keys.length ? n - 1 : -1;
 }
 
-/** Scroll to the step the address bar names, once its section has mounted (sections mount lazily). */
-export function followHash() {
+/** Aim at a target now and again while the page settles (sections above may still be mounting and changing height),
+ *  until the reader scrolls on their own. */
+function settle(aim: () => void) {
+	let moved = false;
+	const stop = () => { moved = true; };
+	const evs = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+	evs.forEach((ev) => addEventListener(ev, stop, { passive: true, once: true }));
+	const go = () => { if (!moved) { following = performance.now(); aim(); } };
+	following = performance.now();
+	requestAnimationFrame(go);
+	AIMS.forEach((ms) => setTimeout(go, ms));
+	setTimeout(() => evs.forEach((ev) => removeEventListener(ev, stop)), AIMS[AIMS.length - 1] + 500);
+}
+const AIMS = [250, 600, 1000, 1600, 2400, 3500]; // ms after the link is followed
+
+/** Scroll to the step the address bar names, once its section has mounted (sections mount lazily); or, for a whole
+ *  section's link (#which-ai; one of `sections`), to the section's top. */
+export function followHash(sections: string[] = []) {
+	const bare = /^#([\w-]+)$/.exec(decodeURIComponent(location.hash));
+	if (bare && sections.includes(bare[1])) {
+		const el = document.getElementById(bare[1]);
+		if (el) settle(() => el.scrollIntoView({ block: "start", behavior: "instant" }));
+		return;
+	}
 	const t = parse(location.hash);
 	if (!t) return;
 	const el = document.getElementById(t.id);
 	if (!el) return;
-	let moved = false; // the reader scrolling on their own ends the re-aiming below
-	const stop = () => { moved = true; };
-	const evs = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
-	evs.forEach((ev) => addEventListener(ev, stop, { passive: true, once: true }));
 	const run = (e: Entry) => {
 		const i = index(e, t.key);
 		if (i < 0) return;
-		following = performance.now();
-		// sections above may still be mounting and changing height: aim, then aim again while the page settles
-		const aim = () => { if (!moved) { following = performance.now(); e.go(i, true); } };
-		requestAnimationFrame(aim);
-		[400, 1000, 2000].forEach((ms) => setTimeout(aim, ms));
-		setTimeout(() => evs.forEach((ev) => removeEventListener(ev, stop)), 2500);
+		settle(() => e.go(i, true));
 	};
 	const e = reg.get(t.id);
 	if (e) run(e);
 	else {
 		waiting.set(t.id, run);
-		el.scrollIntoView({ block: "start" }); // brings the section near, so it mounts
+		// bring the section near, so it mounts, and keep it near while the sections above it mount and grow
+		settle(() => { if (!reg.has(t.id)) el.scrollIntoView({ block: "start", behavior: "instant" }); });
 	}
 }
 

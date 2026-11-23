@@ -14,7 +14,8 @@
 	//        - the demo, a centred column: an illustrative review, then the paper's prompt closing around it, then the
 	//          model's answer under a placeholder name (John Doe); the few words that matter are highlighted, the rest
 	//          is quiet gray, so the point reads without reading every word;
-	//        - the private reviews as a full-width wall of tiles (1 tile = 1 review), the lit share large on it;
+	//        - the ICML 2020 reviews as a full-width wall of tiles (1 tile = 10 reviews), the lit share large on it (the view
+	//          keeps its name, `reviews`, so links to #which-human/reviews still land on it);
 	//        - the five models as five columns on one baseline, their shares above them;
 	//        - Figure 1's other sets of writers as a skyline of blocks (1 tile = 1 text);
 	//        - stated confidence as two blocks side by side (1 tile = 1 answer);
@@ -298,11 +299,11 @@
 		return out;
 	}
 
-	// Private reviews: one model's result on the reviews, as a wall of tiles; the lit share large on the lit tiles
+	// ICML 2020: one model's result on the reviews, as a wall of tiles; the lit share large on the lit tiles
 	function drawReviews(A: Box, narrow: boolean) {
 		const m = FAB;
-		const top = header(A, { title: U["title.reviews"], icon: "incognito", unit: U["unit.reviews"] });
-		const W = A.x1 - A.x0, f = fit(S.reviews.tiles, W, A.y1 - top, 44); // a few hundred reviews: larger tiles, so the share fits on them
+		const top = header(A, { title: U["title.reviews"], icon: "icml", unit: U["unit.reviews"] });
+		const W = A.x1 - A.x0, f = fit(S.reviews.tiles, W, A.y1 - top, 22);
 		const gw = f.cols * f.s, gh = f.rows * f.s, gx = A.x0 + (W - gw) / 2, gy = top + Math.max(0, (A.y1 - top - gh) / 2), bottom = gy + gh;
 		place({ id: "reviews", n: S.reviews.tiles, k: m.lit, x: gx, y: gy, cols: f.cols, rows: f.rows, s: f.s, alpha: 1, color: hue(m), order: "up" }, 0);
 		const litH = (m.lit / f.cols) * f.s, cx = gx + gw / 2, np = Math.round(Math.min(narrow ? 72 : 128, gw / (narrow ? 5.2 : 7)));
@@ -326,7 +327,7 @@
 
 	// the five models on the same reviews: five columns on one baseline, each share above its column
 	function drawModels(A: Box, narrow: boolean) {
-		const top = header(A, { title: U["title.reviews"], icon: "incognito", keys: "wrong", unit: U["unit.reviews"] });
+		const top = header(A, { title: U["title.reviews"], icon: "icml", keys: "wrong", unit: U["unit.reviews"] });
 		const n = S.models.length, N = S.reviews.tiles;
 		if (narrow) {
 			bars(A, top, S.models.map((m, i) => ({ id: i === 0 ? "reviews" : `m:${m.id}`, n: N, k: m.lit, color: hue(m), t: m.short, strong: i === 0, num: pct(m.pct) })), 6);

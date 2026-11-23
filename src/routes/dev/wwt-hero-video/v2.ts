@@ -43,7 +43,7 @@ export async function loadAssets(want: [string, string][]): Promise<Assets> {
 export const ICONS: [string, string][] = [
 	["openai", P.openai], ["anthropic", P.anthropic], ["google", P.google], ["openai", "#FFFFFF"], ["anthropic", "#FFFFFF"], ["google", "#FFFFFF"],
 	["chat-x", P.ink2], ["eye-off", P.ink2], ["rewrite", P.ink2], ["human", P.ink], ["ai", P.ink], ["bulb", P.ink], ["pen", P.ink],
-	["nature", P.ink], ["arxiv", P.ink], ["reddit", P.ink], ["book", P.ink], ["quote", P.grayL],
+	["nature", P.ink], ["arxiv", P.ink], ["reddit", P.ink], ["book", P.ink], ["icml", P.ink], ["quote", P.grayL],
 ];
 
 // ── drawing
@@ -216,18 +216,16 @@ function opener({ ctx, W, H, wide, A }: V, S: Sz) {
 	if (!wide) {
 		txt(ctx, "Who wrote this?", S.M, 190, 118);
 		txt(ctx, "Fable 5.2 names the reviewer of", S.M, 300, S.sub, { w: 500 });
-		txt(ctx, "56%", S.M - 8, 600, 330, { c: P.clay, ls: -0.04 });
-		lines(ctx, ["of 398 private", "peer reviews"], S.M, 700, S.sub, S.sub * 1.22, { w: 500 });
+		txt(ctx, "55%", S.M - 8, 600, 330, { c: P.clay, ls: -0.04 });
+		lines(ctx, ["of 15K anonymous", "ICML 2020 reviews"], S.M, 700, S.sub, S.sub * 1.22, { w: 500 });
 		hl(ctx, "never made public", S.M, 880, S.sub * 1.12);
-		lines(ctx, ["A study across thousands of anonymous", "peer reviews is underway."], S.M, 975, 38, 48, { w: 400, c: P.ink2, it: true, ls: 0 });
 	} else {
 		lines(ctx, ["Who wrote", "this?"], S.M, 300, 168, 180);
 		hl(ctx, "never made public", S.M, 760, S.sub * 1.08);
 		const x = 1000;
 		lines(ctx, ["Fable 5.2 names", "the reviewer of"], x, 210, S.sub, S.sub * 1.2, { w: 500 });
-		txt(ctx, "56%", x - 10, 700, 430, { c: P.clay, ls: -0.04 });
-		lines(ctx, ["of 398 private", "peer reviews"], x, 830, S.sub, S.sub * 1.2, { w: 500 });
-		lines(ctx, ["A study across thousands of", "anonymous peer reviews", "is underway."], S.M, 870, 44, 54, { w: 400, c: P.ink2, it: true, ls: 0 });
+		txt(ctx, "55%", x - 10, 700, 430, { c: P.clay, ls: -0.04 });
+		lines(ctx, ["of 15K anonymous", "ICML 2020 reviews"], x, 830, S.sub, S.sub * 1.2, { w: 500 });
 	}
 }
 
@@ -339,20 +337,20 @@ function human({ ctx, wide, t, A }: V, S: Sz) {
 	const anon = 1 - cl((t - 0.8) / 0.2), redact = cl((t - 0.8) / 0.4), ok = cl((t - 1.3) / 0.2), tk = (t - 1.35) / 0.25;
 	if (!wide) {
 		lines(ctx, ["If a human,", "often exactly who"], S.M, 150 + h1.dy * 20, S.head * 0.95, S.head * 1.05, { a: h1.a });
-		review(ctx, S.M, 300, 936, 270, k, { a: cd.a, anon, redact, ok, tickP: tk, tag: "Peer review" });
+		review(ctx, S.M, 300, 936, 270, k, { a: cd.a, anon, redact, ok, tickP: tk, tag: "ICML 2020" });
 		const c = chip(ctx, 1008, 300, "Claude Fable 5.2", S.lab * 0.86, { sw: P.clay, a: ch.a, al: "right" });
 		stroke(ctx, [[1008 - c.w / 2, 300 + c.h / 2], [1008 - c.w / 2, 470]], (t - 0.5) / 0.3, P.clay, 3, ch.a);
-		txt(ctx, "56%", S.M - 8, 800, S.big, { c: P.clay, a: big.a, ls: -0.04 });
-		txt(ctx, "of 398 private peer reviews", S.M, 880, S.lab, { w: 500, a: s1.a });
+		txt(ctx, "55%", S.M - 8, 800, S.big, { c: P.clay, a: big.a, ls: -0.04 });
+		txt(ctx, "of 15K anonymous ICML 2020 reviews", S.M, 880, S.lab, { w: 500, a: s1.a });
 		hl(ctx, "never made public", S.M, 980, S.sub, { a: s2.a });
 	} else {
 		lines(ctx, ["If a human,", "often", "exactly who"], S.M, 230 + h1.dy * 20, S.head, S.head * 1.08, { a: h1.a });
-		review(ctx, 960, 110, 860, 330, k * 0.95, { a: cd.a, anon, redact, ok, tickP: tk, tag: "Peer review" });
+		review(ctx, 960, 110, 860, 330, k * 0.95, { a: cd.a, anon, redact, ok, tickP: tk, tag: "ICML 2020" });
 		const c = chip(ctx, 1820, 110, "Claude Fable 5.2", S.lab * 0.8, { sw: P.clay, a: ch.a, al: "right" });
 		stroke(ctx, [[1820 - c.w / 2, 110 + c.h / 2], [1820 - c.w / 2, 330]], (t - 0.5) / 0.3, P.clay, 4, ch.a);
-		txt(ctx, "56%", 950, 850, S.big * 1.05, { c: P.clay, a: big.a, ls: -0.04 });
+		txt(ctx, "55%", 950, 850, S.big * 1.05, { c: P.clay, a: big.a, ls: -0.04 });
 		hl(ctx, "never made public", S.M, 780, S.sub, { a: s2.a });
-		lines(ctx, ["of 398 private", "peer reviews"], 960, 960, S.lab * 0.9, S.lab * 1.12, { w: 500, a: s1.a });
+		lines(ctx, ["of 15K anonymous", "ICML 2020 reviews"], 960, 960, S.lab * 0.9, S.lab * 1.12, { w: 500, a: s1.a });
 	}
 }
 

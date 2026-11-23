@@ -1,7 +1,8 @@
 <script lang="ts">
-	// A share control at the foot of each section (Atrey, 17 Nov): a share icon; hovering it offers two links, the blog
-	// or this section; a click without hovering first (a tap, a keyboard press) shares the blog. On a touch screen with a
-	// share sheet it opens that; otherwise it copies the link and says so. Icons: Bootstrap Icons (MIT), the paper's
+	// A share control at the foot of each section: a share icon; hovering it offers two links, the blog or this section;
+	// a click without hovering first (a tap, a keyboard press) shares this section (/blog/who-wrote-this/#which-ai, which
+	// the page follows to the section's top). On a touch screen with a share sheet it opens that; otherwise it copies
+	// the link and says so. Icons: Bootstrap Icons (MIT), the paper's
 	// icon family. Names are sh-* so the site's Tailwind utilities never style them.
 	//   <ShareBlock url={url} id="which-ai" name="Which AI" />
 	let { url, id, name }: { url: string; id: string; name: string } = $props();
@@ -53,7 +54,7 @@
      focus close the menu) and let a mouse hover over the button or the menu keep it open. Every action has a button. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <div class="sh" role="group" aria-label="Share" onpointerenter={enter} onpointerleave={leave} onkeydown={keys} onfocusout={blur}>
-	<button type="button" class="sh-main" aria-haspopup="menu" aria-expanded={open} onclick={() => share(false)} onfocus={() => (open = !coarse())}>
+	<button type="button" class="sh-main" aria-haspopup="menu" aria-expanded={open} onclick={() => share(true)} onfocus={() => (open = !coarse())}>
 		<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M11 2.5a2.5 2.5 0 1 1 .603 1.628l-6.718 3.12a2.5 2.5 0 0 1 0 1.504l6.718 3.12a2.5 2.5 0 1 1-.488.876l-6.718-3.12a2.5 2.5 0 1 1 0-3.256l6.718-3.12A2.5 2.5 0 0 1 11 2.5m-8.5 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m11 5.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3" /></svg>
 		Share
 	</button>

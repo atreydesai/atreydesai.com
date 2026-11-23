@@ -47,14 +47,14 @@
 	type Art = "print" | "clarity" | "defenses" | "close";
 	type Beat = { dur: number; head: string; sub?: string; lines?: string[]; art: Art; level?: number };
 	// Paper text (tools/check_ngrams.py): beats 1-4 heads are the abstract's three levels (content.json); subs are the
-	// introduction's (beat 4 drops "398"); beat 5 is the introduction's "Familiarity with the writer predicts accuracy";
+	// introduction's (beat 4 drops "15K"); beat 5 is the introduction's "Familiarity with the writer predicts accuracy";
 	// beat 6 is the conclusion's "Defenses are limited, since models rarely refuse, writing cannot be deleted from existing
 	// weights, and AI rewriting only partly helps"; beat 7 is the conclusion's last line (content.json closing).
 	const BEATS: Beat[] = [
 		{ dur: 1.6, head: C.hero.ask, art: "print", level: 0 },
 		{ dur: 2.6, head: L.items[0].t, sub: "as well as specialized detectors", art: "print", level: 1 },
 		{ dur: 2.6, head: L.items[1].t, sub: "they can often name the lab behind an AI-generated text", art: "print", level: 2 },
-		{ dur: 3.2, head: L.items[2].t, sub: "names the reviewer of 56% of private peer reviews", art: "print", level: 3 },
+		{ dur: 3.2, head: L.items[2].t, sub: "names the reviewer of 55% of anonymous ICML 2020 reviews", art: "print", level: 3 },
 		{ dur: 2.6, head: "Familiarity with the writer predicts accuracy", art: "clarity" },
 		{ dur: 3.3, head: "Defenses are limited", lines: ["models rarely refuse", "writing cannot be deleted from existing weights", "AI rewriting only partly helps"], art: "defenses" },
 		{ dur: 3.8, head: C.closing.t, art: "close" },
@@ -475,7 +475,7 @@
 	<div class="rroot" data-justify="off" style:width="{frameW}px" style:height="{frameH}px">
 		<div class="rdark" style:opacity={dark}></div>
 		<div class="rplate" style:width="{plate}px" style:left="{(frameW - plate) / 2}px" style:top="{(frameH - plate) / 2}px">
-			<ResultsExplainer size="card" label="Who wrote this? Frontier models identify AI text as well as specialized detectors, name the lab behind 98% of texts from OpenAI, Anthropic and Google, and the reviewer of 56% of private peer reviews; defenses are limited." />
+			<ResultsExplainer size="card" label="Who wrote this? Frontier models identify AI text as well as specialized detectors, name the lab behind 98% of texts from OpenAI, Anthropic and Google, and the reviewer of 55% of anonymous ICML 2020 reviews; defenses are limited." />
 		</div>
 	</div>
 {:else}

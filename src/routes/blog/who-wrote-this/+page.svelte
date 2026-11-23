@@ -28,11 +28,13 @@
 
 	const INTER_CSS = "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;1,14..32,400;1,14..32,500&amp;display=swap";
 	import type { PageData } from "./$types";
-	// a link to a step (#anonymity/rewrite) opens the page there, and so does such a hash set later (steplinks.ts)
+	// a link to a step (#anonymity/rewrite) or to a section (#which-ai, what its Share button copies) opens the page
+	// there, and so does such a hash set later (steplinks.ts)
 	onMount(() => {
-		followHash();
-		addEventListener("hashchange", followHash);
-		return () => removeEventListener("hashchange", followHash);
+		const follow = () => followHash(stops.slice(1).map((s) => s.id));
+		follow();
+		addEventListener("hashchange", follow);
+		return () => removeEventListener("hashchange", follow);
 	});
 
 	let { data }: { data: PageData } = $props();
