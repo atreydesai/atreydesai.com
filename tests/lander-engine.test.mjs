@@ -41,11 +41,7 @@ import {
   pilotControls,
   windFor,
   START_LIVES,
-  DEMO_CAPTIONS,
-  DEMO_HOLD,
   attemptEmoji,
-  demoFlight,
-  demoStage,
 } from "../src/lib/arcade/lander-engine.js";
 
 const H = 1 / 120;
@@ -574,50 +570,6 @@ test("on expert, every coaster can still be reached from the start with 15% of t
         assert.ok(best.ship.fuel >= 0.15 * site.fuel, `${where}: landed with ${best.ship.fuel.toFixed(0)} of ${site.fuel}`);
       }
     }
-  }
-});
-
-// --- The demo -----------------------------------------------------------------------
-
-test("the demo flies a calm first site to its ×5 coaster, on the real rules, from any view", () => {
-  const { site, pad } = demoFlight();
-  assert.equal(site.n, 1);
-  assert.equal(site.expert, false);
-  assert.equal(site.wind, 0);
-  assert.equal(pad.multiplier, 5);
-  assert.ok(site.pads.includes(pad));
-  const order = ["burn", "fuel", "steer", "descend", "landed"];
-  for (const view of [160, 200, 260, 330, 450, 600, 800]) {
-    const ship = newShip(site, view);
-    const pilot = createPilot(pad, ship);
-    let result = null;
-    let time = 0;
-    /** @type {string[]} */
-    const seen = [];
-    /** @type {number[]} when each stage began */
-    const began = [];
-    for (let step = 0; step < 120 * 40 && !result; step++) {
-      time = step * H;
-      const stage = demoStage(pilot, ship, time);
-      if (seen[seen.length - 1] !== stage) {
-        seen.push(stage);
-        began.push(time);
-      }
-      result = stepShip(ship, pilotControls(pilot, ship, site, time), site, time, H);
-    }
-    seen.push(demoStage(pilot, ship, time));
-    began.push(time);
-    assert.equal(result?.kind, "land", `view ${view}`);
-    assert.equal(result.pad, pad);
-    // Long enough to say each line, short enough to watch: 15 to 30 s with
-    // the hold on the landing.
-    assert.ok(time + DEMO_HOLD >= 15 && time + DEMO_HOLD <= 30, `view ${view}: ${time.toFixed(1)} s`);
-    // Every caption shows, in order, each long enough to read.
-    assert.deepEqual(seen, order, `view ${view}`);
-    for (let i = 0; i < began.length - 1; i++) {
-      assert.ok(began[i + 1] - began[i] >= 2, `view ${view}: "${seen[i]}" for ${(began[i + 1] - began[i]).toFixed(1)} s`);
-    }
-    for (const stage of order) assert.ok(DEMO_CAPTIONS[stage].length > 0);
   }
 });
 

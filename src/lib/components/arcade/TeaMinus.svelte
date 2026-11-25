@@ -18,8 +18,8 @@
   } from "#lib/sfx.ts";
   import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
   import {
-    DEMO_CAPTIONS,
-    DEMO_HOLD,
+    FOOT_DROP,
+    FOOT_SPAN,
     GRAVITY,
     MAX_FUEL,
     PERIOD,
@@ -27,9 +27,6 @@
     attemptEmoji,
     clearance,
     createPilot,
-    createRng,
-    demoFlight,
-    demoStage,
     groundAt,
     livesFor,
     makeSite,
@@ -40,10 +37,16 @@
     zoomForClearance,
   } from "#lib/arcade/lander-engine.js";
   import type { CrashReason, Pad, Pilot, Ship, Site, Terrain, Touchdown } from "#lib/arcade/lander-engine.js";
+  import { createFlightLessons, teaRows } from "#lib/arcade/lander-lessons.js";
   import {
+    ACCENT,
+    CREAM,
+    HALO,
     INK,
     LID,
     MENU_ICONS,
+    NOTE_BACK,
+    NOTE_GOLD,
     PEARL,
     SPRITE_PAD,
     STRAW_PINK,
@@ -57,16 +60,21 @@
     stepPopups,
     type Popup,
   } from "#lib/arcade/art.ts";
-  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
+  import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
+  import { hexToRgb, mixHex, mixRgb } from "#lib/arcade/core/color.ts";
+  import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
+  import { beckon, chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { createFrameLoop, every } from "#lib/arcade/core/loop.ts";
+  import { clamp, lerp, smooth, snap } from "#lib/arcade/core/math.ts";
+  import { createRng, ihash, noise2 } from "#lib/arcade/core/rng.ts";
   import { emojiRows } from "#lib/arcade/share.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import { REVIVE_BLINK_SECONDS, blinkShows } from "#lib/arcade/blink.ts";
-  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import { arcadeExpert } from "#lib/boba.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import Coach from "./Coach.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
-  import DemoBar from "./DemoBar.svelte";
-  import DemoCard from "./DemoCard.svelte";
   import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
@@ -76,8 +84,11 @@
   // Tea minus: a lunar lander painted as a pixel-print night. The cup's tea is
   // its fuel, so every burn empties it a little; whatever is left on touchdown
   // is the score. All rules and physics live in lander-engine.js; this file
-  // only steps it, draws it, and wires it to the arcade. The demo flies the
-  // engine's own autopilot on the same rules, pressing the same three keys.
+  // only steps it, draws it, and wires it to the arcade. It opens straight on
+  // the countdown and teaches in flight: lander-lessons.js says what each
+  // moment needs, the shared coach slows play for a move and sets one line
+  // beside the cup or the coaster, and a dithered ghost of the cup flies the
+  // move (for the tilt, the path the engine's own autopilot would take).
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
@@ -85,7 +96,6 @@
   type Mode = "countdown" | "flying" | "landed" | "crashed" | "over";
 
   const STEP = 1 / 120;
-  const HALO = "rgba(253, 248, 243, 0.8)";
   const TEA = "#c79a6b";
   const EMPTY_CUP = "#f6eee2";
   /** Between attempts: how long the result stays up, and when it can be skipped. */
@@ -93,6 +103,8 @@
   const SKIP_AFTER = 0.7;
   const GAME_OVER_SECONDS = 1.6;
   const INTRO_SECONDS = 5;
+  /** A lesson about a thing waits this long for a site's intro to be read; a move doesn't wait. */
+  const INTRO_READ = 2.5;
   /** Below this altitude a fast descent or drift counts as unsafe. */
   const DANGER_ALTITUDE = 150;
   const LOW_FUEL = 110;
@@ -107,7 +119,6 @@
   // the theme.
 
   const NIGHT = { top: "#141a2e", mid: "#1f2547", horizon: "#3b2a52" };
-  const CREAM = "#fdf8f3";
   const EARTH = {
     ocean: "#3a6a91",
     oceanLight: "#779bbe",
@@ -117,13 +128,11 @@
     night: "#141a2e",
   };
   const SCENE_INK = "#1a1a1a";
-  const ACCENT = "#e85d4c";
   const COASTER_PAPER = "#fbf2e8";
   const LABEL_GOLD = "#704a05";
   /** Flame by heat: core, yellow, gold, red, and the tail at the ragged edge. */
   const FLAME = ["#fff6d8", "#ffd166", "#dba84d", "#e85d4c", "#8a3251"];
   const SMOKE = "#cfc6ba";
-  const NOTE_GOLD = "#ffd166";
   const LOOP_COLORS = { ink: CREAM, paper: COASTER_PAPER, slab: ACCENT, muted: CREAM };
 
   // Each terrain has its own ground, its own far silhouettes, and its own
@@ -225,9 +234,6 @@
   ];
   /** The screen-space art cell, in CSS px. World-space art uses CELL units. */
   const SC = 4;
-  /** Ordered dithering thresholds, 4 × 4. */
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
-  const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
 
   /** Full-burn flame length in cells, and how fast it retracts on cut-off. */
   const FLAME_FULL = 9;
@@ -308,10 +314,6 @@
   }
   const LANDER_GRIDS = [0, 1, 2, 3, 4].map(landerGrid);
 
-  function fuelLevel(fuel: number) {
-    return Math.max(0, Math.min(4, Math.ceil((fuel / MAX_FUEL) * 4)));
-  }
-
   // --- Types ---------------------------------------------------------------
 
   interface FlightPath {
@@ -385,7 +387,6 @@
   let bestLanding = 0;
   let paused = false;
   let gameOver = false;
-  let tipVisible = false;
   let liveMessage = "Tea minus starting";
   let localBest = 0;
   let newBest = false;
@@ -398,16 +399,31 @@
   /** Each attempt of the run as one emoji, for the shared result. */
   let attempts: string[] = [];
 
-  // The demo: asked about on a first visit, flown by the engine's autopilot.
-  /** The first-visit card is up, holding the countdown. */
-  let askDemo = false;
-  let demoOn = false;
-  let demoEnded = false;
-  let demoCaption = "";
-  let pilot: Pilot | null = null;
-  /** The autopilot's keys, shown on the touch pads while it flies. */
-  let demoHeld: Held = { left: false, right: false, thrust: false };
-  let demoBar: DemoBar | undefined;
+  // Lessons, once per device: lander-lessons.js says what each moment needs
+  // and keeps track of what the player has shown this flight; the coach
+  // slows play for a move and shows one lesson at a time.
+  const coach = createCoach("lander");
+  const lessons = createFlightLessons(coach);
+  /** The coach's lesson, whether it's fading, and where it points, copied out so the page follows them. */
+  let coachLesson: Lesson | null = null;
+  let coachLeaving = false;
+  /** The explanation is over (done, or the move made), though the slip may still be fading. */
+  let coachEnded = false;
+  let coachX: number | null = null;
+  let coachY: number | null = null;
+  let coachRing = 0;
+  /** Half the cup's width in px, when the line sits beside it with no loop: the slip keeps clear of it. */
+  let coachWidth = 0;
+  let coachSide: "above" | "below" | "left" | "right" = "above";
+  /** What in the tickets a lesson is about, so it is underlined there too. */
+  let hudLit: "tea" | "descent" | "drift" | null = null;
+  /** On touch, the hold button a move lesson is about. */
+  let padLit: keyof Held | "tilt" | null = null;
+  /** Real seconds lessons have been on screen (stops while paused): drives the ghost. */
+  let lessonClock = 0;
+  const ghostPoints: Array<{ x: number; y: number }> = [];
+  /** The world on screen, for what a lesson can point at. */
+  const view = { left: 0, right: 0, bottom: 0, top: 0 };
 
   // HUD readouts, refreshed about ten times a second rather than every frame.
   let siteN = 1;
@@ -422,7 +438,8 @@
   let tooFast = false;
   let drifting = false;
   let fuelFraction = 1;
-  let hudClock = 0;
+  /** The tickets' numbers refresh about ten times a second, not every frame. */
+  const hudTick = every(0.1);
 
   let canvas: HTMLCanvasElement;
   let playScope: HTMLElement;
@@ -483,12 +500,40 @@
   let pendingPopups: Array<{ delay: number; x: number; y: number; text: string; kind: "perfect" | "plain" | "gold" }> = [];
   let shake = 0;
 
+  // Input. Each source holds a control on its own, so letting go of one
+  // never lets go of another still held: a key by its name (W and Space
+  // both burn), a hold button by each pointer on it and by a key pressed
+  // while it has focus. A press is also latched until an engine step has
+  // seen it (in a lesson's slow motion, frames can pass without one), and a
+  // touch the browser takes back clears only its own press.
+  /** Keys down, by name, and what they hold. */
+  const keysDown = new Set<string>();
   const keys: Held = { left: false, right: false, thrust: false };
+  /** Pointers on each hold button, and a key holding it while it has focus. */
+  const padPointers: Record<keyof Held, Set<number>> = { left: new Set(), right: new Set(), thrust: new Set() };
+  const padKeys: Held = { left: false, right: false, thrust: false };
+  /** What the hold buttons hold now (it also draws them pressed). */
   let touchHeld: Held = { left: false, right: false, thrust: false };
+  /** Presses not yet seen by a step: by key, by a hold button's key, and by pointer. */
+  const pressedKeys: Held = { left: false, right: false, thrust: false };
+  const pressedPadKeys: Held = { left: false, right: false, thrust: false };
+  const pressedPointers = new Map<number, keyof Held>();
+  const pressedPads: Held = { left: false, right: false, thrust: false };
+  function clearPresses() {
+    pressedKeys.left = pressedKeys.right = pressedKeys.thrust = false;
+    pressedPadKeys.left = pressedPadKeys.right = pressedPadKeys.thrust = false;
+    pressedPads.left = pressedPads.right = pressedPads.thrust = false;
+    pressedPointers.clear();
+  }
+  /** The keys as the next engine step sees them. */
+  const input: Held = { left: false, right: false, thrust: false };
 
-  let last = 0;
-  let raf = 0;
+  /** In development, the engine's autopilot at the keys (`?autoplay`). */
+  let autoplay = false;
+  let autopilot: Pilot | null = null;
+
   let active = true;
+  const loop = createFrameLoop({ update: (dt, rawDt) => advance(dt, rawDt), draw: () => draw(), isPaused: () => paused });
   const timers = createTimers();
 
   /**
@@ -536,30 +581,6 @@
   }));
 
   const pad2 = (value: number, width: number) => String(Math.round(value)).padStart(width, "0");
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-  const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
-  /** Snaps a screen coordinate to the scene cell. */
-  const snap = (value: number) => Math.round(value / SC) * SC;
-  /** A stable 0–1 value per integer, so seeded marks never shimmer. */
-  const ihash = (n: number) => {
-    let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0xc2b2ae35);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  };
-  const hash2 = (a: number, b: number) => ihash(Math.imul(a, 73856093) ^ Math.imul(b, 19349663));
-  const smooth = (t: number) => t * t * (3 - 2 * t);
-  /** Smooth value noise on an integer lattice. */
-  function noise2(a: number, b: number) {
-    const ia = Math.floor(a);
-    const ib = Math.floor(b);
-    const fa = smooth(a - ia);
-    const fb = smooth(b - ib);
-    const top = lerp(hash2(ia, ib), hash2(ia + 1, ib), fa);
-    const bottom = lerp(hash2(ia, ib + 1), hash2(ia + 1, ib + 1), fa);
-    return lerp(top, bottom, fb);
-  }
   /** Periodic 1D value noise from a table: `u` in table cells, wrapping. */
   function tableNoise(table: number[], u: number) {
     const count = table.length;
@@ -569,13 +590,6 @@
     const b = table[(((i + 1) % count) + count) % count];
     return a + (b - a) * f;
   }
-  const rgb = (hex: string) => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-  const mixRgb = (a: number[], b: number[], t: number) => a.map((value, index) => Math.round(lerp(value, b[index], t)));
-  const toHex = (color: number[]) => `#${color.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
   function putPixel(data: Uint8ClampedArray, index: number, color: number[]) {
     data[index * 4] = color[0];
     data[index * 4 + 1] = color[1];
@@ -583,11 +597,13 @@
     data[index * 4 + 3] = 255;
   }
 
-  const controls = () => ({
-    left: keys.left || touchHeld.left,
-    right: keys.right || touchHeld.right,
-    thrust: keys.thrust || touchHeld.thrust,
-  });
+  /** The keys held now, and any press a step hasn't seen yet. */
+  function controls() {
+    input.left = keys.left || touchHeld.left || pressedKeys.left || pressedPadKeys.left || pressedPads.left;
+    input.right = keys.right || touchHeld.right || pressedKeys.right || pressedPadKeys.right || pressedPads.right;
+    input.thrust = keys.thrust || touchHeld.thrust || pressedKeys.thrust || pressedPadKeys.thrust || pressedPads.thrust;
+    return input;
+  }
 
   // World to screen. World y points up; screen y points down.
   const sx = (x: number) => viewW / 2 + (x - cam.x) * S;
@@ -604,27 +620,16 @@
   function buildSky() {
     const width = Math.max(1, Math.ceil(viewW / SC));
     const height = Math.max(1, Math.ceil(viewH / SC));
-    skyCanvas ??= document.createElement("canvas");
-    skyCanvas.width = width;
-    skyCanvas.height = height;
-    const context = skyCanvas.getContext("2d");
-    if (!context) return;
-    const image = context.createImageData(width, height);
-    const top = rgb(NIGHT.top);
-    const mid = rgb(NIGHT.mid);
-    const low = rgb(NIGHT.horizon);
+    const layer = cellLayer(skyCanvas, width, height);
+    skyCanvas = layer.canvas;
+    const { context, image } = layer;
+    if (!context || !image) return;
+    const top = hexToRgb(NIGHT.top);
+    const mid = hexToRgb(NIGHT.mid);
+    const low = hexToRgb(NIGHT.horizon);
     const bands = [top, mixRgb(top, mid, 0.5), mid, mixRgb(mid, low, 0.5), low];
-    const stops = [0, 0.2, 0.42, 0.62, 0.84].map((f) => (f * playBottom) / SC);
-    for (let y = 0; y < height; y++) {
-      let segment = 0;
-      while (segment < stops.length - 2 && y >= stops[segment + 1]) segment++;
-      const t = clamp((y - stops[segment]) / (stops[segment + 1] - stops[segment]), 0, 1);
-      // Flat for most of the band, dithered across the middle of the join.
-      const blend = clamp((t - 0.3) / 0.4, 0, 1);
-      for (let x = 0; x < width; x++) {
-        putPixel(image.data, y * width + x, bands[blend > bayer(x, y) ? segment + 1 : segment]);
-      }
-    }
+    // Flat for most of each band, dithered across the middle of each join.
+    paintBands(image.data, width, height, bands, [0, 0.2, 0.42, 0.62, 0.84].map((f) => (f * playBottom) / SC));
     const skyRows = Math.floor((playBottom * 0.8) / SC);
     if (plan.feature === "galaxy") paintGalaxy(image.data, width, Math.min(height, skyRows));
     if (plan.feature === "comet") paintComet(image.data, width, Math.min(height, skyRows));
@@ -633,7 +638,7 @@
 
   /** Lifts a sky cell a share of the way toward cream. */
   function lighten(data: Uint8ClampedArray, index: number, amount: number) {
-    const cream = rgb(CREAM);
+    const cream = hexToRgb(CREAM);
     for (let k = 0; k < 3; k++) data[index * 4 + k] = Math.round(lerp(data[index * 4 + k], cream[k], amount));
   }
 
@@ -777,8 +782,8 @@
     // Down a 2:1 pixel slope, so the trail steps like a printed line.
     const travel = Math.floor(meteor.age * METEOR_SPEED);
     const fade = t < 0.15 ? t / 0.15 : t > 0.7 ? (1 - t) / 0.3 : 1;
-    const headX = snap(meteor.x) + meteor.dir * travel * SC;
-    const headY = snap(meteor.y) + Math.floor(travel / 2) * SC;
+    const headX = snap(meteor.x, SC) + meteor.dir * travel * SC;
+    const headY = snap(meteor.y, SC) + Math.floor(travel / 2) * SC;
     ctx.fillStyle = CREAM;
     const trail = 7;
     for (let k = trail; k >= 0; k--) {
@@ -902,12 +907,12 @@
     context.putImageData(earthImage, 0, 0);
   }
   const EARTH_RGB = {
-    ocean: rgb(EARTH.ocean),
-    oceanLight: rgb(EARTH.oceanLight),
-    land: rgb(EARTH.land),
-    landLight: rgb(EARTH.landLight),
-    cloud: rgb(EARTH.cloud),
-    night: rgb(EARTH.night),
+    ocean: hexToRgb(EARTH.ocean),
+    oceanLight: hexToRgb(EARTH.oceanLight),
+    land: hexToRgb(EARTH.land),
+    landLight: hexToRgb(EARTH.landLight),
+    cloud: hexToRgb(EARTH.cloud),
+    night: hexToRgb(EARTH.night),
   };
 
   /** The earth where this site's plan hangs it, drifting a hair against the camera. */
@@ -929,9 +934,9 @@
     const drift = -16 * Math.tanh((cam.x - 100) / 700);
     const [share, down] = EARTH_SPOTS[plan.spot];
     const edge = r + Math.max(28, viewW * 0.06);
-    const x = snap(clamp(viewW * share, edge, viewW - edge) + drift);
-    // On a phone the caption spans the width, so the earth hangs below it.
-    const y = snap(playTop + r + (viewW < 640 ? 84 : 20) + down * r);
+    const x = snap(clamp(viewW * share, edge, viewW - edge) + drift, SC);
+    // On a phone the earth hangs lower, clear of anything pinned under the tickets.
+    const y = snap(playTop + r + (viewW < 640 ? 84 : 20) + down * r, SC);
     ctx.drawImage(earthCanvas, x - r, y - r, r * 2, r * 2);
   }
 
@@ -1052,7 +1057,7 @@
   function buildRange(range: Range) {
     const shape = range.near ? look.near : look.far;
     const fill = range.near ? look.range.near : look.range.far;
-    const rim = range.near ? look.range.rim : toHex(mixRgb(rgb(look.range.far), rgb(look.range.rim), 0.6));
+    const rim = range.near ? look.range.rim : mixHex(look.range.far, look.range.rim, 0.6);
     const values = silhouette(shape.style, range.period, createRng(plan.seed ^ (range.near ? 0x47 : 0x31)));
     const height = Math.ceil(viewH / SC) + 80;
     // Anchored to where the ground sits at rest (world height 90, unzoomed),
@@ -1117,7 +1122,7 @@
     let ground = Infinity;
     for (let k = 0; k < width; k++) ground = Math.min(ground, tops[best + k]);
     for (let k = 0; k < width; k++) tops[best + k] = ground;
-    const cloth = toHex(mixRgb(rgb(rim), rgb(CREAM), 0.35));
+    const cloth = mixHex(rim, CREAM, 0.35);
     const top = ground - sprite.length;
     sprite.forEach((row, y) => {
       for (let x = 0; x < width; x++) {
@@ -1139,8 +1144,8 @@
     for (const range of RANGES) {
       if (!range.canvas) continue;
       const width = range.period * SC;
-      const offset = snap((cam.x - 100) * range.factor * base);
-      const shift = snap(clamp((cam.y - restY) * base * range.factor, -0.25 * playH, 0.25 * playH));
+      const offset = snap((cam.x - 100) * range.factor * base, SC);
+      const shift = snap(clamp((cam.y - restY) * base * range.factor, -0.25 * playH, 0.25 * playH), SC);
       let x = -((offset % width) + width) % width;
       for (; x < viewW; x += width) {
         ctx.drawImage(range.canvas, x, shift, width, range.canvas.height * SC);
@@ -1167,8 +1172,8 @@
     ctx.fillStyle = CREAM;
     for (const dash of WIND_DASHES) {
       const cells = Math.max(2, Math.round(dash.length / SC));
-      const x = snap(dash.x * (viewW + 80) - 40);
-      const y = snap(playTop + dash.y * (playBottom - playTop));
+      const x = snap(dash.x * (viewW + 80) - 40, SC);
+      const y = snap(playTop + dash.y * (playBottom - playTop), SC);
       for (let k = 0; k < cells; k++) {
         ctx.globalAlpha = k === 0 ? 0.34 : 0.22 * (1 - k / cells) + 0.05;
         ctx.fillRect(x - direction * k * SC, y, SC, 2);
@@ -1480,7 +1485,7 @@
       });
     }
 
-    const palette = [...look.regolith, look.ray ?? look.regolith[0]].map(rgb);
+    const palette = [...look.regolith, look.ray ?? look.regolith[0]].map((hex) => hexToRgb(hex));
     const image = context.createImageData(STRIP_COLUMNS, STRIP_ROWS);
     for (let index = 0; index < tones.length; index++) {
       if (tones[index] >= 0) putPixel(image.data, index, palette[tones[index]]);
@@ -1505,8 +1510,8 @@
     context.clearRect(0, 0, STRIP_COLUMNS, STRIP_ROWS);
     const random = createRng(siteSeed ^ 0x7a11);
     const bend = (random() - 0.5) * 0.6;
-    const wall = toHex(mixRgb(rgb(look.regolith[3]), rgb(look.range.near), 0.45));
-    const edge = toHex(mixRgb(rgb(look.regolith[2]), rgb(look.range.near), 0.3));
+    const wall = mixHex(look.regolith[3], look.range.near, 0.45);
+    const edge = mixHex(look.regolith[2], look.range.near, 0.3);
     const lips = [-1, 1].map((side) => groundAt(site, trench.cx + side * (trench.floorHalf + trench.walls[side < 0 ? 0 : 1])));
     for (let c = 0; c < STRIP_COLUMNS; c++) {
       const x = c * CELL + 1;
@@ -1804,11 +1809,12 @@
   let worldX = 0;
   let worldY = 0;
 
+  /** A point in the cup's own frame, as drawn this frame, to world. */
   function toWorld(lx: number, ly: number) {
-    const cos = Math.cos(ship.angle);
-    const sin = Math.sin(ship.angle);
-    worldX = ship.x + lx * cos + ly * sin;
-    worldY = ship.y - lx * sin + ly * cos;
+    const cos = Math.cos(shown.angle);
+    const sin = Math.sin(shown.angle);
+    worldX = shown.x + lx * cos + ly * sin;
+    worldY = shown.y - lx * sin + ly * cos;
   }
 
   /** How many cells of flame show, clipped where the plume meets the ground. */
@@ -1816,9 +1822,9 @@
     return Math.min(flameLen, Math.max(0.5, flameReach / CELL));
   }
 
-  // The demo's autopilot pulses its burn key against the throttle's lag, so
-  // its flame follows the throttle itself rather than the key.
-  const thrustHeld = () => keys.thrust || touchHeld.thrust || (pilot !== null && ship.throttle > 0.12);
+  // The autopilot (in development) pulses its burn key against the throttle's
+  // lag, so its flame follows the throttle itself rather than the key.
+  const thrustHeld = () => keys.thrust || touchHeld.thrust || (autoplay && ship.throttle > 0.12);
 
   /** Flame length, ignition and cut-off, embers and smoke, once a frame. */
   function stepFire(dt: number) {
@@ -1854,8 +1860,8 @@
   function spawnEmber() {
     const tip = shownFlame() * CELL;
     toWorld((Math.random() - 0.5) * 2.4, -6 - tip);
-    const sin = Math.sin(ship.angle);
-    const cos = Math.cos(ship.angle);
+    const sin = Math.sin(shown.angle);
+    const cos = Math.cos(shown.angle);
     const speed = 42 + Math.random() * 38;
     const spread = (Math.random() - 0.5) * 0.55;
     spawn(
@@ -1871,8 +1877,8 @@
   function spawnSmoke(push: number) {
     const tip = shownFlame() * CELL;
     toWorld((Math.random() - 0.5) * 4, -6 - tip);
-    const sin = Math.sin(ship.angle);
-    const cos = Math.cos(ship.angle);
+    const sin = Math.sin(shown.angle);
+    const cos = Math.cos(shown.angle);
     const speed = (6 + Math.random() * 10) * push;
     spawn(
       P_SMOKE,
@@ -1974,8 +1980,8 @@
   function drawGroundLight() {
     if (ship.state === "crashed" || flameLen <= 0.05 || flameReach >= 95) return;
     const strength = (flameLen / FLAME_FULL) * (1 - flameReach / 95);
-    const sin = Math.sin(ship.angle);
-    const x = ship.x - sin * (6 + flameReach);
+    const sin = Math.sin(shown.angle);
+    const x = shown.x - sin * (6 + flameReach);
     const y = groundAt(site, x);
     const r = (30 + 26 * strength) * S;
     drawGlow(sx(x), sy(y), r, r * 0.6, strength * 0.42 * flicker());
@@ -2176,11 +2182,11 @@
   function drawLander() {
     if (!ctx || ship.state === "crashed" || !blinkShows(landerBlink)) return;
     const { px, k } = spriteScale();
-    const level = fuelLevel(ship.fuel);
+    const level = teaRows(ship.fuel);
     const sprite = cachedSprite(`tea-minus-${level}`, LANDER_GRIDS[level], px, LANDER_PALETTE, HALO);
     ctx.save();
-    ctx.translate(sx(ship.x), sy(ship.y));
-    ctx.rotate(ship.angle);
+    ctx.translate(sx(shown.x), sy(shown.y));
+    ctx.rotate(shown.angle);
     drawFlame();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
@@ -2259,7 +2265,7 @@
       const y = Math.round(popup.y);
       const width = Math.ceil((ctx.measureText(popup.text).width + 14) / SC) * SC;
       ctx.globalAlpha = Math.max(0, Math.min(1, (popup.life / popup.maxLife) * 2));
-      ctx.fillStyle = NIGHT.top;
+      ctx.fillStyle = NOTE_BACK;
       ctx.fillRect(Math.round(x - width / 2), y - 10, width, 20);
       ctx.fillStyle = popup.kind === "gold" ? NOTE_GOLD : CREAM;
       ctx.fillText(popup.text, x, y + 0.5);
@@ -2275,10 +2281,12 @@
     ctx.fillStyle = NIGHT.top;
     ctx.fillRect(0, 0, viewW, viewH);
 
+    // One shake for the whole frame, on both sides of the spotlight.
+    const jolt = shake > 0 && !reduceMotion;
+    const joltX = jolt ? (Math.random() - 0.5) * 12 * shake : 0;
+    const joltY = jolt ? (Math.random() - 0.5) * 12 * shake : 0;
     ctx.save();
-    if (shake > 0 && !reduceMotion) {
-      ctx.translate((Math.random() - 0.5) * 12 * shake, (Math.random() - 0.5) * 12 * shake);
-    }
+    ctx.translate(joltX, joltY);
     if (skyCanvas) ctx.drawImage(skyCanvas, 0, 0, skyCanvas.width * SC, skyCanvas.height * SC);
     drawStars();
     drawEarth();
@@ -2293,35 +2301,83 @@
     drawWreck();
     drawParticles(true);
     drawFlash();
+    ctx.restore();
+    // While a lesson explains, the scene dims around the cup and what the
+    // lesson is about; the ghost and the cup are drawn over it, in full light.
+    drawLessonLight();
+    ctx.save();
+    ctx.translate(joltX, joltY);
+    drawLessonGhost();
     drawLander();
     drawLandingLoop();
     ctx.restore();
     drawNotes();
+    placeCoach();
   }
 
   // --- Camera -------------------------------------------------------------------
 
   /** Zooms in as the ground comes up, following the ship through a dead zone. */
   function updateCamera(dt: number) {
-    const target = 1 + 1.5 * (mode === "countdown" ? 0 : zoomForClearance(clearance(ship, site)));
+    const target = 1 + 1.5 * (mode === "countdown" ? 0 : zoomForClearance(clearance(shown, site)));
     cam.z += (target - cam.z) * Math.min(1, dt * 2.2);
     const z = cam.z;
     const f = (z - 1) / 1.5;
     const yTarget = lerp(
       viewHUnits / 2 - 6,
-      Math.max(viewHUnits / (2 * z) - 6, groundAt(site, ship.x) + (0.27 * viewHUnits) / z),
+      Math.max(viewHUnits / (2 * z) - 6, groundAt(site, shown.x) + (0.27 * viewHUnits) / z),
       f,
     );
     cam.y += (yTarget - cam.y) * Math.min(1, dt * 5);
     const dead = (viewUnits / (2 * z)) * (0.56 - 0.46 * f);
-    const xTarget = clamp(cam.x, ship.x - dead, ship.x + dead);
+    const xTarget = clamp(cam.x, shown.x - dead, shown.x + dead);
     cam.x += (xTarget - cam.x) * Math.min(1, dt * 7);
   }
 
   function snapCamera() {
+    snapShown();
     cam.z = 1;
     cam.y = viewHUnits / 2 - 6;
     cam.x = ship.x;
+  }
+
+  // The rules step at a fixed 120 Hz. In slow motion a frame can fall
+  // between steps, so the cup (and the camera following it) is drawn where
+  // it is between its last two steps, never where a step left it: motion
+  // stays smooth at any speed, and the physics never changes.
+  /** The cup before the last step, and where it is drawn this frame. */
+  const before = { x: 0, y: 0, angle: 0 };
+  const shown = { x: 0, y: 0, angle: 0 };
+
+  /** Remembers the cup before a step. */
+  function keepBefore() {
+    before.x = ship.x;
+    before.y = ship.y;
+    before.angle = ship.angle;
+  }
+
+  /** Where to draw the cup this frame: between its last two steps while it flies, else exactly where it is. */
+  function placeShip() {
+    if (ship.state !== "flying") {
+      snapShown();
+      return;
+    }
+    const t = clamp(accumulator / STEP, 0, 1);
+    shown.x = lerp(before.x, ship.x, t);
+    shown.y = lerp(before.y, ship.y, t);
+    // The short way round, should the cup be turned right over.
+    let turn = ship.angle - before.angle;
+    if (turn > Math.PI) turn -= Math.PI * 2;
+    else if (turn < -Math.PI) turn += Math.PI * 2;
+    shown.angle = before.angle + turn * t;
+  }
+
+  /** A fresh cup (or one that has landed or crashed) is drawn exactly where it is. */
+  function snapShown() {
+    keepBefore();
+    shown.x = ship.x;
+    shown.y = ship.y;
+    shown.angle = ship.angle;
   }
 
   // --- Rules in motion ---------------------------------------------------------
@@ -2345,7 +2401,8 @@
   // Later sites pay more (the engine's site multiplier), but only the points
   // a landing earns are ever shown, never the factor behind them.
   function showIntro() {
-    showCaption("intro", "", siteIntro);
+    // The first site's intro is already up from the countdown: it keeps its clock.
+    if (caption?.kind !== "intro" || caption.line !== siteIntro) showCaption("intro", "", siteIntro);
     liveMessage = `Site ${site.n}, ${site.name}. ${siteIntro}`;
   }
 
@@ -2395,6 +2452,10 @@
   function startFlight() {
     mode = "flying";
     modeTime = 0;
+    // A key tapped before the flight doesn't carry into it as a press.
+    clearPresses();
+    lessons.start({ revived: landerBlink > 0 });
+    if (autoplay) autopilot = createPilot(richestPad(), ship);
     showIntro();
   }
 
@@ -2415,7 +2476,6 @@
 
   /** A click, tap, or game key moves on once the result has had a moment. */
   function trySkip() {
-    if (demoOn || askDemo) return;
     if ((mode === "landed" || (mode === "crashed" && lives > 0)) && modeTime >= SKIP_AFTER && !paused) {
       nextAttempt();
     }
@@ -2493,35 +2553,28 @@
       });
     });
 
-    // In the demo the strip says what this means instead.
-    if (!demoOn) {
-      const line = LANDINGS[landingTurn++ % LANDINGS.length];
-      showCaption("result", "", line);
-      liveMessage = `${line} ${result.points} points${result.feather ? ", a feather landing" : ""}.`;
-    }
+    const line = LANDINGS[landingTurn++ % LANDINGS.length];
+    showCaption("result", "", line);
+    liveMessage = `${line} ${result.points} points${result.feather ? ", a feather landing" : ""}.`;
     syncHud();
   }
 
   function crash(reason: CrashReason) {
     setThruster(0);
     sfxCrashLanding();
-    if (!demoOn) {
-      lives -= 1;
-      livesPulse += 1;
-    }
+    lives -= 1;
+    livesPulse += 1;
     path.points.push(ship.x, ship.y);
     path.crashed = true;
     mode = "crashed";
     modeTime = 0;
     breakCup();
 
-    if (!demoOn) {
-      const list = CRASHES[reason];
-      const line = list[crashTurns[reason]++ % list.length];
-      const left = lives > 0 ? `${lives} ${lives === 1 ? "lander" : "landers"} left` : "no landers left";
-      showCaption("result", "", line);
-      liveMessage = `${line} ${left[0].toUpperCase()}${left.slice(1)}.`;
-    }
+    const list = CRASHES[reason];
+    const line = list[crashTurns[reason]++ % list.length];
+    const left = lives > 0 ? `${lives} ${lives === 1 ? "lander" : "landers"} left` : "no landers left";
+    showCaption("result", "", line);
+    liveMessage = `${line} ${left[0].toUpperCase()}${left.slice(1)}.`;
     syncHud();
   }
 
@@ -2530,7 +2583,7 @@
     const sin = Math.sin(ship.angle);
     const cos = Math.cos(ship.angle);
     const speed = Math.hypot(ship.vx, ship.vy);
-    const level = fuelLevel(ship.fuel);
+    const level = teaRows(ship.fuel);
     const centerY = (LANDER_TOP - 8) / 2;
     for (const [from, to] of SLICES) {
       const lx = ((from + to) / 2 - LANDER_COLUMNS / 2) * CELL;
@@ -2671,26 +2724,27 @@
 
   function fly(dt: number) {
     accumulator += dt;
-    const held = controls();
     while (accumulator >= STEP) {
       accumulator -= STEP;
-      // The demo's autopilot decides every step, as the tests fly it.
-      const input = pilot ? pilotControls(pilot, ship, site, flightTime) : held;
-      const result = stepShip(ship, input, site, flightTime, STEP, ceiling);
+      const held = autoplay ? autoplayInput() : controls();
+      clearPresses();
+      keepBefore();
+      const result = stepShip(ship, held, site, flightTime, STEP, ceiling);
       flightTime += STEP;
       if (result) {
         accumulator = 0;
-        if (!demoOn) attempts = [...attempts, attemptEmoji(result)];
+        attempts = [...attempts, attemptEmoji(result)];
+        lessons.touchdown(result);
         if (result.kind === "land") land(result);
         else crash(result.reason);
         return;
       }
+      lessons.step(held, ship, site, STEP);
       samplePath();
       if (ship.throttle > 0.08) raiseDust();
     }
 
     setThruster(ship.throttle);
-    if (pilot) showDemoKeys();
 
     if (ship.fuel <= 0 && !emptyNoted) {
       emptyNoted = true;
@@ -2712,11 +2766,7 @@
       sfxLowFuel();
     }
 
-    hudClock += dt;
-    if (hudClock >= 0.1) {
-      hudClock = 0;
-      syncHud();
-    }
+    if (hudTick(dt)) syncHud();
   }
 
   function syncHud() {
@@ -2737,27 +2787,25 @@
     fuelFraction = ship.fuel / MAX_FUEL;
   }
 
-  function frame(timestamp: number) {
-    if (!active) return;
-    if (!last) last = timestamp;
-    const rawDt = (timestamp - last) / 1000;
-    last = timestamp;
-    const dt = Math.min(rawDt, 0.05);
-
-    if (paused) {
-      // Still drawn, so the theme toggle shows through the pause card.
-      draw();
-      raf = requestAnimationFrame(frame);
-      return;
-    }
+  /**
+   * One frame of play, `realDt` real seconds (capped). The loop still draws
+   * while paused, so the theme toggle shows through the pause card, but
+   * doesn't call this.
+   */
+  function advance(realDt: number, rawDt: number) {
+    // A lesson eases play into slow motion while it explains, and back out
+    // once it ends: the move made, Continue, or the thing gone from view.
+    const dt = mode === "countdown" ? realDt : coach.step(rawDt, realDt);
+    lessonClock += realDt;
+    // The spotlight comes up with an explanation and goes as it ends or the move is made.
+    const explaining = mode !== "countdown" && coach.current && !coach.leaving && !coach.acting && (coach.current.slow ?? 1) < 1;
+    const dimTarget = explaining ? 1 : 0;
+    lessonDim = reduceMotion ? dimTarget : lessonDim + (dimTarget - lessonDim) * (1 - Math.exp(-realDt / 0.18));
     clock += dt;
     stepMeteor(dt);
 
     if (mode === "countdown") {
-      // The first-visit card holds the countdown until it is answered.
-      const step = askDemo
-        ? { elapsed: countdownElapsed, count: countdown, beep: false, done: false }
-        : stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
+      const step = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
       countdownElapsed = step.elapsed;
       if (step.beep) {
         countdown = step.count;
@@ -2767,32 +2815,29 @@
     } else {
       modeTime += dt;
       landerBlink = Math.max(0, landerBlink - dt);
-      if (mode === "flying") fly(dt);
-      if (demoOn) {
-        // The demo never moves on: it holds on its landing, then is over.
-        if (pilot && !demoEnded) {
-          const line = DEMO_CAPTIONS[demoStage(pilot, ship, flightTime)];
-          if (line !== demoCaption) demoCaption = line;
-        }
-        if (mode !== "flying" && modeTime >= DEMO_HOLD && !demoEnded) void endDemo();
-      } else if (mode === "landed" || (mode === "crashed" && lives > 0)) {
+      if (mode === "flying") {
+        fly(dt);
+        // A site's intro gets a moment to be read before a thing's lesson takes its place.
+        const reading = caption?.kind === "intro" && captionAge < INTRO_READ;
+        if (mode === "flying") lessons.check({ ship, site, time: flightTime }, viewNow(), ceiling, reading);
+      }
+      if (mode === "landed" || (mode === "crashed" && lives > 0)) {
         if (modeTime >= RESULT_SECONDS) nextAttempt();
       } else if (mode === "crashed" && modeTime >= GAME_OVER_SECONDS) {
         void endGame();
       }
+      placeShip();
       stepEffects(dt);
     }
 
     if (caption) {
-      captionAge += dt;
+      captionAge += realDt;
       if ((caption.kind === "intro" && captionAge >= INTRO_SECONDS) || (caption.kind === "note" && captionAge >= 4)) {
         caption = null;
       }
     }
 
     updateCamera(dt);
-    draw();
-    raf = requestAnimationFrame(frame);
   }
 
   // --- Input ---------------------------------------------------------------
@@ -2807,10 +2852,6 @@
     " ": "thrust",
   };
 
-  function pressed(control: keyof Held) {
-    if (control === "thrust" && tipVisible && mode !== "countdown") tipVisible = false;
-  }
-
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === "Tab") {
       onPlayfieldTab(event);
@@ -2821,13 +2862,14 @@
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     // A focused control keeps Space and Enter for itself.
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
-    const control = KEY_CONTROLS[key];
-    // The demo flies itself, and the first-visit card waits for an answer:
-    // the game's own keys do nothing, and never scroll the page.
-    if (demoOn || askDemo) {
-      if (control) event.preventDefault();
+    // Enter (on the playfield) ends the explanation that is up; a held
+    // Enter repeating never skips the one after it.
+    if (key === "Enter" && coach.current && !coach.leaving) {
+      event.preventDefault();
+      if (!event.repeat) continueLesson();
       return;
     }
+    const control = KEY_CONTROLS[key];
     if (key === "Enter") {
       if (!event.repeat) trySkip();
       return;
@@ -2835,51 +2877,103 @@
     if (!control) return;
     // Arrows and Space never scroll the page underneath.
     event.preventDefault();
-    if (!event.repeat) trySkip();
-    keys[control] = true;
-    pressed(control);
+    keysDown.add(key);
+    syncKeys();
+    if (event.repeat) return;
+    pressedKeys[control] = true;
+    // A press that moves on to the next flight is held there, not counted as a tap in it.
+    trySkip();
   }
 
   function onKeyUp(event: KeyboardEvent) {
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-    const control = KEY_CONTROLS[key];
-    if (control) keys[control] = false;
+    if (keysDown.delete(key)) syncKeys();
+  }
+
+  /** What the keys down hold: a control stays held while any of its keys is. */
+  function syncKeys() {
+    keys.left = keys.right = keys.thrust = false;
+    for (const key of keysDown) {
+      const control = KEY_CONTROLS[key];
+      if (control) keys[control] = true;
+    }
+  }
+
+  /** What the hold buttons hold: any pointer on one, or a key on it while it has focus. */
+  function syncPads() {
+    const left = padPointers.left.size > 0 || padKeys.left;
+    const right = padPointers.right.size > 0 || padKeys.right;
+    const thrust = padPointers.thrust.size > 0 || padKeys.thrust;
+    if (left !== touchHeld.left || right !== touchHeld.right || thrust !== touchHeld.thrust) touchHeld = { left, right, thrust };
+  }
+
+  /** The presses by pointer still waiting for a step, by control. */
+  function syncPointerPresses() {
+    pressedPads.left = pressedPads.right = pressedPads.thrust = false;
+    for (const control of pressedPointers.values()) pressedPads[control] = true;
   }
 
   function releaseAll() {
-    keys.left = keys.right = keys.thrust = false;
-    if (touchHeld.left || touchHeld.right || touchHeld.thrust) {
-      touchHeld = { left: false, right: false, thrust: false };
+    keysDown.clear();
+    syncKeys();
+    for (const control of ["left", "right", "thrust"] as const) {
+      padPointers[control].clear();
+      padKeys[control] = false;
     }
-  }
-
-  function holdPad(control: keyof Held, down: boolean) {
-    if (down && (paused || gameOver || demoOn || askDemo)) return;
-    if (touchHeld[control] === down) return;
-    touchHeld = { ...touchHeld, [control]: down };
-    if (down) {
-      trySkip();
-      pressed(control);
-    }
+    clearPresses();
+    syncPads();
   }
 
   function padDown(event: PointerEvent, control: keyof Held) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
+    if (paused || gameOver) return;
     const target = event.currentTarget as HTMLElement;
     try {
       target.setPointerCapture(event.pointerId);
     } catch {
       // Capture is a nicety; the up and cancel handlers still release.
     }
-    holdPad(control, true);
+    padPointers[control].add(event.pointerId);
+    pressedPointers.set(event.pointerId, control);
+    syncPointerPresses();
+    syncPads();
+    trySkip();
   }
 
+  /** A pointer lifted (or its capture lost) lets go of its own hold only. */
+  function padUp(event: PointerEvent, control: keyof Held) {
+    if (padPointers[control].delete(event.pointerId)) syncPads();
+  }
+
+  /** A touch the browser took back (a scroll, a system gesture) never counts as a press, and ends only its own hold. */
+  function padCancel(event: PointerEvent, control: keyof Held) {
+    padPointers[control].delete(event.pointerId);
+    if (pressedPointers.delete(event.pointerId)) syncPointerPresses();
+    syncPads();
+  }
+
+  /** Space or Enter on a focused hold button holds it, as a key of its own. */
   function padKey(event: KeyboardEvent, control: keyof Held, down: boolean) {
     if (event.key !== " " && event.key !== "Enter") return;
     event.preventDefault();
-    if (down && event.repeat) return;
-    holdPad(control, down);
+    if (down) {
+      if (event.repeat || paused || gameOver) return;
+      padKeys[control] = true;
+      pressedPadKeys[control] = true;
+      syncPads();
+      trySkip();
+    } else {
+      padKeys[control] = false;
+      syncPads();
+    }
+  }
+
+  /** Focus leaving a hold button ends the key's hold on it, not a pointer's. */
+  function padBlur(control: keyof Held) {
+    if (!padKeys[control]) return;
+    padKeys[control] = false;
+    syncPads();
   }
 
   function onStagePointer(event: PointerEvent) {
@@ -2891,8 +2985,7 @@
   // --- Pause, restart, and finish -----------------------------------------
 
   async function pauseGame() {
-    // Nothing runs behind the first-visit card, so there is nothing to pause.
-    if (gameOver || paused || askDemo) return;
+    if (gameOver || paused) return;
     paused = true;
     releaseAll();
     setThruster(0);
@@ -2905,12 +2998,11 @@
   function resumeGame() {
     if (gameOver || !paused) return;
     paused = false;
-    last = 0;
+    loop.resync();
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = demoOn ? "Demo resumed" : "Game resumed";
-    if (demoOn) demoBar?.focus();
-    else focusPlayfield();
+    liveMessage = "Game resumed";
+    focusPlayfield();
   }
 
   /**
@@ -2944,6 +3036,7 @@
     if (gameOver) return;
     gameOver = true;
     mode = "over";
+    lessons.end();
     releaseAll();
     setThruster(0);
     const result = concludeRun("lander", score);
@@ -2970,7 +3063,8 @@
 
   /** A new mission: fresh seeds, a full set of landers, site 1, and the countdown. */
   function newMission() {
-    seedBase = Math.floor(Math.random() * 1_000_000);
+    seedBase = devSeed() ?? Math.floor(Math.random() * 1_000_000);
+    autoplay = devAutoplay();
     landingTurn = Math.floor(Math.random() * LANDINGS.length);
     crashTurns = {
       fast: Math.floor(Math.random() * 3),
@@ -2991,7 +3085,9 @@
     newBest = false;
     popups = [];
     pendingPopups = [];
-    caption = null;
+    lessons.end();
+    lessons.newRun();
+    coach.reset();
     enterSite(1);
     resetAttempt();
     mode = "countdown";
@@ -2999,7 +3095,9 @@
     countdown = COUNTDOWN_SECONDS;
     countdownElapsed = 0;
     goVisible = false;
-    last = 0;
+    // The first site's intro is read during the countdown, before the cup needs watching.
+    showCaption("intro", "", siteIntro);
+    loop.resync();
   }
 
   function restart() {
@@ -3011,9 +3109,11 @@
     newMission();
     sfxCountdown(COUNTDOWN_SECONDS);
     liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+    // The results slip has gone: focus comes back to the game.
+    void tick().then(focusPlayfield);
   }
 
-  // --- The demo ----------------------------------------------------------------
+  // --- Sharing ---------------------------------------------------------------
 
   /** The share text's lines: one emoji per attempt, then any feather landings. */
   function shareRows() {
@@ -3023,99 +3123,278 @@
     return rows;
   }
 
-  /**
-   * The touch pads light with what the autopilot is doing. Its keys flicker
-   * step to step, so they read from the ship's eased spin and throttle.
-   */
-  function showDemoKeys() {
-    const left = ship.spin < -0.5;
-    const right = ship.spin > 0.5;
-    const thrust = ship.throttle > 0.12;
-    if (left === demoHeld.left && right === demoHeld.right && thrust === demoHeld.thrust) return;
-    demoHeld = { left, right, thrust };
+  // --- Lessons -------------------------------------------------------------------
+
+  /** Just past the cup's widest point (its feet), in world units from its centre. */
+  const CUP_EDGE = (LANDER_COLUMNS / 2) * CELL + 2;
+
+  /** How dim the scene is around a lesson, 0..1, eased in real time. */
+  let lessonDim = 0;
+  const focusBoxes: FocusBox[] = [{ x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }];
+  const cupBox = focusBoxes.slice(0, 1);
+
+  /** Sets a focus box from world bounds, padded, in canvas px. */
+  function focusOn(box: FocusBox, left: number, right: number, bottom: number, top: number, pad: number) {
+    box.x = sx(left) - pad;
+    box.y = sy(top) - pad;
+    box.w = (right - left) * S + pad * 2;
+    box.h = (top - bottom) * S + pad * 2;
   }
 
   /**
-   * The demo: a normal first site, flown to its ×5 coaster by the engine's
-   * autopilot. It scores nothing that is kept and the player's game keys do
-   * nothing; pause and Escape still work.
+   * The lesson's spotlight: the scene dims, and the cup and what the lesson
+   * is about stay in full light: the coaster or pennant it names, the
+   * coaster the tilt's ghost lands on, the coaster under a touchdown, the
+   * fall a burn slows. The tickets sit above the canvas, so the telemetry a
+   * touchdown names stays lit too.
    */
-  function startDemo() {
-    askDemo = false;
-    timers.clear();
-    releaseAll();
-    stopMusic();
-    paused = false;
-    gameOver = false;
-    demoOn = true;
-    demoEnded = false;
-    const flight = demoFlight();
-    score = 0;
-    lives = startLives;
-    landerBlink = 0;
-    landings = 0;
-    feathers = 0;
-    bestLanding = 0;
-    attempts = [];
-    popups = [];
-    pendingPopups = [];
-    caption = null;
-    tipVisible = false;
-    countdown = 0;
-    goVisible = false;
-    useSite(flight.site);
-    resetAttempt();
-    pilot = createPilot(flight.pad, ship);
-    demoHeld = { left: false, right: false, thrust: false };
-    demoCaption = DEMO_CAPTIONS[demoStage(pilot, ship, 0)];
-    mode = "flying";
-    modeTime = 0;
-    last = 0;
-    setMusicPhase("opening");
-    startMusic();
-    liveMessage = "Demo. The cup flies itself to a coaster.";
-  }
-
-  async function endDemo() {
-    demoEnded = true;
-    pilot = null;
-    demoHeld = { left: false, right: false, thrust: false };
-    setThruster(0);
-    liveMessage = "Demo over. Your turn.";
-    await tick();
-    demoBar?.focus();
-  }
-
-  function stopDemo() {
-    demoOn = false;
-    demoEnded = false;
-    pilot = null;
-    demoCaption = "";
-    demoHeld = { left: false, right: false, thrust: false };
-  }
-
-  /** The first real run: the countdown, and the first-run tip once per device. */
-  function firstRun() {
-    tipVisible = firstVisit("lander");
-    sfxCountdown(COUNTDOWN_SECONDS);
-    liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
-  }
-
-  /** From the demo (or the card offering it) into a fresh real run. */
-  function playFromDemo() {
-    askDemo = false;
-    if (demoOn) {
-      stopDemo();
-      stopMusic();
-      timers.clear();
-      releaseAll();
-      setThruster(0);
-      paused = false;
-      gameOver = false;
-      newMission();
+  function drawLessonLight() {
+    if (!ctx || lessonDim <= 0.01) return;
+    const cue = lessons.cue;
+    const pad = 6 * S;
+    const half = (LANDER_COLUMNS / 2) * CELL + 4;
+    // The cup, from its feet to the top of its straw.
+    let low = shown.y - FOOT_DROP - 4;
+    if (cue?.lesson.id === "burn" && cue.path) {
+      for (const point of cue.path.points) low = Math.min(low, shown.y + point.y - FOOT_DROP);
     }
-    firstRun();
-    focusPlayfield();
+    if (cue?.lesson.id === "touchdown" && cue.pad) low = Math.min(low, cue.pad.y - 6);
+    focusOn(focusBoxes[0], shown.x - half, shown.x + half, low, shown.y + LANDER_TOP + 4, pad);
+    let count = 1;
+    if (cue && !cue.ship) {
+      // A coaster with its label under it, or a pennant on its post.
+      const reach = Math.max(10, cue.size + 4);
+      focusOn(focusBoxes[1], cue.x - reach, cue.x + reach, cue.y - 14, cue.y + 10, pad);
+      count = 2;
+    } else if (cue?.lesson.id === "steer" && cue.path?.land && cue.pad) {
+      const { x, y } = cue.path.land;
+      const reach = cue.pad.width / 2 + 6;
+      focusOn(focusBoxes[1], x - reach, x + reach, y - FOOT_DROP - 14, y + LANDER_TOP, pad);
+      count = 2;
+    } else if (cue?.lesson.id === "feather") {
+      const box = loopBox();
+      const target = focusBoxes[1];
+      target.x = box.x;
+      target.y = box.y;
+      target.w = box.width;
+      target.h = box.height;
+      count = 2;
+    }
+    drawSpotlight(ctx, viewW, viewH, count === 2 ? focusBoxes : cupBox, lessonDim, { color: NOTE_BACK, cell: SC });
+  }
+
+  /**
+   * The player has read it: Continue (Enter, or the slip's button) ends the
+   * explanation, counts it, and play comes back to speed. A move skipped this
+   * way counts as known.
+   */
+  function continueLesson() {
+    const lesson = coach.current;
+    if (!lesson || coach.leaving || (mode !== "flying" && mode !== "landed")) return;
+    coach.done(lesson.id);
+  }
+
+  /** The world on screen, in world units, as the camera frames it now. */
+  function viewNow() {
+    const s = base * cam.z;
+    view.left = cam.x - viewW / 2 / s;
+    view.right = cam.x + viewW / 2 / s;
+    view.top = cam.y + (pmid - playTop) / s;
+    view.bottom = cam.y - (playBottom - pmid) / s;
+    return view;
+  }
+
+  /**
+   * Puts the callout beside what its lesson is about (the cup, a coaster, a
+   * pennant), and underlines or lights what it names in the tickets and on
+   * the hold buttons. Captions give way: one message at a time.
+   */
+  function placeCoach() {
+    const cue = lessons.cue;
+    if (!cue || mode === "countdown") {
+      if (coachLesson) coachLesson = null;
+      if (coachX !== null) coachX = coachY = null;
+      if (hudLit) hudLit = null;
+      if (padLit) padLit = null;
+      return;
+    }
+    if (coachLesson !== cue.lesson) {
+      coachLesson = cue.lesson;
+      // A lesson takes the place of an intro or a note; a result waits for it.
+      if (caption && caption.kind !== "result") caption = null;
+    }
+    // The callout stays readable through its minimum, then fades; its
+    // Continue goes the moment the explanation is over.
+    if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
+    const ended = coach.leaving || coach.acting;
+    if (ended !== coachEnded) coachEnded = ended;
+    const id = cue.lesson.id;
+    const ring = cue.size > 0 ? Math.round(Math.max(14, cue.size * S)) : 0;
+    let x = Math.round(sx(cue.ship ? shown.x + cue.x : cue.x));
+    let y = Math.round(sy(cue.ship ? shown.y + cue.y : cue.y));
+    // Coasters and pennants are on the ground, so their line sits above
+    // them. On the cup, the line takes the roomier side, away from a ghost's
+    // path, clear of the cup itself when no loop holds it off; the
+    // touchdown's line sits over the straw, clear of its ghost below; a
+    // feather's beside the landing loop, under the notes.
+    let side: typeof coachSide = "above";
+    if (id === "feather") {
+      const box = loopBox();
+      side = box.x + box.width < viewW - 280 ? "right" : "left";
+      x = Math.round(side === "right" ? box.x + box.width : box.x);
+      y = Math.round(box.y + box.height / 2);
+    } else if (cue.ship && id === "touchdown") {
+      y = Math.round(sy(shown.y + LANDER_TOP + 2));
+    } else if (cue.ship) {
+      const toward = cue.path?.land ? Math.sign(cue.path.land.x - shown.x) : 0;
+      side = x < viewW / 2 ? "right" : "left";
+      if (toward > 0 && x > 300) side = "left";
+      if (toward < 0 && viewW - x > 300) side = "right";
+    }
+    const width = cue.ship && !ring && (side === "left" || side === "right") ? Math.round(CUP_EDGE * S) : 0;
+    if (x !== coachX) coachX = x;
+    if (y !== coachY) coachY = y;
+    if (ring !== coachRing) coachRing = ring;
+    if (width !== coachWidth) coachWidth = width;
+    if (side !== coachSide) coachSide = side;
+    const on = !coach.leaving;
+    const lit = !on ? null : id === "fuel" ? "tea" : id === "touchdown" && cue.fault !== "tilt" ? (cue.fault === "fast" ? "descent" : "drift") : null;
+    if (lit !== hudLit) hudLit = lit;
+    // The hold button that makes the move, until it's made.
+    let pad: typeof padLit = null;
+    if (on && !coach.acting) {
+      if (id === "burn" || (id === "touchdown" && cue.fault === "fast")) pad = "thrust";
+      else if (id === "steer") pad = "tilt";
+      else if (id === "touchdown") pad = (cue.fault === "tilt" ? ship.angle : ship.vx) > 0 ? "left" : "right";
+    }
+    if (pad !== padLit) padLit = pad;
+  }
+
+  /**
+   * A move's ghost, the arcade's hologram: the cup dithered in cream, flying
+   * the move along chalk dashes. The burn rides with the cup and shows its
+   * fall slowing; the tilt flies the autopilot's path to a coaster and rests
+   * there; the touchdown stands upright on the coaster below.
+   */
+  function drawLessonGhost() {
+    const cue = lessons.cue;
+    if (!ctx || paused || !cue || coach.leaving || coach.acting) return;
+    const cell = Math.max(2, Math.round(CELL * S));
+    const density = 0.55 + 0.2 * beckon(lessonClock, reduceMotion, 1.1);
+    const march = reduceMotion ? 0 : -lessonClock * 24;
+    if (cue.lesson.id === "touchdown" && cue.pad) {
+      const cx = cue.pad.cx + Math.round((shown.x - cue.pad.cx) / PERIOD) * PERIOD;
+      const room = Math.max(0, cue.pad.width / 2 - FOOT_SPAN);
+      const gx = clamp(shown.x, cx - room, cx + room);
+      const gy = cue.pad.y + FOOT_DROP;
+      ghostPoints.length = 2;
+      const from = (ghostPoints[0] ??= { x: 0, y: 0 });
+      const to = (ghostPoints[1] ??= { x: 0, y: 0 });
+      from.x = sx(shown.x);
+      from.y = sy(shown.y - FOOT_DROP);
+      to.x = sx(gx);
+      to.y = sy(gy);
+      chalkPath(ctx, ghostPoints, { color: CREAM, cell, dash: 1, gap: 2, offset: march });
+      drawGhostCup(gx, gy, 0, density, cell, false);
+      return;
+    }
+    const path = cue.path;
+    if (!path || path.points.length < 2) return;
+    // A burn's path is measured from the cup, so it rides along with it.
+    const ox = path.relative ? shown.x : 0;
+    const oy = path.relative ? shown.y : 0;
+    const points = path.points;
+    ghostPoints.length = points.length;
+    for (let i = 0; i < points.length; i++) {
+      const point = (ghostPoints[i] ??= { x: 0, y: 0 });
+      point.x = sx(points[i].x + ox);
+      point.y = sy(points[i].y + oy - FOOT_DROP);
+    }
+    chalkPath(ctx, ghostPoints, { color: CREAM, cell, dash: 1, gap: 2, offset: march });
+    // The ghost flies the path, rests at its end for a beat, and goes again.
+    // Under Reduce Motion it waits at the end.
+    const period = path.relative ? 1.8 : 3.4;
+    const t = reduceMotion ? 1 : clamp(((lessonClock % period) / period) / 0.8, 0, 1);
+    const along = t * (points.length - 1);
+    const index = Math.min(points.length - 2, Math.floor(along));
+    const a = points[index];
+    const b = points[index + 1];
+    const f = along - index;
+    drawGhostCup(ox + lerp(a.x, b.x, f), oy + lerp(a.y, b.y, f), lerp(a.a, b.a, f), density, cell, cue.lesson.id === "burn");
+  }
+
+  /** The cup as a ghost at world x, y and a tilt, with a short flame when it is burning. */
+  function drawGhostCup(x: number, y: number, angle: number, density: number, cell: number, flame: boolean) {
+    if (!ctx) return;
+    const { px, k } = spriteScale();
+    const sprite = cachedSprite("tea-minus-4", LANDER_GRIDS[4], px, LANDER_PALETTE);
+    const cx = sx(x);
+    const cy = sy(y);
+    const reach = Math.ceil((LANDER.length + 4) * CELL * S);
+    drawGhost(
+      ctx,
+      cx - reach,
+      cy - reach,
+      reach * 2,
+      reach * 2,
+      (g) => {
+        g.translate(cx, cy);
+        g.rotate(angle);
+        g.drawImage(sprite, -(LANDER_COLUMNS / 2) * CELL * S - SPRITE_PAD * k, -LANDER_TOP * S - SPRITE_PAD * k, sprite.width * k, sprite.height * k);
+        if (!flame) return;
+        // A tongue of flame on the flame's own cells: three wide, then one.
+        g.fillStyle = CREAM;
+        for (let i = 0; i < 4; i++) {
+          const half = i < 2 ? 1 : 0;
+          g.fillRect((-half * CELL - 1) * S, (6 + i * CELL) * S, ((half * 2 + 1) * CELL) * S, CELL * S);
+        }
+      },
+      { color: CREAM, density, cell },
+    );
+  }
+
+  // --- Development ------------------------------------------------------------------
+
+  /** In development, `?seed=` replays a run's sites, for checking a lesson by eye. */
+  function devSeed() {
+    if (!import.meta.env.DEV) return null;
+    const seed = Number(new URLSearchParams(window.location.search).get("seed"));
+    return Number.isInteger(seed) && seed > 0 ? seed : null;
+  }
+
+  /**
+   * In development, `?autoplay` hands the keys to the engine's autopilot,
+   * which waits as a player following each lesson would, so every lesson can
+   * be seen: a second to read each one, and no tilting until it is taught.
+   */
+  function devAutoplay() {
+    return import.meta.env.DEV && new URLSearchParams(window.location.search).has("autoplay");
+  }
+
+  const IDLE: Held = { left: false, right: false, thrust: false };
+  const BURN_HELD: Held = { left: false, right: false, thrust: true };
+
+  /** The autopilot's keys for a step, held back while a lesson is new. */
+  function autoplayInput(): Held {
+    const cue = lessons.cue;
+    if (!autopilot || (cue && !coach.leaving && coach.age < 1)) return IDLE;
+    // It burns when told to, as a player following the line would.
+    if (cue?.lesson.id === "burn" && !coach.leaving) return BURN_HELD;
+    // Once the tilt is taught, it flies the ghost's path.
+    if (cue?.lesson.id === "steer" && cue.pad && autopilot.pad !== cue.pad) autopilot = createPilot(cue.pad, ship);
+    const held = pilotControls(autopilot, ship, site, flightTime);
+    if (!coach.learned("steer") && cue?.lesson.id !== "steer") held.left = held.right = false;
+    return held;
+  }
+
+  /** The richest coaster, the nearest of them: where the autopilot heads. */
+  function richestPad() {
+    let best = site.pads[0];
+    const away = (pad: Pad) => Math.abs(((pad.cx - ship.x + PERIOD * 1.5) % PERIOD) - PERIOD / 2);
+    for (const pad of site.pads) {
+      if (pad.multiplier > best.multiplier || (pad.multiplier === best.multiplier && away(pad) < away(best))) best = pad;
+    }
+    return best;
   }
 
   // --- Sizing and lifecycle ------------------------------------------------
@@ -3137,7 +3416,10 @@
     viewUnits = units;
     base = viewW / viewUnits;
     viewHUnits = (playBottom - playTop) / base;
+    const lastCeiling = ceiling;
     ceiling = viewHUnits + 30;
+    // A ghost's flight was planned under the old ceiling and view: plan it again.
+    if (mode === "flying" && ceiling !== lastCeiling) lessons.replan();
     if (mode === "countdown") {
       ship = newShip(site, viewHUnits);
       path = { points: [ship.x, ship.y], ticks: [], crashed: false };
@@ -3192,22 +3474,21 @@
     // Held keys never outlive the window's focus.
     window.addEventListener("blur", releaseAll);
 
-    // Asked for from the menu, the demo plays now; on a first visit, a card
-    // offers it before the countdown; otherwise straight to the countdown.
-    const intro = demoIntro("lander", takeDemoRequest("lander"));
+    // Straight to the countdown: the game teaches in flight.
     newMission();
-    askDemo = intro === "ask";
     tick().then(() => {
       if (!active) return;
       sizeCanvas();
-      if (intro === "demo") startDemo();
-      else if (intro === "none") firstRun();
-      raf = requestAnimationFrame(frame);
+      // Focus lands in the game, so keys and a screen reader start here.
+      focusPlayfield();
+      sfxCountdown(COUNTDOWN_SECONDS);
+      liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+      loop.start();
     });
 
     return () => {
       active = false;
-      cancelAnimationFrame(raf);
+      loop.stop();
       timers.clear();
       setThruster(0);
       stopMusic();
@@ -3219,9 +3500,6 @@
       unmountShell();
     };
   });
-
-  /** The touch pads show the autopilot's keys during the demo, the player's otherwise. */
-  $: padsHeld = demoOn ? demoHeld : touchHeld;
 
   const arrowX = (sign: number) => (sign > 0 ? "→" : sign < 0 ? "←" : "·");
   const wordX = (sign: number) => (sign > 0 ? "right" : sign < 0 ? "left" : "none");
@@ -3264,14 +3542,14 @@
           <span class="boba-meta">altitude</span>
           <span class="tm-value">{pad2(readAltitude, 4)}</span>
         </span>
-        <span class="tm-readout" class:is-unsafe={drifting}>
+        <span class="tm-readout" class:is-unsafe={drifting} class:is-lit={hudLit === "drift"}>
           <span class="boba-meta">{drifting ? "drifting" : "drift"}</span>
           <span class="tm-value">
             {pad2(readDrift, 3)}
             <span aria-hidden="true">{arrowX(readDriftSign)}</span><span class="sr-only">{wordX(readDriftSign)}</span>
           </span>
         </span>
-        <span class="tm-readout" class:is-unsafe={tooFast}>
+        <span class="tm-readout" class:is-unsafe={tooFast} class:is-lit={hudLit === "descent"}>
           <span class="boba-meta">{tooFast ? "too fast" : "descent"}</span>
           <span class="tm-value">
             {pad2(readDescent, 3)}
@@ -3290,7 +3568,7 @@
       </div>
 
       <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.6deg">
-        <span class="boba-stack tm-tea">
+        <span class="boba-stack tm-tea" class:is-lit={hudLit === "tea"}>
           <CupTimer fraction={fuelFraction} rush={fuelFraction * MAX_FUEL < LOW_FUEL} />
           <span class="boba-meta tm-tea-label">tea</span>
         </span>
@@ -3298,24 +3576,19 @@
         <HudButtons {paused} on:pause={togglePause} />
       </div>
     </div>
-
-    {#if tipVisible && !paused}
-      <div class="boba-tip" role="note" aria-label="How to play">
-        <span>land upright and slowly on a coaster</span>
-        <span class="boba-keys"><kbd>← →</kbd> tilt <kbd>Space</kbd> burn</span>
-      </div>
-    {/if}
-
-    <!-- The same sentence goes to the live region, so this copy is hidden. -->
-    {#if caption}
-      {#key caption.id}
-        <p class="tm-caption" aria-hidden="true">
-          {#if caption.kicker}<span class="tm-caption-kicker">{caption.kicker}</span>{/if}
-          <span class="tm-caption-line">{caption.line}</span>
-        </p>
-      {/key}
-    {/if}
   </header>
+
+  <!-- Low over the regolith, never at the top where the cup starts, and
+       never with a lesson: one message at a time. The same sentence goes to
+       the live region, so this copy is hidden. -->
+  {#if caption && !coachLesson}
+    {#key caption.id}
+      <p class="tm-caption boba-ui" aria-hidden="true" style="--tm-caption-bottom: {Math.round(viewH - playBottom + 12)}px">
+        {#if caption.kicker}<span class="tm-caption-kicker">{caption.kicker}</span>{/if}
+        <span class="tm-caption-line">{caption.line}</span>
+      </p>
+    {/key}
+  {/if}
 
   {#if touchUI}
     <div bind:this={padsEl} class="tm-pads boba-ui">
@@ -3323,16 +3596,17 @@
         <button
           type="button"
           class="tm-pad boba-riso is-small"
-          class:is-down={padsHeld.left}
+          class:is-down={touchHeld.left}
+          class:has-slab={padLit === "left" || padLit === "tilt"}
           style="--tilt: -1.4deg"
           aria-label="Tilt left"
           on:pointerdown={(event) => padDown(event, "left")}
-          on:pointerup={() => holdPad("left", false)}
-          on:pointercancel={() => holdPad("left", false)}
-          on:lostpointercapture={() => holdPad("left", false)}
+          on:pointerup={(event) => padUp(event, "left")}
+          on:pointercancel={(event) => padCancel(event, "left")}
+          on:lostpointercapture={(event) => padUp(event, "left")}
           on:keydown={(event) => padKey(event, "left", true)}
           on:keyup={(event) => padKey(event, "left", false)}
-          on:blur={() => holdPad("left", false)}
+          on:blur={() => padBlur("left")}
           on:contextmenu={(event) => event.preventDefault()}
         >
           <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -3343,16 +3617,17 @@
         <button
           type="button"
           class="tm-pad boba-riso is-small"
-          class:is-down={padsHeld.right}
+          class:is-down={touchHeld.right}
+          class:has-slab={padLit === "right" || padLit === "tilt"}
           style="--tilt: 1.2deg"
           aria-label="Tilt right"
           on:pointerdown={(event) => padDown(event, "right")}
-          on:pointerup={() => holdPad("right", false)}
-          on:pointercancel={() => holdPad("right", false)}
-          on:lostpointercapture={() => holdPad("right", false)}
+          on:pointerup={(event) => padUp(event, "right")}
+          on:pointercancel={(event) => padCancel(event, "right")}
+          on:lostpointercapture={(event) => padUp(event, "right")}
           on:keydown={(event) => padKey(event, "right", true)}
           on:keyup={(event) => padKey(event, "right", false)}
-          on:blur={() => holdPad("right", false)}
+          on:blur={() => padBlur("right")}
           on:contextmenu={(event) => event.preventDefault()}
         >
           <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -3364,16 +3639,17 @@
       <button
         type="button"
         class="tm-pad tm-burn boba-riso is-small"
-        class:is-down={padsHeld.thrust}
+        class:is-down={touchHeld.thrust}
+        class:has-slab={padLit === "thrust"}
         style="--tilt: -0.9deg"
         aria-label="Burn"
         on:pointerdown={(event) => padDown(event, "thrust")}
-        on:pointerup={() => holdPad("thrust", false)}
-        on:pointercancel={() => holdPad("thrust", false)}
-        on:lostpointercapture={() => holdPad("thrust", false)}
+        on:pointerup={(event) => padUp(event, "thrust")}
+        on:pointercancel={(event) => padCancel(event, "thrust")}
+        on:lostpointercapture={(event) => padUp(event, "thrust")}
         on:keydown={(event) => padKey(event, "thrust", true)}
         on:keyup={(event) => padKey(event, "thrust", false)}
-        on:blur={() => holdPad("thrust", false)}
+        on:blur={() => padBlur("thrust")}
         on:contextmenu={(event) => event.preventDefault()}
       >
         <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -3384,32 +3660,26 @@
     </div>
   {/if}
 
-  <!-- Inside the play scope, so Tab cycles through their buttons. -->
-  {#if askDemo}
-    <DemoCard
-      deck="Watch the cup fly itself down to a coaster, or go straight in."
-      on:watch={startDemo}
-      on:play={playFromDemo}
-    />
-  {/if}
-
-  {#if demoOn}
-    <!-- On touch the strip goes to the top, clear of the hold buttons, and
-         just under the tickets, which take two rows on a phone. -->
-    <div class="tm-demo" style="--tm-demo-top: {Math.round(playTop + 8)}px">
-      <DemoBar
-        bind:this={demoBar}
-        caption={demoCaption}
-        ended={demoEnded}
-        placement={touchUI ? "top" : "bottom"}
-        on:play={playFromDemo}
-        on:again={startDemo}
-      />
-    </div>
-  {/if}
+  <!-- Inside the play scope, so Tab reaches its Continue button. -->
+  <Coach
+    lesson={coachLesson}
+    x={coachX}
+    y={coachY}
+    side={coachSide}
+    ring={coachRing}
+    width={coachWidth}
+    scene="dark"
+    leaving={coachLeaving}
+    continuable={!!coachLesson && (coachLesson.slow ?? 1) < 1 && !coachEnded}
+    on:continue={continueLesson}
+    returnFocus={focusPlayfield}
+    touch={touchUI}
+    hidden={paused || gameOver}
+    top={playTop + 8}
+  />
 </div>
 
-{#if !askDemo && !demoOn && (countdown > 0 || goVisible)}
+{#if countdown > 0 || goVisible}
   <Countdown value={countdown} caption="tea minus" goCaption="go for landing" />
 {/if}
 
@@ -3513,21 +3783,44 @@
   }
 
   .tm-tea {
+    position: relative;
     justify-items: center;
     gap: 0;
   }
 
+  /* What a lesson is about, underlined in the tickets as well: the tea, or
+     the readout that has gone unsafe. */
+  .tm-tea.is-lit::after {
+    content: "";
+    position: absolute;
+    inset: auto -4px -6px;
+    height: 3px;
+    background: var(--b-slab);
+    border-radius: 2px;
+    animation: boba-rise var(--motion-slow) var(--ease-emphasized) both;
+  }
+
+  .tm-readout.is-lit .boba-meta {
+    text-decoration: underline 2px var(--b-slab);
+    text-underline-offset: 3px;
+  }
+
   /* --- Mission-control caption --- */
 
-  /* A paper chip, the first-run tip's look, so the line reads on the night
-     sky in either theme. */
+  /* A paper chip, so the line reads on the night in either theme. It sits
+     low, just above the bottom of the play area (above the hold buttons on
+     touch), over the regolith rather than up where the cup starts. */
   .tm-caption {
+    position: fixed;
+    inset: auto 0 var(--tm-caption-bottom, var(--space-6));
+    z-index: calc(var(--layer-overlay) + 2);
     display: grid;
     justify-items: center;
     gap: var(--space-0-5);
     width: fit-content;
     max-width: min(45ch, calc(100vw - var(--space-8)));
-    margin: var(--space-3) auto 0;
+    margin: 0 auto;
+    font-family: var(--font-ui);
     padding: var(--space-2) var(--space-3);
     text-align: center;
     background: var(--b-raised);
@@ -3556,12 +3849,6 @@
     font-weight: 400;
     line-height: 1.4;
     text-wrap: balance;
-  }
-
-  /* The demo strip, placed at the top on touch, starts under the tickets
-     rather than at a fixed height, so it never covers the telemetry. */
-  .tm-demo :global(.demo.is-top) {
-    top: var(--tm-demo-top, 5.5rem);
   }
 
   /* --- Touch controls: tilt pair bottom left, burn bottom right --- */
@@ -3621,9 +3908,14 @@
     height: 2.5rem;
   }
 
-  /* No slab at rest: the pads sit straight on the sky or the regolith. */
+  /* No slab at rest: the pads sit straight on the sky or the regolith. The
+     one a lesson is about earns its slab until the move is made. */
   .tm-pad::before {
     display: none;
+  }
+
+  .tm-pad.has-slab::before {
+    display: block;
   }
 
   /* Held: the sheet takes the accent plate's ink and sinks a pixel, with a
@@ -3649,7 +3941,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .tm-caption {
+    .tm-caption,
+    .tm-tea.is-lit::after {
       animation: none;
     }
 

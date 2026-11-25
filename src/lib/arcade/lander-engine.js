@@ -1147,48 +1147,6 @@ export function pilotControls(pilot, ship, site, time) {
   };
 }
 
-// --- The demo -------------------------------------------------------------------
-
-/** The run seed whose calm first site the demo flies. */
-export const DEMO_SEED = 2;
-/** Seconds the demo stays on its landing before it is over. */
-export const DEMO_HOLD = 3;
-
-/**
- * The demo's flight: a normal run's first site (calm, the gentlest ground)
- * and its ×5 coaster, far enough off that the autopilot shows every step.
- * @returns {{ site: Site, pad: Pad }}
- */
-export function demoFlight() {
-  const site = makeSite(1, DEMO_SEED);
-  const pad = site.pads.find((p) => p.multiplier === 5 && p.cx > 330 && p.cx < 720) ?? site.pads[1];
-  return { site, pad };
-}
-
-/** One line for each part of the demo, said while it happens. */
-export const DEMO_CAPTIONS = {
-  burn: "Hold burn to slow the fall.",
-  fuel: "The tea in the cup is the fuel.",
-  steer: "Tilt to line up over a coaster.",
-  descend: "Come down slow and level.",
-  landed: "The tea left over is the score.",
-};
-
-/**
- * Which part of the demo the flight is in.
- * @param {Pilot} pilot
- * @param {Pick<Ship, "state">} ship
- * @param {number} time seconds since the flight began
- * @returns {keyof typeof DEMO_CAPTIONS}
- */
-export function demoStage(pilot, ship, time) {
-  if (ship.state === "landed") return "landed";
-  if (pilot.descending) return "descend";
-  if (time < 3.5) return "burn";
-  if (time < 7.5) return "fuel";
-  return "steer";
-}
-
 // --- Sharing ------------------------------------------------------------------
 
 /**
