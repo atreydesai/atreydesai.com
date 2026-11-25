@@ -16,12 +16,9 @@ import {
   slideFor,
   sliderWidth,
   speedForHeight,
-  stepSlide,
-  trackFor,
   traySpan,
   widthAfterPerfect,
 } from "../src/lib/arcade/stack-engine.js";
-import { DEMO_SCRIPT, demoAim, demoDropsNow } from "../src/lib/arcade/stack-demo.js";
 
 /** Screen pixels to a unit: phone and desktop, at one and two device pixels. */
 const PIXEL_SCALES = [4, 5, 8, 10];
@@ -34,17 +31,45 @@ function centredLeft(topLeft, topWidth, width) {
 
 // --- The perfect window ---------------------------------------------------------
 
-test("normal's perfect window starts at 30 ms and tightens to 14 ms by 24 cups", () => {
+test("normal's perfect window starts at 32 ms and tightens to 15 ms by 24 cups", () => {
   const start = perfectWindow(0, speedForHeight(0));
-  assert.ok(Math.abs(start - 0.45) < 1e-9, `${start}`);
+  assert.ok(Math.abs(start - 0.48) < 1e-9, `${start}`);
   // As time either side of centre, at the slide's own speed.
   const ms = (height) => (1000 * perfectWindow(height, speedForHeight(height))) / speedForHeight(height);
-  assert.ok(Math.abs(ms(0) - 30) < 1e-9);
-  assert.ok(Math.abs(ms(24) - 14) < 1e-9);
-  assert.ok(Math.abs(ms(80) - 14) < 1e-9);
+  assert.ok(Math.abs(ms(0) - 32) < 1e-9);
+  assert.ok(Math.abs(ms(24) - 15) < 1e-9);
+  assert.ok(Math.abs(ms(80) - 15) < 1e-9);
   for (let height = 1; height <= 24; height++) assert.ok(ms(height) < ms(height - 1), `height ${height}`);
   // The old window was 1.5 units: now well under a third of it.
   assert.ok(start < 0.5);
+});
+
+test("normal is very slightly easier than it was: a few percent more perfect window, the same slide", () => {
+  assert.deepEqual(NORMAL.perfect, { start: 0.032, end: 0.015, by: 24 });
+  assert.deepEqual(NORMAL.speed, { start: 15, perCup: 0.65, max: 40 });
+  // Expert is left exactly as it was.
+  assert.deepEqual(EXPERT, {
+    expert: true,
+    startWidth: 10,
+    speed: { start: 22, perCup: 1, max: 44 },
+    perfect: { start: 0, end: 0, by: 1 },
+    growAfter: 4,
+    growEvery: 2,
+    vary: 0.2,
+    phases: [8, 20],
+  });
+  const before = { ...NORMAL, perfect: { start: 0.03, end: 0.014, by: 24 } };
+  for (let height = 0; height <= 120; height++) {
+    const speed = speedForHeight(height);
+    const now = perfectWindow(height, speed);
+    const was = perfectWindow(height, speed, before);
+    // Between 5% and 8% wider in time, and so in distance: a hair, not a new game.
+    assert.ok(now / was > 1.05 && now / was < 1.08, `height ${height}: ${now} vs ${was}`);
+    // Still under a unit, so a drop just outside it is still "a hair off".
+    assert.ok(now < 1, `height ${height}: ${now}`);
+    // And never narrower than one frame of the slide and half a pixel.
+    assert.ok(now >= speed / (2 * FRAME_RATE) + 1 / 8 - 1e-9, `height ${height}`);
+  }
 });
 
 test("expert's perfect window is the narrowest allowed, and always narrower in time than normal's", () => {
@@ -230,100 +255,6 @@ test("normal alternates sides at the height's speed; expert varies side and pace
   const runA = Array.from({ length: 20 }, (_, height) => slideFor(height, EXPERT, 1).fromLeft);
   const runB = Array.from({ length: 20 }, (_, height) => slideFor(height, EXPERT, 2).fromLeft);
   assert.notDeepEqual(runA, runB);
-});
-
-// --- Demo -----------------------------------------------------------------------
-
-/**
- * Plays the demo script on the real rules the way the component does: a
- * frame loop that slides the cup, asks the autopilot, and drops.
- */
-function playDemo({ fps = 60, px = 5, halfScreen = 127 } = {}) {
-  const rules = NORMAL;
-  const dt = 1 / fps;
-  let tower = [traySpan(rules)];
-  let streak = 0;
-  let time = 0;
-  const kinds = [];
-  const widths = [];
-  for (const cup of DEMO_SCRIPT) {
-    const height = tower.length - 1;
-    const top = tower[tower.length - 1];
-    const width = sliderWidth(top, rules);
-    const { fromLeft, speed } = slideFor(height, rules);
-    const track = trackFor(top, halfScreen, width);
-    let left = fromLeft ? track.min : track.max;
-    let direction = fromLeft ? 1 : -1;
-    let pass = 1;
-    const aim = demoAim(cup, width, fromLeft);
-    const window = perfectWindow(height, speed, rules);
-    const centre = centredLeft(top.left, top.width, width);
-    let result = null;
-    for (let frame = 0; frame < fps * 20; frame++) {
-      const moved = stepSlide(left, direction, speed * dt, track);
-      if (moved.direction !== direction) pass++;
-      left = moved.position;
-      direction = moved.direction;
-      time += dt;
-      const verdict = dropCup(top, left, width, { window, px });
-      const offset = left - centre;
-      if (demoDropsNow(cup, { offset, aim, step: speed * dt, pass, kind: verdict.kind })) {
-        result = verdict;
-        break;
-      }
-    }
-    assert.ok(result, `the autopilot never dropped cup ${height + 1}`);
-    kinds.push(result.kind);
-    if (result.kind === "miss" || !result.placed) break;
-    let placed = result.placed;
-    if (result.kind === "perfect") {
-      streak++;
-      placed = grownSpan(placed, streak, rules);
-    } else {
-      streak = 0;
-    }
-    widths.push(placed.width);
-    tower.push(placed);
-  }
-  return { kinds, widths, time };
-}
-
-test("the demo plays its script on the real rules, at any frame rate and size", () => {
-  const expected = DEMO_SCRIPT.map((cup) => cup.expect);
-  for (const fps of [60, 120, 144]) {
-    for (const px of PIXEL_SCALES) {
-      for (const halfScreen of [45, 127]) {
-        const run = playDemo({ fps, px, halfScreen });
-        assert.deepEqual(run.kinds, expected, `fps ${fps} px ${px} half ${halfScreen}`);
-        assert.ok(run.time >= 15 && run.time <= 30, `fps ${fps}: ${run.time.toFixed(1)} s`);
-      }
-    }
-  }
-});
-
-test("the demo is a believable player: perfects, trims, a regrowth, a near miss, then the fall", () => {
-  const run = playDemo();
-  const count = (kind) => run.kinds.filter((item) => item === kind).length;
-  assert.ok(count("perfect") >= 6);
-  assert.ok(count("cut") >= 3);
-  assert.equal(count("close"), 1);
-  assert.equal(run.kinds.at(-1), "miss");
-  // Somewhere the cup grows back after a run of perfects.
-  assert.ok(run.widths.some((width, index) => index > 0 && width > run.widths[index - 1]));
-  // Captions are one short lowercase line, with no exclamation marks or dots between facts.
-  for (const cup of DEMO_SCRIPT) {
-    if (!cup.caption) continue;
-    assert.equal(cup.caption, cup.caption.toLowerCase());
-    assert.ok(cup.caption.length <= 48, cup.caption);
-    assert.ok(!/[!·.]/.test(cup.caption), cup.caption);
-  }
-  assert.ok(DEMO_SCRIPT[0].caption);
-});
-
-test("a slow frame rate still finishes the demo", () => {
-  const run = playDemo({ fps: 30 });
-  assert.equal(run.kinds.at(-1), "miss");
-  assert.ok(run.time <= 40);
 });
 
 // --- Share ----------------------------------------------------------------------

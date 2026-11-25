@@ -45,12 +45,17 @@ const HALF_PIXEL = 1 / 8;
  * }} Rules
  */
 
-/** @type {Rules} */
+/**
+ * Normal's perfect window is 32 ms at the first cup, tightening to 15 ms by
+ * 24 cups: a touch wider than it was (30 and 14), so normal plays very
+ * slightly easier. The slide's speed is unchanged.
+ * @type {Rules}
+ */
 export const NORMAL = {
   expert: false,
   startWidth: START_WIDTH,
   speed: { start: 15, perCup: 0.65, max: 40 },
-  perfect: { start: 0.03, end: 0.014, by: 24 },
+  perfect: { start: 0.032, end: 0.015, by: 24 },
   growAfter: GROW_AFTER,
   growEvery: 1,
   vary: 0,

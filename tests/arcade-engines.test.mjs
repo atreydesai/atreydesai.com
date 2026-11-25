@@ -116,7 +116,7 @@ test("a stab goes to the closest waiting cup, and late cups are missed", () => {
 
 test("a close drop is perfect and keeps the full width", () => {
   const top = { left: -7, width: START_WIDTH };
-  // The first cup's window is 0.45 units (30 ms at the opening slide).
+  // The first cup's window is 0.48 units (32 ms at the opening slide).
   for (const left of [-7, -6.6, -7.45]) {
     const result = dropCup(top, left);
     assert.equal(result.kind, "perfect", `left ${left}`);

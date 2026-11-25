@@ -2,9 +2,8 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
-  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import { arcadeExpert } from "#lib/boba.ts";
   import {
-    finishMusic,
     setMusicPaused,
     setMusicPhase,
     sfxBlip,
@@ -33,12 +32,28 @@
     traySpan,
   } from "#lib/arcade/stack-engine.js";
   import type { DropKind, Rules, Span } from "#lib/arcade/stack-engine.js";
-  import { DEMO_SCRIPT, demoAim, demoDropsNow } from "#lib/arcade/stack-demo.js";
   import {
+    SLICE_EASE,
+    SLICE_FALL,
+    SLICE_SLOW,
+    SLIP_GUESS,
+    bestCallout,
+    createStackLessons,
+    ghostSpan,
+    lessonsFor,
+    roomUnderSlice,
+    towerCallout,
+  } from "#lib/arcade/stack-lessons.js";
+  import {
+    ACCENT,
+    CREAM,
     DRINKS,
+    HALO,
     INK,
     LID,
     MENU_ICONS,
+    NOTE_BACK,
+    NOTE_GOLD,
     PEARL,
     SPRITE_PAD,
     STRAW_PINK,
@@ -51,11 +66,17 @@
     stepPopups,
     type Popup,
   } from "#lib/arcade/art.ts";
-  import { demoIntro, firstVisit, readBest } from "#lib/arcade/scores.ts";
+  import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
+  import { hexToRgb, mixHex } from "#lib/arcade/core/color.ts";
+  import { bayer } from "#lib/arcade/core/dither.ts";
+  import { beckon, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { createFrameLoop } from "#lib/arcade/core/loop.ts";
+  import { approach, clamp, damp, lerp, smoothstep, snap } from "#lib/arcade/core/math.ts";
+  import { createRng, hash2, noise2 } from "#lib/arcade/core/rng.ts";
+  import { readBest } from "#lib/arcade/scores.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
-  import DemoBar from "./DemoBar.svelte";
-  import DemoCard from "./DemoCard.svelte";
+  import Coach from "./Coach.svelte";
   import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
@@ -70,7 +91,6 @@
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
   const CUP_ROWS = 10;
-  const HALO = "rgba(253, 248, 243, 0.8)";
   const DROP_KEYS = new Set([" ", "Enter", "ArrowDown"]);
   const PALETTES = DRINKS.map((liquid) => ({ O: INK, l: LID, L: liquid, b: PEARL }));
 
@@ -133,11 +153,11 @@
 
   // --- The scene's palette -----------------------------------------------------
   // The climb is painted the same in both site themes: only the HTML on top
-  // of it (tickets, tip, buttons) follows the theme.
+  // of it (tickets, callouts, buttons) follows the theme.
 
-  /** The screen-space art cell, in CSS px. */
+  /** The screen-space art cell, in CSS px: the arcade's 4 px cell, which is core `snap`'s default. */
   const SC = 4;
-  const CREAM = "#fdf8f3";
+  /** Space, at the top of the climb. */
   const NIGHT = "#141a2e";
   /** Ground to space. */
   const SKY = ["#f4d9b0", "#f0c9a0", "#bcd6e6", "#9cc0dc", "#779bbe", "#3a6a91", "#1f4567", "#1f2547", "#141a2e"];
@@ -156,7 +176,6 @@
   const TABLE = "#8a5a3c";
   const TABLE_SHADE = "#6f4530";
   const TRAY_PAPER = "#fbf2e8";
-  const ACCENT = "#e85d4c";
   const CLOUD_SHADE = "#e3dccf";
   const CLOUD_DUSK = "#f0c9a0";
   const BIRD = "#2b2320";
@@ -184,53 +203,16 @@
   const P_BIRDS = 0.72;
   const P_BALLOON = 0.8;
 
-  /** Ordered dithering thresholds, 4 × 4. */
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
-  const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
-  /** Snaps a screen coordinate to the scene cell. */
-  const snap = (value: number) => Math.round(value / SC) * SC;
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-  const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
-  const smoothstep = (from: number, to: number, value: number) => {
-    const t = clamp((value - from) / (to - from), 0, 1);
-    return t * t * (3 - 2 * t);
-  };
-  /** A stable 0–1 value per integer, so seeded marks never shimmer. */
-  const ihash = (n: number) => {
-    let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0xc2b2ae35);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  };
-  const hash2 = (a: number, b: number) => ihash(Math.imul(a, 73856093) ^ Math.imul(b, 19349663));
-  function seeded(seed: number) {
-    let a = seed;
-    return () => {
-      a |= 0;
-      a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-  const rgb = (hex: string) => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-  const mix = (a: string, b: string, t: number) => {
-    const from = rgb(a);
-    const to = rgb(b);
-    return `#${from.map((value, index) => Math.round(lerp(value, to[index], t)).toString(16).padStart(2, "0")).join("")}`;
-  };
+  // Seeded detail (stars, cities, clouds, the moon, the earth) is hashed and
+  // generated by the core (`hash2`, `noise2`, `createRng`), which is bit for
+  // bit what this scene used before, so nothing seeded moves.
   function putPixel(data: Uint8ClampedArray, index: number, color: number[]) {
     data[index * 4] = color[0];
     data[index * 4 + 1] = color[1];
     data[index * 4 + 2] = color[2];
     data[index * 4 + 3] = 255;
   }
-  const SKY_RGB = SKY.map(rgb);
+  const SKY_RGB = SKY.map(hexToRgb);
   const SKY_LUM = SKY_RGB.map(([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255);
 
   /** A pixel grid painted one canvas pixel per cell, to be drawn scaled by SC. */
@@ -263,29 +245,56 @@
   let drops: DropKind[] = [];
   let paused = false;
   let gameOver = false;
-  let tipVisible = false;
-  /** The first-run tip waits for the first real run (never the demo). */
-  let tipChecked = false;
 
-  // Expert is read once when the game opens and kept; the demo always plays
-  // normal. `rules` is whichever the tower in front of you is using.
+  // Expert is read once when the game opens and kept. `rules` is whichever
+  // the tower in front of you is using.
   let expert = false;
   let rules: Rules = NORMAL;
   /** Seeds expert's sides and paces, fresh each run. */
   let runSeed = 0;
 
-  // The demo: the game plays itself on these same rules, records nothing,
-  // and shuts out the player's drops. `asking` is the first-visit card.
-  let asking = false;
-  let demo = false;
-  let demoEnded = false;
-  let demoCaption = "";
-  let demoStep = 0;
-  /** Which pass over the tower the demo's cup is on, from 1. */
-  let demoPass = 1;
-  let demoAimAt = 0;
-  /** Play was pressed mid-demo: the cup falls and the sky comes home first. */
-  let leavingDemo = false;
+  // Lessons, once per device (stack-lessons.js says what and when, and keeps
+  // them in order; the coach shows one at a time and remembers them). In
+  // normal each is an explanation that slows the game until Continue or a
+  // drop; in expert nothing ever slows, so its board's timing is untouched.
+  const coach = createCoach("stack");
+  const lessons = createStackLessons(coach);
+  /** The coach's lesson, whether it is fading, and where its callout points, copied out so the page follows them. */
+  let coachLesson: Lesson | null = null;
+  let coachLeaving = false;
+  let coachX: number | null = null;
+  let coachY: number | null = null;
+  let coachSide: "above" | "below" | "left" | "right" = "above";
+  let coachScene: "dark" | "light" = "light";
+  /** Half the width of what a side-on callout keeps clear of (the tower), px. */
+  let coachWidth = 0;
+  /** The callout stays under this (the tickets' bottom, or 0 when a short screen leaves no room). */
+  let coachTop = 80;
+  /** Held out of sight while it has nowhere clear to go and the camera is still moving the row. */
+  let coachHeld = false;
+  let coachContinuable = false;
+  /**
+   * The callout's slip as measured, and which lesson it was measured for:
+   * it wraps on a narrow screen, and its Continue button can wrap under the
+   * line, so placement never assumes a size.
+   */
+  let slipW: number = SLIP_GUESS.w;
+  let slipH: number = SLIP_GUESS.h;
+  let slipFor = "";
+  let slipEl: HTMLElement | null = null;
+  /** Real seconds of play since the run began; stops while paused, so the ghost holds still. */
+  let lessonClock = 0;
+  /** The slice the trim lesson names, and the share of its speed it falls at (1 is full speed). */
+  let taughtPiece: Piece | null = null;
+  let pieceScale = 1;
+  /**
+   * Where the trim callout sits for its slice, chosen once as it is shown:
+   * under the slice while there is room for it to be read there, else over
+   * the sliding row (on a short screen, or with the tower still low).
+   */
+  let trimFor: Piece | null = null;
+  let trimBelow = true;
+
   let liveMessage = "Cup stack starting";
   let localBest = 0;
   let previousBest = 0;
@@ -294,7 +303,6 @@
   let canvas: HTMLCanvasElement;
   let hudRow: HTMLElement;
   let ctx: CanvasRenderingContext2D | null = null;
-  let hudButtons: HudButtons;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
   let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
@@ -323,11 +331,26 @@
   let camera = 0;
   let zoom = 1;
   let playing = true;
-  let last = 0;
-  let raf = 0;
-  let active = true;
   let lastDrop = 0;
   const timers = createTimers();
+  // Paused, the last frame stays on screen (nothing in the climb needs to
+  // move); a resize redraws it.
+  const loop = createFrameLoop({
+    update: (dt, rawDt) => update(dt, rawDt),
+    draw: () => draw(),
+    isPaused: () => paused,
+    drawWhilePaused: false,
+  });
+  /**
+   * The sliding cup has been painted since it appeared, and where: a drop is
+   * judged from what the player saw, and a press before the first paint of a
+   * new cup (a tap the moment a run starts) is ignored.
+   */
+  let sliderDrawn = false;
+  let paintedLeft = 0;
+  /** Where focus rests during play, so Space drops rather than pressing a button. */
+  let playfield: HTMLElement;
+  let playScope: HTMLElement;
 
   // Scene state. The background is a function of `camera`, so the fall's
   // pull-back and a restart carry it home with no state of its own.
@@ -345,6 +368,9 @@
   const levelTop = (level: number) => groundY - (level + 1) * cupH + camera;
   /** Screen y of something at `alt` px up a layer moving at parallax `p`. */
   const layerY = (alt: number, p: number) => baseY + snap(camera * p) - alt;
+  /** Where a point drawn inside the fall's pull-back (`zoom`) lands on the screen. */
+  const zoomX = (x: number) => viewW / 2 + (x - viewW / 2) * zoom;
+  const zoomY = (y: number) => groundY + (y - groundY) * zoom;
 
   // --- Keeping busy detail away from the tower -----------------------------------
   // Two rectangles: the column behind the top few cups, and the row the
@@ -519,8 +545,8 @@
     const context = sunCanvas.getContext("2d");
     if (!context) return;
     const image = context.createImageData(size, size);
-    const core = rgb(SUN_CORE);
-    const rim = rgb(SUN_RIM);
+    const core = hexToRgb(SUN_CORE);
+    const rim = hexToRgb(SUN_RIM);
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const d = Math.hypot(x + 0.5 - SUN_R, y + 0.5 - SUN_R);
@@ -554,10 +580,10 @@
     const context = moonCanvas.getContext("2d");
     if (!context) return;
     const image = context.createImageData(size, size + MOON_HEAD);
-    const tones = STONE.map(rgb);
+    const tones = STONE.map(hexToRgb);
     const cx = size / 2;
     const cy = MOON_HEAD + size / 2;
-    const random = seeded(4242);
+    const random = createRng(4242);
     const craters = Array.from({ length: 5 }, () => {
       const angle = random() * Math.PI * 2;
       const distance = random() * moonR * 0.62;
@@ -586,8 +612,8 @@
     // The coaster: paper on an off-register accent slab, with a pennant.
     const mid = Math.floor(cx);
     const top = MOON_HEAD;
-    const paper = rgb(TRAY_PAPER);
-    const accent = rgb(ACCENT);
+    const paper = hexToRgb(TRAY_PAPER);
+    const accent = hexToRgb(ACCENT);
     for (let x = mid - 2; x <= mid + 1; x++) putPixel(image.data, (top - 1) * size + x, paper);
     putPixel(image.data, (top - 1) * size + mid + 2, accent);
     for (let x = mid - 1; x <= mid + 2; x++) putPixel(image.data, top * size + x, accent);
@@ -613,17 +639,17 @@
   /** Rows of atmosphere above the limb. */
   const EARTH_ATM = 2;
   const EARTH_RGB = {
-    ocean: rgb(EARTH.ocean),
-    oceanLight: rgb(EARTH.oceanLight),
-    land: rgb(EARTH.land),
-    landLight: rgb(EARTH.landLight),
-    cloud: rgb(EARTH.cloud),
-    night: rgb(EARTH.night),
-    lights: rgb(WINDOW_LIT),
+    ocean: hexToRgb(EARTH.ocean),
+    oceanLight: hexToRgb(EARTH.oceanLight),
+    land: hexToRgb(EARTH.land),
+    landLight: hexToRgb(EARTH.landLight),
+    cloud: hexToRgb(EARTH.cloud),
+    night: hexToRgb(EARTH.night),
+    lights: hexToRgb(WINDOW_LIT),
     dusk: {
-      ocean: rgb(mix(EARTH.ocean, EARTH.night, 0.55)),
-      land: rgb(mix(EARTH.land, EARTH.night, 0.55)),
-      cloud: rgb(mix(EARTH.cloud, EARTH.night, 0.5)),
+      ocean: hexToRgb(mixHex(EARTH.ocean, EARTH.night, 0.55)),
+      land: hexToRgb(mixHex(EARTH.land, EARTH.night, 0.55)),
+      cloud: hexToRgb(mixHex(EARTH.cloud, EARTH.night, 0.5)),
     },
   };
   let earthCanvas: HTMLCanvasElement | null = null;
@@ -633,17 +659,6 @@
   let earthRadius = 0;
   /** When the earth was last painted; below zero means it needs painting. */
   let earthAt = -1;
-
-  /** Smooth value noise on an integer lattice. */
-  function noise2(a: number, b: number) {
-    const ia = Math.floor(a);
-    const ib = Math.floor(b);
-    const fa = smoothstep(0, 1, a - ia);
-    const fb = smoothstep(0, 1, b - ib);
-    const top = lerp(hash2(ia, ib), hash2(ia + 1, ib), fa);
-    const bottom = lerp(hash2(ia, ib + 1), hash2(ia + 1, ib + 1), fa);
-    return lerp(top, bottom, fb);
-  }
 
   function sizeEarth() {
     earthCols = Math.ceil(viewW / SC) + 1;
@@ -760,7 +775,7 @@
       towerP: 0.16,
       antennaP: 0.34,
       tankW: 4,
-      palette: ["", CITY_FAR, mix(CITY_FAR, "#f4d9b0", 0.3), mix(WINDOW_LIT, CITY_FAR, 0.35), mix(ACCENT, CITY_FAR, 0.3), "", ""],
+      palette: ["", CITY_FAR, mixHex(CITY_FAR, "#f4d9b0", 0.3), mixHex(WINDOW_LIT, CITY_FAR, 0.35), mixHex(ACCENT, CITY_FAR, 0.3), "", ""],
       canvas: null,
       horizon: 0,
     },
@@ -781,10 +796,10 @@
       palette: [
         "",
         CITY_NEAR,
-        mix(CITY_NEAR, "#f0c9a0", 0.32),
+        mixHex(CITY_NEAR, "#f0c9a0", 0.32),
         WINDOW_LIT,
         ACCENT,
-        mix(CITY_NEAR, WINDOW_LIT, 0.22),
+        mixHex(CITY_NEAR, WINDOW_LIT, 0.22),
         WINDOW_LIT,
       ],
       canvas: null,
@@ -812,7 +827,7 @@
       for (let row = y; row < y + h; row++) for (let column = x; column < x + w; column++) set(column, row, value);
     };
     const at = (x: number, y: number) => (x >= 0 && x < columns && y >= 0 && y < rows ? grid[y * columns + x] : 0);
-    const random = seeded(layer.seed);
+    const random = createRng(layer.seed);
     let signs = 0;
     let x = -Math.floor(random() * 6);
     while (x < columns) {
@@ -888,7 +903,7 @@
     const context = layer.canvas.getContext("2d");
     if (!context) return;
     const image = context.createImageData(columns, rows);
-    const colors = layer.palette.map((hex) => (hex ? rgb(hex) : null));
+    const colors = layer.palette.map((hex) => (hex ? hexToRgb(hex) : null));
     for (let index = 0; index < grid.length; index++) {
       const color = colors[grid[index]];
       if (color) putPixel(image.data, index, color);
@@ -1000,8 +1015,8 @@
       const context = canvas.getContext("2d");
       if (context) {
         const image = context.createImageData(w, h);
-        const light = rgb(CREAM);
-        const dark = rgb(shade);
+        const light = hexToRgb(CREAM);
+        const dark = hexToRgb(shade);
         for (let index = 0; index < cells.length; index++) {
           if (cells[index]) putPixel(image.data, index, cells[index] === 2 ? dark : light);
         }
@@ -1014,7 +1029,7 @@
 
   function buildClouds() {
     for (const layer of CLOUDS) {
-      const random = seeded(layer.seed * 97);
+      const random = createRng(layer.seed * 97);
       layer.shapes = Array.from({ length: 5 }, (_, index) =>
         makeCloud(Math.round(lerp(layer.minW, layer.maxW, index / 4)), random),
       );
@@ -1201,11 +1216,11 @@
       sprite = gridCanvas(BALLOON, {
         S: STRAW_PINK,
         // A softer outline than the cups', so it stays behind them.
-        O: mix(liquid, INK, 0.55),
+        O: mixHex(liquid, INK, 0.55),
         l: LID,
         L: liquid,
-        h: mix(liquid, CREAM, 0.4),
-        b: mix(PEARL, liquid, 0.2),
+        h: mixHex(liquid, CREAM, 0.4),
+        b: mixHex(PEARL, liquid, 0.2),
         r: TABLE_SHADE,
         K: TABLE,
         k: TABLE_SHADE,
@@ -1494,7 +1509,14 @@
   function inkFor(y: number) {
     return skyLumAt(y) > 0.5
       ? { fg: "#1a1a1a", back: CREAM, perfect: "#c9462f", gold: "#704a05" }
-      : { fg: CREAM, back: NIGHT, perfect: "#f07563", gold: "#ffd166" };
+      : { fg: CREAM, back: NOTE_BACK, perfect: "#f07563", gold: NOTE_GOLD };
+  }
+
+  /** The personal best's line on the screen, or null while it is out of view (or there is none). */
+  function bestLineY() {
+    if (previousBest <= 0) return null;
+    const y = Math.round(zoomY(levelTop(previousBest - 1)));
+    return y < playTop + 8 || y > viewH ? null : y;
   }
 
   /**
@@ -1503,10 +1525,8 @@
    * backing, and the label on a chip, so both read from dusk to space.
    */
   function drawBestLine(c: CanvasRenderingContext2D) {
-    if (previousBest <= 0 || demo || demoEnded) return;
-    const world = levelTop(previousBest - 1);
-    const y = Math.round(groundY + (world - groundY) * zoom);
-    if (y < playTop + 8 || y > viewH) return;
+    const y = bestLineY();
+    if (y === null) return;
     const ink = inkFor(y);
     c.save();
     c.globalAlpha = 0.55;
@@ -1732,10 +1752,13 @@
       drawCup(layer, top, layer.land / 0.12);
     }
     drawFlashes(c);
+    drawFirstGhost(c);
     // The slider glides; a drop then snaps toward the tower (`snapDrop`), so
     // it is never cut by more than was seen hanging over.
     if (playing) {
       sliderShown.left = drawnLeft(slider.left, drawPx);
+      paintedLeft = slider.left;
+      sliderDrawn = true;
       sliderShown.width = slider.width;
       sliderShown.drink = slider.drink;
       drawCup(sliderShown, levelTop(tower.length - 1));
@@ -1743,7 +1766,194 @@
     for (const piece of pieces) drawPiece(piece);
     drawBits(c);
     c.restore();
+    drawLessonLight(c);
     drawNotes(c);
+    placeCoach();
+  }
+
+  // --- Lessons ------------------------------------------------------------------
+
+  /** Where the first cup's ghost sits, set as its lesson starts. */
+  let ghost: Span | null = null;
+  /** The ghost's sprite, kept here so the paint callback below allocates nothing per frame. */
+  let ghostSprite: HTMLCanvasElement | null = null;
+  const paintGhost = (g: CanvasRenderingContext2D) => {
+    if (ghostSprite) g.drawImage(ghostSprite, -SPRITE_PAD, -SPRITE_PAD);
+  };
+
+  /** The first cup's lesson is up, so its ghost shows. */
+  const firstCupTaught = () => playing && tower.length === 1 && lessons.firstCup;
+
+  /**
+   * The first cup's target: a dithered cream ghost of the sliding cup, in the
+   * row it slides in, exactly where a perfect drop lands, so covering it is
+   * the drop. It is placed by the same rule as every cup (`drawCup`), with its
+   * dither on the cup's own cells, and drawn under the sliding cup.
+   */
+  function drawFirstGhost(c: CanvasRenderingContext2D) {
+    if (!ghost || !firstCupTaught()) return;
+    ghostSprite = cachedSprite(`stack-ghost-${ghost.width}`, gridFor(ghost.width), unit, PALETTES[0]);
+    const x = Math.round(viewW / 2) + Math.round(ghost.left * drawPx) / (drawPx / unit);
+    const y = Math.round(levelTop(0));
+    const density = 0.45 + 0.25 * beckon(lessonClock, reduceMotion, 1.2);
+    c.save();
+    c.translate(x, y);
+    drawGhost(c, -SPRITE_PAD, -SPRITE_PAD, ghostSprite.width, ghostSprite.height, paintGhost, { color: CREAM, density, cell: unit });
+    c.restore();
+  }
+
+  /**
+   * Keeps the slip's measured size, for the lesson it shows. The coach makes
+   * a new slip for each lesson; until it has been laid out, a generous guess.
+   */
+  function measureSlip(id: string) {
+    if (slipFor === id && slipEl?.isConnected) {
+      slipW = slipEl.offsetWidth || slipW;
+      slipH = slipEl.offsetHeight || slipH;
+      return;
+    }
+    slipEl = document.querySelector<HTMLElement>(".coach .slip");
+    slipFor = slipEl ? id : "";
+    slipW = slipEl?.offsetWidth || SLIP_GUESS.w;
+    slipH = slipEl?.offsetHeight || SLIP_GUESS.h;
+  }
+
+  /** The screen around the tower, for placing a callout clear of the judged rows. */
+  function stage() {
+    const top = tower[tower.length - 1];
+    const desired = playTop + (viewH - playTop) * 0.34;
+    const settledCamera = Math.max(0, desired - (groundY - tower.length * cupH));
+    return {
+      rowTop: zoomY(levelTop(tower.length - 1)),
+      settledTop: groundY - tower.length * cupH + settledCamera,
+      rowH: cupH * zoom,
+      playTop,
+      viewW,
+      viewH,
+      towerX: zoomX(screenX(top.left + top.width / 2)),
+      towerHalf: (top.width * unit * zoom) / 2,
+      slipW,
+      slipH,
+    };
+  }
+
+  /** The best line's screen y, unrounded, or null while it is off the play area. */
+  function bestLineAt() {
+    if (previousBest <= 0) return null;
+    const y = zoomY(levelTop(previousBest - 1));
+    return y < playTop + 8 || y > viewH ? null : y;
+  }
+
+  /**
+   * The best line can be shown: it is in view, and either its callout fits
+   * on it beside the tower or this is its last chance (the tower is level
+   * with it or one cup short), when it goes wherever a lesson about the
+   * tower goes.
+   */
+  function bestReady() {
+    const line = bestLineAt();
+    if (line === null) return false;
+    if (previousBest - stacked <= 1) return true;
+    return bestCallout({ ...stage(), slipW: SLIP_GUESS.w, slipH: SLIP_GUESS.h }, line).side === "right";
+  }
+
+  /**
+   * Puts the callout where the eye already is, and never over the rows a
+   * drop is judged by (`towerCallout`): over the sliding row, centred on the
+   * tower, where there is room; under the slice it names as it falls; or on
+   * the best line, beside the tower.
+   */
+  function placeCoach() {
+    const lesson = coach.current;
+    if (!lesson || !playing) {
+      if (coachLesson) coachLesson = null;
+      return;
+    }
+    measureSlip(lesson.id);
+    const g = stage();
+    let at = towerCallout(g);
+    if (lesson.id === "trim" && taughtPiece) {
+      if (trimFor !== taughtPiece) {
+        // Chosen once: room under the slice for as long as the line needs
+        // reading, allowing for a row of the tower's climb.
+        trimFor = taughtPiece;
+        const minLife = lessonsFor(rules).trim.minLife ?? 0;
+        trimBelow = roomUnderSlice(zoomY(taughtPiece.y + cupH / 2) + cupH, viewH, slipH, minLife);
+      }
+      if (trimBelow) {
+        at = { side: "below", x: zoomX(taughtPiece.x), y: zoomY(taughtPiece.y + cupH / 2 + 4), width: 0, top: playTop, squeezed: false };
+      }
+    } else if (lesson.id === "best") {
+      const line = bestLineAt();
+      if (line !== null) at = bestCallout(g, line);
+    }
+    const x = Math.round(at.x);
+    const y = Math.round(at.y);
+    const width = Math.round(at.width);
+    // Nowhere clear on a short play area: held back while the camera is
+    // still bringing the row down, so it never sits over the moving row.
+    const held = at.squeezed && Math.abs(g.rowTop - g.settledTop) > 1;
+    if (coachLesson !== lesson) coachLesson = lesson;
+    if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
+    if (coachContinuable !== lessons.explaining) coachContinuable = lessons.explaining;
+    if (coachX !== x) coachX = x;
+    if (coachY !== y) coachY = y;
+    if (coachSide !== at.side) coachSide = at.side;
+    if (coachWidth !== width) coachWidth = width;
+    if (coachTop !== at.top) coachTop = at.top;
+    if (coachHeld !== held) coachHeld = held;
+    // Ink marks over pale sky, cream over dark, as the popups do.
+    const scene = skyLumAt(y) > 0.5 ? "light" : "dark";
+    if (coachScene !== scene) coachScene = scene;
+  }
+
+  /** Continue: the explanation up is learned and play eases back to speed. Returns whether there was one. */
+  function continueLesson() {
+    if (!playing || paused || gameOver) return false;
+    return lessons.proceed();
+  }
+
+  /** How far the spotlight is up, 0..1, eased in real time (at once under Reduce Motion). */
+  let lessonDim = 0;
+  const focusBoxes: FocusBox[] = [{ x: 0, y: 0, w: 0, h: 0 }];
+
+  /**
+   * While a lesson is up the sky dims and the play stays lit: one box over
+   * the row the cup slides in and the tower's top cup (the first cup's ghost
+   * is in that row), stretched to take in the slice or the best line the
+   * lesson names. One box, so no seam is ever dimmed between two.
+   */
+  function drawLessonLight(c: CanvasRenderingContext2D) {
+    if (lessonDim <= 0.01 || !playing) return;
+    const pad = 2 * SC;
+    const rowTop = zoomY(levelTop(tower.length - 1));
+    let x0 = zoomX(screenX(track.min)) - pad;
+    let x1 = zoomX(screenX(track.max + slider.width)) + pad;
+    let y0 = rowTop - pad;
+    let y1 = rowTop + 2 * cupH * zoom + pad;
+    const id = coach.current?.id;
+    if (id === "trim" && taughtPiece) {
+      const half = (cupH * zoom) / 2 + pad;
+      const px = zoomX(taughtPiece.x);
+      const py = zoomY(taughtPiece.y);
+      x0 = Math.min(x0, px - half);
+      x1 = Math.max(x1, px + half);
+      y1 = Math.max(y1, py + half);
+    } else if (id === "best") {
+      const line = bestLineY();
+      if (line !== null) {
+        // The whole line, from its label at the left, down to the row.
+        x0 = 0;
+        x1 = viewW;
+        y0 = Math.min(y0, line - 6 - 5 * SC - pad);
+      }
+    }
+    const box = focusBoxes[0];
+    box.x = x0;
+    box.y = y0;
+    box.w = x1 - x0;
+    box.h = y1 - y0;
+    drawSpotlight(c, viewW, viewH, focusBoxes, lessonDim, { color: NOTE_BACK, cell: SC });
   }
 
   // --- Rules in motion ---------------------------------------------------------
@@ -1761,21 +1971,14 @@
       drink: tower.length % DRINKS.length,
       speed,
     };
-    if (demo) {
-      const cup = DEMO_SCRIPT[demoStep];
-      demoPass = 1;
-      if (cup) {
-        demoAimAt = demoAim(cup, width, fromLeft);
-        if (cup.caption) demoCaption = cup.caption;
-      }
-    }
+    sliderDrawn = false;
   }
 
   /** What a drop right now would come to, judged where the cup is drawn. */
   function judge() {
     const top = tower[tower.length - 1];
     const window = perfectWindow(tower.length - 1, slider.speed, rules);
-    return dropCup(top, slider.left, slider.width, { window, px: drawPx });
+    return dropCup(top, paintedLeft, slider.width, { window, px: drawPx });
   }
 
   function breakOff(cut: Span, snappedLeft: number, level: number, whole: boolean) {
@@ -1783,33 +1986,34 @@
     const to = whole ? slider.width : from + cut.width;
     const centerUnits = cut.left + cut.width / 2;
     const side = centerUnits < tower[tower.length - 1].left + tower[tower.length - 1].width / 2 ? -1 : 1;
-    pieces.push({
+    const piece: Piece = {
       x: screenX(centerUnits),
       y: levelTop(level) + cupH / 2,
       vx: side * (40 + Math.random() * 50),
-      vy: -80,
+      vy: -SLICE_FALL.lift,
       angle: 0,
       spin: side * (2.5 + Math.random() * 2),
       drink: slider.drink,
       gridWidth: slider.width,
       from,
       to,
-    });
+    };
+    pieces.push(piece);
+    return piece;
   }
 
-  /** Drops the sliding cup. The demo's autopilot calls this too; the player's input is shut out of the demo. */
-  function drop(byDemo = false) {
-    if (!playing || paused || gameOver || demo !== byDemo) return;
+  /** Drops the sliding cup, judged where it was last painted. */
+  function drop() {
+    if (!playing || paused || gameOver || !sliderDrawn) return;
     const now = performance.now();
-    if (!byDemo && now - lastDrop < 80) return;
+    if (now - lastDrop < 80) return;
     lastDrop = now;
-    tipVisible = false;
 
     const top = tower[tower.length - 1];
     const level = tower.length - 1;
     const result = judge();
     // The same snap dropCup made, from where the cup was drawn.
-    const snapped = snapDrop(top, drawnLeft(slider.left, drawPx), slider.width);
+    const snapped = snapDrop(top, drawnLeft(paintedLeft, drawPx), slider.width);
     drops = [...drops, result.kind];
 
     if (result.kind === "miss" || !result.placed) {
@@ -1819,13 +2023,14 @@
     }
 
     let placed: Span = result.placed;
+    let slice: Piece | null = null;
     if (result.kind === "perfect") {
       streak += 1;
       perfects += 1;
       bestStreak = Math.max(bestStreak, streak);
       // Perfects in a row grow the cup back toward the tray's center line.
       placed = grownSpan(placed, streak, rules);
-      flashes.push({ level, left: placed.left, width: placed.width, age: 0 });
+      if (!reduceMotion) flashes.push({ level, left: placed.left, width: placed.width, age: 0 });
       addPopup(
         popups,
         screenX(placed.left + placed.width / 2),
@@ -1841,7 +2046,7 @@
         addPopup(popups, screenX(placed.left + placed.width / 2), levelTop(level) - 14, "a hair off");
       }
       if (result.cut) {
-        breakOff(result.cut, snapped, level, false);
+        slice = breakOff(result.cut, snapped, level, false);
         sfxSlice();
       }
     }
@@ -1849,7 +2054,9 @@
     tower = [...tower, { ...placed, drink: slider.drink, land: reduceMotion ? 0 : 0.12 }];
     stacked = tower.length - 1;
     const x = screenX(placed.left + placed.width / 2);
-    for (let i = 0; i < (result.kind === "perfect" ? 10 : 5); i++) {
+    // Under Reduce Motion the landing shows no crumbs, flash or sparkles: the result's words say it, in place.
+    const crumbs = reduceMotion ? 0 : result.kind === "perfect" ? 10 : 5;
+    for (let i = 0; i < crumbs; i++) {
       const life = 0.38 + Math.random() * 0.22;
       spawnBit(
         BIT_CRUMB,
@@ -1865,24 +2072,22 @@
     if (result.kind === "perfect" && !reduceMotion) {
       // From the third perfect in a row, the sparkles take the drink's colour.
       const cy = levelTop(level) + cupH / 2;
-      const color = streak >= rules.growAfter ? DRINKS[slider.drink] : skyLumAt(cy) > 0.6 ? "#d9902f" : "#ffd166";
+      const color = streak >= rules.growAfter ? DRINKS[slider.drink] : skyLumAt(cy) > 0.6 ? "#d9902f" : NOTE_GOLD;
       sparkleRing(x, cy, placed.width * unit, color);
     }
 
-    // In the demo the caption speaks; the live region stays quiet.
     if (stacked % 10 === 0) {
       sfxMilestone();
       addPopup(popups, x, levelTop(level) - 32, `${stacked} high`, "gold", 1);
-      if (!demo) liveMessage = `${stacked} cups high.`;
+      liveMessage = `${stacked} cups high.`;
     } else {
       sfxPlace(result.kind === "perfect", stacked);
-      if (demo) {
-        // Nothing to announce.
-      } else if (result.kind === "perfect") liveMessage = `Perfect. ${stacked} cups.`;
+      if (result.kind === "perfect") liveMessage = `Perfect. ${stacked} cups.`;
       else if (result.kind === "close") liveMessage = `A hair off, so no perfect. ${stacked} cups.`;
     }
     setMusicPhase(phaseForHeight(stacked, rules));
-    if (demo) demoStep += 1;
+    const lesson = lessons.afterDrop({ kind: result.kind, level, streak, width: placed.width });
+    if (lesson?.id === "trim") taughtPiece = slice;
     nextSlider();
   }
 
@@ -1890,17 +2095,10 @@
     playing = false;
     streak = 0;
     sfxTopple();
-    if (demo) {
-      // The demo's tower falls like any other; then the strip offers a turn.
-      timers.later(
-        () => {
-          finishMusic();
-          demoEnded = true;
-        },
-        reduceMotion ? 300 : 1300,
-      );
-      return;
-    }
+    // Whatever was being taught comes down uncounted: a first cup that
+    // missed is taught again on the next run.
+    lessons.fell();
+    taughtPiece = null;
     liveMessage = `The cup missed. ${stacked} cups high.`;
     // Let the last cup fall and the camera pull back before the slip.
     timers.later(() => void endGame(), reduceMotion ? 300 : 1300);
@@ -1926,61 +2124,79 @@
     stepSatellite(dt, view);
   }
 
-  function frame(timestamp: number) {
-    if (!active) return;
-    if (!last) last = timestamp;
-    const dt = Math.min((timestamp - last) / 1000, 0.05);
-    last = timestamp;
-
-    if (paused) {
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-
-    // The demo decides on the frame just drawn, as a player does.
-    if (playing && demo) autopilot();
+  /** One step of play, in real seconds: the slide, the camera, the falling slices, the sky. */
+  function update(dt: number, rawDt = dt) {
+    // The lessons age in real (uncapped) time and offer the best line as it
+    // comes down toward the tower. In normal an explanation slows the game
+    // while it is up (`gameDt`, never more than `dt`); in expert the game
+    // always runs at its own speed.
+    const gameDt = lessons.step(rawDt, dt, playing && previousBest > 0 ? { remaining: previousBest - stacked, ready: bestReady() } : undefined);
+    lessonClock += dt;
+    // The spotlight comes up with an explanation and goes as it ends.
+    const dimTarget = playing && coach.current && !coach.leaving ? 1 : 0;
+    lessonDim = reduceMotion ? dimTarget : damp(lessonDim, dimTarget, 1 / 0.18, dt);
     if (playing) {
       const top = tower[tower.length - 1];
       track = trackFor(top, halfScreen, slider.width);
-      lastStep = slider.speed * dt;
-      const moved = stepSlide(slider.left, slider.direction, lastStep, track);
-      if (moved.direction !== slider.direction) demoPass += 1;
+      const moved = stepSlide(slider.left, slider.direction, slider.speed * gameDt, track);
       slider.left = moved.position;
       slider.direction = moved.direction;
     }
 
     // Keep the sliding cup about a third of the way down the play area.
+    const was = camera;
     const desired = playTop + (viewH - playTop) * 0.34;
     const target = playing ? Math.max(0, desired - (groundY - tower.length * cupH)) : 0;
-    camera += (target - camera) * Math.min(1, dt * (playing ? 6 : 3));
+    // The camera frames in real time, so after a drop in slow motion the row
+    // is back in its place as quickly as ever.
+    camera = approach(camera, target, playing ? 6 : 3, dt);
     if (!playing) {
       const towerHeight = tower.length * cupH + 40;
       const fit = Math.min(1, (groundY - playTop - 24) / towerHeight);
-      zoom += (fit - zoom) * Math.min(1, dt * 3);
+      zoom = approach(zoom, fit, 3, dt);
     } else if (zoom !== 1) {
       // A new tower after a fall: settle back in to full size.
-      zoom = zoom > 0.999 ? 1 : zoom + (1 - zoom) * Math.min(1, dt * 4);
+      zoom = zoom > 0.999 ? 1 : approach(zoom, 1, 4, dt);
     }
 
-    for (const layer of tower) layer.land = Math.max(0, layer.land - dt);
+    for (const layer of tower) layer.land = Math.max(0, layer.land - gameDt);
     for (let index = flashes.length - 1; index >= 0; index--) {
-      flashes[index].age += dt;
+      flashes[index].age += gameDt;
       if (flashes[index].age > 0.35) flashes.splice(index, 1);
     }
+    // The slice the trim lesson names falls slowly (in real time, so the same
+    // in both modes) while it is named, and rides with the tower, so it stays
+    // under the row the next cup slides in. Every other piece falls in the
+    // game's own time.
+    const sliceNamed = taughtPiece !== null && (lessons.pending?.id === "trim" || (coach.current?.id === "trim" && !coach.leaving));
+    pieceScale = damp(pieceScale, sliceNamed ? SLICE_SLOW : 1, SLICE_EASE, dt);
     for (let index = pieces.length - 1; index >= 0; index--) {
       const piece = pieces[index];
-      piece.vy += 2200 * dt;
-      piece.x += piece.vx * dt;
-      piece.y += piece.vy * dt;
-      piece.angle += piece.spin * dt;
+      let step = gameDt;
+      if (piece === taughtPiece) {
+        step = dt * pieceScale;
+        piece.y += camera - was;
+      }
+      piece.vy += SLICE_FALL.gravity * step;
+      piece.x += piece.vx * step;
+      piece.y += piece.vy * step;
+      piece.angle += piece.spin * step;
       if (piece.y > viewH / Math.min(1, zoom) + cupH * 2) pieces.splice(index, 1);
     }
+    // A slice leaving the screen (or the room under it) takes its line with
+    // it at once, even while the line is fading after Continue: learned if
+    // it was up long enough to read.
+    if (taughtPiece && trimFor === taughtPiece && coach.current?.id === "trim") {
+      const gone =
+        zoomY(taughtPiece.y - cupH / 2) > viewH ||
+        (trimBelow && !roomUnderSlice(zoomY(taughtPiece.y + cupH / 2), viewH, slipH));
+      if (gone) lessons.retire("trim");
+    }
+    if (taughtPiece && !sliceNamed && coach.current?.id !== "trim" && !pieces.includes(taughtPiece)) taughtPiece = null;
     updateZone();
-    stepScene(dt);
-    stepBits(dt);
-    stepPopups(popups, dt);
-    draw();
-    raf = requestAnimationFrame(frame);
+    stepScene(gameDt);
+    stepBits(gameDt);
+    stepPopups(popups, gameDt, reduceMotion ? 0 : 24);
   }
 
   // --- Pause, restart, and finish -----------------------------------------
@@ -1997,11 +2213,11 @@
   function resumeGame() {
     if (gameOver || !paused) return;
     paused = false;
-    last = 0;
+    loop.resync();
     setMusicPaused(false);
     sfxBlip();
     liveMessage = "Game resumed";
-    hudButtons?.focusPause();
+    focusPlayfield();
   }
 
   function togglePause() {
@@ -2010,7 +2226,7 @@
   }
 
   async function endGame() {
-    if (gameOver || demo) return;
+    if (gameOver) return;
     gameOver = true;
     const result = concludeRun("stack", stacked);
     localBest = result.best;
@@ -2020,64 +2236,9 @@
     slip?.focus();
   }
 
-  // --- The demo's autopilot --------------------------------------------------
-
-  let lastStep = 0;
-
-  /** Drops when the script says to, through the same drop the player's input calls. */
-  function autopilot() {
-    const cup = DEMO_SCRIPT[demoStep];
-    if (!cup) return;
-    const top = tower[tower.length - 1];
-    const offset = slider.left - (top.left + (top.width - slider.width) / 2);
-    const now = { offset, aim: demoAimAt, step: lastStep, pass: demoPass, kind: judge().kind };
-    if (demoDropsNow(cup, now)) drop(true);
-  }
-
-  function watchDemo() {
-    asking = false;
-    timers.clear();
-    stopMusic();
-    begin(true);
-  }
-
-  /** A fresh real run, from the demo or its card. */
-  function playForReal() {
-    asking = false;
-    timers.clear();
-    stopMusic();
-    begin(false);
-    liveMessage = "New tower. Drop the first cup.";
-  }
-
-  /**
-   * Play, from the demo strip. Mid-demo the demo's cup drops away and the
-   * sky comes home as it does on a fall, then a real run starts; once the
-   * demo has fallen, it starts straight away.
-   */
-  function playFromDemo() {
-    if (!demo || !playing) {
-      playForReal();
-      return;
-    }
-    const top = tower[tower.length - 1];
-    const snapped = snapDrop(top, drawnLeft(slider.left, drawPx), slider.width);
-    breakOff({ left: snapped, width: slider.width }, snapped, tower.length - 1, true);
-    playing = false;
-    demo = false;
-    leavingDemo = true;
-    finishMusic();
-    timers.later(playForReal, reduceMotion ? 300 : 1300);
-  }
-
-  /** Starts a tower: a real run on this visit's mode, or the demo on normal. */
-  function begin(asDemo = false) {
-    demo = asDemo;
-    demoEnded = false;
-    leavingDemo = false;
-    demoStep = 0;
-    demoCaption = "";
-    rules = asDemo ? NORMAL : rulesFor(expert);
+  /** Starts a tower on this visit's mode. */
+  function begin() {
+    rules = rulesFor(expert);
     runSeed = Math.floor(Math.random() * 2 ** 31);
     tower = [{ ...traySpan(rules), drink: 0, land: 0 }];
     drops = [];
@@ -2096,11 +2257,7 @@
     gameOver = false;
     newBest = false;
     previousBest = readBest("stack");
-    last = 0;
-    if (!asDemo && !tipChecked) {
-      tipChecked = true;
-      tipVisible = firstVisit("stack");
-    }
+    loop.resync();
     // Back on the roof: nothing left crossing the sky from the last climb.
     flock.on = false;
     flock.wait = 4;
@@ -2111,13 +2268,43 @@
     satellite.on = false;
     satellite.wait = 4;
     trailCount = 0;
+    taughtPiece = null;
+    pieceScale = 1;
+    lessonClock = 0;
     nextSlider();
+    // A device's very first cup is taught as it slides, over its ghost.
+    trimFor = null;
+    ghost = lessons.begin(rules) ? ghostSpan(tower[0], slider.width) : null;
     setMusicPhase("opening");
     startMusic();
   }
 
   function restart() {
-    playForReal();
+    timers.clear();
+    stopMusic();
+    begin();
+    liveMessage = "New tower. Drop the first cup.";
+    // The results slip has gone: focus comes back to the game.
+    void tick().then(focusPlayfield);
+  }
+
+  /** Hands focus to the playfield rather than a button, so Space drops straight away. */
+  function focusPlayfield() {
+    playfield?.focus({ preventScroll: true });
+  }
+
+  /**
+   * From the playfield, Shift+Tab wraps to the last control in play, which
+   * the shell's Tab trap lets through (the playfield is in the scope but not
+   * a stop), so it never leaves the arcade.
+   */
+  function onPlayfieldTab(event: KeyboardEvent) {
+    if (event.key !== "Tab" || !event.shiftKey || document.activeElement !== playfield) return;
+    const controls = playScope?.querySelectorAll<HTMLElement>("button:not([disabled])");
+    const lastControl = controls?.[controls.length - 1];
+    if (!lastControl) return;
+    event.preventDefault();
+    lastControl.focus();
   }
 
   // --- Sizing and lifecycle ------------------------------------------------
@@ -2140,7 +2327,14 @@
     for (const layer of CITY) buildCity(layer);
     buildMoon();
     sizeEarth();
-    draw();
+    // Slices fall in screen pixels, so a resize strands the one a line names:
+    // its line comes down (learned if it was read) rather than point at nothing.
+    if (taughtPiece) {
+      lessons.retire("trim");
+      taughtPiece = null;
+      trimFor = null;
+    }
+    loop.redraw();
   }
 
   function onPointer(event: PointerEvent) {
@@ -2174,17 +2368,15 @@
       isPaused: () => paused,
       pause: () => void pauseGame(),
       togglePause,
-      // The demo strip and the first-visit card sit outside the HUD.
-      playScope: () =>
-        asking
-          ? document.querySelector(".boba-scrim")
-          : demo || demoEnded
-            ? hudRow.closest(".boba-arcade") ?? hudRow.closest(".boba-hud")
-            : hudRow.closest(".boba-hud"),
+      playScope: () => playScope,
       onKey: (event) => {
         // A focused control keeps Space and Enter for itself.
         if (!DROP_KEYS.has(event.key) || isOnControl(event)) return;
+        // Enter is the game's only on the playfield (a focused button keeps its own).
+        if (event.key === "Enter" && event.target !== playfield && event.target !== document.body) return;
         event.preventDefault();
+        // While an explanation holds the game slowed, Enter is Continue.
+        if (event.key === "Enter" && continueLesson()) return;
         drop();
       },
       onResize: sizeCanvas,
@@ -2192,21 +2384,13 @@
       onReduceMotion: (reduce) => (reduceMotion = reduce),
     });
     sizeCanvas();
-    const intro = demoIntro("stack", takeDemoRequest("stack"));
-    if (intro === "demo") begin(true);
-    else if (intro === "none") begin(false);
-    else {
-      // First visit: the tray waits under the card until it is answered.
-      asking = true;
-      playing = false;
-      tower = [{ ...traySpan(rulesFor(expert)), drink: 0, land: 0 }];
-      rules = rulesFor(expert);
-    }
-    raf = requestAnimationFrame(frame);
+    // Straight into a tower: the game teaches as it plays.
+    begin();
+    loop.start();
+    focusPlayfield();
 
     return () => {
-      active = false;
-      cancelAnimationFrame(raf);
+      loop.stop();
       timers.clear();
       stopMusic();
       unmountShell();
@@ -2214,58 +2398,68 @@
   });
 </script>
 
+<svelte:window on:keydown={onPlayfieldTab} />
+
 <div class="boba-stage cs-stage" on:pointerdown={onPointer} aria-hidden="true"></div>
 <canvas bind:this={canvas} class="boba-canvas" aria-hidden="true"></canvas>
 
-<header class="boba-hud boba-ui is-bare" aria-label="Cup stack status">
-  <div bind:this={hudRow} class="boba-hud-row">
-    <div class="boba-ticket boba-ticket-start boba-riso" style="--tilt: -1.3deg">
-      <span class="boba-ticket-icon" aria-hidden="true">
-        <PixelIcon grid={MENU_ICONS.stack.grid} palette={MENU_ICONS.stack.palette} px={3} />
-      </span>
-      <span class="boba-big">{String(stacked).padStart(2, "0")}</span>
-      <span class="boba-stack">
-        <span class="boba-meta">cups high</span>
-        {#key streak}
-          <span class="boba-combo" class:active={streak > 1}>
-            {streak > 1 ? `×${streak} perfect` : streak === 1 ? "perfect" : "line them up"}
-          </span>
-        {/key}
-      </span>
-      <!-- The demo plays normal, whatever the switch says. -->
-      {#if !demo && !demoEnded && !leavingDemo}
+<div bind:this={playScope} class="cs-play">
+  <!-- Where focus rests during play: not a button, so Space and Enter stay
+       the game's. It covers the play area under the tickets without taking a
+       pointer, so a keyboard's focus ring shows round the play, and it is out
+       of the Tab cycle itself. -->
+  <div
+    bind:this={playfield}
+    class="cs-playfield"
+    style="top: {Math.round(playTop) + 4}px"
+    tabindex="-1"
+    role="group"
+    aria-label="Cup stack playfield"
+  ></div>
+  <header class="boba-hud boba-ui is-bare" aria-label="Cup stack status">
+    <div bind:this={hudRow} class="boba-hud-row">
+      <div class="boba-ticket boba-ticket-start boba-riso" style="--tilt: -1.3deg">
+        <span class="boba-ticket-icon" aria-hidden="true">
+          <PixelIcon grid={MENU_ICONS.stack.grid} palette={MENU_ICONS.stack.palette} px={3} />
+        </span>
+        <span class="boba-big">{String(stacked).padStart(2, "0")}</span>
+        <span class="boba-stack">
+          <span class="boba-meta">cups high</span>
+          {#key streak}
+            <span class="boba-combo" class:active={streak > 1}>
+              {streak > 1 ? `×${streak} perfect` : streak === 1 ? "perfect" : "line them up"}
+            </span>
+          {/key}
+        </span>
         <ExpertTag />
-      {/if}
+      </div>
+
+      <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.6deg">
+        <span class="boba-stack">
+          <span class="boba-meta">best</span>
+          <span class="boba-phase">{previousBest ? `${previousBest} high` : "none yet"}</span>
+        </span>
+        <HudButtons {paused} disabled={!playing} on:pause={togglePause} />
+      </div>
     </div>
+  </header>
+</div>
 
-    <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.6deg">
-      <span class="boba-stack">
-        <span class="boba-meta">best</span>
-        <span class="boba-phase">{previousBest ? `${previousBest} high` : "none yet"}</span>
-      </span>
-      <HudButtons bind:this={hudButtons} {paused} disabled={!playing} on:pause={togglePause} />
-    </div>
-  </div>
-
-  {#if tipVisible && !paused}
-    <div class="boba-tip" role="note" aria-label="How to play">
-      <span>drop each cup onto the last</span>
-      <span class="boba-keys"><kbd>Space</kbd> drop</span>
-    </div>
-  {/if}
-</header>
-
-{#if asking}
-  <DemoCard
-    deck="Watch it stack a few cups by itself, or go straight in."
-    on:watch={watchDemo}
-    on:play={playForReal}
-  />
-{/if}
-
-{#if demo || demoEnded}
-  <DemoBar caption={demoCaption} ended={demoEnded} placement="top" on:play={playFromDemo} on:again={watchDemo} />
-{/if}
+<!-- Lessons sit by the tower, over the row the cup slides in, under a falling slice, or on the best line, never in the tickets. -->
+<Coach
+  lesson={coachLesson}
+  x={coachX}
+  y={coachY}
+  side={coachSide}
+  scene={coachScene}
+  width={coachWidth}
+  leaving={coachLeaving}
+  continuable={coachContinuable}
+  on:continue={continueLesson}
+  returnFocus={focusPlayfield}
+  hidden={paused || gameOver || coachHeld}
+  top={coachTop + 8}
+/>
 
 {#if paused && !gameOver}
   <PauseCard
@@ -2308,5 +2502,23 @@
      takes the rooftop's dusk so the site never shows through behind it. */
   .cs-stage {
     background: #f0c9a0;
+  }
+
+  .cs-play {
+    display: contents;
+  }
+
+  .cs-playfield {
+    position: fixed;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+    z-index: calc(var(--layer-overlay) + 1);
+    pointer-events: none;
+  }
+
+  /* The site's ring, drawn inside the edge so it stays on screen. */
+  .cs-playfield:focus-visible {
+    outline-offset: -2px;
   }
 </style>
