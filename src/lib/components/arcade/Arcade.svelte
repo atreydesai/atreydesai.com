@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
 
   import { arcadeScreen, closeArcade, type GameId } from "#lib/boba.ts";
+  import { syncBests } from "#lib/arcade/scores.ts";
   import { sfxBlip } from "#lib/sfx.ts";
   import ArcadeMenu from "./ArcadeMenu.svelte";
   import RisoDefs from "./RisoDefs.svelte";
@@ -36,6 +37,8 @@
   let failed: GameId | null = null;
 
   async function load(id: GameId) {
+    // A game opened from a link skips the menu: bring back its best from the board.
+    void syncBests(undefined, id);
     try {
       const module = await LOADERS[id]();
       // The visitor may have moved on while it loaded.

@@ -1,11 +1,16 @@
 import { get } from "svelte/store";
 import { arcadeExpert, type GameId } from "#lib/boba.ts";
 
-// Personal bests and first-run tips live in cookies (catch keeps its original
-// names so existing bests carry over); the shared leaderboard lives behind
-// /api/scores, one board per game and mode. Expert runs keep their own bests
-// and their own boards. Every function here takes the mode from the menu's
-// switch unless it is given one, so a game needs no plumbing for it.
+// Personal bests are kept on this device and checked against the shared
+// leaderboard behind /api/scores (one board per game and mode). The board is
+// the record: whenever it is read for the name last signed on this device,
+// a best it holds that the device has lost comes back. On the device a best
+// lives in localStorage; older bests were cookies (catch keeps its original
+// names so existing bests carry over), which Safari expires seven days after
+// they were last written, so they are still read and never trusted alone.
+// Expert runs keep their own bests and their own boards. Every function here
+// takes the mode from the menu's switch unless it is given one, so a game
+// needs no plumbing for it.
 
 /** Which board a run belongs on. */
 export type ArcadeMode = "normal" | "expert";
@@ -52,16 +57,113 @@ function writeCookie(name: string, value: string) {
   document.cookie = `${name}=${value}; path=/; max-age=${ONE_YEAR}; samesite=lax`;
 }
 
+// One storage key per best (`boba_best:<cookie name>`), so two tabs saving
+// bests for different games can't overwrite each other's. When storage is
+// off, bests are kept for this visit in memory, besides the cookie.
+const BEST_KEY = (name: string) => `boba_best:${name}`;
+const sessionBests = new Map<string, number>();
+
+function readStored(name: string) {
+  try {
+    return Math.floor(Number(localStorage.getItem(BEST_KEY(name)))) || 0;
+  } catch {
+    return sessionBests.get(name) ?? 0;
+  }
+}
+
+function writeBest(game: GameId, mode: ArcadeMode, score: number) {
+  const name = bestCookie(game, mode);
+  sessionBests.set(name, Math.max(score, sessionBests.get(name) ?? 0));
+  try {
+    // Never lower: another tab may have saved a higher best a moment ago.
+    if (score > readStored(name)) localStorage.setItem(BEST_KEY(name), String(score));
+  } catch {
+    // Storage off: the memory copy and the cookie below hold it.
+  }
+  writeCookie(name, String(score));
+}
+
+/**
+ * The best on this device for a game and mode: the highest of storage, this
+ * visit's memory and the old cookie. A cookie that holds more than storage
+ * (a best from before storage was used) is copied into storage, so it
+ * outlives the cookie.
+ */
 export function readBest(game: GameId, mode: ArcadeMode = currentMode()) {
-  return parseInt(readCookie(bestCookie(game, mode)) ?? "", 10) || 0;
+  const name = bestCookie(game, mode);
+  const stored = Math.max(readStored(name), sessionBests.get(name) ?? 0);
+  const cookie = parseInt(readCookie(name) ?? "", 10) || 0;
+  if (cookie > stored) {
+    try {
+      localStorage.setItem(BEST_KEY(name), String(cookie));
+    } catch {
+      sessionBests.set(name, cookie);
+    }
+  }
+  return Math.max(stored, cookie);
 }
 
 /** Saves `score` if it beats the stored best for the mode being played. */
 export function recordScore(game: GameId, score: number, mode: ArcadeMode = currentMode()) {
   const best = readBest(game, mode);
   if (score <= best) return { best, newBest: false };
-  writeCookie(bestCookie(game, mode), String(score));
+  writeBest(game, mode, score);
   return { best: score, newBest: true };
+}
+
+/** Takes a best the leaderboard holds for this device's name, if it beats the one here. */
+export function mergeBest(game: GameId, score: number | null | undefined, mode: ArcadeMode = currentMode()) {
+  const value = Math.floor(Number(score));
+  if (!Number.isFinite(value) || value <= 0 || value <= readBest(game, mode)) return false;
+  writeBest(game, mode, value);
+  return true;
+}
+
+// The last name signed on any board is offered again, so a regular doesn't
+// retype it after every run, and it is how this device finds its own bests
+// on the boards. It lives on this device only.
+const NAME_KEY = "boba_player_name_v1";
+
+export function readPlayerName() {
+  try {
+    return localStorage.getItem(NAME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function savePlayerName(name: string) {
+  try {
+    localStorage.setItem(NAME_KEY, name);
+  } catch {
+    // Storage can be off; the field just starts empty next time.
+  }
+}
+
+/**
+ * Brings back from the leaderboard any best this device has lost, for one
+ * game or (without `game`) every game, in a mode. Needs the name signed on
+ * this device; quietly does nothing without one or when the board is offline.
+ * Resolves to whether any best changed.
+ */
+export async function syncBests(mode: ArcadeMode = currentMode(), game?: GameId): Promise<boolean> {
+  const name = readPlayerName().trim();
+  if (!name) return false;
+  try {
+    const query = new URLSearchParams({ mode, name, game: game ?? "all" });
+    const response = await fetch(`/api/scores?${query}`);
+    const data = await response.json();
+    // A different name was signed while this was on its way: not this player's best.
+    if (!data?.available || readPlayerName().trim() !== name) return false;
+    if (game) return mergeBest(game, data.mine, mode);
+    let changed = false;
+    for (const [id, best] of Object.entries(data.bests ?? {})) {
+      if (mergeBest(id as GameId, best as number, mode)) changed = true;
+    }
+    return changed;
+  } catch {
+    return false;
+  }
 }
 
 /** True the first time a game is opened on this device; remembers the visit. */
@@ -156,18 +258,27 @@ export interface BoardEntry {
 interface Board {
   available: boolean;
   scores: BoardEntry[];
+  /** This device's name's best on the board, when it is on it. */
+  mine: number | null;
 }
 
 export async function fetchBoard(game: GameId, mode: ArcadeMode = currentMode()): Promise<Board> {
   try {
-    const response = await fetch(`/api/scores?game=${game}&mode=${mode}`);
+    const query = new URLSearchParams({ game, mode });
+    const name = readPlayerName().trim();
+    if (name) query.set("name", name);
+    const response = await fetch(`/api/scores?${query}`);
     const data = await response.json();
+    // The board also says this device's own best on it, which may be one the device lost.
+    const mine = name && readPlayerName().trim() === name && Number.isFinite(data?.mine) ? Number(data.mine) : null;
+    if (data?.available) mergeBest(game, mine, mode);
     return {
       available: !!data.available,
       scores: Array.isArray(data.scores) ? data.scores : [],
+      mine,
     };
   } catch {
-    return { available: false, scores: [] };
+    return { available: false, scores: [], mine: null };
   }
 }
 
@@ -191,6 +302,7 @@ export async function submitScore(
     if (!response.ok || !data.ok) {
       return { ok: false, reason: data?.reason ?? "couldn't submit" };
     }
+    mergeBest(game, data.mine, mode);
     return {
       ok: true,
       rank: data.rank ?? null,

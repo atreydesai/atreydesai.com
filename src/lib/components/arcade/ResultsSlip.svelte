@@ -3,7 +3,7 @@
 
   import { GAMES, type GameId } from "#lib/boba.ts";
   import { LOOPS } from "#lib/arcade/art.ts";
-  import { currentMode, fetchBoard, submitScore, type BoardEntry } from "#lib/arcade/scores.ts";
+  import { currentMode, fetchBoard, readPlayerName, savePlayerName, submitScore, syncBests, type BoardEntry } from "#lib/arcade/scores.ts";
   import {
     canCopyImage,
     canShareFile,
@@ -23,6 +23,9 @@
   export let score: number;
   export let unit = "points";
   export let newBest = false;
+  /** The board holds a higher best for this device's name than this run: no stamp. */
+  let beatenOnBoard = false;
+  $: stamped = newBest && !beatenOnBoard;
   export let stats: Array<{ label: string; value: string | number }> = [];
   /**
    * The run as a few short lines of emoji for the share text and card, the
@@ -45,7 +48,7 @@
     expert,
     score,
     unit,
-    newBest,
+    newBest: stamped,
     stats,
     lines: share,
   } satisfies ShareInput;
@@ -141,33 +144,16 @@
     card?.focus();
   }
 
-  // The last name signed on any board is offered again, so a regular
-  // doesn't retype it after every run. It lives on this device only.
-  const NAME_KEY = "boba_player_name_v1";
-
-  function readName() {
-    try {
-      return localStorage.getItem(NAME_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  }
-
-  function saveName(name: string) {
-    try {
-      localStorage.setItem(NAME_KEY, name);
-    } catch {
-      // Storage can be off; the field just starts empty next time.
-    }
-  }
-
   onMount(async () => {
     imageCopy = canCopyImage();
-    playerName = readName();
+    // The last name signed on this device is offered again.
+    playerName = readPlayerName();
     const result = await fetchBoard(game, mode);
     boardAvailable = result.available;
     board = result.scores;
     boardLoading = false;
+    // The board is the record: a best it holds above this run means this run wasn't one.
+    if (result.mine !== null && result.mine > score) beatenOnBoard = true;
   });
 
   function onNameInput() {
@@ -196,7 +182,9 @@
       if (me) marked = true;
       return { ...entry, me };
     });
-    saveName(checked.value);
+    savePlayerName(checked.value);
+    // Signing is also how a device that lost its bests gets them back, for every game.
+    void syncBests(mode);
     submitted = true;
   }
 </script>
@@ -223,7 +211,7 @@
               <path pathLength="1" d={LOOPS[1]} />
             </svg>
             <strong>{score}</strong>
-            {#if newBest}
+            {#if stamped}
               <span class="stamp">new best</span>
             {/if}
           </span>

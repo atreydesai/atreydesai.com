@@ -5,7 +5,7 @@
   import { GAMES, arcadeExpert, canPlay, setExpert, type GameId } from "#lib/boba.ts";
   import { MENU_ICONS } from "#lib/arcade/art.ts";
   import { trapFocus } from "#lib/arcade/focus.ts";
-  import { readBest } from "#lib/arcade/scores.ts";
+  import { readBest, syncBests } from "#lib/arcade/scores.ts";
   import { sfxBlip, unlockAudio } from "#lib/sfx.ts";
   import Leaderboards from "./Leaderboards.svelte";
 
@@ -21,11 +21,17 @@
 
   $: expert = $arcadeExpert;
   $: mode = expert ? ("expert" as const) : ("normal" as const);
-  // The prices on the board follow the switch.
+  // The prices on the board follow the switch, and the leaderboard is the
+  // record: a best it holds for this device's name that the device lost
+  // comes back, and the prices update when it does.
   $: if (playable.catch !== undefined) refreshBests(mode);
 
   function refreshBests(which: "normal" | "expert") {
     bests = Object.fromEntries(GAMES.map((game) => [game.id, readBest(game.id, which)]));
+    // Read again whenever a sync ends, changed or not: another sync may have restored one meanwhile.
+    void syncBests(which).then(() => {
+      if (which === mode) bests = Object.fromEntries(GAMES.map((game) => [game.id, readBest(game.id, which)]));
+    });
   }
 
   function pick(id: GameId) {
