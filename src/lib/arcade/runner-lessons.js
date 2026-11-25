@@ -43,8 +43,11 @@ const URGENT_HAZARD = 1.8;
 const THING_IN_VIEW = 0.8;
 
 const move = { slow: 0.15, life: Infinity, minLife: 0.5, move: true };
-/** A thing is named at full speed: slowing for every sighting would drag the opening. */
-const thing = { slow: 1, life: 2.6, minLife: 1.5 };
+/**
+ * A thing is explained in slow motion too: the run is fast, so play slows
+ * while the line is up, and Continue (or running past the thing) ends it.
+ */
+const thing = { slow: 0.25, life: 7, minLife: 1.2 };
 
 /** Every lesson: one short full sentence, eight words or fewer. @type {Readonly<Record<string, Lesson>>} */
 export const LESSONS = Object.freeze({
@@ -68,10 +71,10 @@ export const LESSONS = Object.freeze({
   },
   pearls: { id: "pearls", text: "Pearls fill the sugar meter below.", ...thing },
   customer: { id: "customer", text: "Run past the customer to deliver the tea.", ...thing, life: 3 },
-  spill: { id: "spill", text: "Hard landings spill tea, which lowers your pay.", life: 3, minLife: 1.6 },
+  spill: { id: "spill", text: "Hard landings spill tea, which lowers your pay.", slow: 0.35, life: 5, minLife: 1.2 },
   spare: { id: "spare", text: "Grab the spare cup for an extra life.", ...thing },
   golden: { id: "golden", text: "With both spares held, golden cups pay points.", ...thing },
-  hazard: { id: "hazard", text: "Hazard stripes end the run, even with spares.", ...thing, slow: 0.35, life: 3 },
+  hazard: { id: "hazard", text: "Hazard stripes end the run, even with spares.", ...thing },
   awning: { id: "awning", text: "Land on the awning to bounce up.", ...thing },
   vent: { id: "vent", text: "Glide over the vent to ride the updraft.", ...thing },
   cable: { id: "cable", text: "Jump to catch the cable and ride it.", ...thing },
@@ -93,14 +96,30 @@ export const LESSONS = Object.freeze({
  */
 
 /**
- * @typedef {{ lesson: Lesson, x: number, y: number, size: number, ghost: GhostMove | null, clear: number }} LessonCue
+ * @typedef {{
+ *   lesson: Lesson, x: number, y: number, size: number, ghost: GhostMove | null,
+ *   clear: number, near?: number, item?: any,
+ *   box?: { x0: number, y0: number, x1: number, y1: number }
+ * }} LessonCue
  * Where the lesson points: a world point and a rough radius (world units)
- * for the pen loop around it. For a move, `clear` is the world x past which
- * a runner still on its feet has made it.
+ * for the pen loop around it. `clear` is the world x past which the runner
+ * has gone by it (for a move, made it, still on its feet); `near` is where
+ * the runner first meets it; `item` is the thing itself when it moves, so
+ * the lesson can follow it; `box` is its real extent, for the spotlight.
  */
 
 /** @param {any} item */
 const isHop = (item) => item.type === "ac" || item.type === "tank" || item.type === "crate";
+/** Anything the runner has to act on, or keep clear of, to get past. @param {any} item */
+const needsAction = (item) =>
+  isHop(item) ||
+  item.type === "clothesline" ||
+  item.type === "billboard" ||
+  item.type === "barrel" ||
+  item.type === "drone" ||
+  item.type === "steam" ||
+  item.type === "swing" ||
+  isLethal(item);
 /** @param {any} item */
 const isUnder = (item) => item.type === "clothesline" || item.type === "billboard";
 
@@ -143,20 +162,37 @@ export function lessonAhead(state, learned, { view }) {
     if (!found.move || at < found.move.at) found.move = { at, make };
   };
   /**
-   * A thing at x (its near edge at `near`, where the runner first meets it).
-   * @param {Lesson} lesson @param {number} x @param {number} y @param {number} size @param {number} [near]
+   * A thing at x, met at `near` and passed at `clear` (its edges; both x by default).
+   * @param {Lesson} lesson @param {number} x @param {number} y @param {number} size
+   * @param {{ near?: number, clear?: number, item?: any, box?: LessonCue["box"] }} [extra]
    */
-  const offerThing = (lesson, x, y, size, near = x) => {
+  const offerThing = (lesson, x, y, size, extra = {}) => {
     if (learned(lesson.id) || x < r.x + 0.2 * v || x > seen) return;
-    const cue = { lesson, x, y, size, ghost: null, clear: near };
+    const near = extra.near ?? x;
+    /** @type {LessonCue} */
+    const cue = { lesson, x, y, size, ghost: null, near, clear: extra.clear ?? x, item: extra.item, box: extra.box };
     if (lesson.id === "hazard") {
-      if (!found.hazard || near < found.hazard.clear) found.hazard = cue;
+      if (!found.hazard || near < (found.hazard.near ?? found.hazard.x)) found.hazard = cue;
     } else if (!found.thing || x < found.thing.x) {
       found.thing = cue;
     }
   };
-  /** No gap opens between the runner and x: the approach to a take-off is plain roof. */
-  const approachClear = (/** @type {number} */ x) => !state.chunks.some((/** @type {any} */ c) => c.gaps.some((/** @type {any} */ g) => g.x1 > r.x && g.x0 < x));
+  /**
+   * The approach to a take-off is plain roof: no gap opens, and nothing the
+   * runner must hop, slide, or keep clear of comes first (a wire walk's live
+   * roofs, a crate, a barrel), so the lesson never points past another move.
+   */
+  const approachClear = (/** @type {number} */ x) =>
+    !state.chunks.some(
+      (/** @type {any} */ c) =>
+        c.gaps.some((/** @type {any} */ g) => g.x1 > r.x && g.x0 < x) ||
+        c.items.some((/** @type {any} */ it) => {
+          if (!needsAction(it) || it.hit || it.broken) return false;
+          const x0 = "x0" in it ? it.x0 : it.x - 10;
+          const x1 = "x1" in it ? it.x1 : it.x + 10;
+          return x1 > r.x + 2 && x0 < x;
+        }),
+    );
 
   for (const chunk of state.chunks) {
     if (chunk.x1 < r.x || chunk.x0 > Math.max(soon, seen)) continue;
@@ -166,7 +202,11 @@ export function lessonAhead(state, learned, { view }) {
       const edge = gap.x0;
       const top = topAt(state, edge - 1);
       if (gap.assist === "rail") {
-        offerThing(LESSONS.hazard, (gap.x0 + gap.x1) / 2, top - 20, (gap.x1 - gap.x0) / 2, gap.x0);
+        offerThing(LESSONS.hazard, (gap.x0 + gap.x1) / 2, top - 20, (gap.x1 - gap.x0) / 2, {
+          near: gap.x0,
+          clear: gap.x1,
+          box: { x0: gap.x0, x1: gap.x1, y0: top - 60, y1: top },
+        });
         continue;
       }
       if (!r.grounded || edge > soon || edge - 4 < latest) continue;
@@ -200,7 +240,13 @@ export function lessonAhead(state, learned, { view }) {
     for (const item of chunk.items) {
       const it = /** @type {any} */ (item);
       if (isLethal(item)) {
-        if ("x0" in it) offerThing(LESSONS.hazard, (it.x0 + it.x1) / 2, it.y1 ?? it.y, Math.max(10, (it.x1 - it.x0) / 2), it.x0);
+        if ("x0" in it) {
+          offerThing(LESSONS.hazard, (it.x0 + it.x1) / 2, it.y1 ?? it.y, Math.max(10, (it.x1 - it.x0) / 2), {
+            near: it.x0,
+            clear: it.x1,
+            box: { x0: it.x0, x1: it.x1, y0: it.y0 ?? it.y1, y1: it.y1 },
+          });
+        }
         continue;
       }
       switch (item.type) {
@@ -226,10 +272,11 @@ export function lessonAhead(state, learned, { view }) {
           if (it.state === "sit") offerThing(LESSONS.pigeons, it.x, it.y + 4, 14);
           break;
         case "barrel":
-          if (it.state === "wait") offerThing(LESSONS.barrel, it.x, it.y + BARREL_H / 2, 12);
+          // Followed as it rolls, so the line stays on the barrel it named.
+          if (it.state === "wait" || it.state === "roll") offerThing(LESSONS.barrel, it.x, it.y + BARREL_H / 2, 12, { item: it, clear: it.x });
           break;
         case "drone":
-          if (it.state === "wait") offerThing(LESSONS.drone, it.x, it.y + DRONE_H / 2, 12);
+          if (it.state === "wait" || it.state === "fly") offerThing(LESSONS.drone, it.x, it.y + DRONE_H / 2, 12, { item: it, clear: it.x });
           break;
         case "steam":
           offerThing(LESSONS.steam, (it.x0 + it.x1) / 2, it.y1 + 16, 18);
@@ -301,7 +348,7 @@ export function lessonAhead(state, learned, { view }) {
   // moment the meter fills, then whatever is coming into view.
   if (found.move) return found.move.make();
   const hazard = found.hazard;
-  if (hazard && hazard.clear < soon) return { ...hazard, lesson: { ...hazard.lesson, priority: URGENT_HAZARD } };
+  if (hazard && (hazard.near ?? hazard.x) < soon) return { ...hazard, lesson: { ...hazard.lesson, priority: URGENT_HAZARD } };
   if (!learned("rush") && state.rush === 0 && state.sugar >= SUGAR_FULL) {
     return { lesson: LESSONS.rush, x: r.x, y: r.y + 10, size: 14, ghost: null, clear: r.x };
   }

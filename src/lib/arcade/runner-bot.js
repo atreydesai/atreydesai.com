@@ -13,12 +13,14 @@ import {
   BARREL_W,
   DRONE_SPEED,
   DRONE_W,
+  GRAVITY,
   MANTLE,
   RUNNER_H,
   RUNNER_W,
   STEP,
   SUGAR_FULL,
   cloneRun,
+  jumpReach,
   plumeBox,
   step,
   swingReach,
@@ -33,6 +35,20 @@ const H = STEP;
 const HALF_W = RUNNER_W / 2;
 
 /**
+ * Whether a roof lower than the feet is live from wall to wall: a wire
+ * walk's wire runs the whole low roof between chimney tops, so that roof is
+ * no ground to come down on. (Wires and skylights lying on an ordinary roof
+ * are hopped as before.)
+ * @param {RunState["chunks"][number]} c
+ * @param {RunState["chunks"][number]["roofs"][number]} roof
+ * @param {number} y the feet
+ */
+function liveBelow(c, roof, y) {
+  if (roof.top >= y - 1) return false;
+  return c.items.some((o) => o.type === "wire" && !o.hit && o.y0 === roof.top && o.x0 <= roof.x0 && o.x1 >= roof.x1);
+}
+
+/**
  * A cheap reflex for after a plan: jump at edges and things on the roof (a
  * full jump for anything lethal or tall), slide under low things, glide down.
  * @param {RunState} s
@@ -44,11 +60,27 @@ export function reflex(s, mem) {
   const rush = s.sugar >= SUGAR_FULL && s.rush === 0 && !s.held.rush;
   if (r.cable) return { rush };
   if (!r.grounded) {
-    // Glide down only over a gap or out of a fast fall, never onto what is ahead.
+    // On a wire walk, a hop that would carry on past the top below (in a
+    // rush, say) drops onto it with a slam.
+    if (!r.slamming && r.vy < 150) {
+      for (const c of s.chunks) {
+        if (c.x1 < r.x || c.x0 > r.x) continue;
+        for (const roof of c.roofs) {
+          if (roof.x0 + 2 > r.x || roof.x1 - 4 < r.x || roof.top > r.y || liveBelow(c, roof, r.y)) continue;
+          const after = c.roofs.find((o) => o.x0 === roof.x1);
+          if (!after || !liveBelow(c, after, r.y)) continue;
+          const fall = (r.vy + Math.sqrt(r.vy * r.vy + 2 * GRAVITY * (r.y - roof.top))) / GRAVITY;
+          if (r.x + r.vx * fall > roof.x1 + HALF_W - 2) return { down: !s.held.down, rush };
+        }
+      }
+    }
+    // Glide down only over a gap (or a live roof) or out of a fast fall, never onto what is ahead.
     let below = false;
     for (const c of s.chunks) {
       if (c.x1 < r.x || c.x0 > r.x + r.vx * 0.3) continue;
-      for (const roof of c.roofs) if (roof.x1 > r.x && roof.x0 < r.x + r.vx * 0.3 && roof.top <= r.y + 1 && roof.top > r.y - 150) below = true;
+      for (const roof of c.roofs) {
+        if (roof.x1 > r.x && roof.x0 < r.x + r.vx * 0.3 && roof.top <= r.y + 1 && roof.top > r.y - 150 && !liveBelow(c, roof, r.y)) below = true;
+      }
     }
     return { jump: (mem.high && r.jumpHold > 0) || (r.vy < 0 && (!below || r.vy < -450)), rush };
   }
@@ -58,6 +90,12 @@ export function reflex(s, mem) {
   let high = false;
   let down = false;
   let ground = false;
+  // On a wire walk: whether the roof ahead is live, where the surface
+  // underfoot ends, and the next top beyond to come down on.
+  let live = false;
+  let edge = -Infinity;
+  /** @type {null | RunState["chunks"][number]["roofs"][number]} */
+  let next = null;
   /** @param {number} near @param {number} [closing] @param {number} [lead] */
   const ahead = (near, closing = r.vx, lead = 0.16) => {
     const gap = near - front;
@@ -77,7 +115,12 @@ export function reflex(s, mem) {
         jump = true;
         high = high || roof.top > r.y + 40;
       }
-      if (roof.x0 <= front + look && roof.x1 >= front + look && roof.top >= r.y - 150 && roof.top <= r.y + MANTLE) ground = true;
+      if (roof.x0 <= front + look && roof.x1 >= front + look && roof.top >= r.y - 150 && roof.top <= r.y + MANTLE) {
+        if (liveBelow(c, roof, r.y)) live = true;
+        else ground = true;
+      }
+      if (Math.abs(roof.top - r.y) < 0.1 && roof.x0 <= r.x + HALF_W && roof.x1 >= r.x - HALF_W) edge = Math.max(edge, roof.x1);
+      if (roof.x0 > front && roof.top > r.y - 60 && roof.top <= r.y + MANTLE + 20 && !liveBelow(c, roof, r.y) && (!next || roof.x0 < next.x0)) next = roof;
     }
     for (const gap of c.gaps) {
       // Over the railway, always a full jump, even from the very edge.
@@ -136,7 +179,14 @@ export function reflex(s, mem) {
     }
   }
   if (under) return { down: true, rush };
-  if (!ground) jump = true;
+  // Over a live roof, hop once a tap comes down on the middle of the next
+  // top (or at the very edge, if that comes first); anywhere else, at once.
+  let wait = false;
+  if (!ground && live && next) {
+    const aim = Math.min((next.x0 + next.x1) / 2, next.x0 + 0.25 * r.vx);
+    wait = r.x + jumpReach(r.vx, next.top - r.y, H) < aim && r.x < edge - 2;
+  }
+  if (!ground && !wait) jump = true;
   if (down) return { down: r.sliding || !s.held.down, rush };
   if (jump) {
     mem.high = high;

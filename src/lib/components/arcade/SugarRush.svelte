@@ -70,7 +70,7 @@
   import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
   import { clamp, lerp, quantizeUp, smooth, snap as snapTo } from "#lib/arcade/core/math.ts";
   import { hash2, ihash } from "#lib/arcade/core/rng.ts";
-  import { beckon, chalkPath, drawGhost } from "#lib/arcade/core/ghost.ts";
+  import { beckon, chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import {
     ACCENT,
     CREAM,
@@ -811,6 +811,8 @@
   /** The coach's lesson and whether it's fading, copied out so the page follows them. */
   let coachLesson: Lesson | null = null;
   let coachLeaving = false;
+  /** The explanation is over (done, skipped, or the move made): Continue goes at once, before the slip fades. */
+  let coachEnding = false;
   let coachX: number | null = null;
   let coachY: number | null = null;
   let coachRing = 0;
@@ -2315,12 +2317,12 @@
     ctx.globalAlpha = alpha;
     const flashing = state.rush > 0 && (reduceMotion || Math.floor(clock * 12) % 2 === 0);
     const palette = flashing ? RUSH_PAL : RUNNER_PAL;
-    drawSpriteAt(`${pose.key}${flashing ? "-rush" : ""}`, pose.grid, palette, r.x, r.y, pose.lift, pose.anchor, true);
+    drawSpriteAt(`${pose.key}${flashing ? "-rush" : ""}`, pose.grid, palette, drawX, drawY, pose.lift, pose.anchor, true);
     ctx.globalAlpha = 1;
     // The cable's trolley over the hook.
     if (r.cable) {
-      const cx = Math.round(sx(r.x + CELL));
-      const cy = Math.round(sy(cableY(r.cable, r.x + CELL)));
+      const cx = Math.round(sx(drawX + CELL));
+      const cy = Math.round(sy(cableY(r.cable, drawX + CELL)));
       ctx.fillStyle = "#dba84d";
       ctx.fillRect(cx - Math.round(2 * S), cy - Math.round(3 * S), Math.round(5 * S), Math.round(3 * S));
     }
@@ -2810,6 +2812,7 @@
     drawHedge();
     drawStamps();
     ctx.restore();
+    drawLessonLight();
     drawLines();
     drawNotes();
     pruneArt();
@@ -2838,16 +2841,16 @@
     if (state.status === "respawning") {
       if (clock - fallAt > 0.35) camRunX += (respawnPoint(state).x - camRunX) * (1 - Math.exp(-dt * 7));
     } else {
-      camRunX = r.x;
+      camRunX = drawX;
     }
     camLeft = camRunX - (lead * viewW) / S;
 
     // Up and down it follows the ground, not the jump, and leans toward the
     // roofs coming up so a drop or a climb is in frame before it arrives.
     if (state.status === "running") {
-      if (r.grounded || r.cable) anchorY = r.y;
-      else if (r.y < anchorY - 24) anchorY = r.y + 24;
-      else if (r.y > anchorY + 80) anchorY = r.y - 80;
+      if (r.grounded || r.cable) anchorY = drawY;
+      else if (drawY < anchorY - 24) anchorY = drawY + 24;
+      else if (drawY > anchorY + 80) anchorY = drawY - 80;
     }
     const goal = anchorY * 0.55 + aheadTop(r.x, speed) * 0.45 + 12;
     camY = snapNow ? goal : camY + (goal - camY) * (1 - Math.exp(-dt * 3));
@@ -2857,6 +2860,8 @@
   }
 
   function snapCamera() {
+    prevX = drawX = state.runner.x;
+    prevY = drawY = state.runner.y;
     camRunX = state.runner.x;
     anchorY = state.runner.y;
     updateCamera(0, true);
@@ -3210,6 +3215,20 @@
         }
       }
     }
+    // A lesson about something that moves stays on that very thing.
+    if (current && cue?.item && cue.lesson.id === current.id) {
+      const it = cue.item;
+      cue.x = it.x;
+      cue.y = it.y + (it.type === "barrel" ? BARREL_H / 2 : DRONE_H / 2);
+      cue.clear = it.x;
+      if (it.state === "hit" || it.state === "broken" || it.state === "fell") {
+        if (!coach.leaving) coach.done(current.id);
+      }
+    }
+    // A thing the runner has gone past has been seen: its explanation ends, and play speeds up.
+    if (current && !current.move && !coach.leaving && cue?.lesson.id === current.id && current.id !== "spill" && state.runner.x > cue.clear + 0.1 * Math.max(1, state.runner.vx)) {
+      coach.done(current.id);
+    }
     // Nothing new while "go" is still on screen.
     if (state.status !== "running" || clock - begunAt < GO_SECONDS) return;
     // A move being taught holds the stage; only a thing that moves is followed.
@@ -3220,12 +3239,24 @@
       // A lesson stays on the thing it first pointed at, following it only
       // if it moves; a new lesson waits its turn.
       if (coach.current?.id === next.lesson.id) {
-        if (MOVING_LESSONS.has(next.lesson.id)) cue = next;
+        // Followed through its item (above); the power-up follows the runner.
+        if (next.lesson.id === "rush") cue = next;
       } else if (coach.offer(next.lesson)) {
         cue = next;
       }
     }
     if (!coach.current) cue = null;
+  }
+
+  /**
+   * The player has read it: Continue (Enter, or the slip's button) ends the
+   * explanation, counts it, and play comes back to speed. A move skipped this
+   * way counts as known.
+   */
+  function continueLesson() {
+    const lesson = coach.current;
+    if (!lesson || coach.leaving || mode !== "running") return;
+    coach.done(lesson.id);
   }
 
   /** A move the current lesson asks for was made: wait to see it work; otherwise it's simply known. */
@@ -3296,6 +3327,8 @@
     }
     if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
+    const ending = coach.leaving || coach.acting;
+    if (ending !== coachEnding) coachEnding = ending;
     // A move points at where to make it; a thing gets a loop around it.
     const x = Math.round(sx(cue.ghost ? cue.ghost.takeoff : cue.x));
     const y = Math.round(sy(cue.ghost ? cue.ghost.top + 30 : cue.y));
@@ -3311,6 +3344,54 @@
     const pad: keyof Held | null =
       coach.leaving || coach.acting || !touchUI ? null : lesson.id === "rush" ? "rush" : lesson.id === "slide" || lesson.id === "slam" ? "down" : lesson.move ? "jump" : null;
     if (pad !== padLit) padLit = pad;
+  }
+
+  /** How dim the scene is around a lesson, 0..1, eased in real time. */
+  let lessonDim = 0;
+  const focusBoxes: FocusBox[] = [{ x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }];
+
+  /**
+   * The lesson's spotlight: the scene dims, and the runner and what the
+   * lesson is about stay in full light (for a move, the stretch from the
+   * runner to past the obstacle).
+   */
+  function drawLessonLight() {
+    if (!ctx || lessonDim <= 0.01) return;
+    const r = state.runner;
+    const pad = 10 * S;
+    const runnerBox = focusBoxes[0];
+    runnerBox.x = sx(drawX - 10) - pad;
+    runnerBox.y = sy(drawY + 24) - pad;
+    runnerBox.w = 20 * S + pad * 2;
+    runnerBox.h = 24 * S + pad * 2;
+    let count = 1;
+    if (cue) {
+      const thing = focusBoxes[1];
+      if (cue.ghost) {
+        // The way from the post to past what the move clears, roof to the top of the ghost's arc.
+        const x0 = Math.min(cue.ghost.takeoff, r.x);
+        let high = cue.ghost.top;
+        for (const p of cue.ghost.path) if (p.y > high) high = p.y;
+        thing.x = sx(x0 - 12);
+        thing.y = sy(Math.max(high + 26, cue.y + 20));
+        thing.w = (cue.clear - x0 + 24) * S;
+        thing.h = sy(Math.min(cue.ghost.top - 10, cue.y - 10)) - thing.y;
+      } else if (cue.box) {
+        // A hazard's whole extent, so the side that kills is in the light.
+        thing.x = sx(cue.box.x0 - 8);
+        thing.y = sy(cue.box.y1 + 10);
+        thing.w = (cue.box.x1 - cue.box.x0 + 16) * S;
+        thing.h = sy(cue.box.y0 - 8) - thing.y;
+      } else {
+        const half = Math.max(12, cue.size + 6);
+        thing.x = sx(cue.x - half);
+        thing.y = sy(cue.y + half);
+        thing.w = half * 2 * S;
+        thing.h = half * 2 * S;
+      }
+      count = 2;
+    }
+    drawSpotlight(ctx, viewW, viewH, count === 2 ? focusBoxes : focusBoxes.slice(0, 1), lessonDim, { color: NOTE_BACK, cell: SC });
   }
 
   /**
@@ -3381,10 +3462,21 @@
     return input;
   }
 
+  // The rules step at a fixed 120 Hz. In slow motion a frame may fall
+  // between steps, so the runner and the camera are drawn where they are
+  // between the last two steps (`drawX`, `drawY`), never where a step left
+  // them: motion stays smooth at any speed, and the physics never changes.
+  let prevX = 0;
+  let prevY = 0;
+  let drawX = 0;
+  let drawY = 0;
+
   function run(dt: number) {
     accumulator += dt;
     while (accumulator >= STEP && state.status !== "over") {
       accumulator -= STEP;
+      prevX = state.runner.x;
+      prevY = state.runner.y;
       const held = autoplay ? autoplayInput(autoplay) : controls();
       clearPressed();
       const events = stepRun(state, held, STEP);
@@ -3397,6 +3489,16 @@
       judgeTrial(held);
     }
     if (state.status === "over") accumulator = 0;
+    placeRunner();
+  }
+
+  /** Where to draw the runner this frame: between its last two steps, or exactly where it is after a jump in place (a respawn). */
+  function placeRunner() {
+    const r = state.runner;
+    const t = clamp(accumulator / STEP, 0, 1);
+    const far = Math.abs(r.x - prevX) > 40 || Math.abs(r.y - prevY) > 40;
+    drawX = state.status === "running" && !far ? lerp(prevX, r.x, t) : r.x;
+    drawY = state.status === "running" && !far ? lerp(prevY, r.y, t) : r.y;
   }
 
   /** Everything that moves with the run but isn't a rule: tea, slosh, effects. */
@@ -3489,8 +3591,11 @@
 
   function advance(realDt: number, rawDt = realDt) {
     // A lesson eases the run into slow motion, and back out once it's done.
-    const dt = mode === "running" ? coach.step(realDt) : realDt;
+    const dt = mode === "running" ? coach.step(rawDt, realDt) : realDt;
     lessonClock += realDt;
+    // The spotlight comes up with an explanation and goes as it ends or the move is made.
+    const dimTarget = mode === "running" && coach.current && !coach.leaving && !coach.acting && (coach.current.slow ?? 1) < 1 ? 1 : 0;
+    lessonDim = reduceMotion ? dimTarget : lessonDim + (dimTarget - lessonDim) * (1 - Math.exp(-realDt / 0.18));
     clock += dt;
     if (mode === "countdown") {
       const step = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
@@ -3537,6 +3642,13 @@
     if (gameOver || paused) return;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
+    // Enter (on the playfield) skips the explanation that is up; a held Enter skips only one.
+    if (key === "Enter" && coach.current) {
+      if (event.repeat) return;
+      event.preventDefault();
+      continueLesson();
+      return;
+    }
     const control = KEY_CONTROLS[key];
     if (!control) return;
     event.preventDefault();
@@ -3726,6 +3838,7 @@
     newShift();
     sfxCountdown(COUNTDOWN_SECONDS);
     liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+    void tick().then(focusPlayfield);
   }
 
   // --- Sizing and lifecycle --------------------------------------------------------------
@@ -3821,6 +3934,8 @@
     tick().then(() => {
       if (!active) return;
       sizeCanvas();
+      // Focus lands in the game, so keys and a screen reader start here.
+      focusPlayfield();
       sfxCountdown(COUNTDOWN_SECONDS);
       liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
       loop.start();
@@ -3957,6 +4072,22 @@
     </div>
   </div>
 
+  <!-- Inside the play scope, so Tab reaches its Continue button. -->
+  <Coach
+    lesson={coachLesson}
+    x={coachX}
+    y={coachY}
+    side={coachSide}
+    ring={coachRing}
+    leaving={coachLeaving}
+    touch={touchUI}
+    continuable={!!coachLesson && !coachEnding && (coachLesson.slow ?? 1) < 1}
+    on:continue={continueLesson}
+    returnFocus={focusPlayfield}
+    hidden={paused || gameOver}
+    top={playTop + 8}
+  />
+
   {#if touchUI}
     <div class="sr-pads boba-ui">
       <div bind:this={padsRow} class="sr-pads-row">
@@ -4036,17 +4167,6 @@
   <Countdown value={countdown} caption="out for delivery" goCaption="run" />
 {/if}
 
-<Coach
-  lesson={coachLesson}
-  x={coachX}
-  y={coachY}
-  side={coachSide}
-  ring={coachRing}
-  leaving={coachLeaving}
-  touch={touchUI}
-  hidden={paused || gameOver}
-  top={playTop + 8}
-/>
 
 {#if paused && !gameOver}
   <PauseCard

@@ -21,7 +21,8 @@ export function currentMode(): ArcadeMode {
 
 // Catch went endless (v3), and sugar rush (v2) and cup stack's perfects (v2)
 // got much harder, so their bests start over: an old best was set under
-// different rules.
+// different rules. Sugar rush's second climb (late game only) kept its v2
+// board on purpose: the opening is unchanged, and existing bests stay.
 const BEST_COOKIE: Record<GameId, string> = {
   catch: "boba_best_v3",
   stab: "boba_best_stab_v1",

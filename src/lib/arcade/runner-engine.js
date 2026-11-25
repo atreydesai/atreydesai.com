@@ -35,10 +35,16 @@ const HALF_W = RUNNER_W / 2;
 // Speed climbs in a straight line with distance, so in time it keeps
 // gathering pace until the cap: about 15% faster after the first half
 // minute, a third faster after a minute, and nearly double by two and a half.
+//
+// The run climbs twice. Difficulty unlocks and remixes the set pieces and
+// reaches 1 about a minute and a half in. Then intensity takes over and
+// climbs to 1 by about five minutes: pieces chain, carry more, rest less,
+// and kill more often, while the top speed creeps a little higher.
 
 /**
  * @typedef {{
  *   startSpeed: number, topSpeed: number, speedRamp: number, difficultyRamp: number,
+ *   intensityRamp: number, speedCreep: number, chainMost: number, breatherAfter: number,
  *   startSpares: number, spareFirst: number, spareGap: readonly number[],
  *   lethalMin: number, lethalWeight: number
  * }} Mode
@@ -51,6 +57,14 @@ export const NORMAL = Object.freeze({
   speedRamp: 42000,
   /** World x at which difficulty reaches 1, about a minute and a half in. */
   difficultyRamp: 20000,
+  /** World x at which intensity, the second climb, reaches 1: about five minutes in. */
+  intensityRamp: 96000,
+  /** How much faster than topSpeed the run creeps, from speedRamp to intensityRamp. */
+  speedCreep: 25,
+  /** At full intensity, the chance that a set piece starts a chain. */
+  chainMost: 0.9,
+  /** Pieces laid in chains before a breather at full intensity (twice as many as the climb starts). */
+  breatherAfter: 8,
   startSpares: 1,
   /** No spare is placed before this far along, then one every spareGap. */
   spareFirst: 9000,
@@ -59,13 +73,21 @@ export const NORMAL = Object.freeze({
   lethalMin: 1,
   lethalWeight: 1,
 });
-/** Expert: faster from the off, a steeper climb, no spare to start, almost none to find, and lethal pieces early. */
+/**
+ * Expert: faster from the off, a steeper climb, the second climb in half the
+ * time with more of it chained, no spare to start, almost none to find, and
+ * lethal pieces early.
+ */
 /** @type {Readonly<Mode>} */
 export const EXPERT = Object.freeze({
   startSpeed: 215,
   topSpeed: 430,
   speedRamp: 30000,
   difficultyRamp: 11000,
+  intensityRamp: 52000,
+  speedCreep: 30,
+  chainMost: 1,
+  breatherAfter: 10,
   startSpares: 0,
   spareFirst: 40000,
   spareGap: Object.freeze([50000, 65000]),
@@ -80,6 +102,7 @@ export const START_SPEED = NORMAL.startSpeed;
 export const TOP_SPEED = NORMAL.topSpeed;
 export const SPEED_RAMP = NORMAL.speedRamp;
 export const DIFFICULTY_RAMP = NORMAL.difficultyRamp;
+export const INTENSITY_RAMP = NORMAL.intensityRamp;
 
 export const GRAVITY = 1600;
 export const JUMP_SPEED = 400;
@@ -134,6 +157,15 @@ export const RESPAWN_GRACE = 1.5;
 export const RESPAWN_TIME = 1;
 /** A cup saved from running dry comes back at least this full. */
 export const DRY_REFILL = 0.6;
+/**
+ * Seconds of running at full speed that a stumble eats, slowing by
+ * STUMBLE_SLOW and easing off over STUMBLE_TIME. Past anything that can be
+ * run into, the course leaves at least this much plain roof before a gap or
+ * anything lethal, so a hit is never followed by a fall or the end.
+ */
+export const STUMBLE_RUN = STUMBLE_TIME * (1 - STUMBLE_SLOW / 2);
+/** A runner put back after a fall has at least this many seconds of roof before anything lethal or a railway edge. */
+export const RESPAWN_CLEAR = 0.5;
 
 // --- Spare cups -------------------------------------------------------------------------
 //
@@ -232,6 +264,44 @@ export const STEAM_HISS = 0.3;
 /** Rotten boards over a gap give way this long after they are first stood on. */
 export const CRUMBLE_TIME = 0.45;
 
+/** A row of steam pipes keeps one timer, each pipe this share of a period behind the last, so the plumes roll along it. */
+export const STEAM_STAGGER = 0.3;
+/**
+ * In a row of steam pipes, the least seconds of running from one pipe to the
+ * next: a full jump over one plume from anywhere it clears still comes down
+ * in time to take off for the next.
+ */
+const STEAMWORKS_SPACE = 0.85;
+
+// --- The second climb ---------------------------------------------------------------
+//
+// Once difficulty reaches 1 and every set piece is out, intensity climbs.
+// Set pieces start to chain: two, later three, laid back to back with only a
+// short run-in between instead of a plain roof, picked so the player has to
+// switch moves, and never in a pairing CHAIN_RULES forbids. Pieces carry more
+// obstacles, the plain roof between them shrinks, lethal pieces come up more
+// often, and a breather comes after every few chained pieces, so the climb
+// reads as waves rather than a wall. None of it reaches back into the first
+// climb, where the game teaches its moves.
+
+/** The chance a set piece starts a chain once difficulty reaches 1; it climbs to the mode's chainMost. */
+const CHAIN_FIRST = 0.3;
+/** Chains run to three pieces from this intensity, seven in ten of them by the end. */
+const CHAIN_THREE_FROM = 0.35;
+const CHAIN_THREE = 0.7;
+/** A piece that makes the player switch moves from the last one comes up this much more in a chain. */
+const CHAIN_SWITCH = 2.5;
+/** In a chain, a piece's run-in before its first thing, in seconds of running. Lethal pieces keep a full runway. */
+const LINK_RUNWAY = 0.3;
+/** How much of the plain roof's spare length intensity takes away by the end. */
+const REST_SHRINK = 0.8;
+/** How much intensity tightens the widest spacing in a run of obstacles (and the closest by a quarter as much), in seconds of running. */
+const SPACE_SHRINK = 0.2;
+/** Lethal pieces come up this much more again by full intensity. */
+const LETHAL_CLIMB = 1;
+/** Light pieces, which ask for one thing, come up this much less by full intensity. */
+const LIGHT_FADE = 0.5;
+
 /** Course is kept generated this far ahead of the runner, and kept this far behind. */
 const AHEAD = 1600;
 const BEHIND = 700;
@@ -278,9 +348,12 @@ export const PHASES = Object.freeze([
  * )} Item
  */
 /**
+ * One set piece as laid. `link` is its place in a chain: 0 standing alone or
+ * leading one, 1 or 2 following on from the piece before with only a run-in
+ * between.
  * @typedef {{
- *   id: number, pattern: string, x0: number, x1: number, difficulty: number, speed: number,
- *   roofs: Roof[], items: Item[], gaps: Gap[]
+ *   id: number, pattern: string, x0: number, x1: number, difficulty: number, intensity: number,
+ *   link: number, speed: number, roofs: Roof[], items: Item[], gaps: Gap[]
  * }} Chunk
  */
 /** @typedef {{ jump?: boolean, down?: boolean, rush?: boolean }} Input */
@@ -325,14 +398,16 @@ export function createRng(seed) {
 
 /**
  * Running speed at world x: climbs in a straight line from the mode's start
- * speed to its top speed, then holds.
+ * speed to its top speed, then creeps a little higher by the end of the
+ * second climb, and holds.
  * @param {number} x
  * @param {boolean} [expert]
  */
 export function speedAt(x, expert = false) {
   const mode = modeOf(expert);
   const u = clamp(x / mode.speedRamp, 0, 1);
-  return mode.startSpeed + (mode.topSpeed - mode.startSpeed) * u;
+  const creep = clamp((x - mode.speedRamp) / (mode.intensityRamp - mode.speedRamp), 0, 1);
+  return mode.startSpeed + (mode.topSpeed - mode.startSpeed) * u + mode.speedCreep * creep;
 }
 
 /**
@@ -342,6 +417,18 @@ export function speedAt(x, expert = false) {
  */
 export function difficultyAt(x, expert = false) {
   return clamp(x / modeOf(expert).difficultyRamp, 0, 1);
+}
+
+/**
+ * Intensity, 0 to 1, at world x: the second climb. It is 0 until difficulty
+ * reaches 1, then rises in a straight line to the mode's intensityRamp. Set
+ * pieces chain and crowd by it, and the last few unlock by it.
+ * @param {number} x
+ * @param {boolean} [expert]
+ */
+export function intensityAt(x, expert = false) {
+  const mode = modeOf(expert);
+  return clamp((x - mode.difficultyRamp) / (mode.intensityRamp - mode.difficultyRamp), 0, 1);
 }
 
 /**
@@ -626,42 +713,61 @@ export function isLethal(item) {
 // --- Patterns -------------------------------------------------------------------------------
 
 /**
- * The authored set pieces, by the difficulty that unlocks each. A pattern's
- * parameters stretch from its first, teaching form toward a remix as
- * difficulty climbs past its minimum. A `hard` pattern offers a risky line
- * where a spare cup can sit; a `lethal` one can end the run outright.
+ * The authored set pieces, by the difficulty that unlocks each (and, for the
+ * last few, the intensity). A pattern's parameters stretch from its first,
+ * teaching form toward a remix as difficulty climbs past its minimum. A
+ * `hard` pattern offers a risky line where a spare cup can sit; a `lethal`
+ * one can end the run outright.
+ *
+ * For chaining, `move` is what a piece mostly asks of the player (hop,
+ * slide, slam, both, or ride the air). A `light` piece asks for one thing
+ * (a gap, a step, a ride) and comes up less as intensity climbs, leaving
+ * room for the busier ones. A `timed` piece keeps its own time
+ * (things that come at you, swing, blow or give way); an `air` one ends
+ * coming down from the air, somewhere that can't be known; one that stands
+ * `alone` (a breather, a split route) is never part of a chain. A `mixed`
+ * piece draws its contents from a pool that holds steam, wires and neon by
+ * the time pieces chain, so a chain counts it as both timed and lethal.
  */
 export const PATTERNS = Object.freeze([
-  { id: "warmup", min: 0, weight: 1, late: 0.15, note: "a flat roof and a line of pearls" },
-  { id: "gap", min: 0, weight: 1.2, note: "a plain gap" },
-  { id: "stepDown", min: 0, weight: 1, bias: "down", note: "a gap down to a lower roof" },
-  { id: "hops", min: 0, weight: 1.2, note: "ac units and, later, water tanks to hop" },
-  { id: "stepUp", min: 0.05, weight: 1, bias: "up", note: "a gap up to a higher roof" },
-  { id: "duck", min: 0.1, weight: 1, note: "a clothesline or billboard to slide under" },
-  { id: "pigeons", min: 0.1, weight: 0.8, note: "a flock that takes off as you come; jumping into it scatters it" },
-  { id: "longDrop", min: 0.15, weight: 1, bias: "down", note: "a long drop: glide late to save the tea" },
-  { id: "crates", min: 0.15, weight: 0.9, note: "crate stacks to hop, or slam open for pearls" },
-  { id: "barrels", min: 0.15, weight: 0.9, note: "barrels that roll at you as you come" },
-  { id: "awning", min: 0.2, weight: 0.8, bias: "up", note: "an awning that bounces you to a high roof" },
-  { id: "stairs", min: 0.2, weight: 0.8, note: "three short steps up or down" },
-  { id: "steam", min: 0.2, weight: 0.9, note: "steam pipes that blow on a timer: hop the pipe, or jump the plume" },
-  { id: "slideDrop", min: 0.25, weight: 0.8, note: "slide under a billboard and off the edge" },
-  { id: "swing", min: 0.25, weight: 0.8, note: "a sign swinging on a gantry: slide under, or time it" },
-  { id: "wire", min: 0.25, weight: 0.9, lethal: true, note: "a live wire down on the roof" },
-  { id: "hopSlide", min: 0.3, weight: 0.9, note: "a hop straight into a slide" },
-  { id: "cable", min: 0.3, weight: 0.8, bias: "down", note: "a cable to catch and ride across a wide gap" },
-  { id: "drone", min: 0.3, weight: 0.8, note: "a rival's drone flying in at slide height" },
-  { id: "skylight", min: 0.3, weight: 0.9, lethal: true, hard: true, note: "a skylight that nobody can stand on" },
-  { id: "vent", min: 0.35, weight: 0.8, note: "an updraft that carries you over a gap too wide to jump" },
-  { id: "split", min: 0.35, weight: 0.7, note: "an upper line of pearls over a lower line with the coaster" },
-  { id: "crumble", min: 0.35, weight: 0.8, note: "rotten boards over a wide gap that give way a moment after landing" },
-  { id: "chimneys", min: 0.4, weight: 0.8, note: "a run of narrow chimney tops" },
-  { id: "neon", min: 0.4, weight: 0.8, lethal: true, note: "a shorting neon sign to slide under" },
-  { id: "railGap", min: 0.45, weight: 0.9, lethal: true, hard: true, note: "a gap over the railway, with no ledge below" },
-  { id: "gauntlet", min: 0.55, weight: 0.9, note: "everything at once: hops, slides and crates in a row" },
+  { id: "warmup", min: 0, weight: 1, late: 0.15, move: "none", alone: true, note: "a flat roof and a line of pearls" },
+  { id: "gap", min: 0, weight: 1.2, light: true, move: "hop", note: "a plain gap" },
+  { id: "stepDown", min: 0, weight: 1, bias: "down", light: true, move: "hop", note: "a gap down to a lower roof" },
+  { id: "hops", min: 0, weight: 1.2, move: "hop", note: "ac units and, later, water tanks to hop" },
+  { id: "stepUp", min: 0.05, weight: 1, bias: "up", light: true, move: "hop", note: "a gap up to a higher roof" },
+  { id: "duck", min: 0.1, weight: 1, move: "slide", note: "a clothesline or billboard to slide under" },
+  { id: "pigeons", min: 0.1, weight: 0.8, move: "hop", note: "a flock that takes off as you come; jumping into it scatters it" },
+  { id: "longDrop", min: 0.15, weight: 1, bias: "down", light: true, move: "air", air: true, note: "a long drop: glide late to save the tea" },
+  { id: "crates", min: 0.15, weight: 0.9, move: "slam", note: "crate stacks to hop, or slam open for pearls" },
+  { id: "barrels", min: 0.15, weight: 0.9, move: "hop", timed: true, note: "barrels that roll at you as you come" },
+  { id: "awning", min: 0.2, weight: 0.8, bias: "up", light: true, move: "air", air: true, note: "an awning that bounces you to a high roof" },
+  { id: "stairs", min: 0.2, weight: 0.8, move: "hop", note: "three short steps up or down, later now and then four" },
+  { id: "steam", min: 0.2, weight: 0.9, move: "hop", timed: true, note: "steam pipes that blow on a timer: hop the pipe, or jump the plume" },
+  { id: "slideDrop", min: 0.25, weight: 0.8, move: "slide", air: true, note: "slide under a billboard and off the edge" },
+  { id: "swing", min: 0.25, weight: 0.8, move: "slide", timed: true, note: "a sign swinging on a gantry: slide under, or time it" },
+  { id: "wire", min: 0.25, weight: 0.9, move: "hop", lethal: true, note: "a live wire down on the roof" },
+  { id: "hopSlide", min: 0.3, weight: 0.9, move: "both", note: "a hop straight into a slide" },
+  { id: "cable", min: 0.3, weight: 0.8, bias: "down", light: true, move: "air", air: true, note: "a cable to catch and ride across a wide gap" },
+  { id: "drone", min: 0.3, weight: 0.8, move: "slide", timed: true, note: "a rival's drone flying in at slide height" },
+  { id: "skylight", min: 0.3, weight: 0.9, move: "hop", lethal: true, hard: true, note: "a skylight that nobody can stand on" },
+  { id: "vent", min: 0.35, weight: 0.8, light: true, move: "air", air: true, note: "an updraft that carries you over a gap too wide to jump" },
+  { id: "split", min: 0.35, weight: 0.7, move: "none", alone: true, note: "an upper line of pearls over a lower line with the coaster" },
+  { id: "crumble", min: 0.35, weight: 0.8, light: true, move: "air", air: true, timed: true, note: "rotten boards over a wide gap that give way a moment after landing" },
+  { id: "chimneys", min: 0.4, weight: 0.8, move: "hop", note: "a run of narrow chimney tops" },
+  { id: "neon", min: 0.4, weight: 0.8, move: "slide", lethal: true, note: "a shorting neon sign to slide under" },
+  { id: "railGap", min: 0.45, weight: 0.9, move: "hop", lethal: true, hard: true, note: "a gap over the railway, with no ledge below" },
+  { id: "gauntlet", min: 0.55, weight: 0.9, move: "both", mixed: true, note: "everything at once: hops, slides and crates in a row" },
+  // The second climb's own pieces, made of the same things.
+  { id: "barrage", min: 1, intensity: 0.1, weight: 0.9, move: "both", timed: true, note: "barrels rolling at you with a drone flying in behind them: hop, hop, slide" },
+  { id: "steamworks", min: 1, intensity: 0.25, weight: 0.8, move: "hop", timed: true, note: "a row of steam pipes that blow in turn: hop them in rhythm, or jump every plume" },
+  { id: "wireWalk", min: 1, intensity: 0.4, weight: 0.8, move: "hop", lethal: true, note: "chimney tops with a live wire down the roof between them: miss one and it's the end" },
+  { id: "crumbleRail", min: 1, intensity: 0.55, weight: 0.8, move: "hop", timed: true, lethal: true, note: "rotten boards over a gap, then the railway straight after" },
 ]);
 
 /** @typedef {typeof PATTERNS[number]} Pattern */
+
+/** The piece laid as a breather: a plain roof and a line of pearls. */
+const BREATHER = PATTERNS[0];
 
 /**
  * The difficulty that unlocks a pattern in a mode: lethal ones come early in expert.
@@ -673,27 +779,132 @@ export function patternMin(pattern, expert = false) {
 }
 
 /**
+ * The intensity that unlocks a pattern in a mode: 0 for all but the second
+ * climb's own pieces, and lethal ones come early in expert.
+ * @param {Pattern} pattern
+ * @param {boolean} [expert]
+ */
+export function patternIntensity(pattern, expert = false) {
+  const at = ("intensity" in pattern && pattern.intensity) || 0;
+  return "lethal" in pattern && pattern.lethal ? at * modeOf(expert).lethalMin : at;
+}
+
+/** @param {Pattern} p */
+const isAir = (p) => "air" in p && !!p.air;
+/** @param {Pattern} p */
+const isMixed = (p) => "mixed" in p && !!p.mixed;
+/** Whether a piece keeps its own time, or may hold something that does. @param {Pattern} p */
+const isTimed = (p) => ("timed" in p && !!p.timed) || isMixed(p);
+/** Whether a piece can end the run, or may hold something that can. @param {Pattern} p */
+const isDeadly = (p) => ("lethal" in p && !!p.lethal) || isMixed(p);
+/** @param {Pattern} p */
+const standsAlone = (p) => "alone" in p && !!p.alone;
+
+/**
+ * What a chain never lays back to back, as rules over the piece just laid
+ * (`a`) and the one that would follow it on (`b`) at an intensity, each with
+ * why. On top of these, a piece never follows itself, the pieces that stand
+ * alone never chain, and a piece carrying a spare cup ends its chain, so the
+ * risky line has its full run-out.
+ * @type {ReadonlyArray<{ id: string, why: string, never: (a: Pattern, b: Pattern, intensity: number) => boolean }>}
+ */
+export const CHAIN_RULES = Object.freeze([
+  {
+    id: "afterAir",
+    why: "nothing follows on from a piece that ends coming down from the air (a bounce, a float, a cable, a long drop, a slide off an edge, the boards): where it lands can't be known, so whatever came next could sit under the landing, unseen",
+    never: (/** @type {Pattern} */ a) => isAir(a),
+  },
+  {
+    id: "twoTimers",
+    why: "two timed pieces never meet: barrels, drones, swings, steam and boards each keep their own time (and a gauntlet may hold steam), and back to back their windows could overlap until no line is left",
+    never: (/** @type {Pattern} */ a, /** @type {Pattern} */ b) => isTimed(a) && isTimed(b),
+  },
+  {
+    id: "twoLethal",
+    why: "two pieces that can end the run (a gauntlet may hold wires and neon) meet only in the second half of the climb",
+    never: (/** @type {Pattern} */ a, /** @type {Pattern} */ b, /** @type {number} */ intensity) => intensity < 0.5 && isDeadly(a) && isDeadly(b),
+  },
+]);
+
+/**
+ * Whether piece `b` may follow piece `a` on in a chain at this intensity.
+ * @param {Pattern} a
+ * @param {Pattern} b
+ * @param {number} intensity
+ */
+export function chainAllows(a, b, intensity) {
+  if (a.id === b.id || standsAlone(a) || standsAlone(b)) return false;
+  return !CHAIN_RULES.some((rule) => rule.never(a, b, intensity));
+}
+
+/**
+ * Whether following `a` with `b` makes the player change what they are doing.
+ * @param {Pattern} a
+ * @param {Pattern} b
+ */
+const switches = (a, b) => a.move !== b.move || a.move === "both";
+
+/**
  * A builder lays a pattern down from the end of the course, keeping the
  * pieces and the reach tables it needs in one place.
  * @param {any} course
  * @param {number} remix 0 to 1, how far past its minimum the pattern is
+ * @param {{ link?: boolean, tight?: boolean, lethal?: boolean, air?: boolean, breather?: boolean }} [chain]
+ *   whether this piece follows the last one on in a chain, whether the next
+ *   follows it, whether it can kill, whether it ends in the air, and whether
+ *   it is a breather on the second climb
  */
-function makeBuilder(course, remix) {
+function makeBuilder(course, remix, chain = {}) {
   const x0 = course.end;
   const expert = !!course.expert;
   const random = () => nextRandom(course.gen);
   const v = speedAt(x0, expert);
+  const d = difficultyAt(x0, expert);
+  const i = intensityAt(x0, expert);
+  const link = !!chain.link;
+  const tight = !!chain.tight;
+  const runway = 0.6 * v;
+  /** The least plain roof left past anything that can be run into: a stumble's worth. */
+  const restFloor = STUMBLE_RUN * v;
+  // A piece that ends coming down from the air keeps its whole landing roof,
+  // since where it comes down can't be known; the rest give some up to intensity.
+  const shrink = chain.air ? 0 : REST_SHRINK * i;
+  /**
+   * A plain stretch of roof between set pieces: a little runway plus some
+   * breathing room, which shrinks as difficulty climbs and again as
+   * intensity does, never below a stumble's worth.
+   * @param {number} low @param {number} high
+   */
+  const flat = (low, high) =>
+    Math.max(restFloor, 0.6 * v * (1 - 0.3 * d) + (low + (high - low) * random()) * (1 - 0.45 * d) * (1 - shrink));
   /** @type {null | { x0: number, x1: number, assist: Gap["assist"], from: number }} */
   let pending = null;
   const b = {
     x: x0,
     top: course.top,
-    d: difficultyAt(x0, expert),
+    d,
+    /** Intensity, the second climb. */
+    i,
     t: remix,
     v,
     expert,
     /** Clean roof before a gap, so a stumble has eased off by the edge. */
-    runway: 0.6 * v,
+    runway,
+    /** Whether this piece follows the last one on in a chain, and whether the next follows it. */
+    link,
+    tight,
+    /**
+     * Clean roof before a piece's first thing: a runway, or in a chain a
+     * short run-in, though anything lethal always keeps its full runway.
+     */
+    start: link && !chain.lethal ? LINK_RUNWAY * v : runway,
+    /**
+     * Clean roof a piece leaves past its last thing for whatever comes next:
+     * a runway, or none when the next follows on in a chain (it brings its
+     * own run-in).
+     */
+    handoff: tight ? 0 : runway,
+    restFloor,
     random,
     /** @type {Roof[]} */ roofs: [],
     /** @type {Item[]} */ items: [],
@@ -702,12 +913,13 @@ function makeBuilder(course, remix) {
     /** @type {null | { x: number, y: number }} */ forced: null,
     /** @param {number} low @param {number} high */
     range: (low, high) => low + (high - low) * random(),
+    flat,
     /**
-     * A plain stretch of roof between set pieces: a little runway plus some
-     * breathing room, which shrinks as difficulty climbs.
+     * The plain roof that ends a piece: flat, or just a stumble's worth when
+     * the next piece follows on in a chain.
      * @param {number} low @param {number} high
      */
-    flat: (low, high) => 0.6 * v * (1 - 0.3 * difficultyAt(x0, expert)) + (low + (high - low) * random()) * (1 - 0.45 * difficultyAt(x0, expert)),
+    rest: (low, high) => (tight ? restFloor : flat(low, high)),
     /** @param {number} x */
     speedAt: (x) => speedAt(x, expert),
     /**
@@ -748,9 +960,13 @@ function makeBuilder(course, remix) {
       b.top = t;
       return roof;
     },
-    /** Half the time a small gap, otherwise straight on at the same height. */
+    /**
+     * Half the time a small gap, otherwise straight on at the same height;
+     * always straight on in a chain, and into a breather on the second
+     * climb, which should open with nothing to do.
+     */
     lead() {
-      if (random() < 0.5) b.gap(Math.max(20, b.fit(0, b.range(0.25, 0.4))));
+      if (!link && !chain.breather && random() < 0.5) b.gap(Math.max(20, b.fit(0, b.range(0.25, 0.4))));
     },
     /** @template {Item} T @param {T} item @returns {T} */
     add(item) {
@@ -916,7 +1132,7 @@ const isLowType = (type) => type === "clothesline" || type === "billboard" || ty
 /**
  * Lays obstacles along a fresh roof with time-based spacing, so they read the
  * same at any speed, and arcs of pearls over each. Spacing tightens as
- * difficulty climbs.
+ * difficulty climbs, and again as intensity does.
  * @param {Builder} b
  * @param {BoxType[]} types
  * @param {{ slots?: boolean }} [options]
@@ -926,7 +1142,7 @@ function obstacleRun(b, types, options = {}) {
   const r = b.roof(10);
   // Lay the obstacles out first, then stretch the roof under them. A plume
   // needs a full jump from well back, so it leaves room to land first.
-  let x = r.x0 + b.runway + (types[0] === "steam" ? 0.25 * v : 0);
+  let x = r.x0 + b.start + (types[0] === "steam" ? 0.25 * v : 0);
   /** @type {any[]} */
   const placed = [];
   types.forEach((type, i) => {
@@ -934,18 +1150,18 @@ function obstacleRun(b, types, options = {}) {
     placed.push(o);
     const low = isLowType(type);
     const next = types[i + 1];
-    let space = v * b.range(0.85 - 0.15 * b.t - 0.1 * b.d, 1.05 - 0.1 * b.d);
+    let space = v * b.range(0.85 - 0.15 * b.t - 0.1 * b.d - SPACE_SHRINK * b.i / 4, 1.05 - 0.1 * b.d - SPACE_SHRINK * b.i);
     // Off a slide straight into a hop is quick; into a second slide, quicker.
     if (low) space = v * b.range(0.5, 0.65) + 20;
-    // A tall tank or a wire needs a full jump, which lands a little later;
-    // a plume needs one from well back.
-    if (type === "tank" || type === "wire") space += 0.1 * v;
+    // A tank, a crate stack two high or more, a wire or a skylight needs a
+    // full jump, which lands a little later; a plume needs one from well back.
+    if (type === "tank" || type === "wire" || type === "skylight" || (type === "crate" && o.count > 1)) space += 0.1 * v;
     if (type === "steam") space = Math.max(space, v * 0.95) + 0.25 * v;
     if (next && isLowType(next)) space = Math.max(space, 0.55 * v + 10);
     x = o.x1 + space;
   });
   const last = placed[placed.length - 1];
-  r.x1 = Math.round(last.x1 + b.flat(20, 80));
+  r.x1 = Math.round(last.x1 + b.rest(20, 80));
   b.x = r.x1;
   for (const o of placed) {
     if (isLowType(o.type)) {
@@ -966,7 +1182,7 @@ function obstacleRun(b, types, options = {}) {
   if (options.slots !== false) {
     const after = last.x1 + 0.45 * v;
     if (after + 40 < r.x1 - 30) b.slot(after, r.top);
-    else b.slot(r.x0 + b.runway * 0.5, r.top);
+    else b.slot(r.x0 + b.start * 0.5, r.top);
   }
   return r;
 }
@@ -978,7 +1194,12 @@ function obstacleRun(b, types, options = {}) {
  */
 const meetShift = (v, warning, speed) => (speed * v * warning) / (v + speed);
 
-/** @type {Record<string, { can?: (top: number) => boolean, build: (b: Builder) => void }>} */
+/**
+ * How each pattern is laid. `can` says whether it fits the roof height it
+ * would start from; an `edge` pattern starts right at the edge of that roof,
+ * so in a chain it is given its run-in first.
+ * @type {Record<string, { can?: (top: number) => boolean, edge?: boolean, build: (b: Builder) => void }>}
+ */
 const BUILDERS = {
   warmup: {
     build(b) {
@@ -990,24 +1211,27 @@ const BUILDERS = {
     },
   },
   gap: {
+    edge: true,
     build(b) {
       const from = b.top;
       const dy = Math.round(b.range(-12, 12));
       const edge = b.x;
-      b.gap(Math.max(24, b.fit(dy, b.range(0.4 + 0.1 * b.d, 0.55 + 0.25 * b.t))));
-      const r = b.roof(b.flat(140, 260), b.top + dy);
+      // With intensity the narrow end goes: every gap wants a real jump.
+      b.gap(Math.max(24, b.fit(dy, b.range(0.4 + 0.1 * b.d + 0.15 * b.i, 0.55 + 0.25 * b.t))));
+      const r = b.roof(b.rest(140, 260), b.top + dy);
       b.arc(edge - 0.08 * b.v, from, HOLD_TIME, 7, { every: 0.09 });
       b.slot(r.x0 + 0.55 * (r.x1 - r.x0), r.top);
     },
   },
   stepDown: {
+    edge: true,
     can: (top) => top >= MIN_TOP + 50,
     build(b) {
       const from = b.top;
       const dy = -Math.min(from - MIN_TOP, Math.round(b.range(40, 60 + 40 * b.t)));
       const edge = b.x;
-      b.gap(Math.max(24, b.fit(dy, b.range(0.3, 0.45 + 0.3 * b.t))));
-      const r = b.roof(b.flat(140, 260), from + dy);
+      b.gap(Math.max(24, b.fit(dy, b.range(0.3 + 0.15 * b.i, 0.45 + 0.3 * b.t))));
+      const r = b.roof(b.rest(140, 260), from + dy);
       b.arc(edge - 0.05 * b.v, from, STEP, 6, { every: 0.08 });
       b.slot(r.x0 + 0.5 * (r.x1 - r.x0), r.top);
     },
@@ -1015,21 +1239,24 @@ const BUILDERS = {
   hops: {
     build(b) {
       b.lead();
-      const count = 1 + Math.floor(b.random() * (1 + 2 * b.t + b.d));
+      // Up to four, then up to six by full intensity, more of them tanks.
+      const count = 1 + Math.floor(b.random() * (1 + 2 * b.t + b.d + 2 * b.i));
+      const most = (b.d > 0.6 ? 4 : 3) + Math.round(2 * b.i);
       /** @type {Array<"ac" | "tank">} */
       const types = [];
-      for (let i = 0; i < Math.min(b.d > 0.6 ? 4 : 3, count); i++) types.push(b.d >= 0.2 && b.random() < 0.4 ? "tank" : "ac");
+      for (let i = 0; i < Math.min(most, count); i++) types.push(b.d >= 0.2 && b.random() < 0.4 + 0.2 * b.i ? "tank" : "ac");
       obstacleRun(b, types);
     },
   },
   stepUp: {
+    edge: true,
     can: (top) => top <= MAX_TOP - 40,
     build(b) {
       const from = b.top;
       const dy = Math.round(b.range(26, 40 + 24 * b.t));
       const edge = b.x;
-      b.gap(Math.max(20, b.fit(dy, b.range(0.3, 0.45 + 0.25 * b.t))));
-      const r = b.roof(b.flat(140, 240), from + dy);
+      b.gap(Math.max(20, b.fit(dy, b.range(0.3 + 0.1 * b.i, 0.45 + 0.25 * b.t))));
+      const r = b.roof(b.rest(140, 240), from + dy);
       b.arc(edge - 0.1 * b.v, from, HOLD_TIME, 6, { every: 0.08 });
       b.slot(r.x0 + 0.5 * (r.x1 - r.x0), r.top);
     },
@@ -1037,7 +1264,11 @@ const BUILDERS = {
   duck: {
     build(b) {
       b.lead();
-      obstacleRun(b, [b.t < 0.5 && b.random() < 0.6 ? "clothesline" : "billboard"]);
+      /** @type {BoxType[]} */
+      const types = [b.t < 0.5 && b.random() < 0.6 ? "clothesline" : "billboard"];
+      // With intensity, a second thing to stay down for, close behind.
+      if (b.i > 0 && b.random() < b.i) types.push(types[0] === "billboard" ? "clothesline" : "billboard");
+      obstacleRun(b, types);
     },
   },
   pigeons: {
@@ -1045,8 +1276,8 @@ const BUILDERS = {
       const { v } = b;
       b.lead();
       const edgeVariant = b.t >= 0.25 && b.random() < 0.5;
-      const r = b.roof(b.runway + (edgeVariant ? 180 : 300) + b.range(0, 80));
-      const start = edgeVariant ? r.x1 - 60 : r.x0 + b.runway + 40;
+      const r = b.roof(b.start + (edgeVariant ? 180 : 300) + b.range(0, 80));
+      const start = edgeVariant ? r.x1 - 60 : r.x0 + b.start + 40;
       const count = 3 + Math.floor(b.random() * 3);
       let x = start;
       for (let i = 0; i < count; i++) {
@@ -1069,19 +1300,20 @@ const BUILDERS = {
         // a full jump flies into the birds.
         const tap = Math.max(0, jumpReach(v, 0, STEP) - RUNNER_W);
         b.gap(Math.max(24, Math.min(b.fit(0, 0.5), tap * 0.75)));
-        const next = b.roof(b.flat(120, 220));
+        const next = b.roof(b.rest(120, 220));
         b.slot(next.x0 + 0.5 * (next.x1 - next.x0), next.top);
       } else {
         if (b.t >= 0.25 && b.random() < 0.5) {
           b.obstacle("ac", x + 1.1 * v, r.top);
-          r.x1 = Math.round(x + 1.1 * v + 30 + b.runway);
+          r.x1 = Math.round(x + 1.1 * v + 30 + Math.max(b.handoff, b.restFloor));
           b.x = r.x1;
         }
-        b.slot(r.x0 + b.runway * 0.5, r.top);
+        b.slot(r.x0 + b.start * 0.5, r.top);
       }
     },
   },
   longDrop: {
+    edge: true,
     can: (top) => top >= 170,
     build(b) {
       const { v } = b;
@@ -1089,7 +1321,7 @@ const BUILDERS = {
       const drop = Math.min(from - MIN_TOP, Math.round(b.range(130, 160 + 50 * b.t)));
       const edge = b.x;
       b.gap(Math.max(30, fallReach(v, drop) * b.range(0.35, 0.6)), "drop");
-      const r = b.roof(b.flat(200, 300), from - drop);
+      const r = b.roof(b.rest(200, 300), from - drop);
       // The line running off the edge falls along, stopping high enough over
       // the roof below that a late glide still has room to save the tea.
       const group = b.group();
@@ -1102,7 +1334,10 @@ const BUILDERS = {
   crates: {
     build(b) {
       b.lead();
-      obstacleRun(b, b.t > 0.4 && b.random() < 0.5 ? ["crate", "crate"] : ["crate"]);
+      /** @type {BoxType[]} */
+      const types = b.t > 0.4 && b.random() < 0.5 ? ["crate", "crate"] : ["crate"];
+      if (b.i > 0 && b.random() < b.i) types.push("crate");
+      obstacleRun(b, types);
     },
   },
   barrels: {
@@ -1111,20 +1346,21 @@ const BUILDERS = {
       b.lead();
       const r = b.roof(10);
       b.line(r.x0 + 30, r.top + 6, 3, 24);
-      const count = 1 + Math.floor(b.random() * Math.min(3, 1 + 2 * b.t + b.d));
+      // Up to three, then up to five by full intensity.
+      const count = 1 + Math.floor(b.random() * Math.min(3 + 2 * b.i, 1 + 2 * b.t + b.d + 2 * b.i));
       const shift = meetShift(v, BARREL_WARNING, BARREL_SPEED);
       // Where each meets the runner, a hop apart; each starts further on by
       // as far as it rolls before they meet.
-      let meet = r.x0 + b.runway + 120;
+      let meet = r.x0 + b.start + 120;
       let last = meet;
       for (let i = 0; i < count; i++) {
         b.add({ type: "barrel", x: Math.round(meet + shift), y: r.top, minX: r.x0 + BARREL_W / 2, state: "wait", t: 0 });
         last = meet;
         meet += v * b.range(0.9, 1.15);
       }
-      r.x1 = Math.round(last + shift + BARREL_W + b.runway + 0.4 * v);
+      r.x1 = Math.round(last + shift + BARREL_W + b.handoff + 0.4 * v);
       b.x = r.x1;
-      b.slot(r.x1 - b.runway * 0.6, r.top);
+      if (!b.tight) b.slot(r.x1 - b.runway * 0.6, r.top);
     },
   },
   awning: {
@@ -1145,7 +1381,7 @@ const BUILDERS = {
       const highX = Math.round(awning.x1 + HALF_W + 0.3 * v);
       const highTop = awning.y + Math.round(b.range(100, 118));
       b.gap(highX - a.x1, "awning");
-      const high = b.roof(b.flat(220, 320), highTop);
+      const high = b.roof(b.rest(220, 320), highTop);
       // The arc rides the bounce.
       b.arc(bounceX, awning.y, 0, 6, { every: 0.1, vy: BOUNCE_SPEED });
       // Then a line along the high roof, just past where the bounce lands.
@@ -1156,9 +1392,12 @@ const BUILDERS = {
     },
   },
   stairs: {
+    edge: true,
     build(b) {
       const up = b.top < (MIN_TOP + MAX_TOP) / 2 + (b.random() - 0.5) * 60;
-      for (let i = 0; i < 3; i++) {
+      // With intensity, now and then a fourth step.
+      const steps = 3 + (b.i > 0 && b.random() < 0.6 * b.i ? 1 : 0);
+      for (let i = 0; i < steps; i++) {
         const from = b.top;
         const dy = Math.round((up ? 1 : -1) * b.range(22, 36));
         const edge = b.x;
@@ -1166,14 +1405,14 @@ const BUILDERS = {
         b.gap(g);
         const r = b.roof(b.range(0.45 * b.v + 70, 0.55 * b.v + 110), from + dy);
         b.arc(edge - 0.1 * b.v, from, STEP, 5);
-        if (i === 2) b.slot(r.x0 + 0.5 * (r.x1 - r.x0), r.top);
+        if (i === steps - 1) b.slot(r.x0 + 0.5 * (r.x1 - r.x0), r.top);
       }
     },
   },
   steam: {
     build(b) {
       b.lead();
-      const count = 1 + Math.floor(b.random() * Math.min(3, 1 + 2 * b.t + b.d));
+      const count = 1 + Math.floor(b.random() * Math.min(3 + b.i, 1 + 2 * b.t + b.d + b.i));
       obstacleRun(b, /** @type {BoxType[]} */ (Array.from({ length: count }, () => "steam")));
     },
   },
@@ -1182,14 +1421,14 @@ const BUILDERS = {
     build(b) {
       const { v } = b;
       b.lead();
-      const a = b.roof(b.runway + b.range(160, 220));
+      const a = b.roof(b.start + b.range(160, 220));
       const board = b.obstacle("billboard", a.x1 - (0.5 * v + 30), a.top);
       board.x1 = a.x1 + 16;
       const n = Math.max(2, Math.floor((board.x1 - board.x0) / 24));
       b.line(board.x0, a.top + 5, n, (board.x1 - board.x0) / (n - 1));
       const drop = Math.round(b.range(50, 80));
       b.gap(Math.max(24, (fallReach(v, drop) + RUNNER_W) * b.range(0.45, 0.65)), "drop");
-      const r = b.roof(b.flat(160, 260), a.top - drop);
+      const r = b.roof(b.rest(160, 260), a.top - drop);
       b.slot(r.x0 + 0.5 * (r.x1 - r.x0), r.top);
     },
   },
@@ -1198,8 +1437,8 @@ const BUILDERS = {
       const { v } = b;
       b.lead();
       const r = b.roof(10);
-      const count = b.t > 0.4 && b.random() < 0.5 ? 2 : 1;
-      let x = r.x0 + b.runway;
+      const count = (b.t > 0.4 && b.random() < 0.5 ? 2 : 1) + (b.i > 0 && b.random() < b.i ? 1 : 0);
+      let x = r.x0 + b.start;
       for (let i = 0; i < count; i++) {
         const amp = Math.round(b.range(0.55, 0.8) * 100) / 100;
         const reach = SWING_LEN * Math.sin(amp) + SWING_W / 2;
@@ -1220,21 +1459,25 @@ const BUILDERS = {
         b.line(span.x0 + 4, r.top + 5, n, (span.x1 - span.x0 - 8) / (n - 1));
         x = span.x1 + v * b.range(0.6, 0.8);
       }
-      r.x1 = Math.round(x + b.runway);
+      r.x1 = Math.round(x + b.handoff);
       b.x = r.x1;
-      b.slot(r.x1 - b.runway * 0.7, r.top);
+      if (!b.tight) b.slot(r.x1 - b.runway * 0.7, r.top);
     },
   },
   wire: {
     build(b) {
       b.lead();
-      obstacleRun(b, b.t > 0.5 && b.random() < 0.4 ? ["wire", "wire"] : ["wire"]);
+      /** @type {BoxType[]} */
+      const types = b.t > 0.5 && b.random() < 0.4 ? ["wire", "wire"] : ["wire"];
+      if (b.i > 0 && b.random() < 0.6 * b.i) types.push("wire");
+      obstacleRun(b, types);
     },
   },
   hopSlide: {
     build(b) {
       b.lead();
-      obstacleRun(b, ["ac", "billboard"]);
+      // With intensity, back up again after the slide: hop, slide, hop.
+      obstacleRun(b, b.i > 0 && b.random() < b.i ? ["ac", "billboard", "crate"] : ["ac", "billboard"]);
     },
   },
   cable: {
@@ -1247,7 +1490,7 @@ const BUILDERS = {
       // Wider than any jump, even with a glide, so the cable is the way across.
       const span = Math.round((glideReach(v, -drop) + RUNNER_W) * b.range(1.08, 1.18) + 10);
       b.gap(span, "cable");
-      const far = b.roof(b.flat(200, 300), a.top - drop);
+      const far = b.roof(b.rest(200, 300), a.top - drop);
       const cable = b.add({ type: "cable", x0: a.x1 - 36, y0: a.top + 44, x1: far.x0 + 40, y1: far.top + 30 });
       const group = b.group();
       for (let x = cable.x0 + 40; x < cable.x1 - 20; x += 36) b.pearl(x, cableY(cable, x) - RUNNER_H / 2, group);
@@ -1260,30 +1503,30 @@ const BUILDERS = {
       b.lead();
       const r = b.roof(10);
       b.line(r.x0 + 30, r.top + 6, 3, 24);
-      const count = b.t > 0.4 && b.random() < 0.5 ? 2 : 1;
+      const count = (b.t > 0.4 && b.random() < 0.5 ? 2 : 1) + (b.i > 0 && b.random() < b.i ? 1 : 0);
       const shift = meetShift(v, DRONE_WARNING, DRONE_SPEED);
-      let meet = r.x0 + b.runway + 140;
+      let meet = r.x0 + b.start + 140;
       let last = meet;
       for (let i = 0; i < count; i++) {
         b.add({ type: "drone", x: Math.round(meet + shift), y: r.top + DRONE_LOW, state: "wait", t: 0 });
         last = meet;
         meet += v * b.range(0.9, 1.1);
       }
-      r.x1 = Math.round(last + shift + DRONE_W + b.runway + 0.4 * v);
+      r.x1 = Math.round(last + shift + DRONE_W + b.handoff + 0.4 * v);
       b.x = r.x1;
-      b.slot(r.x1 - b.runway * 0.6, r.top);
+      if (!b.tight) b.slot(r.x1 - b.runway * 0.6, r.top);
     },
   },
   skylight: {
     build(b) {
       b.lead();
       const r = b.roof(10);
-      const glass = b.obstacle("skylight", r.x0 + b.runway + 0.3 * b.v, r.top);
-      r.x1 = Math.round(glass.x1 + 0.8 * b.v + b.runway);
+      const glass = b.obstacle("skylight", r.x0 + b.start + 0.3 * b.v, r.top);
+      r.x1 = Math.round(glass.x1 + 0.8 * b.v + b.handoff);
       b.x = r.x1;
       if (b.spareDue) b.spareOver(glass.x1, r.top, SKYLIGHT_H, false);
       else b.clearArc(glass.x0, glass.x1 - glass.x0, SKYLIGHT_H, r.top);
-      b.slot(r.x1 - b.runway * 0.6, r.top);
+      if (!b.tight) b.slot(r.x1 - b.runway * 0.6, r.top);
     },
   },
   vent: {
@@ -1299,7 +1542,7 @@ const BUILDERS = {
       b.add({ type: "vent", x0, x1: x0 + width, y0: 0, ceiling });
       const farX = x0 + width + 18;
       b.gap(farX - a.x1, "vent");
-      const far = b.roof(b.flat(160, 260), a.top + Math.round(b.range(-30, 30)));
+      const far = b.roof(b.rest(160, 260), a.top + Math.round(b.range(-30, 30)));
       // A plain float takes the low line; a glide rides higher for the top one.
       b.line(x0 + width * 0.2, ceiling + 4, 4, width * 0.2);
       b.line(x0 + width * 0.3, ceiling + GLIDE_LIFT_BONUS - 4, 3, width * 0.2);
@@ -1344,7 +1587,7 @@ const BUILDERS = {
       b.add({ type: "boards", x0: a.x1, x1: a.x1 + width, y: a.top, at: -1, gone: false });
       b.line(a.x1 + 12, a.top + RUNNER_H / 2, 3, Math.min(24, (CRUMBLE_TIME * 0.5 * b.v) / 2));
       b.gap(width, "boards");
-      const far = b.roof(b.flat(160, 260), a.top);
+      const far = b.roof(b.rest(160, 260), a.top);
       b.slot(far.x0 + 0.55 * (far.x1 - far.x0), far.top);
     },
   },
@@ -1353,10 +1596,11 @@ const BUILDERS = {
     build(b) {
       const { v } = b;
       b.lead();
-      b.roof(b.runway + b.range(40, 120));
-      const count = 3 + Math.floor(b.random() * (1 + 2 * b.t));
+      b.roof(b.start + b.range(40, 120));
+      // Up to five tops, then up to seven by full intensity.
+      const count = 3 + Math.floor(b.random() * (1 + 2 * b.t + 2 * b.i));
       const hardAt = Math.floor(b.random() * count);
-      for (let i = 0; i < Math.min(5, count); i++) {
+      for (let i = 0; i < Math.min(5 + Math.round(2 * b.i), count); i++) {
         const from = b.top;
         const width = Math.round(b.range(32, 44) - 10 * b.t);
         const dy = Math.round(clamp(b.range(-18, 18), MIN_TOP - from, MAX_TOP - from));
@@ -1365,32 +1609,38 @@ const BUILDERS = {
         const edge = b.x;
         b.gap(g);
         const c = b.roof(width, from + dy, "chimney");
-        b.arc(edge - 0.1 * v, from, STEP, 4, { every: 0.1 });
+        // The pearls ride a tap that comes down on the middle of the top,
+        // taken no sooner than a tenth of a second before the edge.
+        b.arc(Math.max(edge - 0.1 * v, (c.x0 + c.x1) / 2 - tap), from, STEP, 4, { every: 0.1 });
         if (i === hardAt && width >= COASTER_W) b.slot((c.x0 + c.x1) / 2, c.top, true);
       }
       const from = b.top;
       const dy = Math.round(b.range(-20, 10));
       b.gap(Math.max(22, b.fit(dy, 0.35)));
-      const r = b.roof(b.flat(160, 240), from + dy);
+      const r = b.roof(b.rest(160, 240), from + dy);
       b.slot(r.x0 + 0.5 * (r.x1 - r.x0), r.top);
     },
   },
   neon: {
     build(b) {
       b.lead();
-      obstacleRun(b, b.t > 0.5 && b.random() < 0.4 ? ["ac", "neon"] : ["neon"]);
+      /** @type {BoxType[]} */
+      const types = b.t > 0.5 && b.random() < 0.4 ? ["ac", "neon"] : ["neon"];
+      // With intensity, up out of the slide for a tank straight after.
+      if (b.i > 0 && b.random() < b.i) types.push("tank");
+      obstacleRun(b, types);
     },
   },
   railGap: {
     build(b) {
       const { v } = b;
-      const a = b.roof(b.runway + b.range(60, 140));
+      const a = b.roof(b.start + b.range(60, 140));
       const from = a.top;
       const dy = Math.round(clamp(b.range(-10, 6), MIN_TOP - from, MAX_TOP - from));
       const reach = jumpReach(v, dy);
       const width = Math.max(30, Math.round(b.fit(dy, b.range(0.35, 0.48 + 0.12 * b.t))));
       b.gap(width, "rail");
-      const far = b.roof(b.flat(160, 260), from + dy);
+      const far = b.roof(b.rest(160, 260), from + dy);
       if (b.spareDue) {
         b.spareOver(far.x0, from, dy, true);
       } else {
@@ -1410,7 +1660,9 @@ const BUILDERS = {
       const pool = ["ac", "tank", "crate", "clothesline", "billboard"];
       if (b.d >= 0.6) pool.push("steam");
       if (b.d >= 0.7) pool.push("wire", "neon");
-      const count = 3 + (b.random() < b.t ? 1 : 0);
+      if (b.i >= 0.5) pool.push("skylight");
+      // Three or four, then up to six by full intensity.
+      const count = 3 + (b.random() < b.t ? 1 : 0) + (b.i > 0 ? Math.floor(b.random() * (1 + 2 * b.i)) : 0);
       /** @type {BoxType[]} */
       const types = [];
       for (let i = 0; i < count; i++) {
@@ -1422,21 +1674,156 @@ const BUILDERS = {
       obstacleRun(b, types);
     },
   },
+
+  // The second climb's own pieces.
+
+  barrage: {
+    build(b) {
+      const { v } = b;
+      b.lead();
+      const r = b.roof(10);
+      b.line(r.x0 + 30, r.top + 6, 3, 24);
+      const roll = meetShift(v, BARREL_WARNING, BARREL_SPEED);
+      const fly = meetShift(v, DRONE_WARNING, DRONE_SPEED);
+      // Barrels to hop, then the drone to slide under; remixed, more barrels
+      // first and one more after it.
+      const before = 2 + Math.floor(b.random() * (1 + b.t + b.i));
+      const after = b.t > 0.5 && b.random() < 0.5 + 0.5 * b.i ? 1 : 0;
+      let meet = r.x0 + b.start + 120;
+      let last = meet;
+      for (let k = 0; k < before + 1 + after; k++) {
+        const drone = k === before;
+        if (drone) b.add({ type: "drone", x: Math.round(meet + fly), y: r.top + DRONE_LOW, state: "wait", t: 0 });
+        else b.add({ type: "barrel", x: Math.round(meet + roll), y: r.top, minX: r.x0 + BARREL_W / 2, state: "wait", t: 0 });
+        last = meet;
+        // A hop apart, as in a run of barrels; into the slide and out of it
+        // takes a little longer.
+        meet += v * (drone || k + 1 === before ? b.range(1.05, 1.2) : b.range(0.9, 1.1));
+      }
+      r.x1 = Math.round(last + Math.max(roll, fly) + DRONE_W + b.handoff + 0.4 * v);
+      b.x = r.x1;
+      if (!b.tight) b.slot(r.x1 - b.runway * 0.6, r.top);
+    },
+  },
+  steamworks: {
+    build(b) {
+      const { v } = b;
+      b.lead();
+      const r = b.roof(10);
+      const count = 3 + Math.floor(b.random() * (1 + b.t + b.i));
+      // One timer for the row, each pipe STEAM_STAGGER of a period behind
+      // the last, so the plumes roll along it.
+      const period = Math.round(b.range(1.3, 1.6) * 100) / 100;
+      const first = Math.round(b.random() * 100) / 100;
+      // The first plume needs a full jump from well back, so there is room to land first.
+      let x = r.x0 + b.start + 0.25 * v;
+      /** @type {any[]} */
+      const pipes = [];
+      for (let k = 0; k < count; k++) {
+        const pipe = b.obstacle("steam", x, r.top);
+        pipe.period = period;
+        pipe.phase = Math.round((((first - k * STEAM_STAGGER) % 1) + 1) % 1 * 100) / 100;
+        pipes.push(pipe);
+        // Closer than a run of steam pipes, but a full jump over one plume
+        // still lands in time to take off for the next.
+        x = pipe.x0 + v * b.range(STEAMWORKS_SPACE, STEAMWORKS_SPACE + 0.12);
+      }
+      const last = pipes[pipes.length - 1];
+      r.x1 = Math.round(last.x1 + b.rest(40, 100));
+      b.x = r.x1;
+      for (const pipe of pipes) {
+        const plume = plumeBox(pipe);
+        b.clearArc(plume.x0, plume.x1 - plume.x0, plume.y1 - r.top, r.top);
+      }
+      if (!b.tight) b.slot(r.x0 + b.start * 0.5, r.top);
+    },
+  },
+  wireWalk: {
+    can: (top) => top >= MIN_TOP + 50 && top <= MAX_TOP - 20,
+    build(b) {
+      const { v } = b;
+      b.lead();
+      b.roof(b.start + b.range(40, 100));
+      const tops = 2 + Math.floor(b.random() * (1 + b.t + b.i));
+      for (let k = 0; k <= tops; k++) {
+        const from = b.top;
+        const edge = b.x;
+        const speed = b.speedAt(edge);
+        const last = k === tops;
+        // The chimney tops are wider than a run of chimneys', since missing
+        // one here is the end.
+        const width = last ? 0 : Math.round(b.range(56, 72));
+        const dy = Math.round(clamp(b.range(-10, 10), MIN_TOP + 50 - from, MAX_TOP - 20 - from));
+        // A tap from the middle of one top comes down on the middle of the
+        // next; the last hop is onto a proper roof.
+        const tap = jumpReach(speed, dy, STEP);
+        const most = Math.min(b.fit(dy, 0.7), clearWidth(speed, WIRE_H, 0.14));
+        const across = last ? b.fit(dy, b.range(0.3, 0.45)) : tap - width * b.range(0.95, 1.1);
+        const span = Math.round(clamp(across, 40, Math.max(40, most)));
+        // The roof between sits well below both tops, live from wall to wall.
+        const floor = b.roof(span, Math.min(from, from + dy) - Math.round(b.range(26, 40)));
+        const wire = b.obstacle("wire", floor.x0, floor.top);
+        wire.x1 = floor.x1;
+        const onto = last ? b.roof(b.rest(160, 240), from + dy) : b.roof(width, from + dy, "chimney");
+        // The pearls ride the tap that lands on the middle of what comes next.
+        const land = last ? onto.x0 + 0.25 * speed : (onto.x0 + onto.x1) / 2;
+        b.arc(Math.min(edge - 4, land - tap), from, STEP, 4, { every: 0.1 });
+        if (last) b.slot(onto.x0 + 0.5 * (onto.x1 - onto.x0), onto.top);
+      }
+    },
+  },
+  crumbleRail: {
+    build(b) {
+      const { v } = b;
+      b.lead();
+      const a = b.roof(b.start + b.range(40, 100));
+      // Boards as in a crumble: glide over, or step on and jump off them in time.
+      const width = Math.round(b.fit(0, b.range(1.05, 1.15)) + RUNNER_W);
+      b.add({ type: "boards", x0: a.x1, x1: a.x1 + width, y: a.top, at: -1, gone: false });
+      b.line(a.x1 + 12, a.top + RUNNER_H / 2, 3, Math.min(24, (CRUMBLE_TIME * 0.5 * v) / 2));
+      b.gap(width, "boards");
+      // Room to come down whichever way the boards were crossed, then the tracks.
+      const mid = b.roof(jumpReach(v) + b.restFloor, a.top);
+      const from = mid.top;
+      const dy = Math.round(clamp(b.range(-10, 6), MIN_TOP - from, MAX_TOP - from));
+      const speed = b.speedAt(mid.x1);
+      const reach = jumpReach(speed, dy);
+      const rail = Math.max(30, Math.round(b.fit(dy, b.range(0.35, 0.45 + 0.1 * b.t))));
+      b.gap(rail, "rail");
+      const far = b.roof(b.rest(160, 260), from + dy);
+      b.arc((far.x0 - HALF_W - reach + mid.x1 + HALF_W) / 2, from, HOLD_TIME, 7, { every: 0.09 });
+      b.slot(far.x0 + 0.55 * (far.x1 - far.x0), far.top);
+    },
+  },
 };
 
 /**
- * Picks the next pattern: unlocked by difficulty, fitting the current roof
- * height, never the one just used. Patterns just unlocked come up more, so
- * each is taught before it is mixed in with the rest.
+ * Picks the next pattern: unlocked by difficulty (and by intensity, for the
+ * second climb's own pieces), fitting the current roof height, never the one
+ * just used. Patterns just unlocked come up more, so each is taught before
+ * it is mixed in with the rest, and lethal ones come up more as intensity
+ * climbs. A piece following another on in a chain must be one CHAIN_RULES
+ * allow after it, and comes up more if it makes the player switch moves;
+ * null when none may.
  * @param {any} course
  * @param {number} d
+ * @param {number} i intensity
+ * @param {Pattern | null} [after] the piece this one would follow on from in a chain
+ * @returns {Pattern | null}
  */
-function pickPattern(course, d) {
+function pickPattern(course, d, i, after = null) {
   const mode = modeOf(course.expert);
   const options = PATTERNS.filter((p) => {
     const can = BUILDERS[p.id].can;
-    return patternMin(p, course.expert) <= d && p.id !== course.last && (!can || can(course.top));
+    return (
+      patternMin(p, course.expert) <= d &&
+      patternIntensity(p, course.expert) <= i &&
+      p.id !== course.last &&
+      (!can || can(course.top)) &&
+      (!after || chainAllows(after, p, i))
+    );
   });
+  if (!options.length) return null;
   // Roofs drift back toward the middle heights, so the patterns that need a
   // tall roof (a long drop, a cable) or headroom (an awning) keep coming up.
   const low = course.top < 100;
@@ -1445,12 +1832,15 @@ function pickPattern(course, d) {
   const due = course.end >= course.nextSpare;
   const weights = options.map((p) => {
     const min = patternMin(p, course.expert);
+    const unlock = patternIntensity(p, course.expert);
     const late = 1 + ((("late" in p && p.late) || 1) - 1) * d;
-    const fresh = d - min < 0.1 && min > 0 ? 2 : 1;
+    const fresh = unlock > 0 ? (i - unlock < 0.1 ? 2 : 1) : d - min < 0.1 && min > 0 ? 2 : 1;
     const drift = (low && "bias" in p && p.bias === "up") || (high && "bias" in p && p.bias === "down") ? 1.8 : 1;
     const spare = due && "hard" in p && p.hard ? 6 : 1;
-    const lethal = "lethal" in p && p.lethal ? mode.lethalWeight : 1;
-    return p.weight * late * fresh * drift * spare * lethal;
+    const lethal = "lethal" in p && p.lethal ? mode.lethalWeight * (1 + LETHAL_CLIMB * i) : 1;
+    const light = "light" in p && p.light ? 1 - LIGHT_FADE * i : 1;
+    const change = after && switches(after, p) ? CHAIN_SWITCH : 1;
+    return p.weight * late * fresh * drift * spare * lethal * light * change;
   });
   const total = weights.reduce((sum, w) => sum + w, 0);
   let roll = nextRandom(course.gen) * total;
@@ -1511,23 +1901,86 @@ function placeCoaster(b, course, spot, d) {
 }
 
 /**
+ * How far a pattern is into its remix, 0 to 1: by difficulty past its
+ * minimum, or for the second climb's own pieces by intensity past theirs.
+ * @param {Pattern} pattern
+ * @param {number} d
+ * @param {number} i
+ * @param {boolean} expert
+ */
+function remixOf(pattern, d, i, expert) {
+  const unlock = patternIntensity(pattern, expert);
+  return clamp(unlock > 0 ? (i - unlock) / 0.4 : (d - patternMin(pattern, expert)) / 0.4, 0, 1);
+}
+
+/**
+ * The chance a set piece starts a chain at intensity i, and the chance that
+ * a chain it starts runs to three pieces rather than two.
+ * @param {number} i
+ * @param {Mode} mode
+ */
+function chainOdds(i, mode) {
+  return {
+    start: CHAIN_FIRST + (mode.chainMost - CHAIN_FIRST) * i,
+    three: CHAIN_THREE * clamp((i - CHAIN_THREE_FROM) / (1 - CHAIN_THREE_FROM), 0, 1),
+  };
+}
+
+/**
  * Builds the next chunk onto the end of the course.
  * @param {any} course mutated
  * @returns {Chunk}
  */
 function buildChunk(course) {
   const d = difficultyAt(course.end, course.expert);
+  const i = intensityAt(course.end, course.expert);
+  const mode = modeOf(course.expert);
   const first = course.count === 0;
-  const pattern = first ? PATTERNS[0] : pickPattern(course, d);
-  const b = makeBuilder(course, clamp((d - patternMin(pattern, course.expert)) / 0.4, 0, 1));
-  b.spareDue = !first && "hard" in pattern && !!pattern.hard && course.end >= course.nextSpare;
+  // Following on in a chain under way, if anything may follow the last piece.
+  let link = course.link;
+  const prev = PATTERNS.find((p) => p.id === course.last) ?? null;
+  let pattern = first ? PATTERNS[0] : link > 0 ? pickPattern(course, d, i, prev) : null;
+  if (!pattern) {
+    link = 0;
+    // A breather once enough pieces have come chained, so the second climb
+    // comes in waves (early on, when chains are rare, it takes twice as
+    // many); otherwise anything that fits.
+    const breather = i > 0 && course.chained >= mode.breatherAfter * (2 - i) && course.last !== BREATHER.id;
+    pattern = breather ? BREATHER : /** @type {Pattern} */ (pickPattern(course, d, i));
+  }
+  const spareDue = !first && "hard" in pattern && !!pattern.hard && course.end >= course.nextSpare;
+  // Whether the next piece follows this one on: the rest of a chain under
+  // way, or the start of a new one. Nothing follows on from a piece that
+  // ends in the air, one that stands alone, or one carrying a spare cup.
+  const leads = !first && !spareDue && !isAir(pattern) && !standsAlone(pattern);
+  let next = 0;
+  if (link > 0) {
+    if (leads && link + 1 < course.chainLength) next = link + 1;
+  } else if (i > 0 && leads) {
+    const odds = chainOdds(i, mode);
+    if (nextRandom(course.gen) < odds.start) {
+      course.chainLength = nextRandom(course.gen) < odds.three ? 3 : 2;
+      next = 1;
+    }
+  }
+  const b = makeBuilder(course, remixOf(pattern, d, i, course.expert), {
+    link: link > 0,
+    tight: next > 0,
+    lethal: isDeadly(pattern),
+    air: isAir(pattern),
+    breather: pattern === BREATHER && i > 0,
+  });
+  b.spareDue = spareDue;
   if (first) {
     // The first roof is long, flat and quiet: a moment to find the keys.
     const r = b.roof(560);
     b.line(r.x0 + 240, r.top + 6, 4, 24);
     b.slot(r.x0 + 420, r.top);
   } else {
-    BUILDERS[pattern.id].build(b);
+    const builder = BUILDERS[pattern.id];
+    // A piece that starts right at the roof's edge is given its run-in when it follows on.
+    if (link > 0 && builder.edge) b.roof(b.start);
+    builder.build(b);
   }
 
   // A delivery is due every so often. Split routes always carry one on the
@@ -1558,6 +2011,8 @@ function buildChunk(course) {
     x0: course.end,
     x1: b.x,
     difficulty: d,
+    intensity: i,
+    link,
     speed: b.v,
     roofs: b.roofs,
     items: b.items,
@@ -1567,6 +2022,10 @@ function buildChunk(course) {
   course.end = b.x;
   course.top = b.top;
   course.last = pattern.id;
+  course.link = next;
+  // Chained pieces count toward the next breather; a plain roof resets it.
+  if (pattern === BREATHER) course.chained = 0;
+  else if (link > 0 || next > 0) course.chained += 1;
   return chunk;
 }
 
@@ -1583,6 +2042,11 @@ function newCourse(seed, start, expert) {
     top: 120,
     count: 0,
     last: "",
+    /** The place in a chain the next piece takes: 0 when it doesn't follow on. */
+    link: 0,
+    chainLength: 0,
+    /** Pieces laid in chains since the last breather. */
+    chained: 0,
     nextCoaster: start + 420,
     nextSpare: start + modeOf(expert).spareFirst,
     groups: 0,
@@ -1632,6 +2096,8 @@ export function newRun(seed, options = {}) {
     sugar: 0,
     rush: 0,
     respawnIn: 0,
+    /** Where a fallen runner will come back, settled as it falls. */
+    respawnAt: /** @type {null | { x: number, y: number }} */ (null),
     combo: { chain: 0, timer: 0 },
     streak: 0,
     score: 0,
@@ -1912,6 +2378,7 @@ function loseCup(state, cause, what, events) {
     r.cable = null;
     state.status = "respawning";
     state.respawnIn = RESPAWN_TIME;
+    state.respawnAt = findRespawn(state);
   } else {
     r.grace = HIT_GRACE;
     if (cause === "hit") r.stumble = STUMBLE_TIME;
@@ -1932,23 +2399,65 @@ function lethal(state, what, events) {
   finish(state, what, events);
 }
 
+/** The most chunks laid ahead of time while looking for somewhere safe to come back. */
+const RESPAWN_SEARCH = 40;
+
 /**
- * Where a fallen runner comes back: the start of the next proper roof past
- * where it fell, never a chimney top, and never one too short to react on.
+ * Where a fallen runner will come back: the start of the next proper roof
+ * past where it fell, never a chimney top, never one too short to react on,
+ * and never one with something lethal or the railway less than
+ * RESPAWN_CLEAR seconds on (a live wire along a low roof, a sign hung low).
+ * A roof is only judged once the course is laid that far past it, so when
+ * the next safe roof isn't laid yet, more course is laid until it is.
+ * @param {RunState} state mutated: may lay more course
+ */
+function findRespawn(state) {
+  const fellAt = state.runner.x;
+  for (let laid = 0; laid <= RESPAWN_SEARCH; laid++) {
+    const point = safeRoofStart(state, fellAt);
+    if (point) return point;
+    // A fixed course (a test's hand-built stage) has nothing more to lay.
+    if (state.course.end >= 1e9) break;
+    state.chunks.push(buildChunk(state.course));
+  }
+  const last = /** @type {Roof} */ (state.chunks[state.chunks.length - 1].roofs.at(-1));
+  return { x: last.x0 + 16, y: last.top };
+}
+
+/**
+ * The first roof start past `fellAt` judged safe to come back on, or null if
+ * the course isn't laid far enough to judge the next candidate.
+ * @param {RunState} state
+ * @param {number} fellAt
+ */
+function safeRoofStart(state, fellAt) {
+  for (const chunk of state.chunks) {
+    for (const roof of chunk.roofs) {
+      if (roof.kind !== "roof" || roof.x0 <= fellAt - 20 || roof.x1 - roof.x0 < 120) continue;
+      const x = roof.x0 + 16;
+      // From the front of the runner, with a hair to spare for the speed
+      // gained on the way.
+      const clear = x + HALF_W + 2 + RESPAWN_CLEAR * speedAt(x, state.expert);
+      if (clear > state.course.end) return null;
+      const deadly = state.chunks.some(
+        (c) =>
+          c.x0 < clear &&
+          c.x1 > x &&
+          (c.items.some((o) => isLethal(o) && "x0" in o && o.x1 > x && o.x0 < clear) || c.gaps.some((g) => g.assist === "rail" && g.x0 >= x && g.x0 < clear)),
+      );
+      if (!deadly) return { x, y: roof.top };
+    }
+  }
+  return null;
+}
+
+/**
+ * Where a fallen runner comes back. It is settled the moment the runner
+ * falls, so the camera's pan and the respawn go to the same place.
  * @param {RunState} state
  */
 export function respawnPoint(state) {
-  const fellAt = state.runner.x;
-  for (const chunk of state.chunks) {
-    for (const roof of chunk.roofs) {
-      if (roof.kind === "roof" && roof.x0 > fellAt - 20 && roof.x1 - roof.x0 >= 120) {
-        return { x: roof.x0 + 16, y: roof.top };
-      }
-    }
-  }
-  // The course is always generated far enough ahead that this is unreachable.
-  const last = state.chunks[state.chunks.length - 1].roofs.at(-1);
-  return { x: /** @type {Roof} */ (last).x0 + 16, y: /** @type {Roof} */ (last).top };
+  return state.respawnAt ?? findRespawn(state);
 }
 
 /**
@@ -1958,6 +2467,7 @@ export function respawnPoint(state) {
 function respawn(state, events) {
   const r = state.runner;
   const point = respawnPoint(state);
+  state.respawnAt = null;
   Object.assign(r, {
     x: point.x,
     y: point.y,
