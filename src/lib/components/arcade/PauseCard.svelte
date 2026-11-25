@@ -1,7 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
 
-  export let deck = "The pearls will wait. They’re patient like that.";
+  /** One sentence the player needs while paused; most games need none. */
+  export let deck = "";
   export let resumeLabel = "Resume";
 
   const dispatch = createEventDispatcher<{ resume: null; menu: null; exit: null }>();
@@ -20,7 +21,9 @@
 >
   <div class="boba-card boba-riso boba-pause-card" tabindex="-1">
     <h2 id="boba-pause-title" class="boba-title">paused</h2>
-    <p class="boba-deck">{deck}</p>
+    {#if deck}
+      <p class="boba-deck">{deck}</p>
+    {/if}
     <!-- Each key hint lives in the button it triggers, so it is said once. -->
     <div class="boba-actions is-start">
       <button

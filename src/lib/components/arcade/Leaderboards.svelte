@@ -46,7 +46,7 @@
 </script>
 
 {#if anyOffline}
-  <p class="boba-deck offline">The leaderboards are offline just now.</p>
+  <p class="boba-deck offline">The leaderboards are offline.</p>
 {:else}
   <ol class="boards">
     {#each GAMES as game (game.id)}

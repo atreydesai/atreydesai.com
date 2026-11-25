@@ -20,7 +20,10 @@ function firstCues(seed, seconds = 70) {
     const cue = lessonAhead(state, (id) => learned.has(id), { view: VIEW });
     if (cue && !learned.has(cue.lesson.id)) {
       learned.add(cue.lesson.id);
-      cues.push({ cue, x: state.runner.x, v: state.runner.vx, at: t });
+      const x = state.runner.x;
+      const to = cue.ghost ? cue.ghost.takeoff : x;
+      const between = state.chunks.flatMap((c) => c.gaps).filter((g) => g.x1 > x && g.x0 < to).length;
+      cues.push({ cue, x, v: state.runner.vx, at: t, between });
     }
     step(state, botInput(bot, state), STEP);
   }
@@ -83,9 +86,18 @@ test("a hazard about to be met is named before the power-up", () => {
       if (cue?.lesson.id === "rush") {
         const r = state.runner;
         const ahead = lessonAhead(state, (id) => id !== "hazard", { view: VIEW });
-        if (ahead?.lesson.id === "hazard") assert.ok(ahead.x >= r.x + r.vx * MOVE_LEAD, `seed ${seed}: rush named with a hazard ${((ahead.x - r.x) / r.vx).toFixed(2)} s ahead`);
+        if (ahead?.lesson.id === "hazard") assert.ok(ahead.clear >= r.x + r.vx * MOVE_LEAD, `seed ${seed}: rush named with a hazard ${((ahead.clear - r.x) / r.vx).toFixed(2)} s ahead`);
       }
       step(state, botInput(bot, state), STEP);
+    }
+  }
+});
+
+test("a move is never cued past a gap the runner must cross first", () => {
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    for (const { cue, between } of firstCues(seed)) {
+      if (!cue.ghost || cue.lesson.id === "jump" || cue.lesson.id === "hold" || cue.lesson.id === "glide") continue;
+      assert.equal(between, 0, `seed ${seed}: ${cue.lesson.id} cued across a gap`);
     }
   }
 });

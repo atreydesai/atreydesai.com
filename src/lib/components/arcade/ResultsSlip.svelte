@@ -333,11 +333,11 @@
 
     <p class="sr-only" aria-live="polite">
       {imageState === "copied"
-        ? "Image copied to share."
+        ? "The image is copied."
         : textState === "copied"
-          ? "Text copied to share."
+          ? "The text is copied."
           : imageState === "failed" || textState === "failed"
-            ? "Couldn’t copy it."
+            ? "Copying failed."
             : ""}
     </p>
 

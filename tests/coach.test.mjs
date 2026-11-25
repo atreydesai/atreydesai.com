@@ -67,7 +67,7 @@ test("a done lesson stays up long enough to read", () => {
   coach.done("jump");
   run(coach, 0.5);
   assert.equal(coach.current?.id, "jump");
-  run(coach, 0.6);
+  run(coach, 0.9);
   assert.equal(coach.current, null);
 });
 
@@ -121,10 +121,31 @@ test("a finished lesson fades before it goes, and a fresh run starts at full spe
   assert.equal(coach.current, null);
 });
 
-test("a lesson on its way out gives way at once", () => {
+test("a move takes over from a lesson on its way out; a thing waits for it to fade", () => {
   const coach = createCoach("runner", { persist: false });
   coach.offer({ ...JUMP, minLife: 2 });
   coach.done("jump");
+  assert.equal(coach.offer({ id: "pearls", text: "Pearls fill the sugar meter." }), false);
   assert.equal(coach.offer({ id: "slide", text: "Slide under it.", move: true }), true);
   assert.equal(coach.leaving, false);
+});
+
+test("priorities: a hazard about to be met takes over from the power-up, not from a move", () => {
+  const coach = createCoach("runner", { persist: false });
+  coach.offer({ id: "rush", text: "It smashes things.", move: true, priority: 1.5 });
+  assert.equal(coach.offer({ id: "hazard", text: "Hazard stripes end the run.", priority: 1.8 }), true);
+  assert.equal(coach.offer({ ...JUMP, move: true }), true);
+  assert.equal(coach.offer({ id: "hazard2", text: "Hazard stripes end the run.", priority: 1.8 }), false);
+});
+
+test("a finished lesson stays readable for its minimum, then fades", () => {
+  const coach = createCoach("runner", { persist: false });
+  coach.offer({ id: "pearls", text: "Pearls fill the sugar meter.", minLife: 1 });
+  coach.done("pearls");
+  run(coach, 0.5);
+  assert.equal(coach.fading, false);
+  run(coach, 0.6);
+  assert.equal(coach.fading, true);
+  run(coach, 0.3);
+  assert.equal(coach.current, null);
 });

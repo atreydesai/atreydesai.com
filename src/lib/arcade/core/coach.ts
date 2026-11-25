@@ -29,11 +29,14 @@ export interface Lesson {
   minLife?: number;
   /** How many times it is done before the device stops showing it. */
   times?: number;
-  /**
-   * A move the player has to make now. It takes over from a lesson that
-   * only names a thing (which then counts as seen), never from another move.
-   */
+  /** A move the player has to make now (`acted`/`done` resolve it). */
   move?: boolean;
+  /**
+   * Which lesson gives way to which: a higher priority takes over from a
+   * lower one. Defaults: a thing 1, a move 2. A power-up sits between them,
+   * and a hazard about to be met above a power-up but below a move.
+   */
+  priority?: number;
 }
 
 export interface Coach {
@@ -45,14 +48,17 @@ export interface Coach {
   readonly scale: number;
   /** The current lesson has been done and is on its way out. */
   readonly leaving: boolean;
+  /** The last part of leaving, after it has been readable long enough: the callout fades now. */
+  readonly fading: boolean;
   /** The player has made the move; play is back at speed while the game sees whether it worked. */
   readonly acting: boolean;
   /** Whether the device has finished with a lesson. */
   learned(id: string): boolean;
   /**
-   * Shows `lesson` if the device still needs it and nothing else is up (a
-   * lesson on its way out, or one naming a thing when this is a move, gives
-   * way). Returns true when it is (now or already) the current lesson.
+   * Shows `lesson` if the device still needs it and nothing else is up, or
+   * what is up has a lower priority (a move also takes over from a lesson on
+   * its way out; anything else waits for it to fade). Returns true when it
+   * is (now or already) the current lesson.
    */
   offer(lesson: Lesson): boolean;
   /** The player did it: counts toward `times`, and play eases back to speed. */
@@ -80,8 +86,10 @@ const EASE_OUT = 0.25;
 /** A lesson's callout stays up this long by default (real seconds). */
 const DEFAULT_LIFE = 4.5;
 const DEFAULT_MIN_LIFE = 0.9;
-/** A finished lesson fades over this long before the next can take its place for good. */
+/** A finished lesson fades over this long, once it has been up its minimum. */
 const FADE = 0.3;
+
+const priorityOf = (lesson: Lesson) => lesson.priority ?? (lesson.move ? 2 : 1);
 
 type Store = Partial<Record<GameId, Record<string, number>>>;
 
@@ -159,6 +167,9 @@ export function createCoach(game: GameId, { persist = true } = {}): Coach {
     get leaving() {
       return leaving;
     },
+    get fading() {
+      return !!current && leaving && age >= Math.max(current.minLife ?? DEFAULT_MIN_LIFE, leftAt);
+    },
     get acting() {
       return acting;
     },
@@ -168,9 +179,10 @@ export function createCoach(game: GameId, { persist = true } = {}): Coach {
     offer(lesson) {
       if (current?.id === lesson.id) return true;
       if (!need(lesson)) return false;
+      if (current && leaving && !lesson.move) return false;
       if (current && !leaving) {
-        if (!lesson.move || current.move) return false;
-        // A thing interrupted by a move counts as seen only if it was up long enough to read.
+        if (priorityOf(lesson) <= priorityOf(current)) return false;
+        // A lesson interrupted counts as seen only if it was up long enough to read.
         if (age >= (current.minLife ?? DEFAULT_MIN_LIFE)) count(current.id);
       }
       current = lesson;
@@ -216,7 +228,7 @@ export function createCoach(game: GameId, { persist = true } = {}): Coach {
           leaving = true;
           leftAt = age;
         }
-        if (leaving && age >= Math.max(minLife, leftAt + FADE)) retire();
+        if (leaving && age >= Math.max(minLife, leftAt) + FADE) retire();
         else if (!leaving && !acting) target = current.slow ?? 1;
       }
       const tau = target < scale ? EASE_IN : EASE_OUT;

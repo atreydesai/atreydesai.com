@@ -165,9 +165,9 @@
                   </span>
                 </span>
                 {#if playable[game.id] === false}
-                  <span class="blurb">Needs a mouse, so it only opens on a computer.</span>
+                  <span class="blurb">This game needs a mouse.</span>
                 {:else if failed === game.id}
-                  <span class="blurb" role="alert">Couldn’t load just now. Try it again.</span>
+                  <span class="blurb" role="alert">It didn’t load. Try again.</span>
                 {/if}
               </span>
               <kbd class="key" aria-hidden="true">{game.key}</kbd>

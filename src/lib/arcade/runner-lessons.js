@@ -29,7 +29,7 @@ import {
 /**
  * @typedef {{
  *   id: string, text: string, name?: string, keys?: string[], touch?: string,
- *   slow?: number, life?: number, minLife?: number, move?: boolean
+ *   slow?: number, life?: number, minLife?: number, move?: boolean, priority?: number
  * }} Lesson
  */
 
@@ -37,6 +37,8 @@ import {
 export const MOVE_LEAD = 1.05;
 /** A move isn't taught once its take-off is nearer than this (seconds): too late to help. */
 const MOVE_LATEST = 0.22;
+/** A hazard about to be met: above the power-up and any thing, below a move. */
+const URGENT_HAZARD = 1.8;
 /** A thing is introduced once it is this far into view (share of the view ahead). */
 const THING_IN_VIEW = 0.8;
 
@@ -61,6 +63,8 @@ export const LESSONS = Object.freeze({
     life: 6,
     minLife: 1.4,
     move: true,
+    // Above a thing, below a move, and below a hazard about to be met (it can't smash one).
+    priority: 1.5,
   },
   pearls: { id: "pearls", text: "Pearls fill the sugar meter below.", ...thing },
   customer: { id: "customer", text: "Run past the customer to deliver the tea.", ...thing, life: 3 },
@@ -138,16 +142,21 @@ export function lessonAhead(state, learned, { view }) {
   const offerMove = (at, make) => {
     if (!found.move || at < found.move.at) found.move = { at, make };
   };
-  /** @param {Lesson} lesson @param {number} x @param {number} y @param {number} size */
-  const offerThing = (lesson, x, y, size) => {
+  /**
+   * A thing at x (its near edge at `near`, where the runner first meets it).
+   * @param {Lesson} lesson @param {number} x @param {number} y @param {number} size @param {number} [near]
+   */
+  const offerThing = (lesson, x, y, size, near = x) => {
     if (learned(lesson.id) || x < r.x + 0.2 * v || x > seen) return;
-    const cue = { lesson, x, y, size, ghost: null, clear: x };
+    const cue = { lesson, x, y, size, ghost: null, clear: near };
     if (lesson.id === "hazard") {
-      if (!found.hazard || x < found.hazard.x) found.hazard = cue;
+      if (!found.hazard || near < found.hazard.clear) found.hazard = cue;
     } else if (!found.thing || x < found.thing.x) {
       found.thing = cue;
     }
   };
+  /** No gap opens between the runner and x: the approach to a take-off is plain roof. */
+  const approachClear = (/** @type {number} */ x) => !state.chunks.some((/** @type {any} */ c) => c.gaps.some((/** @type {any} */ g) => g.x1 > r.x && g.x0 < x));
 
   for (const chunk of state.chunks) {
     if (chunk.x1 < r.x || chunk.x0 > Math.max(soon, seen)) continue;
@@ -157,7 +166,7 @@ export function lessonAhead(state, learned, { view }) {
       const edge = gap.x0;
       const top = topAt(state, edge - 1);
       if (gap.assist === "rail") {
-        offerThing(LESSONS.hazard, (gap.x0 + gap.x1) / 2, top - 20, (gap.x1 - gap.x0) / 2);
+        offerThing(LESSONS.hazard, (gap.x0 + gap.x1) / 2, top - 20, (gap.x1 - gap.x0) / 2, gap.x0);
         continue;
       }
       if (!r.grounded || edge > soon || edge - 4 < latest) continue;
@@ -191,7 +200,7 @@ export function lessonAhead(state, learned, { view }) {
     for (const item of chunk.items) {
       const it = /** @type {any} */ (item);
       if (isLethal(item)) {
-        if ("x0" in it) offerThing(LESSONS.hazard, (it.x0 + it.x1) / 2, it.y1 ?? it.y, Math.max(10, (it.x1 - it.x0) / 2));
+        if ("x0" in it) offerThing(LESSONS.hazard, (it.x0 + it.x1) / 2, it.y1 ?? it.y, Math.max(10, (it.x1 - it.x0) / 2), it.x0);
         continue;
       }
       switch (item.type) {
@@ -240,7 +249,7 @@ export function lessonAhead(state, learned, { view }) {
       if (!("x0" in it) || it.x0 <= r.x || it.x0 > soon || it.hit || it.broken) continue;
       if (isUnder(item) && !learned("slide")) {
         const takeoff = Math.max(latest, it.x0 - 0.3 * v);
-        if (takeoff <= latest + 1) continue;
+        if (takeoff <= latest + 1 || !approachClear(takeoff)) continue;
         offerMove(it.x0, () => {
           const floor = topAt(state, takeoff);
           // A path in steps, so the ghost slides under rather than jumping to the far side.
@@ -264,7 +273,7 @@ export function lessonAhead(state, learned, { view }) {
         if (!id) continue;
         const range = clearRange(v, it.x1 - it.x0, height, id === "jump" && !tall ? STEP * 4 : HOLD_TIME);
         const takeoff = it.x0 - (range ? (range.near + range.far) / 2 : 0.35 * v);
-        if (takeoff - 2 < latest) continue;
+        if (takeoff - 2 < latest || !approachClear(takeoff)) continue;
         offerMove(it.x0, () => {
           let path = pathFrom(takeoff, roof, v, { hold: id === "hold" || tall ? HOLD_TIME : STEP * 4, until: 0 });
           if (id === "slam") {
@@ -292,7 +301,7 @@ export function lessonAhead(state, learned, { view }) {
   // moment the meter fills, then whatever is coming into view.
   if (found.move) return found.move.make();
   const hazard = found.hazard;
-  if (hazard && hazard.x < soon) return hazard;
+  if (hazard && hazard.clear < soon) return { ...hazard, lesson: { ...hazard.lesson, priority: URGENT_HAZARD } };
   if (!learned("rush") && state.rush === 0 && state.sugar >= SUGAR_FULL) {
     return { lesson: LESSONS.rush, x: r.x, y: r.y + 10, size: 14, ghost: null, clear: r.x };
   }

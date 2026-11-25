@@ -945,8 +945,13 @@
 
   /** The test bot at the keys (development only). */
   let autoplay: ReturnType<typeof createBot> | null = null;
-  /** Presses not yet seen by an engine step. */
-  const pressed: Held = { jump: false, down: false, rush: false };
+  /** Presses not yet seen by an engine step, from the keys and from the pads (kept apart, so a cancelled touch can't drop a key's tap). */
+  const pressedKeys: Held = { jump: false, down: false, rush: false };
+  const pressedPads: Held = { jump: false, down: false, rush: false };
+  const clearPressed = () => {
+    pressedKeys.jump = pressedKeys.down = pressedKeys.rush = false;
+    pressedPads.jump = pressedPads.down = pressedPads.rush = false;
+  };
 
   let active = true;
   const loop = createFrameLoop({ update: (dt, rawDt) => advance(dt, rawDt), draw: () => draw(), isPaused: () => paused });
@@ -2904,7 +2909,7 @@
           sfxRunJump();
           dustBurst(ev.x, ev.y, 4, 0.7);
           // A jump is the first half of the jump, hold, glide and slam lessons.
-          if (coach.current?.move && ["jump", "hold", "glide", "slam"].includes(coach.current.id)) coach.acted(coach.current.id);
+          if (coach.current?.move && !coach.acting && ["jump", "hold", "glide", "slam"].includes(coach.current.id)) beginTrial(coach.current.id);
           else coach.done("jump");
           break;
         case "slide":
@@ -2913,10 +2918,11 @@
           moveMade("slide");
           break;
         case "glide":
-          coach.done("glide");
+          if (inTrial("glide")) trial.glided = true;
+          else coach.done("glide");
           break;
         case "slam":
-          coach.done("slam");
+          if (!inTrial("slam")) coach.done("slam");
           break;
         case "land": {
           const hard = ev.slam || ev.impact > 600;
@@ -2994,6 +3000,7 @@
           planks((ev.x0 + ev.x1) / 2, ev.y, 8);
           break;
         case "smash":
+          if (ev.what === "crate" && inTrial("slam")) trial.slammed = true;
           sfxRunSmash();
           planks(ev.x, ev.y, ev.what === "crate" ? 8 : 5);
           addNote(ev.x, ev.y + 24, `+${ev.points}`, CREAM, 0.9);
@@ -3192,13 +3199,15 @@
         // The run stopped (a fall, the end): the lesson comes down uncounted.
         coach.dismiss();
         cue = null;
-      } else if (coach.acting) {
-        // Made, and the runner is past it on its feet: learned.
-        if (r.x > cue.clear && (r.grounded || r.cable)) coach.done(current.id);
-      } else if (cue.ghost && r.x > cue.ghost.takeoff + 0.35 * Math.max(1, r.vx)) {
-        // Not made in time: the next one teaches it again, and play never stays slow.
-        coach.dismiss();
-        cue = null;
+      } else if (!coach.acting && cue.ghost) {
+        // Not made in time: past the post, already falling below its roof, or
+        // simply up too long. The next one teaches it again, and play never stays slow.
+        const late = r.x > cue.ghost.takeoff + 0.35 * Math.max(1, r.vx);
+        const falling = !r.grounded && !r.cable && r.y < cue.ghost.top - 6;
+        if (late || falling || coach.age > MOVE_WAIT_SECONDS) {
+          coach.dismiss();
+          cue = null;
+        }
       }
     }
     // Nothing new while "go" is still on screen.
@@ -3221,8 +3230,51 @@
 
   /** A move the current lesson asks for was made: wait to see it work; otherwise it's simply known. */
   function moveMade(id: string) {
-    if (coach.current?.id === id && coach.current.move) coach.acted(id);
+    if (coach.current?.id === id && coach.current.move && !coach.acting) beginTrial(id);
     else coach.done(id);
+  }
+
+  // The attempt at the move being taught, judged every physics step: a
+  // jump counts once the runner is past what it jumped and on its feet; a
+  // hold also needs jump held on the way up, a glide a glide, a slam the
+  // crates broken. Anything else, or too long, takes the lesson down
+  // uncounted, so the next one teaches it again.
+  const TRIAL_SECONDS = 2.5;
+  /** Real seconds a move lesson waits for its move before giving up (a little game time, in slow motion). */
+  const MOVE_WAIT_SECONDS = 8;
+  const trial = { id: "", time: 0, held: 0, glided: false, slammed: false };
+
+  function beginTrial(id: string) {
+    coach.acted(id);
+    trial.id = id;
+    trial.time = 0;
+    trial.held = 0;
+    trial.glided = false;
+    trial.slammed = false;
+  }
+
+  const inTrial = (id: string) => coach.acting && !coach.leaving && coach.current?.id === id && trial.id === id;
+
+  function judgeTrial(held: { jump?: boolean }) {
+    const lesson = coach.current;
+    if (!lesson || !inTrial(lesson.id) || !cue || cue.lesson.id !== lesson.id) return;
+    const r = state.runner;
+    trial.time += STEP;
+    if (lesson.id === "hold" && held.jump && r.vy > 0) trial.held += STEP;
+    if (state.status !== "running" || trial.time > TRIAL_SECONDS) {
+      coach.dismiss();
+      cue = null;
+      return;
+    }
+    if (r.x <= cue.clear || !(r.grounded || r.cable)) return;
+    const worked =
+      lesson.id === "hold" ? trial.held >= HOLD_TIME * 0.8 : lesson.id === "glide" ? trial.glided : lesson.id === "slam" ? trial.slammed : true;
+    if (worked) {
+      coach.done(lesson.id);
+    } else {
+      coach.dismiss();
+      cue = null;
+    }
   }
 
   /** Teaches something that just happened, beside the runner (a hard landing's spill). */
@@ -3243,7 +3295,7 @@
       return;
     }
     if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
-    if (coachLeaving !== coach.leaving) coachLeaving = coach.leaving;
+    if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
     // A move points at where to make it; a thing gets a loop around it.
     const x = Math.round(sx(cue.ghost ? cue.ghost.takeoff : cue.x));
     const y = Math.round(sy(cue.ghost ? cue.ghost.top + 30 : cue.y));
@@ -3323,9 +3375,9 @@
    * lesson's slow motion are far apart.
    */
   function controls() {
-    input.jump = keys.jump || touchHeld.jump || pressed.jump;
-    input.down = keys.down || touchHeld.down || pressed.down;
-    input.rush = keys.rush || touchHeld.rush || pressed.rush;
+    input.jump = keys.jump || touchHeld.jump || pressedKeys.jump || pressedPads.jump;
+    input.down = keys.down || touchHeld.down || pressedKeys.down || pressedPads.down;
+    input.rush = keys.rush || touchHeld.rush || pressedKeys.rush || pressedPads.rush;
     return input;
   }
 
@@ -3334,14 +3386,15 @@
     while (accumulator >= STEP && state.status !== "over") {
       accumulator -= STEP;
       const held = autoplay ? autoplayInput(autoplay) : controls();
-      pressed.jump = pressed.down = pressed.rush = false;
+      clearPressed();
       const events = stepRun(state, held, STEP);
       if (events.length) onEvents(events);
-      // Jump held on the way up long enough to go higher: the hold is learned.
+      // Jump held on the way up long enough to go higher: the hold is known
+      // (outside its lesson; in it, the attempt is judged below).
       const r = state.runner;
-      jumpHeld = held.jump && !r.grounded ? jumpHeld + STEP : 0;
-      // Holding jump before the hold was ever taught means it's known; in its lesson, it waits to see the jump land.
+      jumpHeld = held.jump && !r.grounded && r.vy > 0 ? jumpHeld + STEP : r.grounded ? 0 : jumpHeld;
       if (jumpHeld >= HOLD_TIME * 0.8 && coach.current?.id !== "hold") coach.done("hold");
+      judgeTrial(held);
     }
     if (state.status === "over") accumulator = 0;
   }
@@ -3488,7 +3541,7 @@
     if (!control) return;
     event.preventDefault();
     keys[control] = true;
-    pressed[control] = true;
+    pressedKeys[control] = true;
   }
 
   function onKeyUp(event: KeyboardEvent) {
@@ -3499,7 +3552,7 @@
 
   function releaseAll() {
     keys.jump = keys.down = keys.rush = false;
-    pressed.jump = pressed.down = pressed.rush = false;
+    clearPressed();
     if (touchHeld.jump || touchHeld.down || touchHeld.rush) touchHeld = { jump: false, down: false, rush: false };
   }
 
@@ -3507,12 +3560,12 @@
     if (down && (paused || gameOver)) return;
     if (touchHeld[control] === down) return;
     touchHeld = { ...touchHeld, [control]: down };
-    if (down) pressed[control] = true;
+    if (down) pressedPads[control] = true;
   }
 
   /** A touch the browser took back (a scroll, a system gesture) never counts as a press. */
   function cancelPad(control: keyof Held) {
-    pressed[control] = false;
+    pressedPads[control] = false;
     holdPad(control, false);
   }
 
@@ -3596,7 +3649,7 @@
 
   function begin() {
     // A key tapped during the countdown doesn't carry into the run.
-    pressed.jump = pressed.down = pressed.rush = false;
+    clearPressed();
     begunAt = clock;
     countdown = 0;
     goVisible = true;
@@ -3990,6 +4043,7 @@
   side={coachSide}
   ring={coachRing}
   leaving={coachLeaving}
+  touch={touchUI}
   hidden={paused || gameOver}
   top={playTop + 8}
 />

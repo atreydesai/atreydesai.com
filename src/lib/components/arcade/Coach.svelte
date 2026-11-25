@@ -22,12 +22,14 @@
   export let ring = 0;
   /** The scene behind is dark (most are): the loop and tail print cream, not ink. */
   export let scene: "dark" | "light" = "dark";
-  /** The lesson has been done and is fading. */
+  /** The lesson is fading out (it has been readable long enough). */
   export let leaving = false;
   /** Paused, or something covers the game: hide without forgetting. */
   export let hidden = false;
   /** Keep the slip below this many pixels from the top (under the tickets). */
   export let top = 72;
+  /** The input the game is showing (its touch pads, or keys); null works it out from the pointer. */
+  export let touch: boolean | null = null;
 
   const GUTTER = 16;
   let slip: HTMLElement;
@@ -63,7 +65,7 @@
       ? [
           lesson.name ? `${lesson.name[0].toUpperCase()}${lesson.name.slice(1)}.` : "",
           lesson.text,
-          coarse ? (lesson.touch ? `${lesson.touch[0].toUpperCase()}${lesson.touch.slice(1)}.` : "") : lesson.keys?.length ? `Press ${lesson.keys.join(" or ")}.` : "",
+          (touch ?? coarse) ? (lesson.touch ? `${lesson.touch[0].toUpperCase()}${lesson.touch.slice(1)}.` : "") : lesson.keys?.length ? `Press ${lesson.keys.join(" or ")}.` : "",
         ]
           .filter(Boolean)
           .join(" ")
@@ -131,7 +133,14 @@
 
 {#if lesson}
   {#key lesson.id}
-    <div class="coach boba-ui" class:is-leaving={leaving} class:is-hidden={hidden} class:is-light={scene === "light"}>
+    <div
+      class="coach boba-ui"
+      class:is-leaving={leaving}
+      class:is-hidden={hidden}
+      class:is-light={scene === "light"}
+      class:is-touch={touch === true}
+      class:is-keys={touch === false}
+    >
       {#if anchored && x !== null && y !== null}
         <svg class="marks" width={viewW} height={viewH} aria-hidden="true">
           {#if ring > 0}
@@ -248,6 +257,23 @@
     .touch {
       display: inline;
     }
+  }
+
+  /* The game knows which input it is showing: that wins over the media query. */
+  .is-touch .touch {
+    display: inline;
+  }
+
+  .is-touch :global(.boba-keys) {
+    display: none;
+  }
+
+  .is-keys .touch {
+    display: none;
+  }
+
+  .is-keys :global(.boba-keys) {
+    display: inline-flex;
   }
 
   .is-leaving {

@@ -11,22 +11,21 @@
   onMount(() => onSongChange((name) => (currentSong = name)));
 </script>
 
-<span class="boba-track" aria-label={`Now playing ${currentSong || "nothing yet"}`}>
-  <span class="note" aria-hidden="true">
-    <PixelIcon grid={ICON_NOTE} palette={NOTE_PAL} px={2} />
-  </span>
-  <span class="flag">
-    {#if currentSong}
+<!-- Shown only once a song is playing: before that there is nothing to say. -->
+{#if currentSong}
+  <span class="boba-track" aria-label={`Now playing ${currentSong}`}>
+    <span class="note" aria-hidden="true">
+      <PixelIcon grid={ICON_NOTE} palette={NOTE_PAL} px={2} />
+    </span>
+    <span class="flag">
       <WavingFlag text={currentSong} />
-    {:else}
-      <span class="placeholder">tuning the radio…</span>
-    {/if}
+    </span>
   </span>
-</span>
+{/if}
 
 <style>
   /* The box hugs what is drawn in it (the flag's canvas sets its own CSS
-     width from the measured song name, or the placeholder's text), so the
+     width from the measured song name), so the
      ticket's ordinary gap follows it whatever the song. Long names are
      capped and cut at the free end of the flag. */
   .boba-track {
@@ -51,16 +50,6 @@
     min-width: 0;
     height: 2rem;
     overflow: hidden;
-  }
-
-  .placeholder {
-    color: var(--b-muted);
-    font-family: var(--font-ui);
-    font-size: 0.875rem;
-    font-style: italic;
-    font-weight: 400;
-    line-height: 1.25;
-    white-space: nowrap;
   }
 
   /* The flag is the first thing to go when the HUD gets crowded. */
