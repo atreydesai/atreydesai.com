@@ -64,10 +64,10 @@
 	.sw-hollow { background: transparent; border: 1.5px solid var(--c); }
 	.sw-line { width: 16px; height: 2.5px; border-radius: 1px; }
 	.sw-dash { width: 16px; height: 2.5px; border: 0; background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 8px); }
-	/* beside the point: the words (not the backing, which no longer shows on the ground) start 10 px from it, so a
-	   label set at a mark's edge lines up with the mark */
-	.at-right { transform: translate(2px, -50%); }
-	.at-left { transform: translate(calc(-100% - 2px), -50%); }
+	/* beside the point: the tag starts 10 px from it with no padding on that side, so its words line up with a mark's
+	   edge and its backing never reaches over the mark (the backing no longer shows on the ground) */
+	.at-right { transform: translate(10px, -50%); padding-left: 0; }
+	.at-left { transform: translate(calc(-100% - 10px), -50%); padding-right: 0; }
 	.at-above { transform: translate(-50%, calc(-100% - 8px)); }
 	.at-below { transform: translate(-50%, 8px); }
 	.at-center { transform: translate(-50%, -50%); }
