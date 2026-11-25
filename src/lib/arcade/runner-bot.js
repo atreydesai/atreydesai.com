@@ -1,7 +1,8 @@
 // Sugar rush's reference player: a competent runner that can read the
-// course. The tests use it to prove long runs can be cleared on many seeds,
-// and the demo uses it to play itself. It drives only the inputs a player
-// has (jump, down, rush), so whatever it does a person could do.
+// course. The tests use it to prove long runs can be cleared on many seeds
+// (and in development, `?autoplay` lets it run a lesson-checking playthrough).
+// It drives only the inputs a player has (jump, down, rush), so whatever it
+// does a person could do.
 //
 // It tries a menu of short input plans (jump now or a little later, tap or
 // hold, glide, slide, slam) against copies of the run, picks the one that

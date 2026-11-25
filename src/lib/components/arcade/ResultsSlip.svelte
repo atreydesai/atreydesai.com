@@ -27,6 +27,14 @@
   let beatenOnBoard = false;
   $: stamped = newBest && !beatenOnBoard;
   export let stats: Array<{ label: string; value: string | number }> = [];
+  /** The highest best the board has confirmed for this device's name, once known. */
+  let boardBest: number | null = null;
+  // The receipt's personal best follows the board too, so it never disagrees with the stamp.
+  $: shownStats = stats.map((stat) =>
+    stat.label === "personal best" && boardBest !== null && boardBest > (Number(stat.value) || 0)
+      ? { ...stat, value: boardBest }
+      : stat,
+  );
   /**
    * The run as a few short lines of emoji for the share text and card, the
    * way a word game shares its grid: what happened, at a glance. Each game
@@ -153,7 +161,10 @@
     board = result.scores;
     boardLoading = false;
     // The board is the record: a best it holds above this run means this run wasn't one.
-    if (result.mine !== null && result.mine > score) beatenOnBoard = true;
+    if (result.mine !== null) {
+      boardBest = result.mine;
+      if (result.mine > score) beatenOnBoard = true;
+    }
   });
 
   function onNameInput() {
@@ -176,6 +187,7 @@
       return;
     }
 
+    if (result.mine !== null) boardBest = Math.max(boardBest ?? 0, result.mine);
     let marked = false;
     board = result.scores.map((entry) => {
       const me = !marked && entry.name === checked.value && entry.score === score;
@@ -223,7 +235,7 @@
 
       {#if stats.length}
         <dl class="receipt">
-          {#each stats as stat}
+          {#each shownStats as stat}
             <div>
               <dt>{stat.label}</dt>
               <dd>{stat.value}</dd>

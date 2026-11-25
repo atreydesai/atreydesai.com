@@ -62,16 +62,37 @@ function readStored(name: string) {
   }
 }
 
+/** Raises a stored best to `score`, never lowering it (another tab may have saved more a moment ago). */
+function raiseStored(key: string, score: number) {
+  try {
+    if (score > (Math.floor(Number(localStorage.getItem(key))) || 0)) localStorage.setItem(key, String(score));
+  } catch {
+    // Storage off: the memory copy holds it for this visit.
+  }
+}
+
+/** A best earned on this device. */
 function writeBest(game: GameId, mode: ArcadeMode, score: number) {
   const name = bestCookie(game, mode);
   sessionBests.set(name, Math.max(score, sessionBests.get(name) ?? 0));
+  raiseStored(BEST_KEY(name), score);
+  // The old cookie too, only ever upward, for a browser with storage off.
+  if (score > (parseInt(readCookie(name) ?? "", 10) || 0)) writeCookie(name, String(score));
+}
+
+// A best the leaderboard holds for a signed name is kept apart from the
+// device's own, under that name, so signing as someone else never carries
+// the last name's best over.
+const BOARD_BEST_KEY = (player: string, name: string) => `boba_board_best:${player.trim().toLocaleLowerCase()}:${name}`;
+
+function readBoardBest(name: string) {
+  const player = readPlayerName().trim();
+  if (!player) return 0;
   try {
-    // Never lower: another tab may have saved a higher best a moment ago.
-    if (score > readStored(name)) localStorage.setItem(BEST_KEY(name), String(score));
+    return Math.floor(Number(localStorage.getItem(BOARD_BEST_KEY(player, name)))) || 0;
   } catch {
-    // Storage off: the memory copy and the cookie below hold it.
+    return sessionBests.get(`board:${player.toLocaleLowerCase()}:${name}`) ?? 0;
   }
-  writeCookie(name, String(score));
 }
 
 /**
@@ -85,13 +106,11 @@ export function readBest(game: GameId, mode: ArcadeMode = currentMode()) {
   const stored = Math.max(readStored(name), sessionBests.get(name) ?? 0);
   const cookie = parseInt(readCookie(name) ?? "", 10) || 0;
   if (cookie > stored) {
-    try {
-      localStorage.setItem(BEST_KEY(name), String(cookie));
-    } catch {
-      sessionBests.set(name, cookie);
-    }
+    raiseStored(BEST_KEY(name), cookie);
+    sessionBests.set(name, cookie);
   }
-  return Math.max(stored, cookie);
+  // The device's own best, or the signed name's best on the board if that is higher.
+  return Math.max(stored, cookie, readBoardBest(name));
 }
 
 /** Saves `score` if it beats the stored best for the mode being played. */
@@ -102,12 +121,20 @@ export function recordScore(game: GameId, score: number, mode: ArcadeMode = curr
   return { best: score, newBest: true };
 }
 
-/** Takes a best the leaderboard holds for this device's name, if it beats the one here. */
-export function mergeBest(game: GameId, score: number | null | undefined, mode: ArcadeMode = currentMode()) {
+/** Keeps a best the leaderboard holds for the signed name; true if it raised the best shown. */
+export function mergeBest(
+  game: GameId,
+  score: number | null | undefined,
+  mode: ArcadeMode = currentMode(),
+  player = readPlayerName().trim(),
+) {
   const value = Math.floor(Number(score));
-  if (!Number.isFinite(value) || value <= 0 || value <= readBest(game, mode)) return false;
-  writeBest(game, mode, value);
-  return true;
+  if (!player || !Number.isFinite(value) || value <= 0) return false;
+  const before = readBest(game, mode);
+  const name = bestCookie(game, mode);
+  sessionBests.set(`board:${player.toLocaleLowerCase()}:${name}`, Math.max(value, sessionBests.get(`board:${player.toLocaleLowerCase()}:${name}`) ?? 0));
+  raiseStored(BOARD_BEST_KEY(player, name), value);
+  return readBest(game, mode) > before;
 }
 
 // The last name signed on any board is offered again, so a regular doesn't
@@ -249,7 +276,7 @@ export async function fetchBoard(game: GameId, mode: ArcadeMode = currentMode())
 }
 
 type SubmitResult =
-  | { ok: true; rank: number | null; scores: BoardEntry[] }
+  | { ok: true; rank: number | null; scores: BoardEntry[]; mine: number | null }
   | { ok: false; reason: string };
 
 export async function submitScore(
@@ -268,11 +295,14 @@ export async function submitScore(
     if (!response.ok || !data.ok) {
       return { ok: false, reason: data?.reason ?? "couldn't submit" };
     }
-    mergeBest(game, data.mine, mode);
+    // The name just signed is the one the board answered for (it is saved after this returns).
+    const mine = Number.isFinite(data.mine) ? Number(data.mine) : null;
+    mergeBest(game, mine, mode, name.trim());
     return {
       ok: true,
       rank: data.rank ?? null,
       scores: Array.isArray(data.scores) ? data.scores : [],
+      mine,
     };
   } catch {
     return { ok: false, reason: "couldn't submit, try again" };

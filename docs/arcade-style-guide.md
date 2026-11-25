@@ -61,7 +61,7 @@ arcade or monospace face.
 | Dialog titles                          | NHG Display `700`        | `30px`, lowercase (`.boba-title`)                         |
 | Menu names                             | NHG Text `400`           | The site's `type-item-heading` recipe                     |
 | Decks (the sentence under a title)     | NHG Text `400`, upright  | `15px / 1.5` (`.boba-deck`)                               |
-| Labels, stats, tips, controls, meta    | NHG Text `400`           | `12px` (`.boba-meta`, `.boba-tip`)                        |
+| Labels, stats, controls, meta          | NHG Text `400`           | `12px` (`.boba-meta`)                                     |
 | Button labels, a live combo            | NHG Text `500`           | `13px` on buttons                                         |
 | Asides: phases, tip labels, captions, section labels | NHG Text italic `400` | `14px` (`.boba-phase`); the arcade's second voice |
 | Canvas text (popups, pad labels)       | NHG Text via `arcadeFont()` | Reads `--font-ui`, so it follows the site             |
@@ -775,8 +775,7 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   move or keep time: barrels that roll at the runner, a rival's drone at
   slide height, signs swinging from a gantry, steam pipes that blow on a
   timer (hop the pipe, or jump the plume), and rotten boards over a gap
-  that give way a moment after they take the weight. A test bot (also the
-  demo's player) runs long stretches on many seeds, in both modes, without
+  that give way a moment after they take the weight. A test bot runs long stretches on many seeds, in both modes, without
   losing a cup, so every gap is clearable and everything can be avoided.
 - **Expert** starts at 215 and climbs to 430 in about a minute and a half
   (creeping on to 460 over its second climb),

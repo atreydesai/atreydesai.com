@@ -1234,7 +1234,8 @@
     // basket stays on the mouse, at full speed.
     // Lessons hold on real time (uncapped, so as long on a slow device),
     // while the shift's own step stays capped.
-    const real = Math.min(rawDt, 0.25);
+    // Real time, capped only against a leap (a tab coming back), as the coach's own clock is.
+    const real = Math.min(rawDt, 1);
     const dt = coach.step(rawDt, realDt);
     lessonClock += real;
     // The basket's blink after a pearl drops or comes back runs on real
@@ -1495,6 +1496,23 @@
     </div>
   </div>
 </header>
+  <!-- Inside the play scope, so Tab reaches its Continue button. -->
+  <!-- The lesson's callout, beside the link, the cup, the landing, or the basket. -->
+  <Coach
+    lesson={coachLesson}
+    x={coachX}
+    y={coachY}
+    side={coachSide}
+    ring={coachRing}
+    width={coachWidth}
+    scene={darkPage ? "dark" : "light"}
+    leaving={coachLeaving}
+    continuable={coachContinuable}
+    returnFocus={focusPlayfield}
+    on:continue={continueLesson}
+    hidden={paused || gameOver}
+    top={PLAYFIELD_TOP + 8}
+  />
 </div>
 
 {#if countdown > 0 || goVisible}
@@ -1505,22 +1523,6 @@
   <div class="boba-miss-flash" aria-hidden="true"></div>
 {/if}
 
-<!-- The lesson's callout, beside the link, the cup, the landing, or the basket. -->
-<Coach
-  lesson={coachLesson}
-  x={coachX}
-  y={coachY}
-  side={coachSide}
-  ring={coachRing}
-  width={coachWidth}
-  scene={darkPage ? "dark" : "light"}
-  leaving={coachLeaving}
-  continuable={coachContinuable}
-  returnFocus={focusPlayfield}
-  on:continue={continueLesson}
-  hidden={paused || gameOver}
-  top={PLAYFIELD_TOP + 8}
-/>
 
 {#if paused && !gameOver}
   <PauseCard
