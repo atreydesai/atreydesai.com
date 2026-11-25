@@ -64,7 +64,9 @@
   } from "#lib/arcade/runner-engine.js";
   import { LESSONS, lessonAhead, type LessonCue } from "#lib/arcade/runner-lessons.js";
   import { botInput, createBot } from "#lib/arcade/runner-bot.js";
+  import { RIM, WINDOW, stripSkyline } from "#lib/arcade/core/city.ts";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
+  import { createControls, keyName, watchTouch } from "#lib/arcade/core/controls.ts";
   import { createFrameLoop } from "#lib/arcade/core/loop.ts";
   import { hexToRgb, mixHex, mixRgb, rgbToHex } from "#lib/arcade/core/color.ts";
   import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
@@ -73,6 +75,7 @@
   import { beckon, chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import {
     ACCENT,
+    BALLOON,
     CREAM,
     DRINKS,
     HALO,
@@ -89,7 +92,9 @@
     SPRITE_PAD,
     STRAW_PINK,
     arcadeFont,
+    balloonPalette,
     cachedSprite,
+    drawChipNote,
     clearSpriteCache,
     fitCanvas,
   } from "#lib/arcade/art.ts";
@@ -768,30 +773,6 @@
     return grid;
   }
 
-  // --- The boba-cup balloon (as in cup stack) -----------------------------------------
-
-  const BALLOON = [
-    ".....S.....",
-    ".....S.....",
-    "...OOSOO...",
-    "..OlllllO..",
-    ".OlllllllO.",
-    "OOOOOOOOOOO",
-    "OhLLLLLLLLO",
-    "OhLLLLLLLLO",
-    "OhLLLLLLLLO",
-    ".OLLLLLLLO.",
-    ".OLbLLLbLO.",
-    ".OLLLbLLLO.",
-    "..ObLLLbO..",
-    "..OLLbLLO..",
-    "...OOOOO...",
-    "...r...r...",
-    "....r.r....",
-    "....KKK....",
-    "....kkk....",
-  ];
-
   // --- State -----------------------------------------------------------------
 
   let state: RunState = newRun(1);
@@ -870,8 +851,6 @@
   let stampFont = noteFont;
   let reduceMotion = false;
   let touchUI = false;
-  let coarse = false;
-  let touchSeen = false;
 
   // Layout, in CSS px unless named otherwise.
   let viewW = 0;
@@ -930,9 +909,8 @@
   let slideDustClock = 0;
   let firstChunk = 0;
 
-  const keys: Held = { jump: false, down: false, rush: false };
+  /** What the hold buttons hold now, which draws them pressed (`input` keeps it; see Input). */
   let touchHeld: Held = { jump: false, down: false, rush: false };
-  const input: Held = { jump: false, down: false, rush: false };
   /**
    * The bot's keys, held back while a lesson is new (a second to read it)
    * and off the rush until it has been taught, so each lesson is seen.
@@ -947,13 +925,6 @@
 
   /** The test bot at the keys (development only). */
   let autoplay: ReturnType<typeof createBot> | null = null;
-  /** Presses not yet seen by an engine step, from the keys and from the pads (kept apart, so a cancelled touch can't drop a key's tap). */
-  const pressedKeys: Held = { jump: false, down: false, rush: false };
-  const pressedPads: Held = { jump: false, down: false, rush: false };
-  const clearPressed = () => {
-    pressedKeys.jump = pressedKeys.down = pressedKeys.rush = false;
-    pressedPads.jump = pressedPads.down = pressedPads.rush = false;
-  };
 
   let active = true;
   const loop = createFrameLoop({ update: (dt, rawDt) => advance(dt, rawDt), draw: () => draw(), isPaused: () => paused });
@@ -1113,8 +1084,8 @@
   // --- Skylines ---------------------------------------------------------------------------
   //
   // Two periodic silhouettes behind the roofs, built cell by cell once per
-  // resize and repainted once per colour step. Their windows come on one by
-  // one as the night deepens.
+  // resize (core `stripSkyline`) and repainted here once per colour step.
+  // Their windows come on one by one as the night deepens.
 
   interface Strip {
     /** Horizontal and vertical parallax against the run. */
@@ -1179,71 +1150,12 @@
     },
   ];
 
+  /** A strip's cells, for the sky as it is laid out now. */
   function buildStrip(strip: Strip) {
-    const span = Math.max(1, horizonY - playTop);
-    const high = Math.ceil((strip.high * span) / SC);
-    const low = Math.ceil((strip.low * span) / SC);
-    strip.base = high + 8;
-    // Never fewer rows than the skyline itself, even mid-resize on a tiny window.
-    strip.rows = Math.max(strip.base + 8, strip.base + Math.ceil((viewH - horizonY) / SC) + 40);
-    const { period, rows, base } = strip;
-    const cells = new Uint8Array(period * rows);
-    const lit = new Float32Array(period * rows);
-    const set = (x: number, y: number, value: number) => {
-      const column = ((x % period) + period) % period;
-      if (y >= 0 && y < rows) cells[y * period + column] = value;
-    };
-    const random = createRng(strip.seed);
-    let x = 0;
-    while (x < period) {
-      const w = Math.min(period - x, strip.minW + Math.floor(random() * (strip.maxW - strip.minW + 1)));
-      const h = Math.round(lerp(low, high, Math.pow(random(), 1.3)));
-      const top = base - h;
-      for (let row = top; row < rows; row++) for (let column = x; column < x + w; column++) set(column, row, 1);
-      const feature = random();
-      if (w >= 8 && feature < 0.3) {
-        // A stepped crown.
-        const inset = 2;
-        const tall = 2 + Math.floor(random() * 3);
-        for (let row = top - tall; row < top; row++) for (let column = x + inset; column < x + w - inset; column++) set(column, row, 1);
-      } else if (w >= 7 && feature < 0.5) {
-        // A water tower.
-        const tx = x + 1 + Math.floor(random() * (w - 6));
-        set(tx, top - 1, 1);
-        set(tx + 4, top - 1, 1);
-        for (let column = tx; column < tx + 5; column++) for (let row = top - 5; row < top - 1; row++) set(column, row, 1);
-        set(tx + 2, top - 6, 1);
-      } else if (feature < 0.7) {
-        const ax = x + 1 + Math.floor(random() * Math.max(1, w - 2));
-        const ah = 3 + Math.floor(random() * 5);
-        for (let row = top - ah; row < top; row++) set(ax, row, 1);
-      }
-      const rowStep = 2 + Math.floor(random() * 2);
-      for (let wy = top + 2; wy < rows; wy += rowStep) {
-        for (let wx = x + 1; wx < x + w - 1; wx += 2) {
-          const roll = hash2(strip.seed * 31 + wx, wy);
-          if (roll < strip.windows) {
-            cells[wy * period + wx] = 3;
-            lit[wy * period + wx] = hash2(wx, wy * 7 + strip.seed);
-          }
-        }
-      }
-      x += w;
-    }
-    // A rim on every top and on every wall facing the low sun on the left.
-    for (let y = 0; y < rows; y++) {
-      for (let column = 0; column < period; column++) {
-        if (cells[y * period + column] !== 1) continue;
-        const above = y > 0 ? cells[(y - 1) * period + column] : 0;
-        const left = cells[y * period + ((column - 1 + period) % period)];
-        if (above === 0 || left === 0) cells[y * period + column] = 2;
-      }
-    }
-    strip.cells = cells;
-    strip.lit = lit;
+    Object.assign(strip, stripSkyline(strip, { top: playTop, horizon: horizonY, bottom: viewH, cell: SC }));
     strip.canvas ??= document.createElement("canvas");
-    strip.canvas.width = period;
-    strip.canvas.height = rows;
+    strip.canvas.width = strip.period;
+    strip.canvas.height = strip.rows;
   }
 
   function paintStrip(strip: Strip, n: number) {
@@ -1260,8 +1172,8 @@
     for (let index = 0; index < cells.length; index++) {
       const cell = cells[index];
       if (!cell) continue;
-      let color = cell === 2 ? rim : body;
-      if (cell === 3 && lit[index] < share) color = lit[index] < share * 0.3 ? amber : warm;
+      let color = cell === RIM ? rim : body;
+      if (cell === WINDOW && lit[index] < share) color = lit[index] < share * 0.3 ? amber : warm;
       const o = index * 4;
       data[o] = color[0];
       data[o + 1] = color[1];
@@ -1307,18 +1219,7 @@
 
   function drawBalloon() {
     if (!ctx || !balloon.on) return;
-    const liquid = DRINKS[balloon.drink];
-    const sprite = cachedSprite(`sr-balloon-${balloon.drink}`, BALLOON, 1, {
-      S: STRAW_PINK,
-      O: mixHex(liquid, INK, 0.55),
-      l: LID,
-      L: liquid,
-      h: mixHex(liquid, CREAM, 0.4),
-      b: mixHex(PEARL, liquid, 0.2),
-      r: "#6f4530",
-      K: "#8a5a3c",
-      k: "#6f4530",
-    });
+    const sprite = cachedSprite(`sr-balloon-${balloon.drink}`, BALLOON, 1, balloonPalette(DRINKS[balloon.drink]));
     const bob = Math.round(Math.sin(clock * 0.9)) * SC;
     ctx.globalAlpha = 0.9 - 0.3 * night;
     ctx.drawImage(sprite, snap(balloon.x), snap(balloon.y) + bob, sprite.width * SC, sprite.height * SC);
@@ -2692,14 +2593,9 @@
   function note(x: number, y: number, text: string, color: string, alpha: number) {
     if (!ctx) return;
     ctx.font = noteFont;
-    const width = Math.ceil((ctx.measureText(text).width + 14) / SC) * SC;
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = NOTE_BACK;
-    ctx.fillRect(Math.round(x - width / 2), Math.round(y) - 10, width, 20);
-    ctx.fillStyle = color;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(text, Math.round(x), Math.round(y) + 0.5);
+    drawChipNote(ctx, text, x, y, { color, alpha, cell: SC });
     ctx.globalAlpha = 1;
   }
 
@@ -3450,18 +3346,6 @@
 
   // --- Running -------------------------------------------------------------------------------
 
-  /**
-   * The keys as the engine's next step sees them. A press counts until a
-   * step has seen it, so a tap is never lost between steps, which in a
-   * lesson's slow motion are far apart.
-   */
-  function controls() {
-    input.jump = keys.jump || touchHeld.jump || pressedKeys.jump || pressedPads.jump;
-    input.down = keys.down || touchHeld.down || pressedKeys.down || pressedPads.down;
-    input.rush = keys.rush || touchHeld.rush || pressedKeys.rush || pressedPads.rush;
-    return input;
-  }
-
   // The rules step at a fixed 120 Hz. In slow motion a frame may fall
   // between steps, so the runner and the camera are drawn where they are
   // between the last two steps (`drawX`, `drawY`), never where a step left
@@ -3477,8 +3361,10 @@
       accumulator -= STEP;
       prevX = state.runner.x;
       prevY = state.runner.y;
-      const held = autoplay ? autoplayInput(autoplay) : controls();
-      clearPressed();
+      // A press counts until a step has seen it, so a tap is never lost
+      // between steps, which in a lesson's slow motion are far apart.
+      const held = autoplay ? autoplayInput(autoplay) : input.read();
+      input.clearPresses();
       const events = stepRun(state, held, STEP);
       if (events.length) onEvents(events);
       // Jump held on the way up long enough to go higher: the hold is known
@@ -3633,6 +3519,16 @@
     Shift: "rush",
   };
 
+  // Each source holds a control on its own (a key by its name, a pad by each
+  // pointer on it and by a key while it has focus), and a press waits for a
+  // step to see it, as in tea minus.
+  const input = createControls<keyof Held>({
+    names: ["jump", "down", "rush"],
+    keys: KEY_CONTROLS,
+    enabled: () => !paused && !gameOver,
+    onPads: (pads) => (touchHeld = pads),
+  });
+
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === "Tab") {
       onPlayfieldTab(event);
@@ -3640,7 +3536,7 @@
     }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (gameOver || paused) return;
-    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const key = keyName(event);
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
     // Enter (on the playfield) skips the explanation that is up; a held Enter skips only one.
     if (key === "Enter" && coach.current) {
@@ -3649,55 +3545,14 @@
       continueLesson();
       return;
     }
-    const control = KEY_CONTROLS[key];
-    if (!control) return;
+    if (!input.control(key)) return;
     event.preventDefault();
-    keys[control] = true;
-    pressedKeys[control] = true;
+    // A key's repeats latch a press too.
+    input.keyDown(key, true);
   }
 
   function onKeyUp(event: KeyboardEvent) {
-    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-    const control = KEY_CONTROLS[key];
-    if (control) keys[control] = false;
-  }
-
-  function releaseAll() {
-    keys.jump = keys.down = keys.rush = false;
-    clearPressed();
-    if (touchHeld.jump || touchHeld.down || touchHeld.rush) touchHeld = { jump: false, down: false, rush: false };
-  }
-
-  function holdPad(control: keyof Held, down: boolean) {
-    if (down && (paused || gameOver)) return;
-    if (touchHeld[control] === down) return;
-    touchHeld = { ...touchHeld, [control]: down };
-    if (down) pressedPads[control] = true;
-  }
-
-  /** A touch the browser took back (a scroll, a system gesture) never counts as a press. */
-  function cancelPad(control: keyof Held) {
-    pressedPads[control] = false;
-    holdPad(control, false);
-  }
-
-  function padDown(event: PointerEvent, control: keyof Held) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.preventDefault();
-    const target = event.currentTarget as HTMLElement;
-    try {
-      target.setPointerCapture(event.pointerId);
-    } catch {
-      // Capture is a nicety; the up and cancel handlers still release.
-    }
-    holdPad(control, true);
-  }
-
-  function padKey(event: KeyboardEvent, control: keyof Held, down: boolean) {
-    if (event.key !== " " && event.key !== "Enter") return;
-    event.preventDefault();
-    if (down && event.repeat) return;
-    holdPad(control, down);
+    input.keyUp(keyName(event));
   }
 
   // --- Pause, restart, and finish --------------------------------------------------------
@@ -3705,7 +3560,7 @@
   async function pauseGame() {
     if (gameOver || paused) return;
     paused = true;
-    releaseAll();
+    input.releaseAll();
     setRunGlide(0);
     setMusicPaused(true);
     liveMessage = "The game is paused.";
@@ -3746,7 +3601,7 @@
     gameOver = true;
     coach.dismiss();
     cue = null;
-    releaseAll();
+    input.releaseAll();
     setRunGlide(0);
     syncHud();
     finalStats = breakdown(state);
@@ -3761,7 +3616,7 @@
 
   function begin() {
     // A key tapped during the countdown doesn't carry into the run.
-    clearPressed();
+    input.clearPresses();
     begunAt = clock;
     countdown = 0;
     goVisible = true;
@@ -3831,7 +3686,7 @@
   function restart() {
     stopMusic();
     timers.clear();
-    releaseAll();
+    input.releaseAll();
     setRunGlide(0);
     paused = false;
     gameOver = false;
@@ -3889,14 +3744,6 @@
     if (!document.hidden) repaintCaches();
   }
 
-  async function syncTouchUI() {
-    const next = coarse || touchSeen;
-    if (next === touchUI) return;
-    touchUI = next;
-    await tick();
-    sizeCanvas();
-  }
-
   onMount(() => {
     noteFont = arcadeFont(13, 500);
     stampFont = arcadeFont(12, 500);
@@ -3911,23 +3758,16 @@
       onReduceMotion: (reduce) => (reduceMotion = reduce),
     });
 
-    const coarseQuery = window.matchMedia("(hover: none) and (pointer: coarse)");
-    const onCoarse = () => {
-      coarse = coarseQuery.matches;
-      void syncTouchUI();
-    };
-    const onFirstTouch = (event: PointerEvent) => {
-      if (event.pointerType !== "touch" || touchSeen) return;
-      touchSeen = true;
-      void syncTouchUI();
-    };
-    coarse = coarseQuery.matches;
-    touchUI = coarse;
-    coarseQuery.addEventListener("change", onCoarse);
-    window.addEventListener("pointerdown", onFirstTouch, true);
+    // The pads come and go with touch; the course is then laid out above them.
+    const touchWatch = watchTouch(async (touch) => {
+      touchUI = touch;
+      await tick();
+      sizeCanvas();
+    });
+    touchUI = touchWatch.touch;
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", releaseAll);
+    window.addEventListener("blur", input.releaseAll);
     document.addEventListener("visibilitychange", onVisible);
 
     newShift();
@@ -3947,11 +3787,10 @@
       timers.clear();
       setRunGlide(0);
       stopMusic();
-      coarseQuery.removeEventListener("change", onCoarse);
-      window.removeEventListener("pointerdown", onFirstTouch, true);
+      touchWatch.stop();
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", releaseAll);
+      window.removeEventListener("blur", input.releaseAll);
       document.removeEventListener("visibilitychange", onVisible);
       unmountShell();
     };
@@ -3959,7 +3798,6 @@
 
   $: deliveries = finalStats.deliveries;
   $: endingWords = finalStats.ending ? (ENDINGS[finalStats.ending as keyof typeof ENDINGS] ?? "the end") : "the end";
-  $: padsShown = touchHeld;
 </script>
 
 <div class="boba-stage sr-stage" aria-hidden="true"></div>
@@ -4099,16 +3937,16 @@
         <button
           type="button"
           class="sr-pad boba-riso is-small"
-          class:is-down={padsShown.down}
+          class:is-down={touchHeld.down}
           class:is-lit={padLit === "down"}
           style="--tilt: -1.2deg"
-          on:pointerdown={(event) => padDown(event, "down")}
-          on:pointerup={() => holdPad("down", false)}
-          on:pointercancel={() => cancelPad("down")}
-          on:lostpointercapture={() => holdPad("down", false)}
-          on:keydown={(event) => padKey(event, "down", true)}
-          on:keyup={(event) => padKey(event, "down", false)}
-          on:blur={() => holdPad("down", false)}
+          on:pointerdown={(event) => input.padDown(event, "down")}
+          on:pointerup={(event) => input.padUp(event, "down")}
+          on:pointercancel={(event) => input.padCancel(event, "down")}
+          on:lostpointercapture={(event) => input.padUp(event, "down")}
+          on:keydown={(event) => input.padKey(event, "down", true)}
+          on:keyup={(event) => input.padKey(event, "down", false)}
+          on:blur={() => input.padBlur("down")}
           on:contextmenu={(event) => event.preventDefault()}
         >
           <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -4121,19 +3959,19 @@
           <button
             type="button"
             class="sr-pad sr-rush boba-riso is-small"
-            class:is-down={padsShown.rush}
+            class:is-down={touchHeld.rush}
             class:is-lit={padLit === "rush"}
             class:is-hidden={!rushReady}
             tabindex={rushReady ? 0 : -1}
             aria-hidden={!rushReady}
             style="--tilt: 1.4deg"
-            on:pointerdown={(event) => padDown(event, "rush")}
-            on:pointerup={() => holdPad("rush", false)}
-            on:pointercancel={() => cancelPad("rush")}
-            on:lostpointercapture={() => holdPad("rush", false)}
-            on:keydown={(event) => padKey(event, "rush", true)}
-            on:keyup={(event) => padKey(event, "rush", false)}
-            on:blur={() => holdPad("rush", false)}
+            on:pointerdown={(event) => input.padDown(event, "rush")}
+            on:pointerup={(event) => input.padUp(event, "rush")}
+            on:pointercancel={(event) => input.padCancel(event, "rush")}
+            on:lostpointercapture={(event) => input.padUp(event, "rush")}
+            on:keydown={(event) => input.padKey(event, "rush", true)}
+            on:keyup={(event) => input.padKey(event, "rush", false)}
+            on:blur={() => input.padBlur("rush")}
             on:contextmenu={(event) => event.preventDefault()}
           >
             <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -4144,16 +3982,16 @@
           <button
             type="button"
             class="sr-pad sr-jump boba-riso is-small"
-            class:is-down={padsShown.jump}
+            class:is-down={touchHeld.jump}
             class:is-lit={padLit === "jump"}
             style="--tilt: -0.9deg"
-            on:pointerdown={(event) => padDown(event, "jump")}
-            on:pointerup={() => holdPad("jump", false)}
-            on:pointercancel={() => cancelPad("jump")}
-            on:lostpointercapture={() => holdPad("jump", false)}
-            on:keydown={(event) => padKey(event, "jump", true)}
-            on:keyup={(event) => padKey(event, "jump", false)}
-            on:blur={() => holdPad("jump", false)}
+            on:pointerdown={(event) => input.padDown(event, "jump")}
+            on:pointerup={(event) => input.padUp(event, "jump")}
+            on:pointercancel={(event) => input.padCancel(event, "jump")}
+            on:lostpointercapture={(event) => input.padUp(event, "jump")}
+            on:keydown={(event) => input.padKey(event, "jump", true)}
+            on:keyup={(event) => input.padKey(event, "jump", false)}
+            on:blur={() => input.padBlur("jump")}
             on:contextmenu={(event) => event.preventDefault()}
           >
             <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">

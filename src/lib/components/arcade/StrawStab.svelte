@@ -82,6 +82,7 @@
     addPopup,
     arcadeFont,
     cachedSprite,
+    drawChipNote,
     drawLoop,
     drawParticles,
     fitCanvas,
@@ -1609,14 +1610,8 @@
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const popup of popups) {
-      const x = Math.round(popup.x);
-      const y = Math.round(popup.y);
-      const width = Math.ceil((ctx.measureText(popup.text).width + 14) / SC) * SC;
-      ctx.globalAlpha = clamp((popup.life / popup.maxLife) * 2, 0, 1);
-      ctx.fillStyle = NOTE_BACK;
-      ctx.fillRect(Math.round(x - width / 2), y - 10, width, 20);
-      ctx.fillStyle = popup.kind === "gold" ? NOTE_GOLD : CREAM;
-      ctx.fillText(popup.text, x, y + 0.5);
+      const alpha = clamp((popup.life / popup.maxLife) * 2, 0, 1);
+      drawChipNote(ctx, popup.text, Math.round(popup.x), popup.y, { color: popup.kind === "gold" ? NOTE_GOLD : CREAM, alpha, cell: SC });
     }
     ctx.restore();
   }

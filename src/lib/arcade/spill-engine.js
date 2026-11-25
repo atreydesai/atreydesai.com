@@ -28,7 +28,7 @@ export const WIDTH = 240;
 export const HEIGHT = 300;
 /** The floor is the bottom edge of the room. */
 export const FLOOR = HEIGHT;
-/** The fixed step the screen calls `step` with. */
+/** The fixed step the screen calls `step` with (its clock is core `frameSteps`, at this step and MAX_FRAME). */
 export const STEP = 1 / 120;
 /**
  * The most simulated time one drawn frame may catch up. A slow frame or a
@@ -1098,23 +1098,6 @@ function pour(world, dt) {
 }
 
 // --- Physics --------------------------------------------------------------------------
-
-/**
- * The screen's fixed-step clock: adds a frame's elapsed seconds (clamped to
- * MAX_FRAME; a negative or missing time counts as none) to what was left
- * over, and says how many steps to run now, what is left for next frame, and
- * how far between the last two steps to draw (0 to 1).
- * @param {number} accumulator seconds left over from the last frame
- * @param {number} elapsed seconds since the last frame
- */
-export function frameSteps(accumulator, elapsed) {
-  const add = Number.isFinite(elapsed) ? clamp(elapsed, 0, MAX_FRAME) : 0;
-  const total = (Number.isFinite(accumulator) ? clamp(accumulator, 0, STEP) : 0) + add;
-  // A hair of slack, so 1/120 of a second added 120 times is 120 steps.
-  const steps = Math.floor(total / STEP + 1e-6);
-  const left = Math.max(0, total - steps * STEP);
-  return { steps, accumulator: left, alpha: clamp(left / STEP, 0, 1) };
-}
 
 /**
  * One fixed step. Returns how many events it emitted into `world.events`.

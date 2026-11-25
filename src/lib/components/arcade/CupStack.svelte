@@ -46,6 +46,7 @@
   } from "#lib/arcade/stack-lessons.js";
   import {
     ACCENT,
+    BALLOON,
     CREAM,
     DRINKS,
     HALO,
@@ -56,22 +57,25 @@
     NOTE_GOLD,
     PEARL,
     SPRITE_PAD,
-    STRAW_PINK,
     addPopup,
     arcadeFont,
+    balloonPalette,
     cachedSprite,
+    drawChipNote,
     drawHalo,
     drawSprite,
     fitCanvas,
     stepPopups,
     type Popup,
   } from "#lib/arcade/art.ts";
+  import { citySkyline } from "#lib/arcade/core/city.ts";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
   import { hexToRgb, mixHex } from "#lib/arcade/core/color.ts";
   import { bayer } from "#lib/arcade/core/dither.ts";
   import { beckon, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import { createFrameLoop } from "#lib/arcade/core/loop.ts";
   import { approach, clamp, damp, lerp, smoothstep, snap } from "#lib/arcade/core/math.ts";
+  import { createPool } from "#lib/arcade/core/pool.ts";
   import { createRng, hash2, noise2 } from "#lib/arcade/core/rng.ts";
   import { readBest } from "#lib/arcade/scores.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
@@ -809,103 +813,21 @@
 
   /**
    * A roofline of cell-stepped blocks with setbacks, water towers, antennas,
-   * and on the near layer a shop sign, lit from the low sun on the left: a
-   * one-cell rim along every top and every wall that faces the sun.
+   * and on the near layer a shop sign, lit from the low sun on the left
+   * (core `citySkyline`), painted once in the layer's colours.
    */
   function buildCity(layer: CityLayer) {
-    const columns = Math.ceil(viewW / SC) + 1;
-    const highCells = Math.ceil((layer.high * viewH) / SC);
-    const lowCells = Math.ceil((layer.low * viewH) / SC);
-    const up = highCells + 14;
-    const rows = up + Math.ceil((viewH - baseY) / SC) + 2;
-    layer.horizon = up;
-    const grid = new Uint8Array(columns * rows);
-    const set = (x: number, y: number, value: number) => {
-      if (x >= 0 && x < columns && y >= 0 && y < rows) grid[y * columns + x] = value;
-    };
-    const fill = (x: number, y: number, w: number, h: number, value: number) => {
-      for (let row = y; row < y + h; row++) for (let column = x; column < x + w; column++) set(column, row, value);
-    };
-    const at = (x: number, y: number) => (x >= 0 && x < columns && y >= 0 && y < rows ? grid[y * columns + x] : 0);
-    const random = createRng(layer.seed);
-    let signs = 0;
-    let x = -Math.floor(random() * 6);
-    while (x < columns) {
-      const w = layer.minW + Math.floor(random() * (layer.maxW - layer.minW + 1));
-      const h = Math.round(lerp(lowCells, highCells, Math.pow(random(), 1.4)));
-      const bodyTop = up - h;
-      let top = bodyTop;
-      fill(x, top, w, rows - top, 1);
-      let roofX = x;
-      let roofW = w;
-      if (w >= 7 && random() < 0.4) {
-        // A stepped crown.
-        const inset = 1 + Math.floor(random() * Math.min(3, (w - 3) / 2));
-        const tall = 2 + Math.floor(random() * 4);
-        top -= tall;
-        roofX = x + inset;
-        roofW = w - inset * 2;
-        fill(roofX, top, roofW, tall, 1);
-      }
-      const feature = random();
-      if (signs < layer.signs && roofW >= 12 && feature < layer.signP) {
-        // A shop sign on legs: a cup and two lines of lettering, lit.
-        signs++;
-        const sx = roofX + Math.floor((roofW - 12) / 2);
-        fill(sx + 2, top - 2, 1, 2, 1);
-        fill(sx + 9, top - 2, 1, 2, 1);
-        fill(sx, top - 7, 12, 5, 1);
-        fill(sx + 1, top - 6, 10, 3, 5);
-        fill(sx + 2, top - 6, 3, 2, 6);
-        set(sx + 3, top - 4, 6);
-        fill(sx + 6, top - 6, 4, 1, 6);
-        fill(sx + 6, top - 4, 3, 1, 6);
-      } else if (roofW >= layer.tankW + 2 && feature < layer.signP + layer.towerP) {
-        // A water tower: legs, a catwalk, the tank, its cone.
-        const tw = layer.tankW;
-        const tx = roofX + 1 + Math.floor(random() * Math.max(1, roofW - tw - 1));
-        set(tx, top - 1, 1);
-        set(tx + tw - 1, top - 1, 1);
-        fill(tx, top - 2, tw, 1, 1);
-        fill(tx, top - 5, tw, 3, 1);
-        fill(tx + 1, top - 6, tw - 2, 1, 1);
-        if (tw % 2 === 1) set(tx + (tw - 1) / 2, top - 7, 1);
-      } else if (feature < layer.signP + layer.towerP + layer.antennaP) {
-        const ax = roofX + 1 + Math.floor(random() * Math.max(1, roofW - 2));
-        const ah = 3 + Math.floor(random() * 6);
-        fill(ax, top - ah, 1, ah, 1);
-        if (ah >= 5 && random() < 0.5) fill(ax - 1, top - ah + 2, 3, 1, 1);
-        if (random() < 0.6) set(ax, top - ah - 1, 4);
-      }
-      // A few lit windows, on the building's own grid.
-      for (let wy = bodyTop + 2; wy < up + 8; wy += layer.rowStep) {
-        for (let wx = x + 1; wx < x + w - 1; wx += 2) {
-          if (at(wx, wy) !== 1) continue;
-          const roll = hash2(layer.seed * 31 + wx, wy);
-          if (roll < layer.windows) {
-            set(wx, wy, 3);
-            if (roll < layer.windows * 0.35 && wx + 1 < x + w - 1) set(wx + 1, wy, 3);
-          }
-        }
-      }
-      x += w;
-    }
-    // The rim: every body cell open above, or open on the sun's side.
-    for (let y = 0; y < rows; y++) {
-      for (let column = 0; column < columns; column++) {
-        if (grid[y * columns + column] !== 1) continue;
-        if (at(column, y - 1) === 0 || at(column - 1, y) === 0) grid[y * columns + column] = 2;
-      }
-    }
+    const city = citySkyline(layer, { width: viewW, height: viewH, ground: baseY, cell: SC });
+    layer.horizon = city.horizon;
     layer.canvas ??= document.createElement("canvas");
-    layer.canvas.width = columns;
-    layer.canvas.height = rows;
+    layer.canvas.width = city.columns;
+    layer.canvas.height = city.rows;
     const context = layer.canvas.getContext("2d");
     if (!context) return;
-    const image = context.createImageData(columns, rows);
+    const image = context.createImageData(city.columns, city.rows);
     const colors = layer.palette.map((hex) => (hex ? hexToRgb(hex) : null));
-    for (let index = 0; index < grid.length; index++) {
-      const color = colors[grid[index]];
+    for (let index = 0; index < city.cells.length; index++) {
+      const color = colors[city.cells[index]];
       if (color) putPixel(image.data, index, color);
     }
     context.putImageData(image, 0, 0);
@@ -1183,48 +1105,14 @@
     c.globalAlpha = 1;
   }
 
-  // A hot-air balloon shaped like a boba cup, with its straw up top.
-  const BALLOON = [
-    ".....S.....",
-    ".....S.....",
-    "...OOSOO...",
-    "..OlllllO..",
-    ".OlllllllO.",
-    "OOOOOOOOOOO",
-    "OhLLLLLLLLO",
-    "OhLLLLLLLLO",
-    "OhLLLLLLLLO",
-    ".OLLLLLLLO.",
-    ".OLbLLLbLO.",
-    ".OLLLbLLLO.",
-    "..ObLLLbO..",
-    "..OLLbLLO..",
-    "...OOOOO...",
-    "...r...r...",
-    "....r.r....",
-    "....KKK....",
-    "....kkk....",
-  ];
-  const BALLOON_W = 11;
+  const BALLOON_W = BALLOON[0].length;
   const balloonSprites = new Map<number, HTMLCanvasElement>();
   const balloon = { on: false, done: false, x: 0, alt: 0, dir: 1, drink: 0 };
 
   function balloonSprite(drink: number) {
     let sprite = balloonSprites.get(drink);
     if (!sprite) {
-      const liquid = DRINKS[drink];
-      sprite = gridCanvas(BALLOON, {
-        S: STRAW_PINK,
-        // A softer outline than the cups', so it stays behind them.
-        O: mixHex(liquid, INK, 0.55),
-        l: LID,
-        L: liquid,
-        h: mixHex(liquid, CREAM, 0.4),
-        b: mixHex(PEARL, liquid, 0.2),
-        r: TABLE_SHADE,
-        K: TABLE,
-        k: TABLE_SHADE,
-      });
+      sprite = gridCanvas(BALLOON, balloonPalette(DRINKS[drink]));
       balloonSprites.set(drink, sprite);
     }
     return sprite;
@@ -1593,7 +1481,7 @@
   const BIT_MAX = 160;
   const BIT_CRUMB = 0;
   const BIT_SPARK = 1;
-  const bits = Array.from({ length: BIT_MAX }, () => ({
+  const bits = createPool(BIT_MAX, () => ({
     kind: 0,
     x: 0,
     y: 0,
@@ -1604,11 +1492,11 @@
     size: 3,
     color: CREAM,
   }));
-  let bitCount = 0;
+  type Bit = (typeof bits.items)[number];
 
   function spawnBit(kind: number, x: number, y: number, vx: number, vy: number, life: number, size: number, color: string) {
-    if (bitCount >= BIT_MAX) return;
-    const bit = bits[bitCount++];
+    const bit = bits.spawn();
+    if (!bit) return;
     bit.kind = kind;
     bit.x = x;
     bit.y = y;
@@ -1634,31 +1522,25 @@
     }
   }
 
-  function stepBits(dt: number) {
-    for (let index = bitCount - 1; index >= 0; index--) {
-      const bit = bits[index];
-      bit.age += dt;
-      if (bit.age >= bit.life) {
-        bits[index] = bits[bitCount - 1];
-        bits[bitCount - 1] = bit;
-        bitCount--;
-        continue;
-      }
-      if (bit.kind === BIT_CRUMB) {
-        bit.vy += 240 * dt;
-      } else {
-        const drag = Math.max(0, 1 - 3.2 * dt);
-        bit.vx *= drag;
-        bit.vy *= drag;
-      }
-      bit.x += bit.vx * dt;
-      bit.y += bit.vy * dt;
+  /** One bit's step: false once it has lived out its life. */
+  function stepBit(bit: Bit, dt: number) {
+    bit.age += dt;
+    if (bit.age >= bit.life) return false;
+    if (bit.kind === BIT_CRUMB) {
+      bit.vy += 240 * dt;
+    } else {
+      const drag = Math.max(0, 1 - 3.2 * dt);
+      bit.vx *= drag;
+      bit.vy *= drag;
     }
+    bit.x += bit.vx * dt;
+    bit.y += bit.vy * dt;
+    return true;
   }
 
   function drawBits(c: CanvasRenderingContext2D) {
-    for (let index = 0; index < bitCount; index++) {
-      const bit = bits[index];
+    for (let index = 0; index < bits.count; index++) {
+      const bit = bits.items[index];
       const t = bit.age / bit.life;
       c.fillStyle = bit.color;
       if (bit.kind === BIT_CRUMB) {
@@ -1690,17 +1572,10 @@
     c.textAlign = "center";
     c.textBaseline = "middle";
     for (const popup of popups) {
-      const x = Math.round(popup.x);
-      const y = Math.round(popup.y);
-      const ink = inkFor(y);
-      const width = Math.ceil((c.measureText(popup.text).width + 14) / SC) * SC;
+      const ink = inkFor(Math.round(popup.y));
       const fade = Math.max(0, popup.life / popup.maxLife);
-      c.globalAlpha = fade * 0.92;
-      c.fillStyle = ink.back;
-      c.fillRect(Math.round(x - width / 2), y - 10, width, 20);
-      c.globalAlpha = fade;
-      c.fillStyle = popup.kind === "perfect" ? ink.perfect : popup.kind === "gold" ? ink.gold : ink.fg;
-      c.fillText(popup.text, x, y + 0.5);
+      const color = popup.kind === "perfect" ? ink.perfect : popup.kind === "gold" ? ink.gold : ink.fg;
+      drawChipNote(c, popup.text, Math.round(popup.x), popup.y, { color, back: ink.back, alpha: fade, backAlpha: fade * 0.92, cell: SC });
     }
     c.restore();
   }
@@ -2195,7 +2070,7 @@
     if (taughtPiece && !sliceNamed && coach.current?.id !== "trim" && !pieces.includes(taughtPiece)) taughtPiece = null;
     updateZone();
     stepScene(gameDt);
-    stepBits(gameDt);
+    bits.step(stepBit, gameDt);
     stepPopups(popups, gameDt, reduceMotion ? 0 : 24);
   }
 
@@ -2249,7 +2124,7 @@
     pieces = [];
     flashes = [];
     popups = [];
-    bitCount = 0;
+    bits.clear();
     camera = 0;
     // Zoom eases back in from a fall's pull-back while the new tower plays.
     playing = true;

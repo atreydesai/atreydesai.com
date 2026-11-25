@@ -27,20 +27,19 @@
 // (src/lib/arcade/core/coach.ts), which shows one lesson at a time and
 // remembers them per device, and asks `aim` where the lesson points.
 
-import { HEIGHT, MILK, PIPE_MOUTH, ROOMS, WIDTH, frameSteps, pourCountdown, simulate, strawLeft } from "./spill-engine.js";
+import { HEIGHT, MAX_FRAME, MILK, PIPE_MOUTH, ROOMS, STEP, WIDTH, pourCountdown, simulate, strawLeft } from "./spill-engine.js";
+import { frameSteps } from "./core/loop.ts";
 import { clamp } from "./core/math.ts";
 
 /**
  * @typedef {import("./spill-engine.js").Room} Room
  * @typedef {import("./spill-engine.js").World} World
- * @typedef {{
- *   id: string, text: string, name?: string, keys?: string[], touch?: string,
- *   slow?: number, life?: number, minLife?: number, move?: boolean, priority?: number,
- *   hold?: boolean, continuable?: boolean, during: "plan" | "pour" | "result" | "any"
- * }} Lesson
- * `hold`: it holds the planning dial (or a room's result) while it explains.
- * `continuable: false`: it offers no Continue (doing what it asks is how it ends).
- * `during`: when it belongs; a planning lesson ends as the pour starts.
+ * @typedef {import("./core/coach.ts").Lesson} Lesson
+ * The coach's lesson, with spill's own fields: `hold`, it holds the planning
+ * dial (or a room's result) while it explains; `continuable: false`, it
+ * offers no Continue (doing what it asks is how it ends); `during` ("plan",
+ * "pour", "result" or "any"), when it belongs: a planning lesson ends as the
+ * pour starts.
  */
 
 /** Real seconds a lesson may hold the room in a visit, all its holds together: about seven, then play runs on. */
@@ -514,7 +513,7 @@ export function createHolds(expert) {
  * @param {boolean} holding The lesson up holds the room (never once Pour is pressed).
  */
 export function roomFrame(world, accumulator, dt, holding) {
-  return frameSteps(accumulator, holding && world.status === "waiting" ? 0 : dt);
+  return frameSteps(accumulator, holding && world.status === "waiting" ? 0 : dt, STEP, MAX_FRAME);
 }
 
 /**

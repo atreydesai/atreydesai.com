@@ -72,3 +72,44 @@ test("a pool reuses its items and retires the dead", () => {
   pool.step((p) => --p.life > 0);
   assert.equal(pool.count, 2);
 });
+
+test("a pool steps and retires exactly as cup stack's bits and tea minus's particles did, draw order included", () => {
+  // The loop both games wrote inline before the core pool: last to first, a
+  // dead item swapped with the last live one.
+  const reference = (items, count, update, dt) => {
+    for (let index = count - 1; index >= 0; index--) {
+      const item = items[index];
+      if (update(item, dt)) continue;
+      items[index] = items[count - 1];
+      items[count - 1] = item;
+      count--;
+    }
+    return count;
+  };
+  const random = createRng(77);
+  const MAX = 40;
+  let serial = 0;
+  const make = () => ({ id: 0, life: 0, steps: 0 });
+  const pool = createPool(MAX, make);
+  const old = Array.from({ length: MAX }, make);
+  let oldCount = 0;
+  const update = (item, dt) => {
+    item.steps += dt;
+    return item.steps < item.life;
+  };
+  for (let frame = 0; frame < 400; frame++) {
+    // A burst of spawns now and then, some beyond the pool's size.
+    const spawns = random() < 0.3 ? Math.floor(random() * 25) : 0;
+    for (let k = 0; k < spawns; k++) {
+      const life = 1 + Math.floor(random() * 12);
+      serial++;
+      const a = pool.spawn();
+      if (a) Object.assign(a, { id: serial, life, steps: 0 });
+      if (oldCount < MAX) Object.assign(old[oldCount++], { id: serial, life, steps: 0 });
+    }
+    pool.step(update, 1);
+    oldCount = reference(old, oldCount, update, 1);
+    assert.equal(pool.count, oldCount);
+    for (let index = 0; index < oldCount; index++) assert.equal(pool.items[index].id, old[index].id, `frame ${frame}, slot ${index}`);
+  }
+});

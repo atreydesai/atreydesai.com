@@ -2304,7 +2304,7 @@
 
   /** Ends what was about planning, as the tea comes: a move not made comes back, a line read counts. */
   function endPlanningLesson() {
-    const current = coach.current as Lesson | null;
+    const current = coach.current;
     if (!current || current.during !== "plan" || coach.leaving) return;
     if (current.move) coach.dismiss();
     else coach.done(current.id);
@@ -2312,7 +2312,7 @@
 
   /** What planning should teach now, once "go" has gone. The pour ends what was about planning. */
   function checkLessons() {
-    const current = coach.current as Lesson | null;
+    const current = coach.current;
     if (world.status !== "waiting" || pourLatched) {
       endPlanningLesson();
       if (!coach.current) cue = null;
@@ -2347,7 +2347,7 @@
    * @param dt Real seconds this frame.
    */
   function updateHold(dt: number) {
-    const lesson = coach.current as Lesson | null;
+    const lesson = coach.current;
     const ours = !!cue && cue.lesson === lesson;
     const holdable = ours && (phase === "result" ? lesson?.during === "result" : world.status === "waiting" && !pourLatched);
     lessonHolds = lessonHold.take(lesson, { leaving: coach.leaving, acting: coach.acting, holdable }, dt);
@@ -2358,7 +2358,7 @@
    * a move not made comes back, and either way it goes at once.
    */
   function endLesson() {
-    const current = coach.current as Lesson | null;
+    const current = coach.current;
     if (current && !coach.leaving && !current.move && coach.age >= (current.minLife ?? 0.9)) coach.skip(current.id);
     coach.dismiss();
     cue = null;
@@ -2373,7 +2373,7 @@
    */
   function continueLesson() {
     if (!coachContinuable || paused || levelsOpen) return;
-    const lesson = coach.current as Lesson | null;
+    const lesson = coach.current;
     if (!lesson) return;
     if (lesson.move) {
       skipped.add(lesson.id);
@@ -2427,7 +2427,7 @@
 
   /** Where the callout goes this frame, and what the spotlight keeps lit. */
   function placeCoach() {
-    const lesson = coach.current as Lesson | null;
+    const lesson = coach.current;
     if (!lesson || !cue || cue.lesson !== lesson || phase === "done") {
       if (coachLesson) coachLesson = null;
       if (coachX !== null) coachX = coachY = null;

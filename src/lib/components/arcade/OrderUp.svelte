@@ -136,6 +136,7 @@
     addPopup,
     arcadeFont,
     cachedSprite,
+    drawChipNote,
     drawHalo,
     drawParticles,
     drawSprite,
@@ -2919,14 +2920,9 @@
     g.textAlign = "center";
     g.textBaseline = "middle";
     for (const popup of popups) {
-      const x = Math.round(popup.x);
-      const y = Math.round(popup.y);
-      const width = Math.ceil((g.measureText(popup.text).width + 12) / SC) * SC;
-      g.globalAlpha = Math.max(0, Math.min(1, (popup.life / popup.maxLife) * 2));
-      g.fillStyle = SCENE_INK;
-      g.fillRect(Math.round(x - width / 2), y - 10, width, 20);
-      g.fillStyle = popup.kind === "perfect" ? NOTE_GOLD : popup.kind === "miss" ? "#f18272" : CREAM;
-      g.fillText(popup.text, x, y + 0.5);
+      const alpha = Math.max(0, Math.min(1, (popup.life / popup.maxLife) * 2));
+      const color = popup.kind === "perfect" ? NOTE_GOLD : popup.kind === "miss" ? "#f18272" : CREAM;
+      drawChipNote(g, popup.text, Math.round(popup.x), popup.y, { color, back: SCENE_INK, pad: 12, alpha, cell: SC });
     }
     g.restore();
   }

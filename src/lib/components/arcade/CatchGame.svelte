@@ -563,7 +563,8 @@
       boxes = focusBoxes;
     }
     // A dark wash reads on the page in either theme.
-    drawSpotlight(ctx, viewW, viewH, boxes, lessonDim, { color: INK, cell: LIGHT_CELL });
+    // Over a page of text the dither stays faint, so the words under it still read as words.
+    drawSpotlight(ctx, viewW, viewH, boxes, lessonDim, { color: INK, cell: LIGHT_CELL, pattern: "flat" });
   }
 
   function drawScene() {

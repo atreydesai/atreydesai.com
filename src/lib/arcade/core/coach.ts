@@ -37,6 +37,18 @@ export interface Lesson {
    * and a hazard about to be met above a power-up but below a move.
    */
   priority?: number;
+  // The coach never reads the fields below: they are for a game that holds
+  // play some other way than slowing it (spill holds its room), carried on
+  // the lesson so the game needn't keep a second record of it.
+  /** It holds the game while it explains (spill: the planning dial, or a room's result). */
+  hold?: boolean;
+  /** False: it offers no Continue, since doing what it asks is how it ends (spill's Pour). */
+  continuable?: boolean;
+  /**
+   * The part of the game it belongs to, which ends it as the next begins
+   * (spill: "plan", "pour", "result", or "any").
+   */
+  during?: string;
 }
 
 export interface Coach {

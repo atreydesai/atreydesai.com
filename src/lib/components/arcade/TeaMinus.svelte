@@ -53,6 +53,7 @@
     addPopup,
     arcadeFont,
     cachedSprite,
+    drawChipNote,
     drawHalo,
     drawLoop,
     drawSprite,
@@ -61,11 +62,13 @@
     type Popup,
   } from "#lib/arcade/art.ts";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
+  import { createControls, keyName, watchTouch } from "#lib/arcade/core/controls.ts";
   import { hexToRgb, mixHex, mixRgb } from "#lib/arcade/core/color.ts";
   import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
   import { beckon, chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import { createFrameLoop, every } from "#lib/arcade/core/loop.ts";
   import { clamp, lerp, smooth, snap } from "#lib/arcade/core/math.ts";
+  import { createPool } from "#lib/arcade/core/pool.ts";
   import { createRng, ihash, noise2 } from "#lib/arcade/core/rng.ts";
   import { emojiRows } from "#lib/arcade/share.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
@@ -453,8 +456,6 @@
   let padFont = popupFont;
   let reduceMotion = false;
   let touchUI = false;
-  let coarse = false;
-  let touchSeen = false;
 
   // Layout, in CSS pixels unless named in units.
   let viewW = 0;
@@ -500,33 +501,8 @@
   let pendingPopups: Array<{ delay: number; x: number; y: number; text: string; kind: "perfect" | "plain" | "gold" }> = [];
   let shake = 0;
 
-  // Input. Each source holds a control on its own, so letting go of one
-  // never lets go of another still held: a key by its name (W and Space
-  // both burn), a hold button by each pointer on it and by a key pressed
-  // while it has focus. A press is also latched until an engine step has
-  // seen it (in a lesson's slow motion, frames can pass without one), and a
-  // touch the browser takes back clears only its own press.
-  /** Keys down, by name, and what they hold. */
-  const keysDown = new Set<string>();
-  const keys: Held = { left: false, right: false, thrust: false };
-  /** Pointers on each hold button, and a key holding it while it has focus. */
-  const padPointers: Record<keyof Held, Set<number>> = { left: new Set(), right: new Set(), thrust: new Set() };
-  const padKeys: Held = { left: false, right: false, thrust: false };
-  /** What the hold buttons hold now (it also draws them pressed). */
+  /** What the hold buttons hold now, which draws them pressed (`input` keeps it; see Input). */
   let touchHeld: Held = { left: false, right: false, thrust: false };
-  /** Presses not yet seen by a step: by key, by a hold button's key, and by pointer. */
-  const pressedKeys: Held = { left: false, right: false, thrust: false };
-  const pressedPadKeys: Held = { left: false, right: false, thrust: false };
-  const pressedPointers = new Map<number, keyof Held>();
-  const pressedPads: Held = { left: false, right: false, thrust: false };
-  function clearPresses() {
-    pressedKeys.left = pressedKeys.right = pressedKeys.thrust = false;
-    pressedPadKeys.left = pressedPadKeys.right = pressedPadKeys.thrust = false;
-    pressedPads.left = pressedPads.right = pressedPads.thrust = false;
-    pressedPointers.clear();
-  }
-  /** The keys as the next engine step sees them. */
-  const input: Held = { left: false, right: false, thrust: false };
 
   /** In development, the engine's autopilot at the keys (`?autoplay`). */
   let autoplay = false;
@@ -595,14 +571,6 @@
     data[index * 4 + 1] = color[1];
     data[index * 4 + 2] = color[2];
     data[index * 4 + 3] = 255;
-  }
-
-  /** The keys held now, and any press a step hasn't seen yet. */
-  function controls() {
-    input.left = keys.left || touchHeld.left || pressedKeys.left || pressedPadKeys.left || pressedPads.left;
-    input.right = keys.right || touchHeld.right || pressedKeys.right || pressedPadKeys.right || pressedPads.right;
-    input.thrust = keys.thrust || touchHeld.thrust || pressedKeys.thrust || pressedPadKeys.thrust || pressedPads.thrust;
-    return input;
   }
 
   // World to screen. World y points up; screen y points down.
@@ -1824,7 +1792,7 @@
 
   // The autopilot (in development) pulses its burn key against the throttle's
   // lag, so its flame follows the throttle itself rather than the key.
-  const thrustHeld = () => keys.thrust || touchHeld.thrust || (autoplay && ship.throttle > 0.12);
+  const thrustHeld = () => input.holding("thrust") || (autoplay && ship.throttle > 0.12);
 
   /** Flame length, ignition and cut-off, embers and smoke, once a frame. */
   function stepFire(dt: number) {
@@ -2001,7 +1969,7 @@
   const P_DUST = 2;
   const P_FIRE = 3;
   const P_TEA = 4;
-  const pool: Particle[] = Array.from({ length: MAX_PARTICLES }, () => ({
+  const particles = createPool<Particle>(MAX_PARTICLES, () => ({
     kind: 0,
     x: 0,
     y: 0,
@@ -2014,11 +1982,10 @@
     seed: 0,
     size: 1,
   }));
-  let live = 0;
 
   function spawn(kind: number, x: number, y: number, vx: number, vy: number, life: number, size = 1) {
-    if (live >= MAX_PARTICLES) return null;
-    const p = pool[live++];
+    const p = particles.spawn();
+    if (!p) return null;
     p.kind = kind;
     p.x = x;
     p.y = y;
@@ -2042,59 +2009,50 @@
     else spawn(P_DUST, x, 0.5, side * speed, rise, life);
   }
 
-  function stepParticles(dt: number) {
-    for (let index = live - 1; index >= 0; index--) {
-      const p = pool[index];
-      p.age += dt;
-      let dead = p.age >= p.life;
-      if (!dead) {
-        switch (p.kind) {
-          case P_EMBER: {
-            p.vy -= GRAVITY * 0.35 * dt;
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            const ground = groundAt(site, p.x);
-            if (p.y < ground) {
-              // Sparks skitter off the ground rather than vanish into it.
-              p.y = ground + 0.5;
-              p.vy = Math.abs(p.vy) * 0.22;
-              p.vx = (p.vx >= 0 ? 1 : -1) * Math.max(Math.abs(p.vx) * 0.7, 20);
-            }
-            break;
-          }
-          case P_SMOKE:
-            p.vx *= Math.max(0, 1 - 1.4 * dt);
-            p.vy = p.vy * Math.max(0, 1 - 1.4 * dt) + 4 * dt;
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            break;
-          case P_DUST:
-            p.x += p.vx * dt;
-            p.vx *= Math.max(0, 1 - 1.9 * dt);
-            p.y += p.vy * dt;
-            p.vy *= Math.max(0, 1 - 1.6 * dt);
-            p.g = groundAt(site, p.x);
-            break;
-          case P_FIRE: {
-            p.vx *= Math.max(0, 1 - 3 * dt);
-            p.vy *= Math.max(0, 1 - 3 * dt);
-            if (p.age / p.life > 0.55) p.vy += 9 * dt;
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            break;
-          }
-          default:
-            p.vy -= GRAVITY * 1.6 * dt;
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            dead = p.y < groundAt(site, p.x);
+  /** One particle's step: false once it has burned out (or its tea has reached the ground). */
+  function stepParticle(p: Particle, dt: number) {
+    p.age += dt;
+    if (p.age >= p.life) return false;
+    switch (p.kind) {
+      case P_EMBER: {
+        p.vy -= GRAVITY * 0.35 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        const ground = groundAt(site, p.x);
+        if (p.y < ground) {
+          // Sparks skitter off the ground rather than vanish into it.
+          p.y = ground + 0.5;
+          p.vy = Math.abs(p.vy) * 0.22;
+          p.vx = (p.vx >= 0 ? 1 : -1) * Math.max(Math.abs(p.vx) * 0.7, 20);
         }
+        return true;
       }
-      if (dead) {
-        pool[index] = pool[live - 1];
-        pool[live - 1] = p;
-        live--;
+      case P_SMOKE:
+        p.vx *= Math.max(0, 1 - 1.4 * dt);
+        p.vy = p.vy * Math.max(0, 1 - 1.4 * dt) + 4 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        return true;
+      case P_DUST:
+        p.x += p.vx * dt;
+        p.vx *= Math.max(0, 1 - 1.9 * dt);
+        p.y += p.vy * dt;
+        p.vy *= Math.max(0, 1 - 1.6 * dt);
+        p.g = groundAt(site, p.x);
+        return true;
+      case P_FIRE: {
+        p.vx *= Math.max(0, 1 - 3 * dt);
+        p.vy *= Math.max(0, 1 - 3 * dt);
+        if (p.age / p.life > 0.55) p.vy += 9 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        return true;
       }
+      default:
+        p.vy -= GRAVITY * 1.6 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        return !(p.y < groundAt(site, p.x));
     }
   }
 
@@ -2113,10 +2071,10 @@
 
   /** Back particles (dust, smoke, embers, tea) under the cup; the fireball in front. */
   function drawParticles(front: boolean) {
-    if (!ctx || !live) return;
+    if (!ctx || !particles.count) return;
     const cs = Math.max(1.5, CELL * S);
-    for (let index = 0; index < live; index++) {
-      const p = pool[index];
+    for (let index = 0; index < particles.count; index++) {
+      const p = particles.items[index];
       if ((p.kind === P_FIRE) !== front) continue;
       const t = p.age / p.life;
       const x = sx(p.x);
@@ -2261,14 +2219,8 @@
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const popup of popups) {
-      const x = Math.round(popup.x);
-      const y = Math.round(popup.y);
-      const width = Math.ceil((ctx.measureText(popup.text).width + 14) / SC) * SC;
-      ctx.globalAlpha = Math.max(0, Math.min(1, (popup.life / popup.maxLife) * 2));
-      ctx.fillStyle = NOTE_BACK;
-      ctx.fillRect(Math.round(x - width / 2), y - 10, width, 20);
-      ctx.fillStyle = popup.kind === "gold" ? NOTE_GOLD : CREAM;
-      ctx.fillText(popup.text, x, y + 0.5);
+      const alpha = Math.max(0, Math.min(1, (popup.life / popup.maxLife) * 2));
+      drawChipNote(ctx, popup.text, Math.round(popup.x), popup.y, { color: popup.kind === "gold" ? NOTE_GOLD : CREAM, alpha, cell: SC });
     }
     ctx.restore();
   }
@@ -2434,7 +2386,7 @@
     lastBeep = -10;
     emptyNoted = false;
     path = { points: [ship.x, ship.y], ticks: [], crashed: false };
-    live = 0;
+    particles.clear();
     slices = [];
     spilled = [];
     landedLoop = null;
@@ -2453,7 +2405,7 @@
     mode = "flying";
     modeTime = 0;
     // A key tapped before the flight doesn't carry into it as a press.
-    clearPresses();
+    input.clearPresses();
     lessons.start({ revived: landerBlink > 0 });
     if (autoplay) autopilot = createPilot(richestPad(), ship);
     showIntro();
@@ -2656,7 +2608,7 @@
 
   function stepEffects(dt: number) {
     stepFire(dt);
-    stepParticles(dt);
+    particles.step(stepParticle, dt);
     flash = Math.max(0, flash - dt);
 
     // Slices tumble in the low gravity, bounce, and settle lying down.
@@ -2726,8 +2678,8 @@
     accumulator += dt;
     while (accumulator >= STEP) {
       accumulator -= STEP;
-      const held = autoplay ? autoplayInput() : controls();
-      clearPresses();
+      const held = autoplay ? autoplayInput() : input.read();
+      input.clearPresses();
       keepBefore();
       const result = stepShip(ship, held, site, flightTime, STEP, ceiling);
       flightTime += STEP;
@@ -2852,6 +2804,19 @@
     " ": "thrust",
   };
 
+  // Each source holds a control on its own, so letting go of one never lets
+  // go of another still held: a key by its name (W and Space both burn), a
+  // hold button by each pointer on it and by a key pressed while it has
+  // focus. A press is also latched until an engine step has seen it (in a
+  // lesson's slow motion, frames can pass without one), and a touch the
+  // browser takes back clears only its own press.
+  const input = createControls<keyof Held>({
+    names: ["left", "right", "thrust"],
+    keys: KEY_CONTROLS,
+    enabled: () => !paused && !gameOver,
+    onPads: (pads) => (touchHeld = pads),
+  });
+
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === "Tab") {
       onPlayfieldTab(event);
@@ -2859,7 +2824,7 @@
     }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (gameOver || paused) return;
-    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    const key = keyName(event);
     // A focused control keeps Space and Enter for itself.
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
     // Enter (on the playfield) ends the explanation that is up; a held
@@ -2869,111 +2834,29 @@
       if (!event.repeat) continueLesson();
       return;
     }
-    const control = KEY_CONTROLS[key];
     if (key === "Enter") {
       if (!event.repeat) trySkip();
       return;
     }
-    if (!control) return;
+    if (!input.control(key)) return;
     // Arrows and Space never scroll the page underneath.
     event.preventDefault();
-    keysDown.add(key);
-    syncKeys();
+    input.keyDown(key, !event.repeat);
     if (event.repeat) return;
-    pressedKeys[control] = true;
     // A press that moves on to the next flight is held there, not counted as a tap in it.
     trySkip();
   }
 
   function onKeyUp(event: KeyboardEvent) {
-    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-    if (keysDown.delete(key)) syncKeys();
-  }
-
-  /** What the keys down hold: a control stays held while any of its keys is. */
-  function syncKeys() {
-    keys.left = keys.right = keys.thrust = false;
-    for (const key of keysDown) {
-      const control = KEY_CONTROLS[key];
-      if (control) keys[control] = true;
-    }
-  }
-
-  /** What the hold buttons hold: any pointer on one, or a key on it while it has focus. */
-  function syncPads() {
-    const left = padPointers.left.size > 0 || padKeys.left;
-    const right = padPointers.right.size > 0 || padKeys.right;
-    const thrust = padPointers.thrust.size > 0 || padKeys.thrust;
-    if (left !== touchHeld.left || right !== touchHeld.right || thrust !== touchHeld.thrust) touchHeld = { left, right, thrust };
-  }
-
-  /** The presses by pointer still waiting for a step, by control. */
-  function syncPointerPresses() {
-    pressedPads.left = pressedPads.right = pressedPads.thrust = false;
-    for (const control of pressedPointers.values()) pressedPads[control] = true;
-  }
-
-  function releaseAll() {
-    keysDown.clear();
-    syncKeys();
-    for (const control of ["left", "right", "thrust"] as const) {
-      padPointers[control].clear();
-      padKeys[control] = false;
-    }
-    clearPresses();
-    syncPads();
+    input.keyUp(keyName(event));
   }
 
   function padDown(event: PointerEvent, control: keyof Held) {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    event.preventDefault();
-    if (paused || gameOver) return;
-    const target = event.currentTarget as HTMLElement;
-    try {
-      target.setPointerCapture(event.pointerId);
-    } catch {
-      // Capture is a nicety; the up and cancel handlers still release.
-    }
-    padPointers[control].add(event.pointerId);
-    pressedPointers.set(event.pointerId, control);
-    syncPointerPresses();
-    syncPads();
-    trySkip();
+    if (input.padDown(event, control)) trySkip();
   }
 
-  /** A pointer lifted (or its capture lost) lets go of its own hold only. */
-  function padUp(event: PointerEvent, control: keyof Held) {
-    if (padPointers[control].delete(event.pointerId)) syncPads();
-  }
-
-  /** A touch the browser took back (a scroll, a system gesture) never counts as a press, and ends only its own hold. */
-  function padCancel(event: PointerEvent, control: keyof Held) {
-    padPointers[control].delete(event.pointerId);
-    if (pressedPointers.delete(event.pointerId)) syncPointerPresses();
-    syncPads();
-  }
-
-  /** Space or Enter on a focused hold button holds it, as a key of its own. */
   function padKey(event: KeyboardEvent, control: keyof Held, down: boolean) {
-    if (event.key !== " " && event.key !== "Enter") return;
-    event.preventDefault();
-    if (down) {
-      if (event.repeat || paused || gameOver) return;
-      padKeys[control] = true;
-      pressedPadKeys[control] = true;
-      syncPads();
-      trySkip();
-    } else {
-      padKeys[control] = false;
-      syncPads();
-    }
-  }
-
-  /** Focus leaving a hold button ends the key's hold on it, not a pointer's. */
-  function padBlur(control: keyof Held) {
-    if (!padKeys[control]) return;
-    padKeys[control] = false;
-    syncPads();
+    if (input.padKey(event, control, down)) trySkip();
   }
 
   function onStagePointer(event: PointerEvent) {
@@ -2987,7 +2870,7 @@
   async function pauseGame() {
     if (gameOver || paused) return;
     paused = true;
-    releaseAll();
+    input.releaseAll();
     setThruster(0);
     setMusicPaused(true);
     liveMessage = "The game is paused.";
@@ -3037,7 +2920,7 @@
     gameOver = true;
     mode = "over";
     lessons.end();
-    releaseAll();
+    input.releaseAll();
     setThruster(0);
     const result = concludeRun("lander", score);
     localBest = result.best;
@@ -3103,7 +2986,7 @@
   function restart() {
     stopMusic();
     timers.clear();
-    releaseAll();
+    input.releaseAll();
     paused = false;
     gameOver = false;
     newMission();
@@ -3431,14 +3314,6 @@
     draw();
   }
 
-  async function syncTouchUI() {
-    const next = coarse || touchSeen;
-    if (next === touchUI) return;
-    touchUI = next;
-    await tick();
-    sizeCanvas();
-  }
-
   onMount(() => {
     popupFont = arcadeFont();
     padFont = arcadeFont(13, 500);
@@ -3455,24 +3330,17 @@
       onReduceMotion: (reduce) => (reduceMotion = reduce),
     });
 
-    const coarseQuery = window.matchMedia("(hover: none) and (pointer: coarse)");
-    const onCoarse = () => {
-      coarse = coarseQuery.matches;
-      void syncTouchUI();
-    };
-    const onFirstTouch = (event: PointerEvent) => {
-      if (event.pointerType !== "touch" || touchSeen) return;
-      touchSeen = true;
-      void syncTouchUI();
-    };
-    coarse = coarseQuery.matches;
-    touchUI = coarse;
-    coarseQuery.addEventListener("change", onCoarse);
-    window.addEventListener("pointerdown", onFirstTouch, true);
+    // The hold buttons come and go with touch; the play area then ends above them.
+    const touchWatch = watchTouch(async (touch) => {
+      touchUI = touch;
+      await tick();
+      sizeCanvas();
+    });
+    touchUI = touchWatch.touch;
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     // Held keys never outlive the window's focus.
-    window.addEventListener("blur", releaseAll);
+    window.addEventListener("blur", input.releaseAll);
 
     // Straight to the countdown: the game teaches in flight.
     newMission();
@@ -3492,11 +3360,10 @@
       timers.clear();
       setThruster(0);
       stopMusic();
-      coarseQuery.removeEventListener("change", onCoarse);
-      window.removeEventListener("pointerdown", onFirstTouch, true);
+      touchWatch.stop();
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", releaseAll);
+      window.removeEventListener("blur", input.releaseAll);
       unmountShell();
     };
   });
@@ -3601,12 +3468,12 @@
           style="--tilt: -1.4deg"
           aria-label="Tilt left"
           on:pointerdown={(event) => padDown(event, "left")}
-          on:pointerup={(event) => padUp(event, "left")}
-          on:pointercancel={(event) => padCancel(event, "left")}
-          on:lostpointercapture={(event) => padUp(event, "left")}
+          on:pointerup={(event) => input.padUp(event, "left")}
+          on:pointercancel={(event) => input.padCancel(event, "left")}
+          on:lostpointercapture={(event) => input.padUp(event, "left")}
           on:keydown={(event) => padKey(event, "left", true)}
           on:keyup={(event) => padKey(event, "left", false)}
-          on:blur={() => padBlur("left")}
+          on:blur={() => input.padBlur("left")}
           on:contextmenu={(event) => event.preventDefault()}
         >
           <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -3622,12 +3489,12 @@
           style="--tilt: 1.2deg"
           aria-label="Tilt right"
           on:pointerdown={(event) => padDown(event, "right")}
-          on:pointerup={(event) => padUp(event, "right")}
-          on:pointercancel={(event) => padCancel(event, "right")}
-          on:lostpointercapture={(event) => padUp(event, "right")}
+          on:pointerup={(event) => input.padUp(event, "right")}
+          on:pointercancel={(event) => input.padCancel(event, "right")}
+          on:lostpointercapture={(event) => input.padUp(event, "right")}
           on:keydown={(event) => padKey(event, "right", true)}
           on:keyup={(event) => padKey(event, "right", false)}
-          on:blur={() => padBlur("right")}
+          on:blur={() => input.padBlur("right")}
           on:contextmenu={(event) => event.preventDefault()}
         >
           <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
@@ -3644,12 +3511,12 @@
         style="--tilt: -0.9deg"
         aria-label="Burn"
         on:pointerdown={(event) => padDown(event, "thrust")}
-        on:pointerup={(event) => padUp(event, "thrust")}
-        on:pointercancel={(event) => padCancel(event, "thrust")}
-        on:lostpointercapture={(event) => padUp(event, "thrust")}
+        on:pointerup={(event) => input.padUp(event, "thrust")}
+        on:pointercancel={(event) => input.padCancel(event, "thrust")}
+        on:lostpointercapture={(event) => input.padUp(event, "thrust")}
         on:keydown={(event) => padKey(event, "thrust", true)}
         on:keyup={(event) => padKey(event, "thrust", false)}
-        on:blur={() => padBlur("thrust")}
+        on:blur={() => input.padBlur("thrust")}
         on:contextmenu={(event) => event.preventDefault()}
       >
         <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">

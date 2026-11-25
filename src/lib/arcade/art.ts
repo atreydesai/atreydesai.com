@@ -3,6 +3,8 @@
 // drawn as a riso mark reads its colors from `risoColors()` so it follows the
 // theme.
 
+import { mixHex } from "./core/color.ts";
+
 type Palette = Record<string, string>;
 type Grid = string[];
 
@@ -578,6 +580,49 @@ export function drawPopups(ctx: CanvasRenderingContext2D, list: Popup[], font: s
   ctx.restore();
 }
 
+/** A note's chip width: the text plus `pad`, rounded up to whole cells. */
+export const chipWidth = (ctx: CanvasRenderingContext2D, text: string, pad = 14, cell = 4) =>
+  Math.ceil((ctx.measureText(text).width + pad) / cell) * cell;
+
+export interface ChipNote {
+  /** The text's colour. */
+  color: string;
+  /** The chip's colour. */
+  back?: string;
+  /** Room around the text, both sides together, before the chip rounds up to whole cells. */
+  pad?: number;
+  cell?: number;
+  /** The text's opacity, and the chip's (the text's unless given). */
+  alpha?: number;
+  backAlpha?: number;
+  /** The chip's width, when the caller has measured it already (to keep the chip on screen). */
+  width?: number;
+}
+
+/**
+ * A canvas popup as the scenes write one: `text` on a 20 px chip of `back`,
+ * centred on (`x`, `y`) at the nearest pixel, so it reads over any part of
+ * a scene. Sets only `globalAlpha` and `fillStyle`; the caller sets the
+ * font, `textAlign = "center"` and `textBaseline = "middle"` (once for a
+ * batch of notes) and restores the context after.
+ */
+export function drawChipNote(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  { color, back = NOTE_BACK, pad = 14, cell = 4, alpha = 1, backAlpha = alpha, width }: ChipNote,
+) {
+  const chip = width ?? chipWidth(ctx, text, pad, cell);
+  const middle = Math.round(y);
+  ctx.globalAlpha = backAlpha;
+  ctx.fillStyle = back;
+  ctx.fillRect(Math.round(x - chip / 2), middle - 10, chip, 20);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.fillText(text, Math.round(x), middle + 0.5);
+}
+
 /**
  * Forgets every cached sprite, so each is painted afresh on its next use. A
  * browser may drop the pixels of offscreen canvases while a page is hidden;
@@ -610,6 +655,50 @@ export const ICON_LOCK: Grid = [
   "LLL.LLL",
   "LLLLLLL",
 ];
+
+// --- The boba-cup balloon ---------------------------------------------------------
+
+/**
+ * A hot-air balloon shaped like a boba cup, its straw up top and a basket
+ * on ropes below, 11 by 19: once a run in cup stack's open sky, and now and
+ * then far off over sugar rush's city.
+ */
+export const BALLOON: Grid = [
+  ".....S.....",
+  ".....S.....",
+  "...OOSOO...",
+  "..OlllllO..",
+  ".OlllllllO.",
+  "OOOOOOOOOOO",
+  "OhLLLLLLLLO",
+  "OhLLLLLLLLO",
+  "OhLLLLLLLLO",
+  ".OLLLLLLLO.",
+  ".OLbLLLbLO.",
+  ".OLLLbLLLO.",
+  "..ObLLLbO..",
+  "..OLLbLLO..",
+  "...OOOOO...",
+  "...r...r...",
+  "....r.r....",
+  "....KKK....",
+  "....kkk....",
+];
+
+/** The balloon in a drink's colour, its outline softer than the cups', so it stays behind them. */
+export function balloonPalette(liquid: string): Palette {
+  return {
+    S: STRAW_PINK,
+    O: mixHex(liquid, INK, 0.55),
+    l: LID,
+    L: liquid,
+    h: mixHex(liquid, CREAM, 0.4),
+    b: mixHex(PEARL, liquid, 0.2),
+    r: "#6f4530",
+    K: "#8a5a3c",
+    k: "#6f4530",
+  };
+}
 
 // --- Sugar rush's spare cup ------------------------------------------------------
 

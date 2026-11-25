@@ -1,7 +1,10 @@
 // The frame loop every game runs: one requestAnimationFrame chain, real
 // seconds since the last frame (capped, so a slow frame or a tab coming
 // back never leaps the game ahead), no stepping while paused but still
-// drawing, and a clean stop on close.
+// drawing, and a clean stop on close. A game whose rules step at a fixed
+// rate counts its steps per frame with `frameSteps`.
+
+import { clamp } from "./math.ts";
 
 export interface FrameLoopOptions {
   /** Steps the game by `dt` (capped) real seconds; `rawDt` is uncapped. */
@@ -94,4 +97,21 @@ export function every(seconds: number) {
     elapsed = 0;
     return true;
   };
+}
+
+/**
+ * A fixed-step clock's frame: adds a frame's elapsed seconds (clamped to
+ * `maxFrame`; a negative or missing time counts as none) to what was left
+ * over, and says how many steps of `step` seconds to run now, what is left
+ * for the next frame, and how far between the last two steps to draw (0 to 1).
+ * @param accumulator Seconds left over from the last frame.
+ * @param elapsed Seconds since the last frame.
+ */
+export function frameSteps(accumulator: number, elapsed: number, step: number, maxFrame: number) {
+  const add = Number.isFinite(elapsed) ? clamp(elapsed, 0, maxFrame) : 0;
+  const total = (Number.isFinite(accumulator) ? clamp(accumulator, 0, step) : 0) + add;
+  // A hair of slack, so 1/120 of a second added 120 times is 120 steps.
+  const steps = Math.floor(total / step + 1e-6);
+  const left = Math.max(0, total - steps * step);
+  return { steps, accumulator: left, alpha: clamp(left / step, 0, 1) };
 }

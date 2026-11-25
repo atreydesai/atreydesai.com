@@ -803,7 +803,7 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   piece get one line as they come into view; the first slosh says what
   spilled tea costs. The sugar rush names itself the first time the meter is
   full. A tap is held until the run has seen it, so slow motion never eats
-  one.
+  one, and each key, pointer and pad holds on its own.
 - **Sharing** pastes the distance, each coaster as a cup (full, part, or
   missed), and the cups lost, then what ended the run.
 
@@ -905,10 +905,16 @@ room, to steer it into the cup.
   `rng` (the seeded mulberry32 and position hashes every scene is seeded
   by, pinned by tests so nothing seeded ever moves), `color`, `dither` (the
   Bayer threshold and the dithered band sky), `loop` (the frame loop: capped
-  steps, paused drawing, a clean stop), `pool`, `coach` and `ghost` (the
-  teaching), and `sprite-stack`. Palette values shared across scenes
-  (cream, the accent, the halo, the popup chip, gold) are in `art.ts`. A game
-  keeps a local helper only where the shared one would change what it draws.
+  steps, paused drawing, a clean stop; and `frameSteps`, a fixed-step
+  clock's steps per frame), `pool` (particles, walked last to first, which
+  is the order they are drawn in), `controls` (keys held and on-screen hold
+  buttons, each source holding on its own, presses latched until a step
+  sees them, and when to show the buttons on touch), `city` (the skylines,
+  seeded cell by cell), `coach` and `ghost` (the teaching), and
+  `sprite-stack`. Palette values shared across scenes (cream, the accent,
+  the halo, the popup chip, gold), the boba-cup balloon, and `drawChipNote`
+  (a popup on its dark chip) are in `art.ts`. A game keeps a local helper
+  only where the shared one would change what it draws.
 - **Sprite stacking, sparingly.** `sprite-stack.ts` builds a round object
   from slices (`latheSlices`, one disc per layer of its profile), turns
   every slice by the same angle with nearest-neighbour sampling, squashes

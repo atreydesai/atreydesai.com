@@ -13,7 +13,7 @@
 // guests appear in place, their faces still change, and they stand a moment
 // before they go.
 
-import { NOTE_GOLD, SPRITE_PAD, addParticle, cachedSprite, drawParticles, stepParticles, type Particle } from "./art";
+import { NOTE_GOLD, SPRITE_PAD, addParticle, cachedSprite, chipWidth, drawChipNote, drawParticles, stepParticles, type Particle } from "./art";
 import { JAR_SIZE, waitingMood } from "./orders-engine.js";
 import type { Reaction, WaitMood } from "./orders-engine.js";
 import { COIN, EMOTES, FIGURE_ABOVE, FIGURE_W, JAR, JAR_H, JAR_W, TAKEAWAY, dropFor, figure } from "./orders-guests.js";
@@ -394,14 +394,11 @@ export class Crowd {
       g.textAlign = "center";
       g.textBaseline = "middle";
       for (const note of this.notes) {
-        const width = Math.ceil((g.measureText(note.text).width + 12) / 4) * 4;
+        // Kept on the screen: the chip's width is measured first.
+        const width = chipWidth(g, note.text, 12);
         const x = Math.round(Math.max(width / 2 + 2, Math.min(this.width - width / 2, note.x)));
-        const y = Math.round(Math.max(10, note.y));
-        g.globalAlpha = Math.max(0, Math.min(1, (note.life / note.maxLife) * 2));
-        g.fillStyle = NOTE_INK;
-        g.fillRect(Math.round(x - width / 2), y - 10, width, 20);
-        g.fillStyle = NOTE_GOLD;
-        g.fillText(note.text, x, y + 0.5);
+        const alpha = Math.max(0, Math.min(1, (note.life / note.maxLife) * 2));
+        drawChipNote(g, note.text, x, Math.max(10, note.y), { color: NOTE_GOLD, back: NOTE_INK, alpha, width });
       }
       g.restore();
     }

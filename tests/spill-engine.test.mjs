@@ -36,7 +36,6 @@ import {
   expertRoom,
   extendStroke,
   createRng,
-  frameSteps,
   judgeCup,
   judgeRoom,
   mirrorRoom,
@@ -62,6 +61,7 @@ import {
   strokeAt,
   unlockedRooms,
 } from "../src/lib/arcade/spill-engine.js";
+import { frameSteps } from "../src/lib/arcade/core/loop.ts";
 
 /**
  * A bare room for testing one thing at a time: a kettle, a cup far away in
@@ -653,14 +653,14 @@ test("a droplet squeezed out of a block keeps its slide along the face", () => {
 });
 
 test("the screen's frame clock catches up at most MAX_FRAME, never runs backwards, and draws between steps", () => {
-  let clock = frameSteps(0, 1 / 60);
+  let clock = frameSteps(0, 1 / 60, STEP, MAX_FRAME);
   assert.equal(clock.steps, 2);
   assert.ok(clock.alpha >= 0 && clock.alpha < 1);
   // A slow frame or a tab back from hiding: a few steps, not a backlog.
-  clock = frameSteps(clock.accumulator, 30);
+  clock = frameSteps(clock.accumulator, 30, STEP, MAX_FRAME);
   assert.equal(clock.steps, Math.floor(MAX_FRAME / STEP + 1e-6));
   for (const bad of [-1, Number.NaN, Infinity, undefined]) {
-    const next = frameSteps(STEP / 2, /** @type {number} */ (bad));
+    const next = frameSteps(STEP / 2, /** @type {number} */ (bad), STEP, MAX_FRAME);
     assert.ok(next.steps <= Math.ceil(MAX_FRAME / STEP));
     assert.ok(next.alpha >= 0 && next.alpha <= 1);
   }
@@ -668,7 +668,7 @@ test("the screen's frame clock catches up at most MAX_FRAME, never runs backward
   let acc = 0;
   let total = 0;
   for (let k = 0; k < 120; k++) {
-    const next = frameSteps(acc, 1 / 120);
+    const next = frameSteps(acc, 1 / 120, STEP, MAX_FRAME);
     acc = next.accumulator;
     total += next.steps;
   }
