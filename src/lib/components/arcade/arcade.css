@@ -249,6 +249,18 @@ body.boba-active .custom-cursor {
   line-height: 1.25;
 }
 
+/* A ticket line that comes and goes (a combo, a streak) keeps its height
+   while empty: games lay their scene out under the tickets, so a ticket that
+   grew and shrank mid-run would move the whole scene. */
+.boba-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  height: 1rem;
+  overflow: visible;
+  white-space: nowrap;
+}
+
 .boba-combo {
   display: inline-block;
   color: var(--b-muted);

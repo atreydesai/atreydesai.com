@@ -2425,13 +2425,15 @@
         <span class="boba-big">{String(stacked).padStart(2, "0")}</span>
         <span class="boba-stack">
           <span class="boba-meta">cups high</span>
-          {#if streak > 0}
-            {#key streak}
-              <span class="boba-combo" class:active={streak > 1}>
-                {streak > 1 ? `×${streak} perfect` : "perfect"}
-              </span>
-            {/key}
-          {/if}
+          <span class="boba-line">
+            {#if streak > 0}
+              {#key streak}
+                <span class="boba-combo" class:active={streak > 1}>
+                  {streak > 1 ? `×${streak} perfect` : "perfect"}
+                </span>
+              {/key}
+            {/if}
+          </span>
         </span>
         <ExpertTag />
       </div>

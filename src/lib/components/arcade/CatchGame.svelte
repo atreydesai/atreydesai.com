@@ -1460,11 +1460,13 @@
       <span class="boba-big">{String(score).padStart(3, "0")}</span>
       <span class="boba-stack">
         <span class="boba-meta">points</span>
-        {#if combo > 1}
-          {#key combo}
-            <span class="boba-combo active">×{combo} combo</span>
-          {/key}
-        {/if}
+        <span class="boba-line">
+          {#if combo > 1}
+            {#key combo}
+              <span class="boba-combo active">×{combo} combo</span>
+            {/key}
+          {/if}
+        </span>
       </span>
       <ExpertTag />
     </div>

@@ -3978,14 +3978,19 @@
         <span class="boba-stack sr-score">
           <span class="boba-big">{String(score).padStart(5, "0")}</span>
           <ExpertTag />
-          {#if streak > 0}
-            <span class="boba-meta">streak {streak}</span>
-          {/if}
-          {#if combo > 1}
-            {#key combo}
-              <span class="boba-combo active">pearls ×{combo}</span>
-            {/key}
-          {/if}
+          <!-- One line that always keeps its height, empty or not: the scene
+               is laid out under the tickets, so a ticket that grew and shrank
+               as a combo came and went would move the whole city. -->
+          <span class="boba-line">
+            {#if streak > 0}
+              <span class="boba-meta">streak {streak}</span>
+            {/if}
+            {#if combo > 1}
+              {#key combo}
+                <span class="boba-combo active">pearls ×{combo}</span>
+              {/key}
+            {/if}
+          </span>
         </span>
       </div>
 
