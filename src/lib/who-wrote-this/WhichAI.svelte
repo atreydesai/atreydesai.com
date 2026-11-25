@@ -229,6 +229,14 @@
 	let fontsV = $state(0);
 	let bw = $state(0), bh = $state(0), kw = $state(0), kh = $state(0), fw = $state(0);
 	let hov = $state.raw<BarIt | null>(null); // raw: the leave test compares it with the bar itself (a proxy never equals it)
+	// a touch anywhere but a bar closes the bar's card (before, only the same bar did: on a phone the card stayed over the
+	// chart); a touch on another bar moves it there, as before
+	$effect(() => {
+		if (!hov) return;
+		const off = (e: PointerEvent) => { if (e.pointerType !== "mouse" && !(e.target as Element | null)?.closest?.(".hit")) hov = null; };
+		addEventListener("pointerdown", off, { passive: true });
+		return () => removeEventListener("pointerdown", off);
+	});
 	let tapType = "mouse";
 	let root: HTMLElement, body: HTMLElement, barsBlk: HTMLElement, boardBlk: HTMLElement;
 
@@ -675,6 +683,9 @@
 		.c-q { font-size: 13.5px; }
 		.ph.photo { width: 46px; height: 61px; }
 	}
+	/* a wide screen: the section rail (SectionNav, fixed 10 px from the left, about 30 px wide) sits beside the frame; up
+	   to about 1400 px the frame's 16 px gutter put the lab names under it */
+	@media (min-width: 981px) { .wa { --gut: max(56px, calc(50vw - 40rem)); } }
 	/* tablets: the section rail (SectionNav, 10 px up, 57 px tall) sits bottom-left; keep the frame clear of it */
 	@media (min-width: 601px) and (max-width: 979px) { .frame { bottom: 74px; } }
 	.still .cap-t, .still .ev, .still .keyw, .still .track, .still .bv, .still .n, .still .nm, .still .draw, .still .share, .still .th, .still .node { transition: none; }
