@@ -9,7 +9,6 @@ import {
   catchRules,
   clampSpawnCenter,
   createLives,
-  demoTarget,
   difficultyAt,
   dropPearl,
   formatShift,
@@ -332,20 +331,6 @@ test("a planned throw is always fair to the cups already in the air", () => {
   // Nowhere fair to land: it waits.
   const wall = Array.from({ length: 40 }, (_, i) => ({ time: 0.3 + i * 0.1, center: (i % 2) * 1200 + 40 }));
   assert.equal(planThrow(difficulty, { x: 600, y: 300 }, field, wall, 0, rand), null);
-});
-
-test("the demo goes for the next cup, or a golden one landing just after it", () => {
-  assert.equal(demoTarget([], 0), null);
-  assert.equal(demoTarget([{ time: 1, center: 100 }], 2), null);
-  const plain = [
-    { time: 3, center: 600 },
-    { time: 2, center: 300 },
-  ];
-  assert.equal(demoTarget(plain, 0)?.center, 300);
-  const golden = [...plain, { time: 2.2, center: 900, golden: true }];
-  assert.equal(demoTarget(golden, 0)?.center, 900);
-  const lateGolden = [...plain, { time: 2.6, center: 900, golden: true }];
-  assert.equal(demoTarget(lateGolden, 0)?.center, 300);
 });
 
 test("spawn centers and horizontal bounces remain inside the playfield", () => {

@@ -160,3 +160,84 @@ export function beckon(seconds: number, reduce = false, period = 1.4) {
   if (reduce) return 1;
   return 0.5 + 0.5 * Math.sin((seconds / period) * Math.PI * 2);
 }
+
+export interface FocusBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * The lesson's spotlight: everything outside the `focus` boxes is dimmed by
+ * a flat wash of `color` (up to `strength` × 0.5 alpha), the boxes stay at
+ * full light, and between them a one-step band at half the wash makes a
+ * pixel-stepped edge rather than a soft one. Boxes are in canvas units and
+ * snap outward to the `cell` grid. `strength` 0..1 eases it in and out.
+ */
+export function drawSpotlight(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  focus: readonly FocusBox[],
+  strength: number,
+  { color = "#141a2e", cell = 4, edge = 2 }: { color?: string; cell?: number; edge?: number } = {},
+) {
+  if (strength <= 0.01) return;
+  const band = edge * cell;
+  // Snap each box outward to the grid, inner (lit) and outer (band), then
+  // merge any that touch: an even-odd fill would darken an overlap.
+  let count = 0;
+  for (const box of focus) {
+    if (box.w <= 0 || box.h <= 0) continue;
+    const r = rects[count] ?? (rects[count] = { x0: 0, y0: 0, x1: 0, y1: 0 });
+    r.x0 = Math.floor(box.x / cell) * cell;
+    r.y0 = Math.floor(box.y / cell) * cell;
+    r.x1 = Math.ceil((box.x + box.w) / cell) * cell;
+    r.y1 = Math.ceil((box.y + box.h) / cell) * cell;
+    count++;
+  }
+  for (let merged = true; merged; ) {
+    merged = false;
+    for (let i = 0; i < count && !merged; i++) {
+      for (let j = i + 1; j < count && !merged; j++) {
+        const a = rects[i];
+        const b = rects[j];
+        // Their bands overlap, so their lit areas join into one.
+        if (a.x0 - band < b.x1 + band && b.x0 - band < a.x1 + band && a.y0 - band < b.y1 + band && b.y0 - band < a.y1 + band) {
+          a.x0 = Math.min(a.x0, b.x0);
+          a.y0 = Math.min(a.y0, b.y0);
+          a.x1 = Math.max(a.x1, b.x1);
+          a.y1 = Math.max(a.y1, b.y1);
+          rects[j] = rects[count - 1];
+          rects[count - 1] = b;
+          count--;
+          merged = true;
+        }
+      }
+    }
+  }
+  ctx.save();
+  ctx.fillStyle = color;
+  // The full wash, outside the boxes and their band.
+  ctx.globalAlpha = 0.5 * strength;
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  for (let i = 0; i < count; i++) {
+    const r = rects[i];
+    ctx.rect(r.x0 - band, r.y0 - band, r.x1 - r.x0 + band * 2, r.y1 - r.y0 + band * 2);
+  }
+  ctx.fill("evenodd");
+  // Half the wash on the band, so the light steps down rather than cuts.
+  ctx.globalAlpha = 0.25 * strength;
+  ctx.beginPath();
+  for (let i = 0; i < count; i++) {
+    const r = rects[i];
+    ctx.rect(r.x0 - band, r.y0 - band, r.x1 - r.x0 + band * 2, r.y1 - r.y0 + band * 2);
+    ctx.rect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+  }
+  ctx.fill("evenodd");
+  ctx.restore();
+}
+
+const rects: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];

@@ -25,6 +25,14 @@ test("a lesson eases play into slow motion and back out once it is done", () => 
   assert.equal(coach.offer(JUMP), false, "a learned lesson is not shown again");
 });
 
+test("a slow device still slows: the scale applies to the game's own capped step", () => {
+  const coach = createCoach("runner", { persist: false });
+  coach.offer(JUMP);
+  for (let i = 0; i < 20; i++) coach.step(0.2, 0.05);
+  const game = coach.step(0.2, 0.05);
+  assert.ok(game < 0.02, `a 5 fps frame ran ${game} game seconds`);
+});
+
 test("game time runs slower than real time while a lesson holds", () => {
   const coach = createCoach("runner", { persist: false });
   coach.offer(JUMP);
@@ -39,6 +47,24 @@ test("one lesson at a time, and a lesson done before it shows is skipped", () =>
   coach.offer(JUMP);
   assert.equal(coach.offer({ id: "glide", text: "glide" }), false);
   assert.equal(coach.current.id, "jump");
+});
+
+test("a move nobody makes ends after its life uncounted, to be taught again", () => {
+  const coach = createCoach("runner", { persist: false });
+  coach.offer({ id: "slam", text: "Slam it.", move: true, life: 2, slow: 0.3 });
+  run(coach, 3);
+  assert.equal(coach.current, null);
+  assert.equal(coach.learned("slam"), false);
+  assert.equal(coach.scale > 0.9, true, "play is back at speed");
+});
+
+test("a move being attempted isn't ended by its life; the game judges it", () => {
+  const coach = createCoach("runner", { persist: false });
+  coach.offer({ id: "slam", text: "Slam it.", move: true, life: 1, slow: 0.3 });
+  coach.acted("slam");
+  run(coach, 2);
+  assert.equal(coach.current?.id, "slam");
+  assert.equal(coach.learned("slam"), false);
 });
 
 test("a lesson nobody does still ends after its life, and counts as seen", () => {

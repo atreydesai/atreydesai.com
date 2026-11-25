@@ -188,7 +188,7 @@ export function throwVelocity(difficulty, { spawnBottom, catchLine }, rand = Mat
  * @param {number} left
  * @param {number} right
  */
-function foldInto(position, left, right) {
+export function foldInto(position, left, right) {
   const span = right - left;
   if (span <= 0) return left;
   const period = span * 2;
@@ -270,24 +270,6 @@ export function planThrow(difficulty, spawn, field, others, now, rand = Math.ran
     if (isFairLanding(at, others, basketWidth)) return { vx, vy, kind, landAt: at.time, landCenter: at.center };
   }
   return null;
-}
-
-/**
- * Where the demo's basket heads: the next cup to land, unless a golden cup
- * lands just after it, which it goes for instead (a little greedy, like a
- * person). Null when nothing is coming.
- * @param {Array<{ time: number, center: number, golden?: boolean }>} landings
- * @param {number} now
- */
-export function demoTarget(landings, now) {
-  const ahead = landings.filter((landing) => landing.time >= now).sort((a, b) => a.time - b.time);
-  if (!ahead.length) return null;
-  const next = ahead[0];
-  if (!next.golden) {
-    const golden = ahead.find((landing) => landing.golden && landing.time - next.time < 0.3);
-    if (golden) return golden;
-  }
-  return next;
 }
 
 // --- The playfield --------------------------------------------------------------

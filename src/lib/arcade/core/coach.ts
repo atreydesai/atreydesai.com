@@ -75,8 +75,13 @@ export interface Coach {
   reset(): void;
   /** Counts a lesson as learned without showing it (the player already knows). */
   skip(id: string): void;
-  /** Advances by real seconds; returns the game's seconds for this frame. */
-  step(realDt: number): number;
+  /**
+   * Advances lessons by `realDt`, the real seconds since the last frame
+   * (uncapped, so a hold lasts as long on a slow device as a fast one), and
+   * returns this frame's game seconds: `gameDt` (the game's own capped
+   * step, real seconds by default) at the lesson's time scale.
+   */
+  step(realDt: number, gameDt?: number): number;
 }
 
 const STORE_KEY = "boba_coach_v1";
@@ -182,8 +187,9 @@ export function createCoach(game: GameId, { persist = true } = {}): Coach {
       if (current && leaving && !lesson.move) return false;
       if (current && !leaving) {
         if (priorityOf(lesson) <= priorityOf(current)) return false;
-        // A lesson interrupted counts as seen only if it was up long enough to read.
-        if (age >= (current.minLife ?? DEFAULT_MIN_LIFE)) count(current.id);
+        // A thing interrupted counts as seen if it was up long enough to read;
+        // a move never counts until it has worked.
+        if (!current.move && age >= (current.minLife ?? DEFAULT_MIN_LIFE)) count(current.id);
       }
       current = lesson;
       age = 0;
@@ -215,26 +221,36 @@ export function createCoach(game: GameId, { persist = true } = {}): Coach {
     skip(id) {
       if ((counts[id] ?? 0) === 0) count(id);
     },
-    step(realDt) {
-      const dt = Math.max(0, realDt);
+    step(realDt, gameDt = realDt) {
+      // Real time, but never a leap: a tab coming back after a minute is not a
+      // minute of lesson (games pause when hidden, so frames are rarely this long).
+      const dt = Math.min(Math.max(0, realDt), 1);
       let target = 1;
       if (current) {
         age += dt;
         const life = current.life ?? DEFAULT_LIFE;
         const minLife = current.minLife ?? DEFAULT_MIN_LIFE;
-        if (!leaving && age >= life) {
-          // Ran its course without being done: it counts as seen once.
-          count(current.id);
-          leaving = true;
-          leftAt = age;
+        if (!leaving && !acting && age >= life) {
+          // Ran its course without being done. A thing counts as seen; a move
+          // that was never made comes down uncounted, to be taught again (one
+          // being attempted is left for the game to judge).
+          if (current.move) {
+            retire();
+            target = 1;
+          } else {
+            count(current.id);
+            leaving = true;
+            leftAt = age;
+          }
         }
-        if (leaving && age >= Math.max(minLife, leftAt) + FADE) retire();
-        else if (!leaving && !acting) target = current.slow ?? 1;
+        if (current && leaving && age >= Math.max(minLife, leftAt) + FADE) retire();
+        else if (current && !leaving && !acting) target = current.slow ?? 1;
       }
       const tau = target < scale ? EASE_IN : EASE_OUT;
       scale += (target - scale) * (1 - Math.exp(-dt / tau));
       if (Math.abs(target - scale) < 0.01) scale = target;
-      return dt * scale;
+      // The scale applies to the game's capped step, so a slow device still slows.
+      return Math.max(0, gameDt) * scale;
     },
   };
 }

@@ -8,7 +8,7 @@
   // The game decides where the eye already is and puts the callout there:
   // beside the runner, under the cup, by the station. `side` says which
   // side of the anchor the slip sits on; it stays on screen either way.
-  import { onMount } from "svelte";
+  import { createEventDispatcher, onMount } from "svelte";
 
   import { LOOPS } from "#lib/arcade/art.ts";
   import type { Lesson } from "#lib/arcade/core/coach.ts";
@@ -20,6 +20,8 @@
   export let side: "above" | "below" | "left" | "right" = "above";
   /** Half the size of the pen loop drawn around the anchor; 0 draws none. */
   export let ring = 0;
+  /** Half the width of the thing itself, when it is wider than the loop would be (a long link): the loop stretches round it and the slip keeps clear of it. */
+  export let width = 0;
   /** The scene behind is dark (most are): the loop and tail print cream, not ink. */
   export let scene: "dark" | "light" = "dark";
   /** The lesson is fading out (it has been readable long enough). */
@@ -30,6 +32,31 @@
   export let top = 72;
   /** The input the game is showing (its touch pads, or keys); null works it out from the pointer. */
   export let touch: boolean | null = null;
+  /**
+   * The game is slowed for this explanation: the slip carries a Continue
+   * button (Enter on a keyboard, which the game also listens for) that ends
+   * it and brings play back to speed.
+   */
+  export let continuable = false;
+
+  /** Where focus goes when the Continue button it was on goes away (the game's playfield). */
+  export let returnFocus: (() => void) | null = null;
+
+  const dispatch = createEventDispatcher<{ continue: null }>();
+
+  function go() {
+    dispatch("continue");
+    returnFocus?.();
+  }
+
+  /** A Continue button that disappears while focused hands focus back to the game. */
+  function handsBackFocus(node: HTMLButtonElement) {
+    return {
+      destroy() {
+        if (document.activeElement === node || !document.activeElement || document.activeElement === document.body) returnFocus?.();
+      },
+    };
+  }
 
   const GUTTER = 16;
   let slip: HTMLElement;
@@ -66,6 +93,7 @@
           lesson.name ? `${lesson.name[0].toUpperCase()}${lesson.name.slice(1)}.` : "",
           lesson.text,
           (touch ?? coarse) ? (lesson.touch ? `${lesson.touch[0].toUpperCase()}${lesson.touch.slice(1)}.` : "") : lesson.keys?.length ? `Press ${lesson.keys.join(" or ")}.` : "",
+          continuable && !(touch ?? coarse) ? "Enter continues." : "",
         ]
           .filter(Boolean)
           .join(" ")
@@ -74,7 +102,12 @@
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.max(lo, v)));
 
   $: anchored = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y);
-  $: gap = (ring > 0 ? ring * 0.8 : 6) + 14;
+  $: loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
+  $: loopH = ring * 1.75;
+  $: horizontal = side === "left" || side === "right";
+  // How far the slip sits from the anchor: clear of the loop (or the thing) on its side.
+  $: reach = horizontal ? Math.max(ring * 0.8, loopW / 2, width) : Math.max(ring * 0.8, loopH / 2);
+  $: gap = (ring > 0 || width > 0 ? reach : 6) + 14;
   $: place = position(anchored, x ?? viewW / 2, y ?? viewH / 2, side, gap, slipW, slipH, viewW, viewH, top);
 
   function position(
@@ -119,7 +152,7 @@
     const dx = x - place.tx;
     const dy = y - place.ty;
     const length = Math.hypot(dx, dy);
-    const stop = (ring > 0 ? ring * 0.9 : 6) + 4;
+    const stop = (ring > 0 || width > 0 ? reach * 0.95 : 6) + 4;
     if (length <= stop + 6) return null;
     const k = (length - stop) / length;
     return { x1: place.tx, y1: place.ty, x2: place.tx + dx * k, y2: place.ty + dy * k };
@@ -127,8 +160,6 @@
 
   // Each lesson gets one of the hand-drawn loops, so they don't all match.
   $: loop = LOOPS[(lesson?.id.length ?? 0) % LOOPS.length];
-  $: loopW = ring * 2.3;
-  $: loopH = ring * 1.75;
 </script>
 
 {#if lesson}
@@ -155,23 +186,31 @@
         </svg>
       {/if}
 
-      <p
+      <div
         bind:this={slip}
         bind:offsetWidth={slipW}
         bind:offsetHeight={slipH}
         class="slip boba-riso is-small"
         style="left: {place.left}px; top: {place.top}px"
-        aria-hidden="true"
       >
-        {#if lesson.name}<span class="name">{lesson.name}</span>{/if}
-        <span class="line">{lesson.text}</span>
-        {#if lesson.keys?.length}
-          <span class="boba-keys">
-            {#each lesson.keys as key}<kbd>{key}</kbd>{/each}
-          </span>
+        <!-- The live region below reads the words; the slip shows them. -->
+        <p class="words" aria-hidden="true">
+          {#if lesson.name}<span class="name">{lesson.name}</span>{/if}
+          <span class="line">{lesson.text}</span>
+          {#if lesson.keys?.length}
+            <span class="boba-keys">
+              {#each lesson.keys as key}<kbd>{key}</kbd>{/each}
+            </span>
+          {/if}
+          {#if lesson.touch}<span class="touch">{lesson.touch}</span>{/if}
+        </p>
+        {#if continuable && !leaving}
+          <button type="button" class="boba-btn secondary go" use:handsBackFocus on:click={go}>
+            Continue
+            <kbd aria-hidden="true">Enter</kbd>
+          </button>
         {/if}
-        {#if lesson.touch}<span class="touch">{lesson.touch}</span>{/if}
-      </p>
+      </div>
     </div>
   {/key}
 {/if}
@@ -231,8 +270,8 @@
     position: absolute;
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-1) var(--space-2);
+    align-items: center;
+    gap: var(--space-2);
     max-width: min(20rem, calc(100vw - 2rem));
     margin: 0;
     padding: var(--space-1-5) var(--space-3);
@@ -245,6 +284,28 @@
 
   .name {
     font-style: italic;
+  }
+
+  .words {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
+    margin: 0;
+  }
+
+  /* The arcade's own secondary button: the only part of the callout that takes a press. */
+  .go {
+    pointer-events: auto;
+  }
+
+  /* The game says which input it shows: keys win even on a touch screen, and the reverse. */
+  .is-keys .go kbd {
+    display: inline;
+  }
+
+  .is-touch .go kbd {
+    display: none;
   }
 
   .touch {

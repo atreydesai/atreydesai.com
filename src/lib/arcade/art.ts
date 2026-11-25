@@ -352,7 +352,8 @@ export function cachedSprite(
   return sprite;
 }
 
-function isDarkTheme() {
+/** The site is in its dark theme (the arcade's HTML follows it; most scenes don't). */
+export function isDarkTheme() {
   return (
     typeof document !== "undefined" &&
     document.documentElement.classList.contains("dark")

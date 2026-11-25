@@ -11,9 +11,15 @@ export interface FrameLoopOptions {
   isPaused: () => boolean;
   /** The longest step a frame may take, in seconds. */
   maxDt?: number;
+  /**
+   * Draw every frame while paused (a scene with something alive in it).
+   * False keeps the last frame on screen instead; call `redraw()` when
+   * something invalidates it (a resize, a theme change).
+   */
+  drawWhilePaused?: boolean;
 }
 
-export function createFrameLoop({ update, draw, isPaused, maxDt = 0.05 }: FrameLoopOptions) {
+export function createFrameLoop({ update, draw, isPaused, maxDt = 0.05, drawWhilePaused = true }: FrameLoopOptions) {
   let raf = 0;
   let last = 0;
   let running = false;
@@ -25,21 +31,28 @@ export function createFrameLoop({ update, draw, isPaused, maxDt = 0.05 }: FrameL
     if (!last) last = timestamp;
     const rawDt = Math.max(0, (timestamp - last) / 1000);
     last = timestamp;
-    if (!isPaused()) update(Math.min(rawDt, maxDt), rawDt);
+    const paused = isPaused();
+    if (!paused && !held) update(Math.min(rawDt, maxDt), rawDt);
     if (mine !== generation) return;
-    draw();
+    if (!paused || drawWhilePaused) draw();
     if (mine !== generation) return;
     raf = requestAnimationFrame((t) => frame(t, mine));
   };
 
   // In development, `window.__arcadeLoop.step(seconds)` runs the game ahead
-  // at 60 steps a second however slowly the page is being painted, for
-  // checking a moment late in a run by eye. Not in a production build.
+  // at 60 steps a second however slowly the page is being painted, and
+  // `hold(true)` freezes it where it is (still drawn), for checking a moment
+  // late in a run by eye. Not in a production build.
   const dev = import.meta.env?.DEV && typeof window !== "undefined";
+  let held = false;
   const handle = {
     step(seconds: number) {
-      for (let t = 0; t < seconds; t += 1 / 60) if (!isPaused()) update(1 / 60, 1 / 60);
-      draw();
+      const mine = generation;
+      for (let t = 0; t < seconds && running && mine === generation; t += 1 / 60) if (!isPaused()) update(1 / 60, 1 / 60);
+      if (running && mine === generation) draw();
+    },
+    hold(on: boolean) {
+      held = on;
     },
   };
 
@@ -48,6 +61,7 @@ export function createFrameLoop({ update, draw, isPaused, maxDt = 0.05 }: FrameL
       if (running) return;
       running = true;
       last = 0;
+      held = false;
       const mine = ++generation;
       raf = requestAnimationFrame((t) => frame(t, mine));
       if (dev) (window as unknown as { __arcadeLoop?: typeof handle }).__arcadeLoop = handle;
@@ -63,6 +77,10 @@ export function createFrameLoop({ update, draw, isPaused, maxDt = 0.05 }: FrameL
     /** Forget the last timestamp (after a pause), so the next frame steps from zero. */
     resync() {
       last = 0;
+    },
+    /** Draws one frame now, outside the loop (for a paused scene that was resized). */
+    redraw() {
+      draw();
     },
   };
 }
