@@ -35,6 +35,7 @@ import {
   emptyProgress,
   expertRoom,
   extendStroke,
+  createRng,
   frameSteps,
   judgeCup,
   judgeRoom,
@@ -1078,4 +1079,12 @@ test("rooms describe themselves for screen readers", () => {
   const sieved = ROOMS.find((room) => room.sieves?.length);
   assert.match(describeRoom(/** @type {any} */ (sieved)), /sieve .* holds pearls/);
   for (const room of ROOMS) assert.ok(!describeRoom(room).includes("undefined"));
+});
+
+test("the room's seeded generator is the mulberry32 every room was tuned with", () => {
+  // Values from the generator this engine wrote for itself before the core's took its place.
+  const fromHash = createRng(2166136261);
+  assert.deepEqual([fromHash(), fromHash(), fromHash(), fromHash()], [0.6112444521859288, 0.4935242917854339, 0.7740248835179955, 0.4122861116193235]);
+  const small = createRng(42);
+  assert.deepEqual([small(), small(), small()], [0.6011037519201636, 0.44829055899754167, 0.8524657934904099]);
 });

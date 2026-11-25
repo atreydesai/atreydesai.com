@@ -48,7 +48,6 @@
     cupWalls,
     describeRoom,
     extendStroke,
-    frameSteps,
     judgeRoom,
     nextRoom,
     pourNow,
@@ -64,14 +63,53 @@
     unlockedRooms,
   } from "#lib/arcade/spill-engine.js";
   import type { Progress, Room, RoomResult, World } from "#lib/arcade/spill-engine.js";
-  import { ICON_AUDIO_PAL, ICON_LEVELS, ICON_LOCK, MENU_ICONS, fitCanvas, arcadeFont } from "#lib/arcade/art.ts";
-  import { demoIntro, firstVisit, readSpillProgress, writeSpillProgress } from "#lib/arcade/scores.ts";
-  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import {
+    ACCENT,
+    CREAM as CREAM_HEX,
+    ICON_AUDIO_PAL,
+    ICON_LEVELS,
+    ICON_LOCK,
+    INK as INK_HEX,
+    LID as LID_HEX,
+    MENU_ICONS,
+    PEARL as PEARL_HEX,
+    STRAW_PINK,
+    arcadeFont,
+    fitCanvas,
+  } from "#lib/arcade/art.ts";
+  import { createCoach } from "#lib/arcade/core/coach.ts";
+  import { hexToRgb, mixHex } from "#lib/arcade/core/color.ts";
+  import { bayer } from "#lib/arcade/core/dither.ts";
+  import { chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { createFrameLoop, every } from "#lib/arcade/core/loop.ts";
+  import { clamp } from "#lib/arcade/core/math.ts";
+  import { hash2 } from "#lib/arcade/core/rng.ts";
+  import { readSpillProgress, writeSpillProgress } from "#lib/arcade/scores.ts";
+  import {
+    LESSONS,
+    LOW_SHARE,
+    ROUTE_ROOM,
+    aim,
+    continuable as offersContinue,
+    createHolds,
+    createSpot,
+    fillLineY,
+    ghostRoute,
+    knownFrom,
+    mayOffer,
+    planningLesson,
+    resultLesson,
+    roomFrame,
+    routeVerdict,
+    sideFor,
+    wordedFor,
+  } from "#lib/arcade/spill-lessons.js";
+  import type { Cue, Lesson } from "#lib/arcade/spill-lessons.js";
+  import { arcadeExpert } from "#lib/boba.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import Coach from "./Coach.svelte";
   import Countdown from "./Countdown.svelte";
-  import DemoBar from "./DemoBar.svelte";
-  import DemoCard from "./DemoCard.svelte";
   import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
@@ -117,8 +155,6 @@
   const SC = 4;
   /** Room for the caption chip (up to two balanced lines) between the tickets and the room. */
   const CAPTION_SPACE = 64;
-  /** Roughly how much cup a settled droplet fills, measured from the authored rooms. */
-  const AREA_PER_DROP = 18.6;
   /** How far a kettle tips while it pours. */
   const TILT = 0.5;
   const PIPE_TRANSIT = 0.3;
@@ -130,8 +166,6 @@
   const SKIP_AFTER = 0.6;
   const INTRO_SECONDS = 4;
   const STAR_STAGGER = 0.12;
-  /** Below this share of the budget the straw is low: coral, and the word. */
-  const LOW_SHARE = 0.2;
   /** The reach ring shows below this share, and is at full strength by LOW_SHARE. */
   const RING_SHARE = 0.6;
   /** Rooms to a page: the level select keeps a page's rooms side by side. */
@@ -139,41 +173,34 @@
 
   // --- Colour ---------------------------------------------------------------------
   // The kitchen has no light mode: it is painted the same in both themes, and
-  // only the HTML on top (tickets, chips, buttons) follows the theme.
+  // only the HTML on top (tickets, chips, buttons) follows the theme. Pixels
+  // are packed as one Uint32 each, in the byte order ImageData keeps; the
+  // mixing is the core's (each mix here stays between its two colours), and
+  // the shared palette comes from art.ts.
 
-  const hexRgb = (hex: string): [number, number, number] => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
   const pack = (r: number, g: number, b: number, a = 255) => ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
   const c32 = (hex: string) => {
-    const [r, g, b] = hexRgb(hex);
+    const [r, g, b] = hexToRgb(hex);
     return pack(r, g, b);
-  };
-  const mixHex = (a: string, b: string, t: number) => {
-    const x = hexRgb(a);
-    const y = hexRgb(b);
-    return `#${x.map((value, i) => Math.round(value + (y[i] - value) * t).toString(16).padStart(2, "0")).join("")}`;
   };
   const mix32 = (a: string, b: string, t: number) => c32(mixHex(a, b, t));
 
-  const INK_HEX = "#2b2320";
   const INK = c32(INK_HEX);
-  const CREAM = c32("#fdf8f3");
+  const CREAM = c32(CREAM_HEX);
   const PAPER = c32("#fbf2e8");
-  const CORAL = c32("#e85d4c");
+  const CORAL = c32(ACCENT);
   const WHITE = c32("#ffffff");
   const STEEL = c32("#9aa3a8");
   const STEEL_LIGHT = c32("#c9d0d4");
   const STEEL_DARK = c32("#6f777c");
   const STEEL_DEEP = c32("#3a3f44");
-  const PINK = c32("#ff5277");
+  const PINK = c32(STRAW_PINK);
   const PINK_DEEP = c32("#c93a5e");
-  const STRIPE_WHITE = c32("#fdf8f3");
-  const PEARL_DARK = c32("#2b1a12");
+  const STRIPE_WHITE = c32(CREAM_HEX);
+  const PEARL_DARK = c32(PEARL_HEX);
   const PEARL_SHINE = c32("#8a6a5a");
-  const LID = c32("#ece3d6");
+  const LID = c32(LID_HEX);
+  /** The star's gold: warmer than the arcade's NOTE_GOLD, so it stays the spill's own. */
   const GOLD = c32("#dba84d");
   const OPENING = c32("#3a3f44");
   const TEA_HEX = "#b9854f";
@@ -214,17 +241,6 @@
     { top: "#141a2e", low: "#3b2a52", sun: "#fdf8f3", night: true },
   ];
 
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
-  const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
-  const ihash = (n: number) => {
-    let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0xc2b2ae35);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  };
-  const hash2 = (a: number, b: number) => ihash(Math.imul(a, 73856093) ^ Math.imul(b, 19349663));
-  const clamp = (value: number, low: number, high: number) => (value < low ? low : value > high ? high : value);
   const pad2 = (value: number) => String(value).padStart(2, "0");
 
   // --- Sprites ---------------------------------------------------------------------
@@ -386,8 +402,7 @@
 
   let phase: Phase = "idle";
   let paused = false;
-  let tipVisible = false;
-  let liveMessage = "Spill starting";
+  let liveMessage = "Spill is starting.";
   let localBest = 0;
   let newBest = false;
   let countdown = 0;
@@ -442,7 +457,8 @@
   let accumulator = 0;
   let alpha = 1;
   let clock = 0;
-  let hudClock = 0;
+  /** The HUD's readouts refresh about ten times a second. */
+  const hudTick = every(0.1);
   let pourAnnounced = false;
   let shake = 0;
 
@@ -452,6 +468,10 @@
   let playfield: HTMLElement;
   let hudRow: HTMLElement;
   let barEl: HTMLElement;
+  let pourButton: HTMLButtonElement | null = null;
+  let gaugeEl: HTMLElement | null = null;
+  let captionEl: HTMLElement | null = null;
+  let verdictEl: HTMLElement | null = null;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
   let levelsCard: HTMLElement;
@@ -476,8 +496,6 @@
   let verdictTop = 200;
   let roomCenterX = 0;
 
-  let last = 0;
-  let raf = 0;
   let active = true;
   const timers = createTimers();
 
@@ -1331,12 +1349,10 @@
     for (let y = top + 5; y < top + 12 && y < bottom - 5; y++) blend(l + 5, y, WHITE, 0.25);
 
     const order = cup.order;
-    const inner = cup.w - CUP_WALL * 4;
     const bandRight = cup.x < WIDTH / 2;
 
     // The fill line at the amount needed, with a notch outside the wall.
-    const needY = Math.round(cup.y - CUP_WALL * 2 - (order.need * AREA_PER_DROP) / inner);
-    const lineY = Math.max(top + 2, needY);
+    const lineY = fillLineY(cup, CUP_WALL);
     for (let x = l + 3; x <= r - 3; x++) if ((x - l) % 4 < 2) blend(x, lineY, INK, 0.75);
     const notchX = bandRight && order.milk !== undefined ? l - 1 : r + 1;
     const dir = notchX < l ? -1 : 1;
@@ -2099,6 +2115,8 @@
         syncHud();
       } else if (type === EVENTS.INTO_CUP) {
         const cup = world.cups[a];
+        // The first tea into a cup: what its dashed line asks for.
+        if (cup && phase === "play" && !coach.current) teach({ lesson: LESSONS.fill, target: { kind: "line", index: a } });
         if (cup && paced("drop", 0.07)) sfxDrop(clamp(b / cup.order.full, 0, 1));
         if (cup && !reduceMotion) {
           const surface = surfaceAt(x, cup.y - cup.h, cup.y);
@@ -2157,6 +2175,399 @@
     }
   }
 
+  // --- Lessons -------------------------------------------------------------------------
+  // Taught once per device, inside the live room: spill-lessons.js says what
+  // and when, and the coach shows one at a time. Nothing is slowed: a lesson
+  // that explains holds the room instead. During planning the room is frozen
+  // outright (roomFrame takes no step: the dial, a belt, a kettle's rail all
+  // wait), so a held room plays out exactly as an unheld one would from the
+  // same planning time, while straws can still be drawn and taken back; a
+  // lesson about a result holds the next room back. Each lesson may hold for
+  // a few seconds of real time in a visit; Continue, Pour, or doing what it
+  // asks lets the room run on.
+
+  type Side = "above" | "below" | "left" | "right";
+
+  const coach = createCoach("spill");
+  /** What the lesson up is about (refound every frame, since belts and kettles move). */
+  let cue: Cue | null = null;
+  const spot = createSpot();
+  /** The callout, copied out of the coach so the markup follows it. */
+  let coachLesson: Lesson | null = null;
+  let coachLeaving = false;
+  let coachX: number | null = null;
+  let coachY: number | null = null;
+  let coachRing = 0;
+  let coachWidth = 0;
+  let coachSide: Side = "above";
+  let coachScene: "dark" | "light" = "light";
+  let coachContinuable = false;
+  /** The room's name chip steps aside while a lesson is up, unless the lesson is about it. */
+  let captionHidden = false;
+  /** The lesson up holds the room this frame. */
+  let lessonHolds = false;
+  /** A lesson is up and explaining (placed, not done, its move not made): the kitchen dims to its thing. */
+  let lessonExplains = false;
+  /** Each lesson's hold allowance for the visit. */
+  const lessonHold = createHolds(expert);
+  /** Moves set aside with Continue this visit: not learned, and not shown again until the game opens again. */
+  const skipped = new Set<string>();
+  /** What planning may still teach: learned, or set aside for the visit. */
+  const settledLesson = (id: string) => coach.learned(id) || skipped.has(id);
+  /** Pour was pressed: planning is over, and nothing holds the room until the next one. */
+  let pourLatched = false;
+  /** Real seconds since the last lesson came down, so two never run together. */
+  let quietFor = Infinity;
+  /** The spotlight's strength, eased in real time. */
+  let lessonDim = 0;
+  /** The bar control the lesson is about, lit while the rest of the bar steps back. */
+  let barLit: "pour" | "gauge" | null = null;
+  /** The input the player is using: the lessons' wording and their key chips follow it. */
+  let inputMode: "mouse" | "touch" | "keys" = "mouse";
+  /** The ghost route in room units, built once per lesson, and the arrowhead at its end. */
+  let ghost: ReadonlyArray<{ x: number; y: number }> = [];
+  const ghostArrow = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ];
+  const ghostBox = { x: 0, y: 0, w: 0, h: 0 };
+  /**
+   * The ghost straw, dithered once into its own layer at the screen's scale
+   * (on the dither's 4-unit repeat), and drawn from there each frame: only
+   * the chalk moves.
+   */
+  let ghostLayer: HTMLCanvasElement | null = null;
+  let ghostKey = "";
+  const ghostArea = { x: 0, y: 0, w: 0, h: 0 };
+  /** The ghost straw's dither: a checkerboard of cream. */
+  const GHOST_DENSITY = 0.5;
+  /** The spotlight's boxes in canvas px: a pool, and the ones in use this frame. */
+  const litPool: FocusBox[] = [];
+  const litBoxes: FocusBox[] = [];
+  /** A control's box, measured as its lesson starts and after a resize, not every frame. */
+  let placeRect: DOMRect | null = null;
+  /** The cue the callout has been placed for, so one never shows before it has a place. */
+  let placedCue: Cue | null = null;
+  /** The chalk's ink. */
+  const CHALK = INK_HEX;
+  /** Roughly the slip's size, for choosing a side it fits on (Coach keeps it on screen either way). */
+  const SLIP_W = 260;
+  const SLIP_H = 72;
+
+  function setCue(next: Cue) {
+    cue = next;
+    placeRect = null;
+    placedCue = null;
+    // A lesson takes the room name's place: one message at a time.
+    if (caption && captionLife === INTRO_SECONDS) caption = null;
+    if (next.target.kind === "route") buildGhost();
+  }
+
+  /** The route's points, its box, and an arrowhead at its end pointing the way it is drawn. */
+  function buildGhost() {
+    ghost = ghostRoute(room) ?? [];
+    ghostKey = "";
+    if (ghost.length < 2) return;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const point of ghost) {
+      x0 = Math.min(x0, point.x);
+      y0 = Math.min(y0, point.y);
+      x1 = Math.max(x1, point.x);
+      y1 = Math.max(y1, point.y);
+    }
+    const pad = 4;
+    ghostBox.x = x0 - pad;
+    ghostBox.y = y0 - pad;
+    ghostBox.w = x1 - x0 + pad * 2;
+    ghostBox.h = y1 - y0 + pad * 2;
+    // The area the dithered layer covers: the box, out to the dither's repeat.
+    ghostArea.x = Math.floor(ghostBox.x / 4) * 4;
+    ghostArea.y = Math.floor(ghostBox.y / 4) * 4;
+    ghostArea.w = Math.ceil((ghostBox.x + ghostBox.w) / 4) * 4 - ghostArea.x;
+    ghostArea.h = Math.ceil((ghostBox.y + ghostBox.h) / 4) * 4 - ghostArea.y;
+    const end = ghost[ghost.length - 1];
+    const before = ghost[ghost.length - 2];
+    const length = Math.hypot(end.x - before.x, end.y - before.y) || 1;
+    const ux = (end.x - before.x) / length;
+    const uy = (end.y - before.y) / length;
+    ghostArrow[0].x = end.x - ux * 6 - uy * 4;
+    ghostArrow[0].y = end.y - uy * 6 + ux * 4;
+    ghostArrow[1].x = end.x;
+    ghostArrow[1].y = end.y;
+    ghostArrow[2].x = end.x - ux * 6 + uy * 4;
+    ghostArrow[2].y = end.y - uy * 6 - ux * 4;
+  }
+
+  /** Ends what was about planning, as the tea comes: a move not made comes back, a line read counts. */
+  function endPlanningLesson() {
+    const current = coach.current as Lesson | null;
+    if (!current || current.during !== "plan" || coach.leaving) return;
+    if (current.move) coach.dismiss();
+    else coach.done(current.id);
+  }
+
+  /** What planning should teach now, once "go" has gone. The pour ends what was about planning. */
+  function checkLessons() {
+    const current = coach.current as Lesson | null;
+    if (world.status !== "waiting" || pourLatched) {
+      endPlanningLesson();
+      if (!coach.current) cue = null;
+      return;
+    }
+    const next = planningLesson(world, settledLesson, { drafting: !!world.draft });
+    if (next && next.lesson.id !== current?.id && mayOffer(next.lesson, current, coach.age, quietFor, coach.leaving) && coach.offer(next.lesson)) {
+      setCue(next);
+    }
+    if (!coach.current) cue = null;
+  }
+
+  /** A lesson that something which just happened calls for: the coach decides whether it can go up now. */
+  function teach(next: Cue | null) {
+    if (!next || coach.learned(next.lesson.id) || coach.current?.id === next.lesson.id) return;
+    if (coach.offer(next.lesson)) setCue(next);
+  }
+
+  /** A lesson about a straw whose straw has gone (Clear) comes down at once, and holds nothing. */
+  function dropLostTarget() {
+    if (!cue || cue.target.kind !== "straw" || coach.current !== cue.lesson || coach.leaving) return;
+    for (const stroke of world.strokes) if (stroke.id === cue.target.index) return;
+    coach.dismiss();
+    cue = null;
+    lessonHolds = false;
+  }
+
+  /**
+   * Whether the lesson up holds the room this frame: the dial while the
+   * room is still planning and Pour hasn't been pressed, or the next room
+   * while a result is explained, out of the lesson's allowance for the visit.
+   * @param dt Real seconds this frame.
+   */
+  function updateHold(dt: number) {
+    const lesson = coach.current as Lesson | null;
+    const ours = !!cue && cue.lesson === lesson;
+    const holdable = ours && (phase === "result" ? lesson?.during === "result" : world.status === "waiting" && !pourLatched);
+    lessonHolds = lessonHold.take(lesson, { leaving: coach.leaving, acting: coach.acting, holdable }, dt);
+  }
+
+  /**
+   * The room changes or ends under a lesson: a line read long enough counts,
+   * a move not made comes back, and either way it goes at once.
+   */
+  function endLesson() {
+    const current = coach.current as Lesson | null;
+    if (current && !coach.leaving && !current.move && coach.age >= (current.minLife ?? 0.9)) coach.skip(current.id);
+    coach.dismiss();
+    cue = null;
+    lessonHolds = false;
+  }
+
+  /**
+   * The player has read it: Continue (Enter on the playfield, the slip's
+   * button, or a result's own keys) ends it. A line about a thing counts as
+   * learned; a move skipped is only set aside for the visit, since nothing
+   * has been made to work (room 1's route is learned if the room then clears).
+   */
+  function continueLesson() {
+    if (!coachContinuable || paused || levelsOpen) return;
+    const lesson = coach.current as Lesson | null;
+    if (!lesson) return;
+    if (lesson.move) {
+      skipped.add(lesson.id);
+      coach.dismiss();
+      cue = null;
+      lessonHolds = false;
+    } else coach.done(lesson.id);
+    coachContinuable = false;
+  }
+
+  /**
+   * A straw went down (`drawnId`) or was taken back (-1) in room 1 while
+   * the route is still to learn. The engine runs the room on the straws as
+   * laid: if they would pour into the cup the route is learned; if not, a
+   * straw off the ghost (or the one just drawn) is where taking a straw back
+   * is taught.
+   */
+  function judgeRoute(drawnId: number) {
+    if (room.id !== ROUTE_ROOM || world.status !== "waiting" || coach.learned(LESSONS.route.id) || !world.strokes.length) return;
+    const verdict = routeVerdict(room, world.strokes, drawnId);
+    if (verdict.learned) {
+      coach.done(LESSONS.route.id);
+      return;
+    }
+    if (drawnId >= 0 && verdict.offGhost >= 0 && coach.current?.id === LESSONS.route.id && !coach.learned(LESSONS.takeBack.id)) {
+      // The route steps aside uncounted, and comes back once the straw is taken back.
+      coach.dismiss();
+      teach({ lesson: LESSONS.takeBack, target: { kind: "straw", index: verdict.offGhost } });
+    }
+  }
+
+  /**
+   * The side of a room point whose slip fits on screen, clear of the loop:
+   * the side asked for, then the other above or below, then right, then left.
+   */
+  function pickSide(prefer: "above" | "below", x: number, y: number, ring: number, width: number): Side {
+    const vertical = ring * 0.875 + 14;
+    const loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
+    const across = Math.max(ring * 0.8, loopW / 2, width) + 14;
+    const barTop = barEl ? barEl.getBoundingClientRect().top : viewH;
+    const fits: Record<Side, boolean> = {
+      above: y - vertical - SLIP_H >= hudBottomPx + 8,
+      below: y + vertical + SLIP_H <= barTop - 8,
+      right: x + across + SLIP_W <= viewW - 16,
+      left: x - across - SLIP_W >= 16,
+    };
+    const order: Side[] = prefer === "above" ? ["above", "below", "right", "left"] : ["below", "above", "right", "left"];
+    for (const side of order) if (fits[side]) return side;
+    return prefer;
+  }
+
+  /** Where the callout goes this frame, and what the spotlight keeps lit. */
+  function placeCoach() {
+    const lesson = coach.current as Lesson | null;
+    if (!lesson || !cue || cue.lesson !== lesson || phase === "done") {
+      if (coachLesson) coachLesson = null;
+      if (coachX !== null) coachX = coachY = null;
+      if (coachContinuable) coachContinuable = false;
+      if (captionHidden) captionHidden = false;
+      if (lessonDim <= 0.01) spot.count = 0;
+      return;
+    }
+    const target = cue.target;
+    const found = aim(target, world, spot, { cupWall: CUP_WALL, dial: target.kind === "dial" ? dialSpots[target.index] : null });
+    let x: number | null = null;
+    let y: number | null = null;
+    let ring = 0;
+    let width = 0;
+    let side: Side = "above";
+    let scene: "dark" | "light" = "light";
+    if (found && spot.place === "room") {
+      x = rx + spot.x * S;
+      y = ry + spot.y * S;
+      ring = spot.ring * S;
+      width = spot.wide * S;
+      // A side that fits, chosen as the lesson goes up and kept, so the slip doesn't hop.
+      side = placedCue === cue ? coachSide : pickSide(sideFor(target, spot, room), x, y, ring, width);
+    } else if (found) {
+      const element = spot.place === "pour" ? pourButton : spot.place === "gauge" ? gaugeEl : spot.place === "verdict" ? verdictEl : captionEl;
+      if (!placeRect && element?.isConnected) placeRect = element.getBoundingClientRect();
+      if (placeRect) {
+        x = placeRect.left + placeRect.width / 2;
+        y = placeRect.top + placeRect.height / 2;
+        ring = (placeRect.height / 2 + 4) / 0.875;
+        width = placeRect.width / 2 + 2 > ring * 1.15 ? placeRect.width / 2 - 4 : 0;
+        // The bar is under the room: its slip goes above, over the floor's dark tiles.
+        side = spot.place === "pour" || spot.place === "gauge" ? "above" : "below";
+        scene = spot.place === "pour" || spot.place === "gauge" ? "dark" : "light";
+      }
+    }
+    if (x === null || y === null) {
+      // Not placed yet (its control is still mounting): it waits. Gone (a
+      // straw taken back): it fades where it was.
+      if (placedCue !== cue) {
+        if (coachLesson) coachLesson = null;
+        if (coachContinuable) coachContinuable = false;
+        return;
+      }
+    } else {
+      placedCue = cue;
+      if (x !== coachX) coachX = x;
+      if (y !== coachY) coachY = y;
+      if (ring !== coachRing) coachRing = ring;
+      if (width !== coachWidth) coachWidth = width;
+      if (side !== coachSide) coachSide = side;
+      if (scene !== coachScene) coachScene = scene;
+    }
+    const shown = wordedFor(lesson, inputMode);
+    if (coachLesson !== shown) coachLesson = shown;
+    if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
+    const canContinue = offersContinue(lesson, lessonHolds);
+    if (coachContinuable !== canContinue) coachContinuable = canContinue;
+    const hideCaption = target.kind !== "caption";
+    if (hideCaption !== captionHidden) captionHidden = hideCaption;
+  }
+
+  const paintGhostStraw = (g: CanvasRenderingContext2D) => {
+    g.strokeStyle = "#000";
+    g.lineWidth = STRAW_OUTER * 2;
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    g.beginPath();
+    g.moveTo(ghost[0].x, ghost[0].y);
+    for (let i = 1; i < ghost.length; i++) g.lineTo(ghost[i].x, ghost[i].y);
+    g.stroke();
+  };
+
+  /** The ghost straw's dithered layer at `scale` device px per room unit, made again only when the scale changes. */
+  function ghostRaster(scale: number) {
+    const key = `${scale}:${GHOST_DENSITY}`;
+    if (ghostLayer && ghostKey === key) return ghostLayer;
+    ghostLayer ??= document.createElement("canvas");
+    ghostLayer.width = Math.max(1, Math.ceil(ghostArea.w * scale));
+    ghostLayer.height = Math.max(1, Math.ceil(ghostArea.h * scale));
+    const g = ghostLayer.getContext("2d");
+    if (!g) return null;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, ghostLayer.width, ghostLayer.height);
+    g.setTransform(scale, 0, 0, scale, -ghostArea.x * scale, -ghostArea.y * scale);
+    drawGhost(g, ghostBox.x, ghostBox.y, ghostBox.w, ghostBox.h, paintGhostStraw, { color: CREAM_HEX, density: GHOST_DENSITY, cell: 1 });
+    ghostKey = key;
+    return ghostLayer;
+  }
+
+  /**
+   * The route lesson's hologram, in the room's own pixels: a ghost straw
+   * dithered in cream where to draw (drawn once, at this scale), chalk
+   * dashes marching the way to draw it with an arrowhead at the end, and a
+   * small accent post at its start where the pen goes down. Still under
+   * Reduce Motion, and held while paused.
+   */
+  function drawLessonGhost(left: number, top: number) {
+    if (!ctx || !cue || cue.target.kind !== "route" || coach.current !== cue.lesson || coach.leaving || ghost.length < 2) return;
+    const m = ctx.getTransform();
+    const layer = ghostRaster((Math.hypot(m.a, m.b) || 1) * S);
+    ctx.save();
+    if (layer) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(layer, left + ghostArea.x * S, top + ghostArea.y * S, ghostArea.w * S, ghostArea.h * S);
+    }
+    ctx.translate(left, top);
+    ctx.scale(S, S);
+    const progress = reduceMotion ? 1 : Math.min(1, (clock % 2.4) / 1.5);
+    chalkPath(ctx, ghost, { color: CHALK, cell: 1.5, dash: 2, gap: 2, offset: reduceMotion ? 0 : -clock * 9, progress });
+    chalkPath(ctx, ghostArrow, { color: CHALK, cell: 1.5, dash: 64, gap: 0 });
+    const start = ghost[0];
+    ctx.fillStyle = CHALK;
+    ctx.fillRect(Math.round(start.x) - 2.5, Math.round(start.y) - 2.5, 5, 5);
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(Math.round(start.x) - 1.5, Math.round(start.y) - 1.5, 3, 3);
+    ctx.restore();
+  }
+
+  /**
+   * The explanation's spotlight: while a lesson is up, the kitchen dims
+   * under a wash of ink and what the lesson is about (the fixture, the cup,
+   * the kettle, the ghost route, the straws) stays in full light, stepped to
+   * the kitchen's cell. It follows the lesson shown, held or not.
+   */
+  function drawLessonLight(left: number, top: number) {
+    if (!ctx || lessonDim <= 0.01) return;
+    litBoxes.length = 0;
+    for (let i = 0; i < spot.count; i++) {
+      const from = spot.lit[i];
+      const box = (litPool[i] ??= { x: 0, y: 0, w: 0, h: 0 });
+      box.x = left + from.x * S;
+      box.y = top + from.y * S;
+      box.w = from.w * S;
+      box.h = from.h * S;
+      litBoxes.push(box);
+    }
+    drawSpotlight(ctx, viewW, viewH, litBoxes, lessonDim, { color: INK_HEX, cell: SC });
+  }
+
   // --- The room, start to finish -------------------------------------------------------
 
   function phaseFor(r: Room) {
@@ -2189,6 +2600,8 @@
     outAnnounced = false;
     holdResult = false;
     verdict = null;
+    pourLatched = false;
+    endLesson();
     resetRoomVisuals();
     cancelGesture();
     penDrawing = false;
@@ -2199,9 +2612,13 @@
     syncHud();
   }
 
+  /** The room's name, unless the room opens on a lesson, which takes its place. */
   function announceRoom() {
-    if (!tipVisible) showCaption(room.name, INTRO_SECONDS);
     liveMessage = describeRoom(room);
+    // A new room is a fresh moment: what it brings is named at once.
+    quietFor = Infinity;
+    checkLessons();
+    if (!coach.current) showCaption(room.name, INTRO_SECONDS);
   }
 
   /** Into a level: through the countdown the first time the music starts, else straight in. */
@@ -2215,7 +2632,7 @@
       countdown = COUNTDOWN_SECONDS;
       countdownElapsed = 0;
       goVisible = false;
-      last = 0;
+      loop.resync();
       sfxCountdown(COUNTDOWN_SECONDS);
       liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
       return;
@@ -2223,7 +2640,7 @@
     setMusicPhase(phaseFor(room));
     setMusicPaused(false);
     phase = "play";
-    last = 0;
+    loop.resync();
     syncHud();
     announceRoom();
   }
@@ -2235,15 +2652,6 @@
     penDrawing = false;
     setPour(0);
     lastCleared = result.cleared;
-    if (demo) {
-      // The demo's room clears, and nothing is booked.
-      verdictCount += 1;
-      verdict = { id: verdictCount, stars: result.stars, points: result.points };
-      sfxRoomClear(result.stars);
-      liveMessage = `Room cleared with ${result.stars} ${result.stars === 1 ? "star" : "stars"}.`;
-      syncHud();
-      return;
-    }
     teaSpilled += result.spilled;
     if (result.cleared) {
       let note = "";
@@ -2277,6 +2685,11 @@
       showCaption(room.hint, Infinity);
       liveMessage = `Spilled. Hint: ${room.hint}.`;
     }
+    // What the room's end means, the first time: the stars, the points, a spill's hint.
+    endLesson();
+    // Room 1 cleared is the route made to work, however it was drawn (or skipped).
+    if (result.cleared && room.id === ROUTE_ROOM) coach.done(LESSONS.route.id);
+    teach(resultLesson(result.cleared, coach.learned));
     syncHud();
   }
 
@@ -2306,7 +2719,13 @@
   }
 
   function trySkip() {
-    if (phase !== "result" || paused || levelsOpen || resultAge < SKIP_AFTER) return;
+    if (phase !== "result" || paused || levelsOpen) return;
+    // A lesson explaining the result is read first.
+    if (coachContinuable) {
+      continueLesson();
+      return;
+    }
+    if (resultAge < SKIP_AFTER) return;
     advance();
   }
 
@@ -2321,8 +2740,10 @@
    * and after its verdict, so tea still on its way keeps flowing; the verdict
    * is caught the step it lands.
    */
-  function simulate(dt: number) {
-    const clock = frameSteps(accumulator, dt);
+  function simulate(dt: number, hold = false) {
+    // A lesson holding planning freezes the room: no step at all, so the
+    // room later plays out exactly as it would have from this planning time.
+    const clock = roomFrame(world, accumulator, dt, hold);
     accumulator = clock.accumulator;
     for (let k = 0; k < clock.steps; k++) {
       step(world, STEP);
@@ -2337,9 +2758,9 @@
 
   function syncHud() {
     const live = phase === "play" && !settled();
-    canPour = live && world.status === "waiting" && !demo;
-    canClear = live && world.strokes.length > 0 && !demo;
-    canNext = phase === "result" && lastCleared && !levelsOpen && !demo;
+    canPour = live && world.status === "waiting";
+    canClear = live && world.strokes.length > 0;
+    canNext = phase === "result" && lastCleared && !levelsOpen;
     const judged = world.result ?? judgeRoom(world);
     previewStars = world.status === "waiting" ? 0 : judged.stars;
     cupOk = judged.cups.map((cup) => cup.ok);
@@ -2413,6 +2834,11 @@
       ctx.drawImage(dynCanvas, x, y, RW * S, RH * S);
     }
     drawGlow(x + MX * S, y + MT * S);
+    // The lesson: where it points, the spotlight over the kitchen, and the
+    // ghost route above it, under the pen and its reach ring.
+    placeCoach();
+    drawLessonLight(x + MX * S, y + MT * S);
+    drawLessonGhost(x + MX * S, y + MT * S);
     drawOverlays(x + MX * S, y + MT * S);
   }
 
@@ -2610,10 +3036,11 @@
     if (best >= 0 && bestD < 24) noDrawFlash[best] = 0.6;
   }
 
-  /** A straw refused for want of straw: the gauge says so, with a shake. */
+  /** A straw refused for want of straw: the gauge says so, with a shake, and taking one back is taught there. */
   function outOfStraw() {
     if (paced("empty", 0.8)) gaugeShake += 1;
     if (!outAnnounced) syncGauge();
+    if (world.strokes.length) teach({ lesson: LESSONS.takeBack, target: { kind: "gauge", index: 0 } });
   }
 
   /** Starts a straw at a world point; says why if it can't. */
@@ -2669,9 +3096,10 @@
         extendStroke(world, lx + ((cx - lx) / d) * reach, ly + ((cy - ly) / d) * reach);
       }
     }
-    if (commitStroke(world) >= 0) {
+    const drawn = commitStroke(world);
+    if (drawn >= 0) {
       strawVersion++;
-      tipVisible = false;
+      judgeRoute(drawn);
     }
     syncHud();
   }
@@ -2695,6 +3123,8 @@
     crumbs(stroke.points);
     sfxErase();
     strawVersion++;
+    coach.done(LESSONS.takeBack.id);
+    judgeRoute(-1);
     if (hoverId === id) hoverId = -1;
     syncHud();
     return true;
@@ -2707,7 +3137,7 @@
   }
 
   function onStageDown(event: PointerEvent) {
-    if (demo) return;
+    inputMode = event.pointerType === "mouse" ? "mouse" : "touch";
     if (phase === "result") {
       if (event.button === 0 || event.pointerType !== "mouse") {
         event.preventDefault();
@@ -2740,7 +3170,6 @@
   }
 
   function onStageMove(event: PointerEvent) {
-    if (demo) return;
     if (!gesture) {
       if (event.pointerType !== "mouse" || !playable()) {
         overRoom = false;
@@ -2818,9 +3247,6 @@
     const key = event.key;
     const lower = key.toLowerCase();
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    // The demo and its question take none of the game's keys; Enter and
-    // Space reach their focused buttons.
-    if (demo || asking) return;
     if (levelsOpen) {
       // The dialog's tiles take their own keys; L closes it again.
       if (lower === "l") {
@@ -2835,7 +3261,15 @@
       void openLevels();
       return;
     }
+    // A focused button (Pause, Mute, the slip's Continue) keeps its own Enter and Space.
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
+    // On the playfield, Enter ends the explanation that is up, as its slip says.
+    if (key === "Enter" && coachContinuable) {
+      event.preventDefault();
+      continueLesson();
+      return;
+    }
+    if (ARROWS[key] || key === " " || key === "Delete") inputMode = "keys";
     if (phase === "result") {
       if (key === " " || key === "Enter" || ARROWS[key]) event.preventDefault();
       if (key === " " || key === "Enter") trySkip();
@@ -2872,7 +3306,6 @@
   }
 
   function onKeyUp(event: KeyboardEvent) {
-    if (demo) return;
     const arrow = ARROWS[event.key];
     if (arrow) held[arrow] = false;
     if (event.key === " " && penDrawing) {
@@ -2905,8 +3338,6 @@
 
   function releaseAll() {
     held.left = held.right = held.up = held.down = false;
-    // The demo's pen is the script's, and carries on after a pause.
-    if (demo) return;
     if (penDrawing) {
       penDrawing = false;
       cancelStroke(world);
@@ -2917,15 +3348,22 @@
   // --- Actions -----------------------------------------------------------------------
 
   function pour() {
-    if (demo || !playable() || world.status !== "waiting") return;
+    if (!playable() || world.status !== "waiting") return;
     if (pourNow(world)) {
+      // Pressing Pour is what its lesson asks for, taught or not, and ends
+      // planning at once: what held the room lets go, and the kettle starts
+      // on the next step.
+      coach.done(LESSONS.pour.id);
+      pourLatched = true;
+      lessonHolds = false;
+      endPlanningLesson();
       liveMessage = "Pouring early.";
       syncHud();
     }
   }
 
   function clearAll() {
-    if (demo || !playable() || !world.strokes.length) return;
+    if (!playable() || !world.strokes.length) return;
     for (const stroke of world.strokes) crumbs(stroke.points);
     clearStrokes(world);
     sfxErase();
@@ -2933,8 +3371,13 @@
     syncHud();
   }
 
+  /** Next, from its button or its key: a lesson about the result is read first, as with Enter and Space. */
   function next() {
-    if (demo || phase !== "result" || !lastCleared || paused || levelsOpen) return;
+    if (phase !== "result" || !lastCleared || paused || levelsOpen) return;
+    if (coachContinuable) {
+      continueLesson();
+      return;
+    }
     advance();
   }
 
@@ -2947,12 +3390,12 @@
   // --- Pause, the level select, and closing time ---------------------------------------------
 
   async function pauseGame() {
-    if (paused || levelsOpen || asking || phase === "idle" || phase === "done") return;
+    if (paused || levelsOpen || phase === "idle" || phase === "done") return;
     paused = true;
     releaseAll();
     setPour(0);
     setMusicPaused(true);
-    liveMessage = "Game paused";
+    liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
   }
@@ -2960,12 +3403,11 @@
   function resumeGame() {
     if (!paused) return;
     paused = false;
-    last = 0;
+    loop.resync();
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = "Game resumed";
-    if (demo) void tick().then(() => demoBar?.focus());
-    else focusPlayfield();
+    liveMessage = "The game resumed.";
+    focusPlayfield();
   }
 
   function togglePause() {
@@ -2976,6 +3418,23 @@
 
   function focusPlayfield() {
     playfield?.focus({ preventScroll: true });
+  }
+
+  /**
+   * Focus reached the playfield from the keyboard: the lessons word
+   * themselves for the pen keys, and the pen shows, so a keyboard player
+   * isn't left guessing.
+   */
+  function onPlayfieldFocus() {
+    let keyboard = false;
+    try {
+      keyboard = playfield.matches(":focus-visible");
+    } catch {
+      keyboard = false;
+    }
+    if (!keyboard) return;
+    inputMode = "keys";
+    penVisible = true;
   }
 
   function focusPlayfieldIfIdle() {
@@ -3014,7 +3473,7 @@
 
   /** Opens the level select over the room, which waits until it closes. */
   async function openLevels() {
-    if (demo || asking || levelsOpen || paused || phase === "countdown" || phase === "done") return;
+    if (levelsOpen || paused || phase === "countdown" || phase === "done") return;
     levelsOpen = true;
     releaseAll();
     setPour(0);
@@ -3036,7 +3495,7 @@
       return;
     }
     levelsOpen = false;
-    last = 0;
+    loop.resync();
     if (musicStarted) setMusicPaused(false);
     sfxBlip();
     syncHud();
@@ -3144,238 +3603,112 @@
     focusPlayfieldIfIdle();
   }
 
-  /** First visit: straight into room 1. Later visits: the level select, next room in focus. */
+  /** Set once lessons have run on this device: progress saved before then shows what was already played. */
+  const LESSONS_SEEN_KEY = "boba_spill_lessons";
+
+  /**
+   * Whether this is the first visit since the game began teaching in play
+   * (marked as it is asked). Only then does saved progress count lessons as
+   * known; after that, the device's own lessons say what it knows.
+   */
+  function firstVisitWithLessons() {
+    try {
+      if (window.localStorage.getItem(LESSONS_SEEN_KEY)) return false;
+      window.localStorage.setItem(LESSONS_SEEN_KEY, "1");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * How the game opens. A device that has cleared nothing goes straight
+   * into room 1 through the countdown (and returns true: focus goes to the
+   * playfield); one with progress gets the level select over the next room,
+   * that room in focus. Lessons start afresh for the visit.
+   */
   function openGame() {
     progress = cleanProgress(readSpillProgress(mode));
-    const start = nextRoom(progress);
+    coach.reset();
+    lessonHold.clear();
+    skipped.clear();
+    quietFor = Infinity;
+    if (firstVisitWithLessons()) {
+      // A save from before the lessons: what its cleared rooms taught (in either mode) is known.
+      const other = cleanProgress(readSpillProgress(expert ? "normal" : "expert"));
+      for (const id of knownFrom((index) => progress.stars[index] > 0 || other.stars[index] > 0)) coach.skip(id);
+    }
     if (progressSummary(progress).cleared === 0) {
       playLevel(0);
-      return;
+      return true;
     }
+    const start = nextRoom(progress);
     enterRoom(start >= AFTER_HOURS ? LAST_ROOM : start);
     phase = "idle";
     void openLevels();
-  }
-
-  // --- The demo ---------------------------------------------------------------------
-  // Room 1 plays itself on its real rules: a pen draws a straw the wrong way,
-  // takes it back, draws the room's own route, presses pour, and the tea runs
-  // into the cup. The script runs on the game's clock, so a pause holds it;
-  // it records nothing and takes none of the player's input.
-
-  /** The first time here, the game asks before the first room. */
-  let asking = false;
-  let demo = false;
-  let demoEnded = false;
-  let demoCaption = "";
-  let demoClock = 0;
-  let demoStep = 0;
-  let demoSettledAt = -1;
-  let demoBar: DemoBar;
-  let demoCard: DemoCard;
-  /** The pen's glide between two points, drawing a straw along it or not. */
-  let demoMove: { x0: number; y0: number; x1: number; y1: number; start: number; duration: number; draw: boolean } | null = null;
-  let demoStraw = -1;
-  /** Whether the first-run tip is due, read once as the game opens. */
-  let firstTip = false;
-  /** Where Tab cycles while the demo or its question is up. */
-  let demoScope: HTMLElement;
-
-  /** Room 1, with time enough that the pen, not the dial, decides when it pours. */
-  const DEMO_ROOM: Room = { ...ROOMS[0], plan: 30 };
-  const DEMO_WRONG: Array<[number, number]> = [
-    [56, 142],
-    [22, 186],
-  ];
-  const DEMO_ROUTE = ROOMS[0].solution.strokes[0];
-
-  function demoGlide(x1: number, y1: number, duration: number, draw = false) {
-    demoMove = { x0: pen.x, y0: pen.y, x1, y1, start: demoClock, duration, draw };
-  }
-
-  /** The script: each step fires once, when the demo's clock reaches it. */
-  const DEMO_SCRIPT: Array<{ at: number; run: () => void }> = [
-    { at: 0, run: () => ((demoCaption = "a kettle is about to pour; steer its tea into the cup"), (penVisible = true)) },
-    { at: 0.8, run: () => demoGlide(DEMO_WRONG[0][0], DEMO_WRONG[0][1], 0.7) },
-    {
-      at: 1.7,
-      run: () => {
-        demoCaption = "drag to draw a straw";
-        penDrawing = startDraft(pen.x, pen.y);
-        demoGlide(DEMO_WRONG[1][0], DEMO_WRONG[1][1], 0.8, true);
-      },
-    },
-    {
-      at: 2.6,
-      run: () => {
-        penDrawing = false;
-        finishDraft(pen.x, pen.y);
-        demoStraw = world.strokes.at(-1)?.id ?? -1;
-      },
-    },
-    {
-      at: 3.6,
-      run: () => {
-        demoCaption = "that one runs the wrong way; tap a straw to take it back";
-        demoGlide((DEMO_WRONG[0][0] + DEMO_WRONG[1][0]) / 2, (DEMO_WRONG[0][1] + DEMO_WRONG[1][1]) / 2, 0.6);
-      },
-    },
-    { at: 4.6, run: () => removeById(demoStraw) },
-    {
-      at: 5.6,
-      run: () => {
-        demoCaption = "straw is limited, and the gauge below shows what is left";
-        demoGlide(DEMO_ROUTE[0][0], DEMO_ROUTE[0][1], 0.6);
-      },
-    },
-    {
-      at: 6.3,
-      run: () => {
-        penDrawing = startDraft(pen.x, pen.y);
-        const end = DEMO_ROUTE[DEMO_ROUTE.length - 1];
-        demoGlide(end[0], end[1], 1.4, true);
-      },
-    },
-    {
-      at: 7.8,
-      run: () => {
-        penDrawing = false;
-        finishDraft(pen.x, pen.y);
-        penVisible = false;
-      },
-    },
-    { at: 8.6, run: () => (demoCaption = "the kettle pours on its own, or press pour to start early") },
-    {
-      at: 10.6,
-      run: () => {
-        if (pourNow(world)) syncHud();
-        demoCaption = "fill the cup past its line to clear the room";
-      },
-    },
-  ];
-
-  function stepDemo(dt: number) {
-    demoClock += dt;
-    while (demoStep < DEMO_SCRIPT.length && demoClock >= DEMO_SCRIPT[demoStep].at) DEMO_SCRIPT[demoStep++].run();
-    if (demoMove) {
-      const t = clamp((demoClock - demoMove.start) / demoMove.duration, 0, 1);
-      const ease = t * t * (3 - 2 * t);
-      pen.x = demoMove.x0 + (demoMove.x1 - demoMove.x0) * ease;
-      pen.y = demoMove.y0 + (demoMove.y1 - demoMove.y0) * ease;
-      if (demoMove.draw && penDrawing) extendTo(pen.x, pen.y);
-      if (t >= 1) demoMove = null;
-    }
-    // A moment on the cleared room, then the strip offers it again.
-    if (phase === "result" && demoSettledAt < 0) demoSettledAt = demoClock;
-    if (demoSettledAt >= 0 && !demoEnded && demoClock - demoSettledAt > 2.4) {
-      demoEnded = true;
-      liveMessage = "The demo is over.";
-    }
-  }
-
-  /** Starts (or restarts) the demo on room 1. */
-  async function startDemo() {
-    asking = false;
-    demo = true;
-    demoEnded = false;
-    demoClock = 0;
-    demoStep = 0;
-    demoSettledAt = -1;
-    demoMove = null;
-    demoStraw = -1;
-    demoCaption = "";
-    levelsOpen = false;
-    caption = null;
-    tipVisible = false;
-    pen.x = WIDTH / 2;
-    pen.y = HEIGHT / 2;
-    enterRoom(0, DEMO_ROOM);
-    phase = "play";
-    last = 0;
-    liveMessage = "Demo: room 1 plays itself.";
-    await tick();
-    demoBar?.focus();
-  }
-
-  /** Out of the demo (or past the question) into the game as it opens normally. */
-  function leaveDemo() {
-    demo = false;
-    asking = false;
-    demoEnded = false;
-    demoMove = null;
-    penVisible = false;
-    penDrawing = false;
-    verdict = null;
-    setPour(0);
-    tipVisible = firstTip;
-    openGame();
-    focusPlayfieldIfIdle();
-  }
-
-  /** How the game opens: its demo, the question, or straight in. */
-  async function openWithIntro() {
-    const intro = demoIntro("spill", takeDemoRequest("spill"));
-    if (intro === "demo") {
-      void startDemo();
-      return;
-    }
-    if (intro === "ask") {
-      asking = true;
-      enterRoom(0, roomAt(0, 1, expert));
-      phase = "idle";
-      await tick();
-      demoCard?.focus();
-      return;
-    }
-    openGame();
+    return false;
   }
 
   // --- The loop ----------------------------------------------------------------------
 
-  function frame(timestamp: number) {
-    if (!active) return;
-    if (!last) last = timestamp;
-    const elapsed = Math.max(0, (timestamp - last) / 1000);
-    last = timestamp;
-    const dt = Math.min(elapsed, 0.05);
-
-    if (!paused && !levelsOpen && phase !== "done") {
-      clock += dt;
-      if (phase === "countdown") {
-        const nextCount = stepCountdown(countdownElapsed, countdown, Math.min(elapsed, 0.25));
-        countdownElapsed = nextCount.elapsed;
-        if (nextCount.beep) {
-          countdown = nextCount.count;
-          sfxCountdown(countdown);
-        }
-        if (nextCount.done) beginRun();
-      } else if (phase === "play") {
-        if (demo) stepDemo(dt);
-        else stepPen(dt);
+  /**
+   * One frame of play: the countdown, or the room on its fixed clock. The
+   * lessons run on real time (`rawDt`), so a hold lasts as long on a slow
+   * device as a fast one.
+   */
+  function update(dt: number, rawDt: number) {
+    clock += dt;
+    if (phase === "countdown") {
+      const nextCount = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
+      countdownElapsed = nextCount.elapsed;
+      if (nextCount.beep) {
+        countdown = nextCount.count;
+        sfxCountdown(countdown);
+      }
+      if (nextCount.done) beginRun();
+    } else if (phase === "play" || phase === "result") {
+      coach.step(rawDt, dt);
+      quietFor = coach.current ? 0 : quietFor + rawDt;
+      if (phase === "play") {
+        checkLessons();
+        dropLostTarget();
+      }
+      updateHold(Math.min(rawDt, 0.25));
+      if (phase === "play") {
+        stepPen(dt);
+        simulate(dt, lessonHolds);
+      } else {
+        // The verdict is in, and the tea keeps moving until the room changes;
+        // a lesson about the result holds the next room back while it explains.
         simulate(dt);
-      } else if (phase === "result") {
-        // The verdict is in, and the tea keeps moving until the room changes.
-        simulate(dt);
-        resultAge += dt;
-        if (demo) stepDemo(dt);
-        else if (!holdResult && resultAge >= (lastCleared ? CLEAR_SECONDS : FAIL_SECONDS)) advance();
+        if (!lessonHolds) resultAge += dt;
+        if (!holdResult && !lessonHolds && resultAge >= (lastCleared ? CLEAR_SECONDS : FAIL_SECONDS)) advance();
       }
-      if (phase !== "idle") stepVisuals(dt);
-      if (caption) {
-        captionAge += dt;
-        if (captionAge >= captionLife) caption = null;
-        // A retry's hint goes once the tea is coming.
-        else if (captionLife === Infinity && phase === "play" && world.status !== "waiting") caption = null;
-      }
-      hudClock += dt;
-      if (hudClock >= 0.1) {
-        hudClock = 0;
-        syncHud();
-      }
+      // The spotlight follows the lesson shown, held or not (expert's too):
+      // up while it explains, gone as it is done or its move is made.
+      const explains = !!cue && coach.current === cue.lesson && placedCue === cue && !coach.leaving && !coach.acting;
+      if (explains !== lessonExplains) lessonExplains = explains;
+      const dimTarget = explains ? 1 : 0;
+      lessonDim = reduceMotion ? dimTarget : lessonDim + (dimTarget - lessonDim) * (1 - Math.exp(-rawDt / 0.18));
+      const lit = explains && cue ? (cue.target.kind === "pour" ? "pour" : cue.target.kind === "gauge" ? "gauge" : null) : null;
+      if (lit !== barLit) barLit = lit;
     }
-    draw();
-    raf = requestAnimationFrame(frame);
+    if (phase !== "idle") stepVisuals(dt);
+    if (caption) {
+      captionAge += dt;
+      if (captionAge >= captionLife) caption = null;
+      // A retry's hint goes once the tea is coming.
+      else if (captionLife === Infinity && phase === "play" && world.status !== "waiting") caption = null;
+    }
+    if (hudTick(dt)) syncHud();
   }
+
+  const loop = createFrameLoop({
+    update,
+    draw,
+    // The level select and closing time hold the room too; it is still drawn.
+    isPaused: () => paused || levelsOpen || phase === "done",
+  });
 
   // --- Sizing and lifecycle -------------------------------------------------------------
 
@@ -3402,6 +3735,8 @@
     dynCtx ??= dynCanvas.getContext("2d");
     dynImage ??= new ImageData(RW, RH);
     bakeKitchen();
+    // A lesson pointing at a control finds it again where the resize put it.
+    placeRect = null;
     draw();
   }
 
@@ -3412,7 +3747,7 @@
       isPaused: () => paused || levelsOpen,
       pause: () => void pauseGame(),
       togglePause,
-      playScope: () => (demo || asking ? demoScope : playScope),
+      playScope: () => playScope,
       onKey,
       onResize: layout,
       observe: hudRow,
@@ -3428,19 +3763,22 @@
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", releaseAll);
 
+    // A phone is taught with taps until it shows otherwise.
+    if (window.matchMedia("(hover: none) and (pointer: coarse)").matches) inputMode = "touch";
+
     tick().then(() => {
       if (!active) return;
       layout();
       dialFont = arcadeFont(Math.max(10, Math.round(10 + S * 1.2)), 700);
-      firstTip = firstVisit("spill");
-      tipVisible = firstTip;
-      void openWithIntro();
-      raf = requestAnimationFrame(frame);
+      // Into room 1, focus rests on the playfield so its keys work at once;
+      // the level select puts it on the next room's tile itself.
+      if (openGame()) focusPlayfield();
+      loop.start();
     });
 
     return () => {
       active = false;
-      cancelAnimationFrame(raf);
+      loop.stop();
       timers.clear();
       setPour(0);
       stopMusic();
@@ -3479,7 +3817,7 @@
 
 <div bind:this={playScope} class="sp-play">
   <!-- Where focus rests in play: not a button, so Space stays the pen key. -->
-  <div bind:this={playfield} class="sr-only" tabindex="-1" role="group" aria-label="Spill playfield"></div>
+  <div bind:this={playfield} class="sr-only" tabindex="-1" role="group" aria-label="Spill playfield" on:focus={onPlayfieldFocus}></div>
   <header class="boba-hud boba-ui is-bare" aria-label="Spill status">
     <div bind:this={hudRow} class="boba-hud-row">
       <div class="boba-ticket boba-ticket-start boba-riso" style="--tilt: -1.1deg">
@@ -3516,7 +3854,7 @@
           <button
             type="button"
             class="boba-icon-btn"
-            disabled={phase === "countdown" || phase === "done" || paused || demo || asking}
+            disabled={phase === "countdown" || phase === "done" || paused}
             aria-label="Levels"
             aria-keyshortcuts="L"
             aria-haspopup="dialog"
@@ -3530,24 +3868,23 @@
         </span>
       </div>
     </div>
-
-    {#if tipVisible && !paused && !levelsOpen && phase !== "idle"}
-      <div class="boba-tip" role="note" aria-label="How to play">
-        <span>draw a straw to steer the tea into the cup</span>
-      </div>
-    {/if}
   </header>
 
-  <!-- The same line goes to the live region, so this copy is hidden. -->
+  <!-- The same line goes to the live region, so this copy is hidden. It steps aside while a lesson is up. -->
   {#if caption}
     {#key caption.id}
-      <p class="sp-caption boba-ui" style="top: {captionTop}px" aria-hidden="true">{caption.line}</p>
+      <p bind:this={captionEl} class="sp-caption boba-ui" class:is-hidden={captionHidden} style="top: {captionTop}px" aria-hidden="true">{caption.line}</p>
     {/key}
   {/if}
 
   {#if verdict}
     {#key verdict.id}
-      <div class="sp-verdict boba-ui boba-riso is-small" style="top: {verdictTop}px; left: {roomCenterX}px" aria-hidden="true">
+      <div
+        bind:this={verdictEl}
+        class="sp-verdict boba-ui boba-riso is-small"
+        style="top: {verdictTop}px; left: {roomCenterX}px"
+        aria-hidden="true"
+      >
         <span class="sp-verdict-stars">
           {#each [0, 1, 2] as index}
             <span class="sp-verdict-star" class:is-on={index < verdict.stars} style="--delay: {index * STAR_STAGGER}s">
@@ -3560,7 +3897,8 @@
     {/key}
   {/if}
 
-  <div bind:this={barEl} class="sp-bar boba-ui">
+  <!-- While a lesson explains, the bar steps back except the control it is about. -->
+  <div bind:this={barEl} class="sp-bar boba-ui" class:is-spot={lessonExplains}>
     {#if canNext}
       <button
         type="button"
@@ -3574,8 +3912,10 @@
       </button>
     {:else}
       <button
+        bind:this={pourButton}
         type="button"
         class="boba-btn sp-bar-btn sp-bar-main"
+        class:is-lit={barLit === "pour"}
         style="--lean: -0.6deg"
         disabled={!canPour}
         aria-keyshortcuts="Enter"
@@ -3589,7 +3929,9 @@
     <!-- The straw gauge: what is left, the straw being drawn, and what each straw down cost. -->
     {#key gaugeShake}
       <div
+        bind:this={gaugeEl}
         class="sp-gauge boba-riso is-small"
+        class:is-lit={barLit === "gauge"}
         class:is-low={strawLow}
         class:is-out={strawOut}
         class:is-hit={gaugeShake > 0}
@@ -3627,6 +3969,25 @@
       <kbd aria-hidden="true">C</kbd>
     </button>
   </div>
+
+  <!-- The lesson's callout, beside the fixture, the ghost route, the cup, or the control it is about:
+       inside the play scope, so Tab reaches its Continue. -->
+  <Coach
+    lesson={coachLesson}
+    x={coachX}
+    y={coachY}
+    side={coachSide}
+    ring={coachRing}
+    width={coachWidth}
+    scene={coachScene}
+    leaving={coachLeaving}
+    touch={inputMode === "touch"}
+    continuable={coachContinuable}
+    on:continue={continueLesson}
+    returnFocus={focusPlayfield}
+    hidden={paused || levelsOpen || phase === "done" || phase === "countdown"}
+    top={hudBottomPx + 8}
+  />
 </div>
 
 {#if levelsOpen}
@@ -3707,34 +4068,14 @@
   </div>
 {/if}
 
-<div bind:this={demoScope}>
-  {#if asking}
-    <DemoCard
-      bind:this={demoCard}
-      deck="Watch room 1 play itself for a few seconds, or go straight in."
-      on:watch={() => void startDemo()}
-      on:play={leaveDemo}
-    />
-  {:else if demo && !paused}
-    <DemoBar
-      bind:this={demoBar}
-      caption={demoCaption}
-      ended={demoEnded}
-      placement="top"
-      on:play={leaveDemo}
-      on:again={() => void startDemo()}
-    />
-  {/if}
-</div>
-
 {#if countdown > 0 && phase === "countdown"}
-  <Countdown value={countdown} caption="kettle's on" goCaption="pour" />
+  <Countdown value={countdown} />
 {:else if goVisible}
-  <Countdown value={0} caption="kettle's on" goCaption="pour" />
+  <Countdown value={0} />
 {/if}
 
 {#if paused}
-  <PauseCard bind:this={pauseCard} deck="The kettle is holding its pour." on:resume={resumeGame} on:menu={toMenu} on:exit={exit} />
+  <PauseCard bind:this={pauseCard} on:resume={resumeGame} on:menu={toMenu} on:exit={exit} />
 {/if}
 
 {#if phase === "done"}
@@ -3862,6 +4203,11 @@
     box-shadow: var(--shadow-popover-dark);
   }
 
+  /* One message at a time: a lesson up elsewhere hides the chip, not forgets it. */
+  .sp-caption.is-hidden {
+    visibility: hidden;
+  }
+
   @keyframes sp-caption-in {
     from {
       opacity: 0;
@@ -3929,6 +4275,16 @@
   .sp-bar-btn {
     min-width: 6rem;
     pointer-events: auto;
+    transition:
+      transform var(--motion-base) var(--ease-emphasized),
+      filter 180ms var(--ease-standard);
+  }
+
+  /* A lesson explaining: the bar steps back with the kitchen, except the
+     control the lesson is about (Pour, or the straw gauge). */
+  .sp-bar.is-spot > .sp-bar-btn:not(.is-lit),
+  .sp-bar.is-spot > .sp-gauge:not(.is-lit) {
+    filter: brightness(0.62) saturate(0.85);
   }
 
   /* --- The straw gauge: a long straw that shortens from the right as it is spent --- */
@@ -3944,6 +4300,7 @@
     padding: var(--space-1-5) var(--space-3);
     pointer-events: auto;
     cursor: default;
+    transition: filter 180ms var(--ease-standard);
   }
 
   .sp-gauge.is-hit {
@@ -4196,6 +4553,11 @@
     .sp-verdict-star,
     .sp-gauge.is-hit {
       animation: none;
+    }
+
+    .sp-bar-btn,
+    .sp-gauge {
+      transition: none;
     }
   }
 

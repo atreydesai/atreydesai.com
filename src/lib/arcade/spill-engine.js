@@ -16,9 +16,13 @@
 // bounce and friction at contacts. Every per-particle quantity lives in a typed
 // array sized once, so the hot loop allocates nothing.
 
+import { clamp } from "./core/math.ts";
+import { createRng } from "./core/rng.ts";
 import { ROOMS } from "./spill-rooms.js";
 
-export { ROOMS };
+// The seeded generator (mulberry32) is the core's: bit for bit the one this
+// engine wrote for itself, so every room's droplets fall as they always have.
+export { ROOMS, createRng };
 
 export const WIDTH = 240;
 export const HEIGHT = 300;
@@ -236,36 +240,11 @@ const BOUNCE_GAP = 1 / 30;
  * @typedef {{ id: number, points: Array<[number, number]>, length: number }} Stroke
  */
 
-/**
- * A small seeded generator (mulberry32).
- * @param {number} seed
- * @returns {() => number} values in [0, 1)
- */
-export function createRng(seed) {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 /** @param {string} text */
 function hashString(text) {
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return h >>> 0;
-}
-
-/**
- * @param {number} value
- * @param {number} low
- * @param {number} high
- */
-function clamp(value, low, high) {
-  return value < low ? low : value > high ? high : value;
 }
 
 // --- World -----------------------------------------------------------------------
@@ -1915,8 +1894,9 @@ export function judgeRoom(world) {
 }
 
 /**
- * Runs a room to its end with some straws drawn first, as the tests and any
- * demo would. Returns the result and the world.
+ * Runs a room to its end with some straws drawn first, as the tests do (and
+ * the route lesson, to see whether a player's own straw works). Returns the
+ * result and the world.
  * @param {Room} room
  * @param {Array<Array<[number, number]>>} [strokes]
  * @param {{ pourAt?: number, maxSeconds?: number }} [options] pourAt presses "pour now" at that time

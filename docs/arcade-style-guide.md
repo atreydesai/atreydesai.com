@@ -866,11 +866,27 @@ room, to steer it into the cup.
   belts back until the second lap, so its first lap is every expert room,
   mirrored or not, on just the route; a test clears each of them at that
   pace.
-- **The demo** plays room 1 on its real rules for about twenty seconds: a
-  pen draws a straw the wrong way, takes it back with a tap, draws the
-  room's route, and presses pour, and the room clears. It records nothing,
-  takes no game keys, and holds on pause. Its strip sits at the top, clear
-  of the straw gauge.
+- **Taught in the room** (`spill-lessons.js`, proven by
+  `tests/spill-lessons.test.mjs`). A device that has cleared nothing goes
+  straight into room 1 through its countdown; one with progress opens on the
+  level select, as before. Nothing is slowed: a lesson that explains holds
+  the room instead, and during planning the room is frozen outright (dial,
+  belts, rails and all), so it later plays out step for step as it would
+  have from that planning time. Straws can still be drawn and taken back
+  while it waits. Each lesson may hold for seven seconds of a visit.
+  Continue (`Enter`, or the slip's button), pressing Pour, or doing what the
+  lesson asks lets the room run on. While any lesson is up the kitchen dims
+  to the thing it is about, in expert too, though expert never holds its
+  five seconds. Room 1, the first time on a device, draws its own route as a
+  cream ghost straw, with chalk marching the way to draw it from an accent
+  post under the stream and the pen keys beside it; the route counts as
+  learned only when the straws as laid would pour into the cup, and then
+  Pour is pointed out. A straw that spoils it is where taking a straw back
+  is taught. Each fixture is named, in italic with a pen loop round it, at
+  the start of the first room that has one. The gauge is named the first
+  time straw runs low, the dial as the kettle is about to pour by itself,
+  and the fill line as tea first reaches a cup. The stars, the points and a
+  spill's hint are named the first time a room ends that way.
 - **The share** is a square per room by its best stars (green three, yellow
   two, orange one), a page of three to a group and four pages to a line.
 - **The order is drawn on the cup:** a fill line, a two-tone band for a milk
