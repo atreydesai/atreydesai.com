@@ -1067,21 +1067,6 @@ export function sfxSputter() {
   effectNoise(start + 0.09, 0.04, 0.05, "bandpass", 600);
 }
 
-/**
- * Order up's demo: the pour stream while the shift's music is paused under
- * the demo. Same as setPourStream, but heard through that pause, since the
- * demo plays its sounds while the shift waits.
- */
-export function setDemoPourStream(level: number, fill = 0) {
-  const held = musicPaused;
-  musicPaused = false;
-  try {
-    setPourStream(level, fill);
-  } finally {
-    musicPaused = held;
-  }
-}
-
 // --- Sugar rush and spill ---------------------------------------------------
 
 // Two more steered loops, built on first use like the thruster: sugar rush's

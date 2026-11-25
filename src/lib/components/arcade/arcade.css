@@ -319,42 +319,7 @@ body.boba-active .custom-cursor {
   transform: translateY(1px);
 }
 
-/* --- First-run tip ---------------------------------------------------------- */
-
-.boba-tip {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: center;
-  gap: var(--space-1) var(--space-2);
-  width: fit-content;
-  max-width: min(45rem, calc(100vw - var(--space-8)));
-  margin: var(--space-4) auto 0;
-  padding: var(--space-2) var(--space-3);
-  color: var(--b-text);
-  background: var(--b-raised);
-  border: 1px solid var(--b-rule);
-  border-radius: var(--radius-inline);
-  box-shadow: var(--shadow-popover);
-  font-size: 0.75rem;
-  line-height: 1.333;
-  text-align: center;
-  pointer-events: auto;
-  animation: boba-rise var(--motion-slow) var(--ease-emphasized) both;
-}
-
-.dark .boba-tip {
-  box-shadow: var(--shadow-popover-dark);
-}
-
-.boba-tip-label {
-  margin-right: var(--space-1);
-  color: var(--b-strong);
-  font-family: var(--font-ui);
-  font-size: inherit;
-  font-style: italic;
-  font-weight: 400;
-}
+/* --- Key chips ------------------------------------------------------------- */
 
 .boba-keys {
   display: inline-flex;
@@ -364,10 +329,6 @@ body.boba-active .custom-cursor {
   color: var(--b-muted);
   font-size: 0.75rem;
   line-height: 1.25;
-}
-
-.boba-tip .boba-keys {
-  margin-left: var(--space-2);
 }
 
 .boba-keys kbd {
@@ -746,7 +707,6 @@ body.boba-active .custom-cursor {
 @media (prefers-reduced-motion: reduce) {
   .boba-riso.is-rush::before,
   .boba-combo.active,
-  .boba-tip,
   .boba-card,
   .boba-miss-flash {
     animation: none;

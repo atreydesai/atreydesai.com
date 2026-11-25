@@ -37,16 +37,6 @@ function bestCookie(game: GameId, mode: ArcadeMode) {
   return mode === "expert" ? `${BEST_COOKIE[game]}_expert` : BEST_COOKIE[game];
 }
 
-const TIP_COOKIE: Record<GameId, string> = {
-  catch: "boba_instructions_seen_v1",
-  stab: "boba_tip_stab_v1",
-  orders: "boba_tip_orders_v1",
-  stack: "boba_tip_stack_v1",
-  lander: "boba_tip_lander_v1",
-  runner: "boba_tip_runner_v1",
-  spill: "boba_tip_spill_v1",
-};
-
 const ONE_YEAR = 31_536_000;
 
 function readCookie(name: string) {
@@ -167,31 +157,6 @@ export async function syncBests(mode: ArcadeMode = currentMode(), game?: GameId)
   }
 }
 
-/** True the first time a game is opened on this device; remembers the visit. */
-export function firstVisit(game: GameId) {
-  const seen = readCookie(TIP_COOKIE[game]) !== null;
-  if (!seen) writeCookie(TIP_COOKIE[game], "1");
-  return !seen;
-}
-
-/**
- * How a game opens: on its demo (the menu asked for it), asking whether to
- * watch the demo (the first time on this device), or straight to the
- * countdown. Remembers that the question was asked, so it is asked once.
- * (Order up also checks its older first-shift cookie, so a regular who
- * already answered that question isn't asked again.)
- */
-export function demoIntro(game: GameId, requested: boolean): "demo" | "ask" | "none" {
-  if (requested) {
-    writeCookie(DEMO_COOKIE(game), "1");
-    return "demo";
-  }
-  if (readCookie(DEMO_COOKIE(game)) !== null) return "none";
-  writeCookie(DEMO_COOKIE(game), "1");
-  return "ask";
-}
-
-const DEMO_COOKIE = (game: GameId) => `boba_demo_${game}_v1`;
 
 // Spill keeps its progress on this device as one small JSON value: each
 // room's best stars and points, and whether after hours is open. Expert is

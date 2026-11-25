@@ -439,8 +439,29 @@ A conveyor belt carries cups past a straw; stab each on the beat.
   pearls, opens two tiers up and climbs a tier every song into a syncopated
   tier of its own, and pushes about a third of bars half a beat off the
   beat. Its scene opens at twilight.
-- **A demo** plays itself on the same rules for about twenty seconds: a
-  good, a graze, and a let-go cup in turn, each while its caption is up.
+- **Taught on the belt** (`stab-lessons.js`, timed on simulated runs by
+  `tests/stab-lessons.test.mjs`). The beat is the audio clock, so nothing
+  slows; a device's first run opens on a practice instead. Its first four
+  cups score nothing and cost no pearl, and neither does the bare belt
+  meanwhile. "Stab when the cup reaches the notch." sits under the belt by
+  the notch while a pen loop shrinks onto the notch for each practice cup,
+  snug on the cup exactly on its beat; for the first two, a dithered cream
+  ghost straw goes in on the beat as a dead-on stab would. Two good stabs in
+  a row end the practice early; one with no good stab comes back next run.
+  After that each thing is named as it first happens, under the belt by the
+  notch: the early and late notes, a perfect, a graze, a pearl lost to a cup
+  let go or to the bare belt, a new song's beat, nightfall's busier belt,
+  and in expert the tighter windows. The first golden cup and the first cup
+  between the beats are ringed in pen once they are the next cup the straw
+  needs, never sooner. While a line explains, the sky, the stall and the
+  belt behind the notch dim and the lane stays lit to the right edge; the
+  music never waits. A line holds up to six seconds with Continue (Enter on
+  the playfield, or its button); Enter doesn't stab.
+- **The climb.** Normal plays two songs at tier 0 and two at tier 1, then
+  steps every other song to tier 3, tier 4 at the eighth song and the top
+  at the tenth. From tier 3 each tier carries a syncopated bar, and in each
+  mode's top two tiers a perfect is a tenth tighter (`45ms`, expert
+  `27ms`); good and graze never change.
 - **The share** is a row per song, a square per bar, coloured by the worst
   stab in it.
 - **A night-market stall, kept in the background.** The scene is a painted
@@ -886,7 +907,7 @@ room, to steer it into the cup.
   `data-justify="off"` so the paragraph justifier leaves game copy alone.
 - Shared pieces live in `src/lib/components/arcade/` (menu, leaderboards,
   countdown, pause card, results slip with the per-game leaderboard and
-  share button, demo card and demo strip, expert tag, pearls, cup timer, HUD
+  share button, the coach's callout, expert tag, pearls, cup timer, HUD
   buttons, track flag), and `src/lib/arcade/shell.ts` wires a game into the
   window (auto-pause, Tab cycling, the pause key, Reduce Motion, resizing).
   `share.ts` builds share text and `blink.ts` times the revive blink.

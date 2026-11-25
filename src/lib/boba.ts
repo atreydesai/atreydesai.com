@@ -110,14 +110,6 @@ export function setExpert(on: boolean) {
   }
 }
 
-/**
- * @deprecated The menu no longer opens a game on its demo; games teach in
- * play. Kept only until every game has moved over, then removed.
- */
-export function takeDemoRequest(_id: GameId) {
-  return false;
-}
-
 // Catch needs both enough room for readable trajectories and a precise
 // mouse-like pointer; the other games play by tap or key.
 export const BOBA_DESKTOP_QUERY =
