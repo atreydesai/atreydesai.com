@@ -839,7 +839,7 @@
 		.lead { left: 0; top: 16px; gap: 10px; }
 		h2 { font-size: clamp(28px, 8.4vw, 36px); }
 		.col, .bar { width: 100%; }
-		.ctl { gap: 8px; }
+		.ctl { gap: 8px; flex-wrap: wrap; overflow: visible; }
 		.seg { gap: 1px; }
 		.seg button { padding-inline: 6px; }
 		.tl :global(.tl-cue-narrow) { display: inline-flex; }

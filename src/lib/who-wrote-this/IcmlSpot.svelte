@@ -2,7 +2,7 @@
 	// The ICML 2020 result, up front: in the masthead beside the title on a wide screen, under the deck on a phone.
 	// The abstract's sentence, then the same reviews as two squares of 100 tiles (1 tile = 1% of the reviews): from the
 	// review alone, and given the list of reviewers (a 2K-review subsample; a dashed line marks the most the list
-	// allows). The button jumps to the section's wall (#which-human/reviews), where the full result is drawn.
+	// allows). The button jumps to the section's wall (#which-human/reviews, set on click), where the full result is drawn.
 	// Strings and numbers: content.json (the abstract's sentence, levels.items[2]) and rq3.json (`list`, `ui`), built
 	// in the private llm-detectors repo by docs/launch_20261116/tools/build_rq3_data.py. Everything is in the
 	// prerendered page at its final size, so nothing below it moves when the page wakes.
@@ -58,7 +58,9 @@
 			</figure>
 		{/each}
 	</div>
-	<a class="sp-go" href="#which-human/reviews">{U["spot.go"]}<Icon name="arrow" class="down" /></a>
+	<!-- the section in the HTML (a step is not an element, and the prerender checks every #link); with the script, the
+	     step: the page follows the hash to the wall (steplinks.ts) -->
+	<a class="sp-go" href="#which-human" onclick={(e) => { e.preventDefault(); location.hash = "which-human/reviews"; }}>{U["spot.go"]}<Icon name="arrow" class="down" /></a>
 </aside>
 
 <style>

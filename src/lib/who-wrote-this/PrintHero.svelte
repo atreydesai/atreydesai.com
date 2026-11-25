@@ -345,8 +345,8 @@
 	.tpos { position: fixed; left: 0; top: 0; }
 	.tag {
 		position: relative; transform: translate(-50%, 0); display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; white-space: nowrap;
-		border-radius: 3px; background: rgba(255, 255, 255, .94); font-size: 13px; font-weight: 600; color: var(--ink);
-		box-shadow: 0 4px 14px rgba(20, 32, 45, .12); transition: opacity .3s;
+		border-radius: 2px; background: rgba(232, 232, 227, .92); font-size: 13px; font-weight: 600; color: var(--ink);
+		transition: opacity .3s; /* the page's one label style (Tags.svelte): the ground's colour, no shadow */
 	}
 	.tag :global(svg) { width: 14px; height: 14px; }
 	.tag[data-k="human"] { color: var(--rq1); } .tag[data-k="ai"] { color: var(--rq2); }

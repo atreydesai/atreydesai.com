@@ -22,5 +22,7 @@
 	button:hover i { background: #898989; }
 	button.past i { background: #898989; }
 	button.on i { background: #14202D; }
+	/* a touch screen: each dash is a 32 x 36 px target (the guide's floor for a finger), drawn the same */
+	@media (pointer: coarse) { .dashes { margin: -15px 0 -7px -4px; } button { height: 36px; } }
 	@media (prefers-reduced-motion: reduce) { i { transition: none; } }
 </style>

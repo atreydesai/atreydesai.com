@@ -133,6 +133,7 @@
 	.chev { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 3px; color: #14202D; }
 	.chev:hover:not(:disabled) { background: rgba(20, 32, 45, .07); }
 	.chev:disabled { opacity: .25; cursor: default; }
+	@media (pointer: coarse) { .chev { width: 40px; height: 40px; margin: -8px; } }
 	.chev svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 
 	/* the rail, on the left */

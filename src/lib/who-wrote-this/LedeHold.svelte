@@ -30,7 +30,9 @@
 	let extra = $state(0); // px the hold is lengthened by, this pass
 
 	onMount(() => {
-		const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+		// a touch screen: no hold and no lengthening (a flick's momentum ran into the pinned lede and felt stuck); the lede
+		// keeps its screen of its own and scrolls with the page
+		const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches || matchMedia("(pointer: coarse)").matches;
 		let prevY = NaN, prevT = 0, v = 0; // v: scroll speed, px per ms (down is positive), lightly smoothed
 		let armT = -1, decided = false, timer = 0, rel = Infinity;
 		const forget = () => { armT = -1; decided = false; clearTimeout(timer); timer = 0; if (extra) extra = 0; };
@@ -89,6 +91,7 @@
 	.run { position: absolute; top: 0; left: 0; right: 0; pointer-events: none; }
 	.stage { position: sticky; top: 0; box-sizing: border-box; min-height: calc(100 * var(--vh, 1vh)); padding-block: 24px; display: grid; align-content: center; }
 	.box { pointer-events: auto; }
+	@media (pointer: coarse) { .lede-wrap { height: calc(100 * var(--vh, 1vh)); } }
 	/* a screen too short to hold the whole paragraph: it scrolls with the page, with its screen of ground around it */
 	@media (max-height: 520px) {
 		.lede-wrap { height: auto; }

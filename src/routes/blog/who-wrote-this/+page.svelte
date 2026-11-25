@@ -471,6 +471,11 @@
 	.btn.paper { background: var(--fable); border-color: var(--fable); color: #fff; }
 	.btn.paper:hover { background: #8F3F16; border-color: #8F3F16; color: #fff; }
 
+	/* footnote marks: a 7 px number is a hard tap; the target reaches past it on a touch screen */
+	@media (pointer: coarse) {
+		.wwt :global(sup.fnref a) { position: relative; }
+		.wwt :global(sup.fnref a::after) { content: ""; position: absolute; inset: -12px -10px; }
+	}
 	@media (max-width: 760px) {
 		.finale { height: calc(160 * var(--vh, 1vh)); }
 		.finale-in { grid-template-columns: 1fr; align-content: center; gap: calc(6 * var(--vh, 1vh)); padding-block: calc(10 * var(--vh, 1vh)); }
@@ -479,7 +484,7 @@
 	@media (max-width: 600px) {
 		.mast { padding-top: 32px; }
 		.lede { font-size: 18px; }
-		.breath { height: calc(12 * var(--vh, 1vh)); }
+		.breath { height: calc(4 * var(--vh, 1vh)); }
 		.lede::first-letter { font-size: calc(18px * 1.6 * 3 * 0.86); }
 		.top nav { gap: 14px; }
 	}

@@ -8,6 +8,7 @@
 
 	let show = $state(false);
 	const IDLE = 2200;
+	let shown = 0; // times it has come up this visit; a touch screen gets it once
 
 	onMount(() => {
 		let last = performance.now();
@@ -18,7 +19,9 @@
 			// (the closing band's place is cached by the page's loop: no layout read here)
 			finale ??= document.querySelector(".finale");
 			const end = finale ? docBox(finale).top - vp.y : Infinity;
-			const want = performance.now() - last > IDLE && end > (vp.h || innerHeight) * 0.9 && !document.querySelector(".ph .cue");
+			const once = matchMedia("(pointer: coarse)").matches && shown >= 1 && !show;
+			const want = !once && performance.now() - last > IDLE && end > (vp.h || innerHeight) * 0.9 && !document.querySelector(".ph .cue");
+			if (want && !show) shown++;
 			if (want !== show) show = want;
 		}, 400);
 		addEventListener("scroll", onScroll, { passive: true });

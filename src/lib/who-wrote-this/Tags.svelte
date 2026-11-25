@@ -48,7 +48,11 @@
 <style>
 	.tags { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
 	.pos { position: fixed; left: 0; top: 0; transition: transform .35s var(--ease, ease); }
-	.tag { position: relative; display: grid; gap: 1px; padding: 3px 8px; border-radius: 3px; background: rgba(243, 243, 239, .94); box-shadow: 0 2px 10px rgba(20, 32, 45, .08); font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; transition: opacity .3s; }
+	/* One label style for every chart (style guide, launch page labels): plain words in ink on a squared backing in the
+	   ground's own colour, so on the dotted ground a label reads as text and on tiles or prints it still masks them. No
+	   shadow (the guide keeps shadows for tooltips) and no light card, which read as buttons. A colour key is the same
+	   label with its swatch. The padding and sizes are the ones the sections' layout maths assumes (TAG_H, tagW). */
+	.tag { position: relative; display: grid; gap: 1px; padding: 3px 8px; border-radius: 2px; background: rgba(232, 232, 227, .92); font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; transition: opacity .3s; }
 	.tag.strong { font-size: 14px; padding: 5px 10px; }
 	.line { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 	.line :global(svg) { width: 1em; height: 1em; color: var(--c); }
@@ -60,8 +64,10 @@
 	.sw-hollow { background: transparent; border: 1.5px solid var(--c); }
 	.sw-line { width: 16px; height: 2.5px; border-radius: 1px; }
 	.sw-dash { width: 16px; height: 2.5px; border: 0; background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 8px); }
-	.at-right { transform: translate(10px, -50%); }
-	.at-left { transform: translate(calc(-100% - 10px), -50%); }
+	/* beside the point: the words (not the backing, which no longer shows on the ground) start 10 px from it, so a
+	   label set at a mark's edge lines up with the mark */
+	.at-right { transform: translate(2px, -50%); }
+	.at-left { transform: translate(calc(-100% - 2px), -50%); }
 	.at-above { transform: translate(-50%, calc(-100% - 8px)); }
 	.at-below { transform: translate(-50%, 8px); }
 	.at-center { transform: translate(-50%, -50%); }

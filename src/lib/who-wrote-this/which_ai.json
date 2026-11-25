@@ -278,7 +278,7 @@
   "Musk v. Altman, trial transcript",
   "Elon Musk (photo: Debbie Rowe / The Royal Society, CC BY-SA 3.0)",
   "Model release date",
-  "Bar height: the share of a model’s texts that Claude Fable 5.2 credits to the model’s own lab",
+  "Bar height: the share of a model’s texts that Fable 5.2 credits to its own lab",
   "{pct}% (above each bar: the share of its texts credited to the model’s own lab; on a thread: the share credited to that lab)",
   "Claude",
   "GPT",

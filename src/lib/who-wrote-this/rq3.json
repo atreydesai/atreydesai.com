@@ -474,11 +474,11 @@
   },
   {
    "id": "key.correct",
-   "t": "{model}: named correctly"
+   "t": "{model} named the writer"
   },
   {
    "id": "key.wrong",
-   "t": "Incorrect"
+   "t": "Not named"
   },
   {
    "id": "conf.lo",

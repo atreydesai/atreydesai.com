@@ -142,7 +142,7 @@
 
 	// ---- 1. the bars: a row per lab, a bar per model at its release date ---------------------------------------------
 	function barsLayout(w: number, h: number, narrow: boolean): BarsGeo {
-		const hf = F(600, narrow ? 11 : 12.5), nf = F(600, narrow ? 9.5 : 11), mf = F(500, narrow ? 9 : 10.5);
+		const hf = F(600, narrow ? 12 : 12.5), nf = F(600, 11), mf = F(500, 11); // 11 px: the guide's floor for chart text
 		// a wide screen names every model under its bar; a phone names a model only on the step that names it, over its
 		// number, so a name and its number read as one label
 		const axisH = narrow ? 40 : 42, numH = narrow ? 22 : 14, nameH = narrow ? 5 : 14;
@@ -175,7 +175,7 @@
 	// ---- 2. the board: models on the left, Claude and GPT on the right, threads between ------------------------------
 	function boardLayout(w: number, h: number, narrow: boolean): BoardGeo {
 		const nw = narrow ? Math.min(150, w * 0.42) : 200, nh = narrow ? 34 : 46, hw = narrow ? 96 : 184, hh = narrow ? 48 : 66;
-		const lf = F(600, narrow ? 10 : 11.5), lh = narrow ? 16 : 19;
+		const lf = F(600, narrow ? 11 : 11.5), lh = narrow ? 16 : 19;
 		// the cards, in lab groups: a little room between groups, less within
 		let gIn = narrow ? 5 : 9, gOut = narrow ? 11 : 20;
 		const groups = BOARD.map((x, i) => (i && x.lab !== BOARD[i - 1].lab ? 1 : 0) as number);
@@ -409,7 +409,7 @@
 					{@render caption(0, NB, bs)}
 					<div class="keyw" class:on={grown}>
 						<div class="key" style:height="{keyTags.h}px"><Tags items={keyTags.items} follow /></div>
-						<p class="measure">{u("Bar height: the share of a model’s texts that Claude Fable 5.2 credits to the model’s own lab")}</p>
+						<p class="measure">{u("Bar height: the share of a model’s texts that Fable 5.2 credits to its own lab")}</p>
 						<!-- the hover cue: at the key row's right end, over the chart's top right (always in the flow, so the
 						     chart's height never changes when it fades) -->
 						<HoverCue inline hover="Hover over a bar" tap="Tap a bar" show={grown && !tried} style="margin-left:auto; margin-block:-1px" />
@@ -655,17 +655,18 @@
 		.measure { font-size: 11px; }
 		.chart { margin-top: 8px; }
 		.head { font-size: 11px; }
-		.n { font-size: 9.5px; }
-		.nm { font-size: 9px; }
-		.tick { font-size: 10px; }
+		/* 11 px: the guide's floor for chart text (the layout measures these sizes) */
+		.n { font-size: 11px; }
+		.nm { font-size: 11px; }
+		.tick { font-size: 11px; }
 		.atitle { font-size: 11.5px; }
 		.kbody { margin-top: 10px; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; gap: 12px; }
-		.share { font-size: 10px; }
+		.share { font-size: 11px; }
 		.node, .hub { padding: 0 8px; }
 		.node b { font-size: 11.5px; }
-		.node span { font-size: 9.5px; }
+		.node span { font-size: 11px; }
 		.hub b { font-size: 15px; gap: 6px; }
-		.hub span { font-size: 10px; gap: 5px; }
+		.hub span { font-size: 11px; gap: 5px; }
 		.hub .ln { width: 12px; }
 		/* a phone keeps only the current report, all in one cell so nothing below moves between steps */
 		.evs { display: grid; }

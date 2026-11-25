@@ -287,7 +287,7 @@
 		let s = maxS, cols = 1;
 		for (; s > 2; s -= 0.25) { cols = Math.floor(W / s); if (items.reduce((a, it) => a + Math.ceil(it.n / cols) * s, 0) + fixed <= A.y1 - top) break; }
 		const total = items.reduce((a, it) => a + Math.ceil(it.n / cols) * s, 0) + fixed;
-		let y = top + Math.max(0, (A.y1 - top - total) / 2), base = 0;
+		let y = top + Math.min(28, Math.max(0, (A.y1 - top - total) / 2)), base = 0; // under the card, not adrift below it
 		const out: { it: Bar; y: number; h: number }[] = [];
 		for (const it of items) {
 			if (it.strong && it.num && tagW(it.t, { strong: true, swatch: it.swatch !== false, icon: !!it.icon }) + tw(it.num, 24, 600) + 16 > W) it.strong = false;

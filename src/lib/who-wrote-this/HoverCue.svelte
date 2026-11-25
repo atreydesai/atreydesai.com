@@ -16,9 +16,10 @@
 
 <style>
 	.hc {
-		position: absolute; z-index: 3; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 8px; border-radius: 999px;
+		/* squared like every control on the page (radius 2 to 3 px, no pills) and flat (no shadow) */
+		position: absolute; z-index: 3; display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px 6px 8px; border-radius: 3px;
 		background: #14202D; color: #fff; font-size: 12.5px; font-weight: 600; line-height: 1; letter-spacing: -0.005em; white-space: nowrap;
-		pointer-events: none; box-shadow: 0 6px 18px rgba(20, 32, 45, .22); transition: opacity .35s ease, transform .35s ease;
+		pointer-events: none; transition: opacity .35s ease, transform .35s ease;
 	}
 	.hc.hc-inline { position: relative; z-index: auto; vertical-align: middle; }
 	.hc.off { opacity: 0; transform: translateY(4px); }
