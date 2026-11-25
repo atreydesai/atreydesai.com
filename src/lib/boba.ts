@@ -29,16 +29,16 @@ export const GAMES: GameInfo[] = [
     desktopOnly: true,
   },
   {
-    id: "stab",
-    name: "straw stab",
-    blurb: "Punch a straw into every cup, right on the beat.",
+    id: "runner",
+    name: "sugar rush",
+    blurb: "Run the rooftops and deliver the tea before it spills.",
     key: "2",
     desktopOnly: false,
   },
   {
-    id: "orders",
-    name: "order up",
-    blurb: "Pour to the line, scoop the toppings, shake, and serve before anyone gives up.",
+    id: "lander",
+    name: "tea minus",
+    blurb: "Land a cup of milk tea on the moon. The tea is also the fuel.",
     key: "3",
     desktopOnly: false,
   },
@@ -50,23 +50,23 @@ export const GAMES: GameInfo[] = [
     desktopOnly: false,
   },
   {
-    id: "lander",
-    name: "tea minus",
-    blurb: "Land a cup of milk tea on the moon. The tea is also the fuel.",
+    id: "spill",
+    name: "spill",
+    blurb: "Draw straws to steer the pour into the cup.",
     key: "5",
     desktopOnly: false,
   },
   {
-    id: "runner",
-    name: "sugar rush",
-    blurb: "Run the rooftops and deliver the tea before it spills.",
+    id: "stab",
+    name: "straw stab",
+    blurb: "Punch a straw into every cup, right on the beat.",
     key: "6",
     desktopOnly: false,
   },
   {
-    id: "spill",
-    name: "spill",
-    blurb: "Draw straws to steer the pour into the cup.",
+    id: "orders",
+    name: "order up",
+    blurb: "Pour to the line, scoop the toppings, shake, and serve before anyone gives up.",
     key: "7",
     desktopOnly: false,
   },
@@ -110,22 +110,12 @@ export function setExpert(on: boolean) {
   }
 }
 
-// A demo asked for from the menu. The game takes it once, when it opens, and
-// plays its demo before the first run instead of going straight in.
-let demoAsked: GameId | null = null;
-
-/** Opens `id` on its demo. */
-export function openDemo(id: GameId) {
-  demoAsked = id;
-  arcadeScreen.set(id);
-  track("arcade_demo", { game: id });
-}
-
-/** True once if the menu asked for `id`'s demo; clears the request. */
-export function takeDemoRequest(id: GameId) {
-  const asked = demoAsked === id;
-  demoAsked = null;
-  return asked;
+/**
+ * @deprecated The menu no longer opens a game on its demo; games teach in
+ * play. Kept only until every game has moved over, then removed.
+ */
+export function takeDemoRequest(_id: GameId) {
+  return false;
 }
 
 // Catch needs both enough room for readable trajectories and a precise

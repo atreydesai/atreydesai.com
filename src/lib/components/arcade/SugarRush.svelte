@@ -36,6 +36,7 @@
     DRONE_W,
     ENDINGS,
     HIT_GRACE,
+    HOLD_TIME,
     MAX_SPARES,
     RESPAWN_GRACE,
     RUSH_TIME,
@@ -61,10 +62,23 @@
     swingBox,
     swingReach,
   } from "#lib/arcade/runner-engine.js";
+  import { LESSONS, lessonAhead, type LessonCue } from "#lib/arcade/runner-lessons.js";
   import { botInput, createBot } from "#lib/arcade/runner-bot.js";
+  import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
+  import { createFrameLoop } from "#lib/arcade/core/loop.ts";
+  import { hexToRgb, mixHex, mixRgb, rgbToHex } from "#lib/arcade/core/color.ts";
+  import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
+  import { clamp, lerp, quantizeUp, smooth, snap as snapTo } from "#lib/arcade/core/math.ts";
+  import { hash2, ihash } from "#lib/arcade/core/rng.ts";
+  import { beckon, chalkPath, drawGhost } from "#lib/arcade/core/ghost.ts";
   import {
+    ACCENT,
+    CREAM,
     DRINKS,
+    HALO,
     INK,
+    NOTE_BACK,
+    NOTE_GOLD,
     LID,
     MENU_ICONS,
     PEARL,
@@ -79,14 +93,12 @@
     clearSpriteCache,
     fitCanvas,
   } from "#lib/arcade/art.ts";
-  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
-  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import { arcadeExpert } from "#lib/boba.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
-  import DemoBar from "./DemoBar.svelte";
-  import DemoCard from "./DemoCard.svelte";
+  import Coach from "./Coach.svelte";
   import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
@@ -96,8 +108,9 @@
   // into the night, faster and faster. Spare cups are its lives and the tea
   // is its pay. Every rule lives in runner-engine.js; this file steps it at
   // 120 Hz, paints the city around it, and answers each event with a sound
-  // and a mark. The demo drives the same run with the reference bot in
-  // runner-bot.js, through the same keys a player has.
+  // and a mark. It teaches in the run itself: the first time each move or
+  // thing matters on this device, runner-lessons.js says so, and the shared
+  // coach slows play, sets a line beside it, and a ghost shows the move.
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
@@ -105,7 +118,6 @@
   type Roof = RunState["chunks"][number]["roofs"][number];
   type Held = { jump: boolean; down: boolean; rush: boolean };
   type Mode = "intro" | "countdown" | "running" | "over";
-  type TeachKind = "slide" | "glide" | "rush" | "lethal";
 
   // --- Scale and timing ------------------------------------------------------
 
@@ -127,26 +139,14 @@
   const OVER_SECONDS = 1.4;
   /** A revived runner blinks on and off in windows this long. */
   const BLINK = 0.08;
-  /** The demo's seed: a calm opening with a gap, a slide, a drop, crates and deliveries. */
-  const DEMO_SEED = 25;
-  /** The demo's script runs this long, then offers to play. */
-  const DEMO_SECONDS = 28;
-  /** A demo caption stays up at least this long before the next replaces it. */
-  const DEMO_CAPTION_SECONDS = 2.3;
-  const TEACH_SECONDS = 2.4;
   const MAX_BITS = 420;
 
   // --- Palette ---------------------------------------------------------------
   // The city is painted the same in both site themes; only the HTML on top
   // follows the theme.
 
-  const HALO = "rgba(253, 248, 243, 0.8)";
-  const CREAM = "#fdf8f3";
   const TEA = "#c79a6b";
   const EMPTY_CUP = "#f6eee2";
-  const ACCENT = "#e85d4c";
-  const NOTE_BACK = "#141a2e";
-  const NOTE_GOLD = "#ffd166";
   const NOTE_DIM = "#b9b3c9";
   const SKY_DUSK = ["#2a2748", "#5a3a6a", "#b85a5a", "#e8915a", "#f4c27a"];
   const SKY_TWILIGHT = ["#1d1f3d", "#2a2748", "#4a3462", "#7a4262", "#a8545e"];
@@ -175,61 +175,12 @@
   const HAZARD = "#ffd23f";
   const GLASS_SHARDS = ["#cfe8ef", "#9fc6d6", "#fdf8f3"];
 
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
-  const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
-
-  // --- Copy ------------------------------------------------------------------
-
-  const TEACH_TEXT: Record<TeachKind, string> = {
-    slide: "slide under it",
-    glide: "hold jump to glide",
-    rush: "rush",
-    lethal: "hazard stripes end the run",
-  };
-  const TEACH_KEYS: Record<TeachKind, string> = {
-    slide: "boba_teach_runner_slide",
-    glide: "boba_teach_runner_glide",
-    rush: "boba_teach_runner_rush",
-    lethal: "boba_teach_runner_lethal",
-  };
-  /** What the demo says the first time the bot does each thing. */
-  const DEMO_LINES = {
-    start: "the cup runs by itself and keeps speeding up",
-    jump: "tap jump to hop, hold it to go higher",
-    glide: "holding jump on the way down glides",
-    slide: "press down to slide under anything red and cream underneath",
-    slam: "tap down in the air to slam crates, hold it to land sliding",
-    delivery: "cross a coaster to hand the tea over",
-    hit: "anything you run into costs a spare cup",
-    rush: "pearls fill the sugar for a rush that smashes through",
-    lethal: "hazard stripes end the run, spare cups or not",
-  } as const;
-  type DemoLine = keyof typeof DEMO_LINES;
-
   // --- Small helpers -----------------------------------------------------------
 
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-  const clamp = (value: number, low: number, high: number) => (value < low ? low : value > high ? high : value);
-  const smooth = (t: number) => t * t * (3 - 2 * t);
-  const snap = (value: number) => Math.round(value / SC) * SC;
-  const quarters = (t: number) => Math.ceil(clamp(t, 0, 1) * 4) / 4;
-  /** A stable 0–1 value per integer, so seeded marks never shimmer. */
-  const ihash = (n: number) => {
-    let h = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0xc2b2ae35);
-    h ^= h >>> 16;
-    return (h >>> 0) / 4294967296;
-  };
-  const hash2 = (a: number, b: number) => ihash(Math.imul(a, 73856093) ^ Math.imul(b, 19349663));
-  const rgb = (hex: string) => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-  const mixRgb = (a: number[], b: number[], t: number) => a.map((value, index) => Math.round(lerp(value, b[index], t)));
-  const toHex = (color: number[]) => `#${color.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
-  const mixHex = (a: string, b: string, t: number) => toHex(mixRgb(rgb(a), rgb(b), clamp(t, 0, 1)));
+  const snap = (value: number) => snapTo(value, SC);
+  const quarters = (t: number) => quantizeUp(t, 4);
+  const rgb = hexToRgb;
+  const toHex = rgbToHex;
 
   // --- The runner's sprite ------------------------------------------------------
   //
@@ -847,16 +798,35 @@
   let mode: Mode = "countdown";
   let paused = false;
   let gameOver = false;
-  let tipVisible = false;
   let liveMessage = "Sugar rush starting";
   let localBest = 0;
   let newBest = false;
   let countdown = COUNTDOWN_SECONDS;
   let countdownElapsed = 0;
   let goVisible = false;
-  let teach: TeachKind | null = null;
-  let teachAge = 0;
-  const taught: Record<TeachKind, boolean> = { slide: false, glide: false, rush: false, lethal: false };
+  // Lessons, once per device (runner-lessons.js says what and when; the
+  // coach slows play and shows one at a time). `cue` is the one on screen.
+  const coach = createCoach("runner");
+  let cue: LessonCue | null = null;
+  /** The coach's lesson and whether it's fading, copied out so the page follows them. */
+  let coachLesson: Lesson | null = null;
+  let coachLeaving = false;
+  let coachX: number | null = null;
+  let coachY: number | null = null;
+  let coachRing = 0;
+  let coachSide: "above" | "below" = "above";
+  /** Which part of the tray a lesson is about, so it lights up too. */
+  let trayLit: "tea" | "sugar" | null = null;
+  /** The scene clock when the run began, and how long "go" stays up. */
+  let begunAt = 0;
+  const GO_SECONDS = 0.62;
+  /** Real seconds the lessons have been on screen (stops when paused): drives the ghost. */
+  let lessonClock = 0;
+  const ghostPoints: Array<{ x: number; y: number }> = [];
+  /** On touch, the pad a move lesson is about. */
+  let padLit: keyof Held | null = null;
+  /** How long jump has been held in the air, for the hold lesson. */
+  let jumpHeld = 0;
 
   // HUD readouts, refreshed about ten times a second.
   let score = 0;
@@ -883,31 +853,14 @@
   /** Expert mode, read once when the game opens; the switch lives on the menu. */
   const expert = get(arcadeExpert);
 
-  // --- The demo -----------------------------------------------------------
-  // The bot plays a normal run on a fixed seed through the same keys a
-  // player has, while a strip says what each move is the first time it
-  // happens. It records nothing and shuts out the player's game keys.
-
-  /** The first visit asks whether to watch the demo before the countdown. */
-  let askDemo = false;
-  let demoOn = false;
-  let demoEnded = false;
-  let demoCaption = "";
-  let demoClock = 0;
-  let demoShownAt = -10;
-  let demoQueue: DemoLine[] = [];
-  const demoSaid = new Set<DemoLine>();
-  let bot = createBot();
-  /** The keys the bot held last step, for the touch pads to show. */
-  let demoHeld: Held = { jump: false, down: false, rush: false };
-  let demoCard: DemoCard;
-  let demoBar: DemoBar;
-
   let canvas: HTMLCanvasElement;
   let playScope: HTMLElement;
   let playfield: HTMLElement;
   let hudRow: HTMLElement;
   let padsRow: HTMLElement | undefined;
+  let trayEl: HTMLElement | undefined;
+  /** The tray sits under the runner on a wide screen; this is its left edge. */
+  let trayLeft = 16;
   let ctx: CanvasRenderingContext2D | null = null;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
@@ -978,10 +931,25 @@
   const keys: Held = { jump: false, down: false, rush: false };
   let touchHeld: Held = { jump: false, down: false, rush: false };
   const input: Held = { jump: false, down: false, rush: false };
+  /**
+   * The bot's keys, held back while a lesson is new (a second to read it)
+   * and off the rush until it has been taught, so each lesson is seen.
+   */
+  function autoplayInput(bot: ReturnType<typeof createBot>) {
+    const keys = botInput(bot, state);
+    const lesson = coach.current;
+    if (lesson && !coach.leaving && coach.age < 1) return { jump: false, down: false, rush: false };
+    if (!coach.learned("rush") && lesson?.id !== "rush") keys.rush = false;
+    return keys;
+  }
 
-  let last = 0;
-  let raf = 0;
+  /** The test bot at the keys (development only). */
+  let autoplay: ReturnType<typeof createBot> | null = null;
+  /** Presses not yet seen by an engine step. */
+  const pressed: Held = { jump: false, down: false, rush: false };
+
   let active = true;
+  const loop = createFrameLoop({ update: (dt, rawDt) => advance(dt, rawDt), draw: () => draw(), isPaused: () => paused });
   const timers = createTimers();
 
   // World to screen. World y points up; screen y points down.
@@ -1032,33 +1000,13 @@
 
   /** Flat bands down to the horizon, joined by ordered dithering; haze below. */
   function paintSky(n: number) {
-    const width = Math.max(1, Math.ceil(viewW / SC));
-    const height = Math.max(1, Math.ceil(viewH / SC));
-    skyCanvas ??= document.createElement("canvas");
-    skyCanvas.width = width;
-    skyCanvas.height = height;
-    const context = skyCanvas.getContext("2d");
-    if (!context) return;
-    const image = context.createImageData(width, height);
-    const data = image.data;
+    const layer = cellLayer(skyCanvas, viewW / SC, viewH / SC);
+    skyCanvas = layer.canvas;
+    if (!layer.context || !layer.image) return;
     const bands = [0, 1, 2, 3, 4].map((index) => skyBand(index, n));
     const stops = SKY_STOPS.map((f) => (f * horizonY) / SC);
-    for (let y = 0; y < height; y++) {
-      let segment = 0;
-      while (segment < stops.length - 2 && y >= stops[segment + 1]) segment++;
-      const t = clamp((y - stops[segment]) / (stops[segment + 1] - stops[segment]), 0, 1);
-      const blend = clamp((t - 0.3) / 0.4, 0, 1);
-      const below = y >= stops[4];
-      for (let x = 0; x < width; x++) {
-        const color = below ? bands[4] : bands[blend > bayer(x, y) ? segment + 1 : segment];
-        const o = (y * width + x) * 4;
-        data[o] = color[0];
-        data[o + 1] = color[1];
-        data[o + 2] = color[2];
-        data[o + 3] = 255;
-      }
-    }
-    context.putImageData(image, 0, 0);
+    paintBands(layer.image.data, layer.canvas.width, layer.canvas.height, bands, stops);
+    layer.context.putImageData(layer.image, 0, 0);
   }
 
   /** A pixel disc with a one-cell rim; the moon gets a shaded crescent. */
@@ -1229,7 +1177,8 @@
     const high = Math.ceil((strip.high * span) / SC);
     const low = Math.ceil((strip.low * span) / SC);
     strip.base = high + 8;
-    strip.rows = strip.base + Math.ceil((viewH - horizonY) / SC) + 40;
+    // Never fewer rows than the skyline itself, even mid-resize on a tiny window.
+    strip.rows = Math.max(strip.base + 8, strip.base + Math.ceil((viewH - horizonY) / SC) + 40);
     const { period, rows, base } = strip;
     const cells = new Uint8Array(period * rows);
     const lit = new Float32Array(period * rows);
@@ -2850,6 +2799,7 @@
     drawCourse();
     drawBits(false);
     drawThrows();
+    drawLessonGhost();
     drawRunner();
     drawBits(true);
     drawHedge();
@@ -2858,6 +2808,7 @@
     drawLines();
     drawNotes();
     pruneArt();
+    placeCoach();
   }
 
   // --- Camera -------------------------------------------------------------------------------
@@ -2952,21 +2903,20 @@
         case "jump":
           sfxRunJump();
           dustBurst(ev.x, ev.y, 4, 0.7);
-          if (tipVisible) tipVisible = false;
-          demoSay("jump");
+          // A jump is the first half of the jump, hold, glide and slam lessons.
+          if (coach.current?.move && ["jump", "hold", "glide", "slam"].includes(coach.current.id)) coach.acted(coach.current.id);
+          else coach.done("jump");
           break;
         case "slide":
           sfxRunSlide();
           dustBurst(ev.x + 6, ev.y, 3, 0.6);
-          if (teach === "slide") teach = null;
-          demoSay("slide");
+          moveMade("slide");
           break;
         case "glide":
-          if (teach === "glide") teach = null;
-          demoSay("glide");
+          coach.done("glide");
           break;
         case "slam":
-          demoSay("slam");
+          coach.done("slam");
           break;
         case "land": {
           const hard = ev.slam || ev.impact > 600;
@@ -3001,17 +2951,23 @@
             sfxRunSpill(Math.min(1, ev.amount * 3));
           }
           teaSplash(ev.x, ev.y, ev.amount);
+          // The first real slosh says what it costs, beside the cup.
+          if (ev.amount >= 0.04) teachNow("spill");
           sloshV += 8 * (Math.random() < 0.5 ? -1 : 1);
           displayTea = Math.min(displayTea, state.tea);
           refillAt = -10;
           break;
         case "hit":
           // What was run into is ghosted by the engine; the cup is spent below.
+          // A move that ran into something didn't work: the next one teaches it again.
+          if (coach.current?.move && coach.acting) {
+            coach.dismiss();
+            cue = null;
+          }
           sfxRunBump();
           kick(0.5);
           if (ev.what === "pigeon") feathers(ev.x, ev.y + 16, 10);
           else dustBurst(ev.x + 6, ev.y + 8, 6, 1);
-          demoSay("hit");
           break;
         case "lethal":
           setRunGlide(0);
@@ -3073,16 +3029,15 @@
           sfxRushStart();
           rushFlashAt = clock;
           liveMessage = "Sugar rush.";
-          if (teach === "rush") teach = null;
+          coach.done("rush");
           dustBurst(ev.x, ev.y, 10, 1.4);
-          demoSay("rush");
           break;
         case "rushEnd":
           sfxRushEnd();
           break;
         case "delivery":
           delivered(ev);
-          demoSay("delivery");
+          coach.done("customer");
           break;
         case "miss": {
           const coaster = findCoaster(ev.x, ev.y);
@@ -3126,6 +3081,7 @@
           if (reduceMotion) still(B_POP, ev.x, ev.y, 1.5, NOTE_GOLD, 0.2);
           else spawn(B_POP, ev.x, ev.y, 0, 0, 0.32, 1.5, NOTE_GOLD);
           followSpares(state.spare);
+          coach.done("spare");
           liveMessage = `Picked up a spare cup. ${spareWords(ev.held)}.`;
           break;
         case "spareBonus":
@@ -3133,6 +3089,7 @@
           if (reduceMotion) still(B_POP, ev.x, ev.y, 1.5, NOTE_GOLD, 0.2);
           else spawn(B_POP, ev.x, ev.y, 0, 0, 0.32, 1.5, NOTE_GOLD);
           addNote(ev.x, ev.y + 20, `+${ev.points}`, NOTE_GOLD, 1.1);
+          coach.done("golden");
           liveMessage = `A golden cup, for ${ev.points} points.`;
           break;
         case "spareUsed":
@@ -3221,157 +3178,171 @@
     if (thrown.full) addStamp(x + 32, y + 30);
   }
 
-  // --- Teaching, once per device ------------------------------------------------------------
+  // --- Lessons ------------------------------------------------------------------------------
 
-  function readTaught() {
-    for (const kind of ["slide", "glide", "rush", "lethal"] as TeachKind[]) {
-      try {
-        taught[kind] = window.localStorage.getItem(TEACH_KEYS[kind]) === "1";
-      } catch {
-        taught[kind] = false;
+  /** Lessons about things that move on their own, so the callout follows them. */
+  const MOVING_LESSONS = new Set(["barrel", "drone", "pigeons", "rush"]);
+
+  /** Asks the lessons what this moment should teach, and keeps the callout on it. */
+  function checkLessons() {
+    const current = coach.current;
+    if (current?.move && !coach.leaving && cue?.lesson.id === current.id) {
+      const r = state.runner;
+      if (state.status !== "running") {
+        // The run stopped (a fall, the end): the lesson comes down uncounted.
+        coach.dismiss();
+        cue = null;
+      } else if (coach.acting) {
+        // Made, and the runner is past it on its feet: learned.
+        if (r.x > cue.clear && (r.grounded || r.cable)) coach.done(current.id);
+      } else if (cue.ghost && r.x > cue.ghost.takeoff + 0.35 * Math.max(1, r.vx)) {
+        // Not made in time: the next one teaches it again, and play never stays slow.
+        coach.dismiss();
+        cue = null;
       }
     }
-  }
-
-  function showTeach(kind: TeachKind) {
-    teach = kind;
-    teachAge = 0;
-    taught[kind] = true;
-    try {
-      window.localStorage.setItem(TEACH_KEYS[kind], "1");
-    } catch {
-      // Without storage it may show again next visit; that is all.
+    // Nothing new while "go" is still on screen.
+    if (state.status !== "running" || clock - begunAt < GO_SECONDS) return;
+    // A move being taught holds the stage; only a thing that moves is followed.
+    if (current && !coach.leaving && current.move && !MOVING_LESSONS.has(current.id)) return;
+    const view = viewW > 0 ? (viewW * (1 - lead)) / S : 600;
+    const next = lessonAhead(state, coach.learned, { view });
+    if (next) {
+      // A lesson stays on the thing it first pointed at, following it only
+      // if it moves; a new lesson waits its turn.
+      if (coach.current?.id === next.lesson.id) {
+        if (MOVING_LESSONS.has(next.lesson.id)) cue = next;
+      } else if (coach.offer(next.lesson)) {
+        cue = next;
+      }
     }
+    if (!coach.current) cue = null;
   }
 
-  /** The first time each move is about to matter, one caption says so. */
-  function checkTeach() {
-    if (demoOn || teach || tipVisible || state.status !== "running") return;
-    const r = state.runner;
-    const reach = r.vx * 1.3;
-    if (!taught.rush && state.sugar >= SUGAR_FULL && state.rush === 0) {
-      showTeach("rush");
+  /** A move the current lesson asks for was made: wait to see it work; otherwise it's simply known. */
+  function moveMade(id: string) {
+    if (coach.current?.id === id && coach.current.move) coach.acted(id);
+    else coach.done(id);
+  }
+
+  /** Teaches something that just happened, beside the runner (a hard landing's spill). */
+  function teachNow(id: keyof typeof LESSONS) {
+    const lesson = LESSONS[id];
+    if (!coach.offer(lesson)) return;
+    cue = { lesson, x: state.runner.x, y: state.runner.y + 20, size: 12, ghost: null, clear: state.runner.x };
+  }
+
+  /** Puts the callout beside its thing on screen, and lights what it is about. */
+  function placeCoach() {
+    const lesson = coach.current;
+    if (!lesson || !cue || cue.lesson.id !== lesson.id || mode !== "running") {
+      if (coachLesson) coachLesson = null;
+      if (coachX !== null) coachX = coachY = null;
+      if (trayLit) trayLit = null;
+      if (padLit) padLit = null;
       return;
     }
-    if (!taught.lethal && lethalAhead(reach)) {
-      showTeach("lethal");
-      return;
-    }
-    if (taught.slide && taught.glide) return;
-    for (const chunk of state.chunks) {
-      if (chunk.x1 < r.x || chunk.x0 > r.x + reach) continue;
-      if (!taught.slide && r.grounded) {
-        for (const item of chunk.items) {
-          if ((item.type === "clothesline" || item.type === "billboard") && !item.hit && item.x0 > r.x && item.x0 - r.x < reach) {
-            showTeach("slide");
-            return;
-          }
-        }
-      }
-      if (!taught.glide) {
-        for (const gap of chunk.gaps) {
-          if (gap.assist === "drop" && gap.x0 > r.x && gap.x0 - r.x < r.vx * 0.9) {
-            showTeach("glide");
-            return;
-          }
-        }
-      }
-    }
+    if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
+    if (coachLeaving !== coach.leaving) coachLeaving = coach.leaving;
+    // A move points at where to make it; a thing gets a loop around it.
+    const x = Math.round(sx(cue.ghost ? cue.ghost.takeoff : cue.x));
+    const y = Math.round(sy(cue.ghost ? cue.ghost.top + 30 : cue.y));
+    if (x !== coachX) coachX = x;
+    if (y !== coachY) coachY = y;
+    const ring = cue.ghost ? 0 : Math.round(Math.max(14, cue.size * S));
+    if (ring !== coachRing) coachRing = ring;
+    // Whatever is well above the runner gets its line underneath, near the runner.
+    const side = y < sy(state.runner.y) - 140 ? "below" : "above";
+    if (side !== coachSide) coachSide = side;
+    const lit = lesson.id === "pearls" || lesson.id === "rush" ? "sugar" : lesson.id === "spill" || lesson.id === "customer" ? "tea" : null;
+    if (lit !== trayLit) trayLit = lit;
+    const pad: keyof Held | null =
+      coach.leaving || coach.acting || !touchUI ? null : lesson.id === "rush" ? "rush" : lesson.id === "slide" || lesson.id === "slam" ? "down" : lesson.move ? "jump" : null;
+    if (pad !== padLit) padLit = pad;
   }
 
-  /** Whether something lethal (or the railway) is coming up within `reach`. */
-  function lethalAhead(reach: number) {
-    const r = state.runner;
-    for (const chunk of state.chunks) {
-      if (chunk.x1 < r.x || chunk.x0 > r.x + reach) continue;
-      for (const item of chunk.items) if (isLethal(item) && "x0" in item && item.x0 > r.x && item.x0 - r.x < reach) return true;
-      for (const gap of chunk.gaps) if (gap.assist === "rail" && gap.x0 > r.x && gap.x0 - r.x < reach) return true;
+  /**
+   * A move's ghost: chalk dashes along the path from where to make it, and a
+   * dithered runner running it over and over, a little ahead of the real one.
+   */
+  function drawLessonGhost() {
+    const ghost = cue?.ghost;
+    if (!ctx || !ghost || paused || !coach.current || coach.leaving || coach.acting || coach.current.id !== cue?.lesson.id) return;
+    const path = ghost.path;
+    ghostPoints.length = path.length;
+    for (let i = 0; i < path.length; i++) {
+      const point = (ghostPoints[i] ??= { x: 0, y: 0 });
+      point.x = sx(path[i].x);
+      point.y = sy(path[i].y + 9);
     }
-    return false;
-  }
+    const cell = Math.max(2, Math.round(CELL * S));
+    chalkPath(ctx, ghostPoints, { color: CREAM, cell, dash: 1, gap: 2, offset: reduceMotion ? 0 : -lessonClock * 24 });
+    // Where to press: a short accent post on the roof.
+    const tx = Math.round(sx(ghost.takeoff) / cell) * cell;
+    const ty = Math.round(sy(ghost.top) / cell) * cell;
+    ctx.fillStyle = ACCENT;
+    ctx.fillRect(tx - cell / 2, ty - cell * 5, cell, cell * 5);
+    ctx.fillRect(tx - cell * 1.5, ty - cell * 6, cell * 3, cell);
 
-  // --- The demo ----------------------------------------------------------------------------
-
-  /** Queues what the demo says about something, the first time it happens. */
-  function demoSay(line: DemoLine) {
-    if (!demoOn || demoEnded || demoSaid.has(line)) return;
-    demoSaid.add(line);
-    demoQueue = [...demoQueue, line];
-  }
-
-  function stepDemo(dt: number) {
-    if (!demoOn || demoEnded) return;
-    demoClock += dt;
-    const r = state.runner;
-    // Things to run into, and things that end it, get a word as they come up.
-    if (!demoSaid.has("hit")) {
-      for (const chunk of state.chunks) {
-        for (const item of chunk.items) {
-          if ((item.type === "ac" || item.type === "tank" || item.type === "crate" || item.type === "barrel") && "x0" in item && item.x0 > r.x && item.x0 - r.x < r.vx * 0.7) demoSay("hit");
-        }
-      }
+    // The ghost waits at the post for a beat, then runs the move.
+    const loop = reduceMotion ? 0.55 : (lessonClock % 1.5) / 1.5;
+    const t = clamp((loop - 0.2) / 0.75, 0, 1);
+    const along = t * (path.length - 1);
+    const index = Math.min(path.length - 2, Math.floor(along));
+    const a = path[index];
+    const b = path[index + 1];
+    const f = along - index;
+    const gx = a.x + (b.x - a.x) * f;
+    const gy = a.y + (b.y - a.y) * f;
+    const rising = b.y > a.y + 0.5;
+    let legs = t === 0 ? "run0" : rising ? "tuck" : "fall";
+    let head = "straw";
+    if (ghost.kind === "slide") legs = t === 0 ? "run0" : "slide";
+    if (ghost.kind === "glide" && !rising && t > 0) {
+      head = "rotor0";
+      legs = "glide";
     }
-    if (lethalAhead(r.vx * 1.2)) demoSay("lethal");
-    if (demoQueue.length && clock - demoShownAt >= DEMO_CAPTION_SECONDS) {
-      demoCaption = DEMO_LINES[demoQueue[0]];
-      demoQueue = demoQueue.slice(1);
-      demoShownAt = clock;
-    }
-    if (demoClock >= DEMO_SECONDS && clock - demoShownAt >= DEMO_CAPTION_SECONDS) {
-      demoEnded = true;
-      liveMessage = "The demo is over.";
-    }
+    if (ghost.kind === "slam" && t > 0.85) legs = "slam";
+    const key = `ghost-${head}-${legs}`;
+    const grid = runnerGrid(key, head, legs, 0, TEA_CELLS, false, false);
+    const sprite = cachedSprite(key, grid, px, RUNNER_PAL, "");
+    const left = Math.round(sx(gx - (legs === "slide" ? 5 : 4.5) * CELL) - SPRITE_PAD * pk);
+    const top = Math.round(sy(gy + grid.length * CELL) - SPRITE_PAD * pk);
+    const w = Math.round(sprite.width * pk);
+    const h = Math.round(sprite.height * pk);
+    const density = 0.6 + 0.2 * beckon(lessonClock, reduceMotion, 0.8);
+    drawGhost(ctx, left, top, w, h, (g) => g.drawImage(sprite, left, top, w, h), { color: CREAM, density, cell });
   }
 
-  /** Plays the demo from the top: a normal run on the demo's seed, driven by the bot. */
-  function startDemo() {
-    stopMusic();
-    timers.clear();
-    releaseAll();
-    setRunGlide(0);
-    paused = false;
-    gameOver = false;
-    askDemo = false;
-    newShift(true);
-    countdown = 0;
-    goVisible = false;
-    mode = "running";
-    setMusicPhase(state.phase);
-    startMusic();
-    demoSay("start");
-    liveMessage = "The demo is playing.";
-  }
-
-  /** Out of the card or the demo into a real run, from the countdown. */
-  function playForReal() {
-    askDemo = false;
-    restart();
-    tipVisible = firstVisit("runner");
-    void tick().then(focusPlayfield);
-  }
 
   // --- Running -------------------------------------------------------------------------------
 
+  /**
+   * The keys as the engine's next step sees them. A press counts until a
+   * step has seen it, so a tap is never lost between steps, which in a
+   * lesson's slow motion are far apart.
+   */
   function controls() {
-    input.jump = keys.jump || touchHeld.jump;
-    input.down = keys.down || touchHeld.down;
-    input.rush = keys.rush || touchHeld.rush;
+    input.jump = keys.jump || touchHeld.jump || pressed.jump;
+    input.down = keys.down || touchHeld.down || pressed.down;
+    input.rush = keys.rush || touchHeld.rush || pressed.rush;
     return input;
   }
 
   function run(dt: number) {
     accumulator += dt;
-    const held = controls();
-    let shown: Held | null = null;
     while (accumulator >= STEP && state.status !== "over") {
       accumulator -= STEP;
-      // The demo plays through the same keys, held by the bot.
-      const keys = demoOn ? botInput(bot, state) : held;
-      if (demoOn) shown = { jump: !!keys.jump, down: !!keys.down, rush: !!keys.rush };
-      const events = stepRun(state, keys, STEP);
+      const held = autoplay ? autoplayInput(autoplay) : controls();
+      pressed.jump = pressed.down = pressed.rush = false;
+      const events = stepRun(state, held, STEP);
       if (events.length) onEvents(events);
+      // Jump held on the way up long enough to go higher: the hold is learned.
+      const r = state.runner;
+      jumpHeld = held.jump && !r.grounded ? jumpHeld + STEP : 0;
+      // Holding jump before the hold was ever taught means it's known; in its lesson, it waits to see the jump land.
+      if (jumpHeld >= HOLD_TIME * 0.8 && coach.current?.id !== "hold") coach.done("hold");
     }
-    if (shown && (shown.jump !== demoHeld.jump || shown.down !== demoHeld.down || shown.rush !== demoHeld.rush)) demoHeld = shown;
     if (state.status === "over") accumulator = 0;
   }
 
@@ -3426,10 +3397,6 @@
     stepLines(dt);
     stepBalloon(dt);
     shake = Math.max(0, shake - dt / 0.35);
-    if (teach) {
-      teachAge += dt;
-      if (teachAge >= TEACH_SECONDS) teach = null;
-    }
   }
 
   function syncHud() {
@@ -3467,23 +3434,10 @@
     slotChange = slotChange;
   }
 
-  function frame(timestamp: number) {
-    if (!active) return;
-    if (!last) last = timestamp;
-    const rawDt = (timestamp - last) / 1000;
-    last = timestamp;
-    const dt = Math.min(rawDt, 0.05);
-    if (paused) {
-      draw();
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-    advance(dt, rawDt);
-    draw();
-    raf = requestAnimationFrame(frame);
-  }
-
-  function advance(dt: number, rawDt = dt) {
+  function advance(realDt: number, rawDt = realDt) {
+    // A lesson eases the run into slow motion, and back out once it's done.
+    const dt = mode === "running" ? coach.step(realDt) : realDt;
+    lessonClock += realDt;
     clock += dt;
     if (mode === "countdown") {
       const step = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
@@ -3494,14 +3448,12 @@
       }
       if (step.done) begin();
     } else if (mode === "running") {
+      if (goVisible && clock - begunAt >= GO_SECONDS) goVisible = false;
       run(dt);
-      checkTeach();
+      checkLessons();
     } else if (mode === "over" && !gameOver && clock - overAt >= OVER_SECONDS) {
-      // A demo that ends early just says so; it never records anything.
-      if (demoOn) demoEnded = true;
-      else void endGame();
+      void endGame();
     }
-    stepDemo(dt);
     stepScene(dt);
     updateCamera(dt);
     hudClock += dt;
@@ -3529,14 +3481,14 @@
       return;
     }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    // The demo and its question shut out the game's own keys.
-    if (gameOver || paused || demoOn || askDemo) return;
+    if (gameOver || paused) return;
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
     if ((key === " " || key === "Enter") && isOnControl(event)) return;
     const control = KEY_CONTROLS[key];
     if (!control) return;
     event.preventDefault();
     keys[control] = true;
+    pressed[control] = true;
   }
 
   function onKeyUp(event: KeyboardEvent) {
@@ -3547,13 +3499,21 @@
 
   function releaseAll() {
     keys.jump = keys.down = keys.rush = false;
+    pressed.jump = pressed.down = pressed.rush = false;
     if (touchHeld.jump || touchHeld.down || touchHeld.rush) touchHeld = { jump: false, down: false, rush: false };
   }
 
   function holdPad(control: keyof Held, down: boolean) {
-    if (down && (paused || gameOver || demoOn || askDemo)) return;
+    if (down && (paused || gameOver)) return;
     if (touchHeld[control] === down) return;
     touchHeld = { ...touchHeld, [control]: down };
+    if (down) pressed[control] = true;
+  }
+
+  /** A touch the browser took back (a scroll, a system gesture) never counts as a press. */
+  function cancelPad(control: keyof Held) {
+    pressed[control] = false;
+    holdPad(control, false);
   }
 
   function padDown(event: PointerEvent, control: keyof Held) {
@@ -3578,7 +3538,7 @@
   // --- Pause, restart, and finish --------------------------------------------------------
 
   async function pauseGame() {
-    if (gameOver || paused || askDemo) return;
+    if (gameOver || paused) return;
     paused = true;
     releaseAll();
     setRunGlide(0);
@@ -3591,7 +3551,7 @@
   function resumeGame() {
     if (gameOver || !paused) return;
     paused = false;
-    last = 0;
+    loop.resync();
     setMusicPaused(false);
     sfxBlip();
     liveMessage = "Game resumed";
@@ -3619,6 +3579,8 @@
   async function endGame() {
     if (gameOver) return;
     gameOver = true;
+    coach.dismiss();
+    cue = null;
     releaseAll();
     setRunGlide(0);
     syncHud();
@@ -3633,9 +3595,11 @@
   }
 
   function begin() {
+    // A key tapped during the countdown doesn't carry into the run.
+    pressed.jump = pressed.down = pressed.rush = false;
+    begunAt = clock;
     countdown = 0;
     goVisible = true;
-    timers.later(() => (goVisible = false), 620);
     mode = "running";
     setMusicPhase(state.phase);
     startMusic();
@@ -3643,25 +3607,35 @@
     if (document.activeElement instanceof HTMLButtonElement && playScope?.contains(document.activeElement)) focusPlayfield();
   }
 
-  /** A fresh run: a real one in the mode the menu set, or the demo's. */
-  function newShift(demo = false) {
-    demoOn = demo;
-    demoEnded = false;
-    demoCaption = "";
-    demoClock = 0;
-    demoShownAt = -10;
-    demoQueue = [];
-    demoSaid.clear();
-    demoHeld = { jump: false, down: false, rush: false };
-    bot = createBot();
-    state = demo ? newRun(DEMO_SEED) : newRun(Math.floor(Math.random() * 2 ** 31), { expert });
+  /** In development, `?seed=` replays a course, for checking a lesson by eye. */
+  function devSeed() {
+    if (!import.meta.env.DEV) return null;
+    const seed = Number(new URLSearchParams(window.location.search).get("seed"));
+    return Number.isInteger(seed) && seed > 0 ? seed : null;
+  }
+
+  /**
+   * In development, `?autoplay` hands the keys to the test bot, which moves
+   * when a player following each lesson would, so every lesson can be seen.
+   */
+  function devBot() {
+    if (!import.meta.env.DEV || !new URLSearchParams(window.location.search).has("autoplay")) return null;
+    return createBot();
+  }
+
+  /** A fresh run in the mode the menu set. */
+  function newShift() {
+    state = newRun(devSeed() ?? Math.floor(Math.random() * 2 ** 31), { expert });
+    autoplay = devBot();
     mode = "countdown";
     accumulator = 0;
     countdown = COUNTDOWN_SECONDS;
     countdownElapsed = 0;
     goVisible = false;
     newBest = false;
-    teach = null;
+    coach.reset();
+    cue = null;
+    jumpHeld = 0;
     displayTea = 1;
     refillAt = -10;
     blinkFrom = -10;
@@ -3684,7 +3658,7 @@
     firstChunk = 0;
     balloon.on = false;
     balloon.wait = 20 + Math.random() * 20;
-    last = 0;
+    loop.resync();
     snapCamera();
     syncHud();
   }
@@ -3708,13 +3682,18 @@
     viewH = window.innerHeight;
     ctx = fitCanvas(canvas, viewW, viewH);
     playTop = hudRow ? hudRow.getBoundingClientRect().bottom : 80;
-    // On touch the course stays above the thumb buttons.
+    // The course stays above the thumb buttons on touch, and above the tray.
     const padsTop = touchUI && padsRow ? padsRow.getBoundingClientRect().top : viewH;
-    playBottom = Math.max(playTop + 180, Math.min(viewH, padsTop - 8));
+    const trayBox = trayEl?.getBoundingClientRect();
+    const trayTop = trayBox && trayBox.height > 0 ? trayBox.top : viewH;
+    playBottom = Math.max(playTop + 180, Math.min(viewH, padsTop - 8, trayTop - 8));
     focusY = playTop + (playBottom - playTop) * 0.6;
     horizonY = playTop + (playBottom - playTop) * 0.68;
     const wide = viewW >= viewH * 1.05;
     lead = wide ? 0.28 : 0.2;
+    // Centred under the runner, kept on screen.
+    const trayW = trayBox?.width ?? 0;
+    trayLeft = Math.round(Math.max(16, Math.min(viewW - trayW - 16, lead * viewW - trayW / 2)));
     baseS = Math.min(viewW / (wide ? 560 : 300), (playBottom - playTop) / 230);
     stripS = baseS;
     sunR = Math.max(5, Math.round((Math.min(viewW, viewH) * 0.07) / SC));
@@ -3755,7 +3734,6 @@
   onMount(() => {
     noteFont = arcadeFont(13, 500);
     stampFont = arcadeFont(12, 500);
-    readTaught();
     const unmountShell = mountShell({
       isOver: () => gameOver,
       isPaused: () => paused,
@@ -3786,29 +3764,18 @@
     window.addEventListener("blur", releaseAll);
     document.addEventListener("visibilitychange", onVisible);
 
-    // On the demo (the menu asked), asking about it (a first visit), or straight in.
-    const intro = demoIntro("runner", takeDemoRequest("runner"));
     newShift();
     tick().then(() => {
       if (!active) return;
       sizeCanvas();
-      if (intro === "demo") {
-        startDemo();
-      } else if (intro === "ask") {
-        askDemo = true;
-        mode = "intro";
-        liveMessage = "First time here? Watch the demo, or play.";
-      } else {
-        tipVisible = firstVisit("runner");
-        sfxCountdown(COUNTDOWN_SECONDS);
-        liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
-      }
-      raf = requestAnimationFrame(frame);
+      sfxCountdown(COUNTDOWN_SECONDS);
+      liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
+      loop.start();
     });
 
     return () => {
       active = false;
-      cancelAnimationFrame(raf);
+      loop.stop();
       timers.clear();
       setRunGlide(0);
       stopMusic();
@@ -3824,8 +3791,7 @@
 
   $: deliveries = finalStats.deliveries;
   $: endingWords = finalStats.ending ? (ENDINGS[finalStats.ending as keyof typeof ENDINGS] ?? "the end") : "the end";
-  /** The pads show the bot's keys while the demo plays. */
-  $: padsShown = demoOn ? demoHeld : touchHeld;
+  $: padsShown = touchHeld;
 </script>
 
 <div class="boba-stage sr-stage" aria-hidden="true"></div>
@@ -3843,8 +3809,9 @@
         </span>
         <span class="boba-stack sr-score">
           <span class="boba-big">{String(score).padStart(5, "0")}</span>
-          {#if !demoOn}
-            <ExpertTag />
+          <ExpertTag />
+          {#if streak > 0}
+            <span class="boba-meta">streak {streak}</span>
           {/if}
           {#if combo > 1}
             {#key combo}
@@ -3854,44 +3821,7 @@
         </span>
       </div>
 
-      <div
-        class="boba-ticket boba-ticket-center boba-riso sr-middle"
-        class:has-slab={rushReady}
-        class:is-demo={demoOn}
-        style="--tilt: 0.8deg"
-      >
-        <span class="sr-readout">
-          <span class="boba-meta">streak</span>
-          <span class="sr-value">{streak}</span>
-        </span>
-        <span
-          class="sr-sugar"
-          class:is-ready={rushReady}
-          class:is-rushing={rushing}
-          role="img"
-          aria-label={rushing ? "Sugar rush running" : rushReady ? "Sugar rush ready" : `Sugar ${sugarPips} of 10`}
-        >
-          <span class="sr-sugar-label" aria-hidden="true">
-            {#if rushReady}
-              <span class="boba-phase">rush</span>
-              <span class="boba-keys"><kbd>X</kbd></span>
-            {:else}
-              <span class="boba-meta">{rushing ? "rushing" : "sugar"}</span>
-            {/if}
-          </span>
-          <span class="sr-pips" aria-hidden="true">
-            {#each Array(10) as _, index}
-              <span class="sr-pip" class:is-full={index < sugarPips}></span>
-            {/each}
-          </span>
-        </span>
-      </div>
-
       <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.6deg">
-        <span class="boba-stack sr-tea">
-          <CupTimer fraction={teaShown} rush={teaShown < 0.25} />
-          <span class="boba-meta sr-tea-label">tea</span>
-        </span>
         <!-- The spare cups are the lives: a cup per slot held, a dashed
              outline per slot empty. A cup lost blinks out in the accent; a
              cup won back blinks in and pops. -->
@@ -3929,24 +3859,50 @@
       </div>
     </div>
 
-    {#if tipVisible && !paused && !demoOn}
-      <div class="boba-tip" role="note" aria-label="How to play">
-        <span>jump the gaps and deliver the tea</span>
-        <span class="boba-keys"><kbd>Space</kbd></span>
-      </div>
-    {:else if teach && !paused && !demoOn}
-      {#key teach}
-        <p class="boba-tip sr-teach" role="note">
-          <span>{TEACH_TEXT[teach]}</span>
-          {#if teach === "slide"}
-            <span class="boba-keys"><kbd>↓</kbd></span>
-          {:else if teach === "rush"}
+  </header>
+
+  <!-- The tray, low and under the runner where the eye already is: the tea,
+       which hard landings slosh out, and the sugar meter the pearls fill. -->
+  <div
+    bind:this={trayEl}
+    class="sr-tray boba-ui"
+    class:is-touch={touchUI}
+    style={touchUI ? "" : `left: ${trayLeft}px`}
+    aria-label="Tea and sugar"
+    role="group"
+  >
+    <div class="boba-ticket boba-riso is-small sr-tray-sheet" class:has-slab={rushReady} style="--tilt: 0.7deg">
+      <span class="boba-stack sr-tea" class:is-lit={trayLit === "tea"}>
+        <CupTimer fraction={teaShown} rush={teaShown < 0.25} />
+        <span class="boba-meta sr-tea-label">tea</span>
+      </span>
+    <span
+      class="sr-sugar"
+      class:is-lit={trayLit === "sugar"}
+      class:is-ready={rushReady}
+      class:is-rushing={rushing}
+      role="img"
+      aria-label={rushing ? "Sugar rush running" : rushReady ? "Sugar rush ready" : `Sugar ${sugarPips} of 10`}
+    >
+      <span class="sr-sugar-label" aria-hidden="true">
+        {#if rushReady}
+          <span class="boba-phase">rush</span>
+          <!-- While the rush's lesson is up, its key is there, not here. -->
+          {#if coachLesson?.id !== "rush"}
             <span class="boba-keys"><kbd>X</kbd></span>
           {/if}
-        </p>
-      {/key}
-    {/if}
-  </header>
+        {:else}
+          <span class="boba-meta">{rushing ? "rushing" : "sugar"}</span>
+        {/if}
+      </span>
+      <span class="sr-pips" aria-hidden="true">
+        {#each Array(10) as _, index}
+          <span class="sr-pip" class:is-full={index < sugarPips}></span>
+        {/each}
+      </span>
+    </span>
+    </div>
+  </div>
 
   {#if touchUI}
     <div class="sr-pads boba-ui">
@@ -3955,10 +3911,11 @@
           type="button"
           class="sr-pad boba-riso is-small"
           class:is-down={padsShown.down}
+          class:is-lit={padLit === "down"}
           style="--tilt: -1.2deg"
           on:pointerdown={(event) => padDown(event, "down")}
           on:pointerup={() => holdPad("down", false)}
-          on:pointercancel={() => holdPad("down", false)}
+          on:pointercancel={() => cancelPad("down")}
           on:lostpointercapture={() => holdPad("down", false)}
           on:keydown={(event) => padKey(event, "down", true)}
           on:keyup={(event) => padKey(event, "down", false)}
@@ -3976,13 +3933,14 @@
             type="button"
             class="sr-pad sr-rush boba-riso is-small"
             class:is-down={padsShown.rush}
+            class:is-lit={padLit === "rush"}
             class:is-hidden={!rushReady}
             tabindex={rushReady ? 0 : -1}
             aria-hidden={!rushReady}
             style="--tilt: 1.4deg"
             on:pointerdown={(event) => padDown(event, "rush")}
             on:pointerup={() => holdPad("rush", false)}
-            on:pointercancel={() => holdPad("rush", false)}
+            on:pointercancel={() => cancelPad("rush")}
             on:lostpointercapture={() => holdPad("rush", false)}
             on:keydown={(event) => padKey(event, "rush", true)}
             on:keyup={(event) => padKey(event, "rush", false)}
@@ -3998,10 +3956,11 @@
             type="button"
             class="sr-pad sr-jump boba-riso is-small"
             class:is-down={padsShown.jump}
+            class:is-lit={padLit === "jump"}
             style="--tilt: -0.9deg"
             on:pointerdown={(event) => padDown(event, "jump")}
             on:pointerup={() => holdPad("jump", false)}
-            on:pointercancel={() => holdPad("jump", false)}
+            on:pointercancel={() => cancelPad("jump")}
             on:lostpointercapture={() => holdPad("jump", false)}
             on:keydown={(event) => padKey(event, "jump", true)}
             on:keyup={(event) => padKey(event, "jump", false)}
@@ -4020,29 +3979,20 @@
   {/if}
 </div>
 
-{#if !askDemo && !demoOn && (countdown > 0 || goVisible)}
+{#if countdown > 0 || goVisible}
   <Countdown value={countdown} caption="out for delivery" goCaption="run" />
 {/if}
 
-{#if askDemo}
-  <DemoCard
-    bind:this={demoCard}
-    deck="Watch the courier run a stretch on its own, or go straight in."
-    on:watch={startDemo}
-    on:play={playForReal}
-  />
-{/if}
-
-{#if demoOn && !paused}
-  <DemoBar
-    bind:this={demoBar}
-    caption={demoCaption}
-    ended={demoEnded}
-    placement={touchUI ? "top" : "bottom"}
-    on:play={playForReal}
-    on:again={startDemo}
-  />
-{/if}
+<Coach
+  lesson={coachLesson}
+  x={coachX}
+  y={coachY}
+  side={coachSide}
+  ring={coachRing}
+  leaving={coachLeaving}
+  hidden={paused || gameOver}
+  top={playTop + 8}
+/>
 
 {#if paused && !gameOver}
   <PauseCard
@@ -4100,24 +4050,43 @@
     gap: 0;
   }
 
-  /* --- Middle ticket: the streak and the sugar meter --- */
+  /* --- The tray: tea and sugar, low and under the runner --- */
 
-  .sr-middle {
+  .sr-tray {
+    position: fixed;
+    bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    z-index: calc(var(--layer-overlay) + 3);
+    pointer-events: none;
+  }
+
+  /* On touch it sits between the slide and jump pads. */
+  .sr-tray.is-touch {
+    left: 50%;
+    bottom: max(var(--space-5), env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+  }
+
+  .sr-tray-sheet {
     gap: var(--space-4);
+    min-height: 0;
+    padding: var(--space-2) var(--space-3);
   }
 
-  .sr-readout {
-    display: grid;
-    gap: var(--space-0-5);
-    justify-items: start;
-    min-width: 2.5rem;
+  /* A lesson about the tea or the sugar underlines it on the tray too. */
+  .sr-tea,
+  .sr-sugar {
+    position: relative;
   }
 
-  .sr-value {
-    color: var(--b-strong);
-    font-size: 0.95rem;
-    font-variant-numeric: lining-nums tabular-nums;
-    line-height: 1.2;
+  .sr-tea.is-lit::after,
+  .sr-sugar.is-lit::after {
+    content: "";
+    position: absolute;
+    inset: auto -4px -6px;
+    height: 3px;
+    background: var(--b-slab);
+    border-radius: 2px;
+    animation: boba-rise var(--motion-slow) var(--ease-emphasized) both;
   }
 
   .sr-sugar {
@@ -4138,8 +4107,14 @@
   }
 
   .sr-pips {
-    display: inline-flex;
+    display: grid;
+    grid-template-columns: repeat(10, auto);
     gap: 3px;
+  }
+
+  /* Between the pads on a phone there is room for two rows of five. */
+  .sr-tray.is-touch .sr-pips {
+    grid-template-columns: repeat(5, auto);
   }
 
   /* Sugar cubes: an empty one is a dashed outline; a full one is printed in
@@ -4338,10 +4313,6 @@
     }
   }
 
-  .sr-teach {
-    margin-top: var(--space-3);
-  }
-
   /* --- Touch controls: slide bottom left, jump bottom right, rush above jump --- */
 
   .sr-pads {
@@ -4441,8 +4412,15 @@
     border-color: #fdf8f3;
   }
 
-  /* Short screens (a phone on its side): rush moves beside jump. */
-  @media (max-height: 500px) {
+  /* The pad a lesson is about: an accent rule under its label. */
+  .sr-pad.is-lit span {
+    text-decoration: underline 2px var(--b-slab);
+    text-underline-offset: 4px;
+  }
+
+  /* Short, wide screens (a phone on its side): rush moves beside jump. Short
+     and narrow, it stays stacked, clear of the tray between the pads. */
+  @media (max-height: 500px) and (min-width: 600px) {
     .sr-pad-stack {
       flex-direction: row;
       align-items: flex-end;
@@ -4458,6 +4436,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .sr-tea.is-lit::after,
+    .sr-sugar.is-lit::after,
     .sr-sugar.is-ready .sr-pips,
     .sr-slot.in,
     .sr-slot.in > *,
@@ -4471,13 +4451,8 @@
   }
 
   @media (max-width: 640px) {
-    .sr-middle {
+    .sr-tray-sheet {
       gap: var(--space-3);
-    }
-
-    /* On a phone the demo's strip takes the middle ticket's row. */
-    .sr-middle.is-demo {
-      visibility: hidden;
     }
 
     .sr-tea-label {

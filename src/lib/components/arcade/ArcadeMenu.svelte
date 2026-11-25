@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
 
   import PixelIcon from "#lib/components/PixelIcon.svelte";
-  import { GAMES, arcadeExpert, canPlay, openDemo, setExpert, type GameId } from "#lib/boba.ts";
+  import { GAMES, arcadeExpert, canPlay, setExpert, type GameId } from "#lib/boba.ts";
   import { MENU_ICONS } from "#lib/arcade/art.ts";
   import { trapFocus } from "#lib/arcade/focus.ts";
   import { readBest } from "#lib/arcade/scores.ts";
@@ -33,12 +33,6 @@
     unlockAudio();
     sfxBlip();
     dispatch("pick", id);
-  }
-
-  function watch(id: GameId) {
-    unlockAudio();
-    sfxBlip();
-    openDemo(id);
   }
 
   function toggleExpert(on = !expert) {
@@ -149,7 +143,7 @@
            price would be. -->
       <ol class="list">
         {#each GAMES as game (game.id)}
-          <li class="entry">
+          <li>
             <button
               type="button"
               class="item"
@@ -178,11 +172,6 @@
               </span>
               <kbd class="key" aria-hidden="true">{game.key}</kbd>
             </button>
-            {#if playable[game.id] !== false}
-              <button type="button" class="demo" on:click={() => watch(game.id)}>
-                demo<span class="sr-only"> of {game.name}</span>
-              </button>
-            {/if}
           </li>
         {/each}
       </ol>
@@ -266,39 +255,6 @@
   .mode-option[aria-checked="true"] .key {
     color: var(--b-paper);
     background: transparent;
-  }
-
-  .entry {
-    display: flex;
-    align-items: center;
-    gap: var(--space-1);
-  }
-
-  .entry .item {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .demo {
-    flex: none;
-    min-height: 2.5rem;
-    padding: 0 var(--space-2);
-    color: var(--b-muted);
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-control);
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.75rem;
-    font-style: italic;
-    line-height: 1.25;
-    touch-action: manipulation;
-    transition: background-color var(--motion-fast) var(--ease-standard);
-  }
-
-  .demo:hover {
-    color: var(--b-strong);
-    background: var(--b-wash);
   }
 
   .list {

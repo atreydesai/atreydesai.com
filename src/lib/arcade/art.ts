@@ -11,6 +11,16 @@ export const PEARL = "#2b1a12";
 export const LID = "#ece3d6";
 export const STRAW_PINK = "#ff5277";
 export const PAPER_WHITE = "#fdf8f3";
+/** Cream: canvas text and halos over scenes that are dark in both themes. */
+export const CREAM = PAPER_WHITE;
+/** The accent plate's ink, for canvas marks (the HUD reads `--b-slab`). */
+export const ACCENT = "#e85d4c";
+/** The paper halo every sprite keeps over a scene. */
+export const HALO = "rgba(253, 248, 243, 0.8)";
+/** The dark chip behind canvas popups over a scene. */
+export const NOTE_BACK = "#141a2e";
+/** Golden things: a full cup, a golden cup, a ×5. */
+export const NOTE_GOLD = "#ffd166";
 
 export const DRINKS = [
   "#b388e0",

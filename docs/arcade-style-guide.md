@@ -36,12 +36,15 @@ Three rules hold everywhere:
 | Game       | Verb                            | Input                                                | Where        |
 | ---------- | ------------------------------- | ---------------------------------------------------- | ------------ |
 | boba catch | Catch cups thrown by links      | Mouse                                                | Desktop only |
+| sugar rush | Run the rooftops and deliver    | Space, `↓`, `X`; three buttons on touch              | Everywhere   |
+| tea minus  | Land a cup of tea on a moon     | Arrows or `WASD`, Space; three hold buttons on touch | Everywhere   |
+| cup stack  | Drop cups onto a tower          | Tap, click, Space                                    | Everywhere   |
+| spill      | Draw straws to steer the pour   | Drag to draw; arrows and Space as a pen              | Everywhere   |
 | straw stab | Stab each cup on the beat       | Tap, click, Space                                    | Everywhere   |
 | order up   | Ice, syrup, pour, scoop, serve  | Hold, tap, click, Space                              | Everywhere   |
-| cup stack  | Drop cups onto a tower          | Tap, click, Space                                    | Everywhere   |
-| tea minus  | Land a cup of tea on a moon     | Arrows or `WASD`, Space; three hold buttons on touch | Everywhere   |
-| sugar rush | Run the rooftops and deliver    | Space, `↓`, `X`; three buttons on touch              | Everywhere   |
-| spill      | Draw straws to steer the pour   | Drag to draw; arrows and Space as a pen              | Everywhere   |
+
+The menu lists them in this order, and their shortcut keys are `1` to `7` in
+the same order.
 
 Every game plays by keyboard as well as pointer. A game that needs a fine
 pointer (catch) is shown in the menu but disabled on touch devices, with a
@@ -167,6 +170,11 @@ Tickets pinned along the top: score at the start, controls (and lives,
 where a game has them) at the end, anything else in the middle (a phone moves the middle ticket to a second
 row). A paper wash fades the site header behind them.
 
+The top is for what is glanced at between moves. A meter the player reads
+while playing (a power-up filling, a level draining) belongs where the eye
+already is: sugar rush carries its tea and sugar on a tray low on the screen,
+under the runner, between the thumb pads on a phone.
+
 - The score ticket is the one with a slab.
 - Timers are a drawn cup whose tea drains. Where a game has lives, they are
   tapioca pearls, and a dropped one becomes a dashed ring.
@@ -185,16 +193,14 @@ row). A paper wash fades the site header behind them.
   `12rem`, so there is never a gap between it and the buttons beside it.
 - Numbers that change use tabular figures and update at most about ten times
   a second.
-- The first-run tip is a small raised strip under the tickets: one
-  instruction and one key. It shows once per device, and hides while the
-  game is paused.
+- There is no first-run tip strip: games teach in play (see Teaching).
 
 ## Dialogs
 
 - **Menu.** A menu board: each game's name with its best score where the
-  price would be, its shortcut key, and a quiet italic `demo` beside it. A
-  `normal | expert` switch sits by the title (key `E`); the prices follow
-  it. The menu's primary button opens the leaderboards (key `L`).
+  price would be, and its shortcut key. A `normal | expert` switch sits by
+  the title (key `E`); the prices follow it. The menu's primary button opens
+  the leaderboards (key `L`).
 - **Leaderboards.** The menu card turns over to every game's board at once:
   the top five of each, for the mode the switch is on, the leader in the
   accent, with a `play` link into each game. A board nobody has signed shows
@@ -293,14 +299,30 @@ exclamation marks, no “Oops”.
   rooms), the proof covers expert too. Expert runs keep their own bests and
   their own boards; `scores.ts` and `/api/scores` take the mode from the
   switch.
-- **A demo first.** Each game can play itself for 15 to 30 seconds on its
-  real rules: an autopilot pressing the same inputs a player would, never
-  scoring, always on normal rules. The first time a game opens on a device a
-  card asks whether to watch it (`DemoCard`); the menu's `demo` opens it any
-  time (`openDemo`). While it plays, `DemoBar` carries the word demo, one
-  caption at a time, and `Play`; at the end, `Watch again`. The strip is a
-  riso sheet with no box behind it. The first-run tip waits for the first
-  real run.
+- **Teaching in play.** No game opens on a card or a self-playing demo: it
+  goes straight to its countdown and teaches inside the live game, the first
+  time each thing matters on this device (`createCoach` in
+  `src/lib/arcade/core/coach.ts`, remembered per device). The pattern comes
+  from the games that do it best (Mario's 1-1, Portal's chambers, Plants vs.
+  Zombies' one-line tips):
+  - **One thing at a time, where the eye is.** A callout (`Coach.svelte`)
+    sits beside the thing in the world, never in the tickets and never on a
+    card: one short full sentence with its key chip (a touch word, and the
+    lit pad, on a phone), a dotted tail, and a pen loop around the thing.
+  - **A move slows play.** About a second before a move is needed the game
+    eases into slow motion, and a ghost of the player's own sprite, dithered
+    through a Bayer screen door in cream, runs the move from where to make
+    it along a line of chalk dashes. Play comes back to speed the moment the
+    move is made. A move made before it is taught is never taught; a move
+    missed takes its lesson down so the next one teaches it, and play never
+    stays slow.
+  - **A thing says what it's for as it comes into view**, at full speed: a
+    golden cup, a hazard, a power-up (named in italic, then one sentence).
+  - **Where time can't bend** (a beat on the audio clock, a window in
+    milliseconds), a ghost and a highlight teach instead of slow motion.
+  - Ghosts and loops are the arcade's only "holograms": dither, chalk and pen,
+    never glow. Under Reduce Motion nothing pulses or draws on; the lessons
+    and the slow motion stay, because they are play.
 - **Share.** Each game builds its own emoji lines for the results slip's
   `share` prop (`emojiRows` in `src/lib/arcade/share.ts` wraps a sequence):
   at most four short lines that say how the run went without explaining it.
@@ -605,8 +627,9 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   flock of pigeons only scatters it; it never costs a cup.
 - **Sugar rush.** Pearls fill a meter of ten sugar cubes; triggering it
   smashes anything that would cost a cup (never anything lethal) for a few
-  seconds, with afterimages and speed lines. The full meter is the one
-  ticket here that earns a slab.
+  seconds, with afterimages and speed lines. The meter and the tea ride on
+  the tray under the runner, not in the tickets; the tray earns a slab when
+  the meter is full.
 - **The course is authored, then shuffled.** Twenty-seven set pieces unlock
   with distance and never repeat back to back. Besides awnings that bounce,
   vents that lift, cables to ride, crates, pigeons and split routes, things
@@ -631,10 +654,17 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   hangs, the walls either side of the railway) and spark or flicker.
 - **The scene** is cup stack's city from the side: dusk at the start, full
   night by about a kilometre and a half, windows coming on as it darkens.
-- New moves are taught in context, once per device, one caption at a time;
-  the first lethal thing gets one too (“hazard stripes end the run”).
-- **A demo** plays a calm opening on a fixed seed with the bot at the keys,
-  captioning each move the first time it happens, for about half a minute.
+- **Taught on the run** (`runner-lessons.js`, timed on real courses by
+  `tests/runner-lessons.test.mjs`). Each move slows play about a second
+  before it is needed, with the runner's ghost running it from a small
+  accent post on the roof where to press: jump over the first gap or crate,
+  hold for a tall one, slide under the first line, glide off the first long
+  drop, slam the first crates. Pearls, the customer, a spare cup, a golden
+  cup (worth points once both spares are held), hazard stripes, and each set
+  piece get one line as they come into view; the first slosh says what
+  spilled tea costs. The sugar rush names itself the first time the meter is
+  full. A tap is held until the run has seen it, so slow motion never eats
+  one.
 - **Sharing** pastes the distance, each coaster as a cup (full, part, or
   missed), and the cups lost, then what ended the run.
 
@@ -714,6 +744,23 @@ room, to steer it into the cup.
   them, then night after hours.
 
 ## Structure
+
+- **One core.** What more than one game needs lives once in
+  `src/lib/arcade/core/`: `math` (clamp, lerp, smoothstep, damp, snapping),
+  `rng` (the seeded mulberry32 and position hashes every scene is seeded
+  by, pinned by tests so nothing seeded ever moves), `color`, `dither` (the
+  Bayer threshold and the dithered band sky), `loop` (the frame loop: capped
+  steps, paused drawing, a clean stop), `pool`, `coach` and `ghost` (the
+  teaching), and `sprite-stack`. Palette values shared across scenes
+  (cream, the accent, the halo, the popup chip, gold) are in `art.ts`. A game
+  keeps a local helper only where the shared one would change what it draws.
+- **Sprite stacking, sparingly.** `sprite-stack.ts` builds a round object
+  from slices (`latheSlices`, one disc per layer of its profile), turns
+  every slice by the same angle with nearest-neighbour sampling, squashes
+  them for a camera looking down at a slant, lifts each a cell above the
+  last, and outlines the finished stack once. The result is an ordinary
+  sprite grid, so it goes through `cachedSprite` like everything else.
+  It is for a drink that turns in place, not for anything a player aims at.
 
 - The arcade is loaded the first time it opens, so its code and its global
   sheet (`arcade.css`) never ship with an ordinary page view. It sets
