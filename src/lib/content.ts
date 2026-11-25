@@ -63,6 +63,9 @@ export interface Post {
     // A 1200×630 share card (`npm run og`) and its alt text.
     image?: string;
     imageAlt?: string;
+    // A 1200×1200 card for the previews that crop to a square (Slack, LinkedIn); `image` then serves X.
+    imageSquare?: string;
+    imageSquareAlt?: string;
 }
 
 export interface ResearchInterestCitation {

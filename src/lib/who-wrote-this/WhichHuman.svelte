@@ -17,6 +17,8 @@
 	//        - the ICML 2020 reviews as a full-width wall of tiles (1 tile = 10 reviews), the lit share large on it (the view
 	//          keeps its name, `reviews`, so links to #which-human/reviews still land on it);
 	//        - the five models as five columns on one baseline, their shares above them;
+	//        - the same reviews given the list of reviewers (a 2K-review subsample, not yet in the paper): two columns,
+	//          the review alone and the review with the list, the most the list allows as a dashed line;
 	//        - Figure 1's other sets of writers as a skyline of blocks (1 tile = 1 text);
 	//        - stated confidence as two blocks side by side (1 tile = 1 answer);
 	//        - the paper's Oates example: Fable 5.2's explanation set large, the story and the answer beside it;
@@ -42,7 +44,7 @@
 	import { FABLE, GRAY, INK as TONE, modelColor, deepen, TILE } from "./palette";
 	import { printSprite, printAspect, warmTilesNear } from "./print/sprites";
 
-	type View = "review" | "prompt" | "reviews" | "models" | "domains" | "confidence" | "example";
+	type View = "review" | "prompt" | "reviews" | "models" | "list" | "domains" | "confidence" | "example";
 	type Model = (typeof S.models)[number];
 	type Dom = (typeof S.domains)[number];
 	type Order = "up" | "col"; // lit first: from the bottom row up, or column by column from the left
@@ -69,10 +71,10 @@
 	// scroll per step, in vh (Atrey, 16 Nov: neither too fast for a fast scroller nor a long still stretch for a slow
 	// one): about 60vh a step, 75vh for a step that animates (the tiles ease in); the demo's prompt step has two moves
 	// (the prompt closes around the review, then the answer arrives), 75vh each
-	const VH = [60, 150, 75, 75, 75, 75, 60];
+	const VH = [60, 150, 75, 75, 75, 75, 75, 60];
 	const LEN = VH.reduce((a, v) => a + v, 0);
 	const ANSWER_AT = 0.5; // share of the prompt step scrolled before the answer arrives
-	const LAND = [0.5, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5]; // where a dash click or a footnote's ↩ lands in its step
+	const LAND = [0.5, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; // where a dash click or a footnote's ↩ lands in its step
 	const HOLD = 350; // ms: the least time a step is shown when a fast scroll crosses several
 	// the beats the stage walks through, in order: each step once, the prompt step twice (before and after its answer)
 	const beatOf = (s: number, p: number) => (s === 0 ? 0 : s === 1 ? (p >= ANSWER_AT ? 2 : 1) : s + 1);
@@ -83,7 +85,8 @@
 	const NOTES = FOOTNOTES.notes;
 	const FN: Record<string, number> = Object.fromEntries(S.notes.map((f, i) => [f.id, i + 1]));
 	// each footnote's return point: the step whose picture or sentence marks it
-	const FN_STEP: Record<number, number> = Object.fromEntries(S.notes.map((f, i) => [i + 1, f.id === "demo" ? 0 : f.id === "placeholder" ? 1 : f.id === "privacy" ? 2 : 4]));
+	const markedAt = (id: string) => STEPS.findIndex((s) => ((s as Step & { marks?: { note: string }[] }).marks ?? []).some((m) => m.note === id));
+	const FN_STEP: Record<number, number> = Object.fromEntries(S.notes.map((f, i) => [i + 1, f.id === "demo" ? 0 : f.id === "placeholder" ? 1 : markedAt(f.id)]));
 	// a step's sentence cut at its footnote marks
 	type Part = { t: string; fn?: number };
 	const parts = (s: Step): Part[] => {
@@ -345,6 +348,41 @@
 		});
 	}
 
+	// ICML 2020 again, given the list of reviewers (a 2K-review subsample, 1 tile = 10 reviews as on the wall): the review
+	// alone against the review and the list, two columns on one baseline, each share above its column; a dashed line
+	// marks the most the list allows
+	function drawList(A: Box, narrow: boolean) {
+		const R = S.list, m = FAB;
+		// both keys name the colours here; on a phone the title gives way to them (the sentence names ICML 2020)
+		const top = header(A, narrow ? { keys: "all", unit: U["unit.reviews"] } : { title: U["title.reviews"], icon: "icml", keys: "all", unit: U["unit.reviews"] });
+		const max = fill(U["list.max"], { pct: Math.round(R.max.pct) });
+		const cols = [
+			{ id: "l:without", k: R.without.lit, t: U["list.without"], sub: U["list.sub"], num: pct(R.without.pct), strong: false },
+			{ id: "l:with", k: R.with.lit, t: U["list.with"], sub: `${U["list.sub"]}; ${max}`, num: pct(R.with.pct), strong: true },
+		];
+		if (narrow) {
+			bars(A, top, cols.map((c) => ({ id: c.id, n: R.tiles, k: c.k, color: hue(m), t: c.t, sub: c.sub, swatch: false, strong: c.strong, num: c.num })), 12);
+			// the most the list allows, as a dashed stair across the second bar (filled column by column from the left)
+			const b = G.blocks.find((e) => e.b.id === "l:with")!.b;
+			G.paths.push({ pts: edge(b, R.max.lit), color: TONE.ink, width: 1.5, dash: [4, 3], progress: 1 });
+			return;
+		}
+		const W = A.x1 - A.x0, gap = Math.round(Math.max(64, W * 0.08)), np = 60, NUM = np + 12, LAB = 10 + tagH(true, true);
+		const cw = Math.min(360, (W - gap) / 2);
+		const f = fit(R.tiles, cw, A.y1 - top - NUM - LAB, 22);
+		const gw = f.cols * f.s, ch = f.rows * f.s, x0 = A.x0 + (W - gw * 2 - gap) / 2;
+		const base = top + NUM + ch + Math.max(0, (A.y1 - top - NUM - ch - LAB) / 2);
+		cols.forEach((c, i) => {
+			const x = x0 + i * (gw + gap), y = base - ch;
+			place({ id: c.id, n: R.tiles, k: c.k, x, y, cols: f.cols, rows: f.rows, s: f.s, alpha: 1, color: hue(m), order: "up" }, i * R.tiles);
+			L.push({ id: `n:${c.id}`, x, y: y - 10, t: c.num, k: "num", ax: 0, ay: 1, size: np, color: deepen(hue(m), 0.15) });
+			G.tags.push({ id: c.id, x: x - 10, y: base + 10 + tagH(c.strong, true) / 2, at: "right", t: c.t, sub: c.sub, strong: c.strong });
+		});
+		// the most the list allows: a dashed stair line at that count on the second column
+		const b = G.blocks.find((e) => e.b.id === "l:with")!.b;
+		G.paths.push({ pts: edge(b, R.max.lit), color: TONE.ink, width: 1.5, dash: [5, 4], progress: 1 });
+	}
+
 	// Figure 1's other sets of writers: a skyline of blocks on one baseline, each share above its block
 	function drawDomains(A: Box, narrow: boolean) {
 		const top = header(A, { keys: "all", unit: U["unit.text"] });
@@ -421,6 +459,7 @@
 		const A: Box = { x0: rs.left, x1: rs.right, y0: rs.top + top, y1: rs.top + top + h };
 		if (view === "reviews") drawReviews(A, narrow);
 		else if (view === "models") drawModels(A, narrow);
+		else if (view === "list") drawList(A, narrow);
 		else if (view === "domains") drawDomains(A, narrow);
 		else if (view === "confidence") drawConfidence(A, narrow);
 		// the demo and the example draw no tiles: every tile settles back into the ground

@@ -13,6 +13,7 @@
 	import ScrollHint from "#lib/who-wrote-this/ScrollHint.svelte";
 	import ShareBlock from "#lib/who-wrote-this/ShareBlock.svelte";
 	import PrintHero from "#lib/who-wrote-this/PrintHero.svelte";
+	import IcmlSpot from "#lib/who-wrote-this/IcmlSpot.svelte";
 	import Timeline from "#lib/who-wrote-this/Timeline.svelte";
 	import HumanOrAIB, { FOOTNOTES as HB_NOTES } from "#lib/who-wrote-this/HumanOrAIB.svelte";
 	import WhichAI, { FOOTNOTES as WA_NOTES } from "#lib/who-wrote-this/WhichAI.svelte";
@@ -134,8 +135,12 @@
 <Seo
 	title="{post.seoTitle ?? post.title} | Atrey Desai"
 	description={post.seoDescription ?? post.excerpt}
-	image={post.image}
-	imageAlt={post.imageAlt}
+	image={post.imageSquare ?? post.image}
+	imageAlt={post.imageSquare ? post.imageSquareAlt : post.imageAlt}
+	imageWidth={post.imageSquare ? 1200 : undefined}
+	imageHeight={post.imageSquare ? 1200 : undefined}
+	twitterImage={post.imageSquare ? post.image : undefined}
+	twitterImageAlt={post.imageAlt}
 	url={url}
 	type="article"
 	pageType="WebPage"
@@ -197,6 +202,8 @@
 			<a class="back" href="/blog/"><Icon name="back" /> Back to blog</a>
 			<h1>{C.meta.title.t}</h1>
 			<p class="deck" data-lag="1">{C.meta.deck.t}</p>
+			<!-- the ICML 2020 result, up front: beside the title on a wide screen, under the deck on a phone -->
+			<div class="spot-at" data-lag="1"><IcmlSpot /></div>
 			<p class="byline" data-lag="2">
 				{#each C.meta.authors as a, i}
 					<span class="author">{a.name}<sup>{#each a.aff as k}{affIndex[k]}{/each}{#if a.equal}*{/if}{#if a.corresponding}<span class="dag">†</span>{/if}</sup>{#if i < C.meta.authors.length - 1}{", "}{/if}</span>
@@ -370,6 +377,20 @@
 
 	/* masthead: title, the paper's title, the full byline with the paper's marks */
 	.mast { padding-block: 48px 8px; max-width: 52rem; }
+	/* a wide screen: the masthead in two columns, the ICML card on the right from the title down */
+	@media (min-width: 1024px) {
+		.mast { max-width: none; display: grid; grid-template-columns: minmax(0, 52rem) minmax(280px, 330px); column-gap: clamp(32px, 4vw, 64px); grid-template-rows: repeat(6, auto) 1fr; justify-content: space-between; }
+		.mast > :global(*) { grid-column: 1; }
+		.mast > .back { grid-row: 1; }
+		.mast > h1 { grid-row: 2; }
+		.mast > .deck { grid-row: 3; }
+		.mast > .byline { grid-row: 4; }
+		.mast > .affs { grid-row: 5; }
+		.mast > .links { grid-row: 6; }
+		.mast > .spot-at { grid-column: 2; grid-row: 1 / -1; align-self: start; }
+	}
+	.spot-at { margin-top: 22px; }
+	@media (min-width: 1024px) { .spot-at { margin-top: 0; } }
 	.back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); text-decoration: none; margin-bottom: 20px; }
 	.back:hover { color: var(--ink); }
 	h1 { font-size: clamp(36px, 5vw, 56px); line-height: 1.02; font-weight: 600; letter-spacing: -0.035em; }

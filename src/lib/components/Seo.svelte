@@ -19,6 +19,13 @@
   // Person's own image in structured data.
   export let image: string | undefined = undefined;
   export let imageAlt: string | undefined = undefined;
+  // A card that is not 1200×630 (a square for Slack's and LinkedIn's previews)
+  // states its own size; X's large card is 1.91:1, so such a page also passes
+  // a wide image for X.
+  export let imageWidth: number | undefined = undefined;
+  export let imageHeight: number | undefined = undefined;
+  export let twitterImage: string | undefined = undefined;
+  export let twitterImageAlt: string | undefined = undefined;
   export let url = SITE_URL;
   export let type = "website";
   export let noindex = false;
@@ -51,6 +58,10 @@
   // Both the portrait and the generated post cards are 1200×630.
   $: cardType = cardImage.endsWith(".png") ? "image/png" : "image/jpeg";
   $: cardSized = cardImage === "/og-image-wide.jpg" || cardImage.startsWith("/images/og/");
+  $: cardW = imageWidth ?? 1200;
+  $: cardH = imageHeight ?? 630;
+  $: twitterUrl = twitterImage ? absoluteSiteUrl(twitterImage) : imageUrl;
+  $: twitterAlt = (twitterImage && twitterImageAlt) || cardAlt;
   $: pageName = title.replace(/\s*\|\s*Atrey Desai$/, "");
   $: isHome = canonicalUrl === `${SITE_URL}/`;
   $: crumbs =
@@ -108,10 +119,10 @@
   <meta property="og:description" content={description} />
   <meta property="og:image" content={imageUrl} />
   <meta property="og:image:alt" content={cardAlt} />
-  {#if cardSized}
+  {#if cardSized || imageWidth}
     <meta property="og:image:type" content={cardType} />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image:width" content={String(cardW)} />
+    <meta property="og:image:height" content={String(cardH)} />
   {/if}
   <meta property="og:site_name" content="Atrey Desai" />
   <meta property="og:locale" content="en_US" />
@@ -131,8 +142,8 @@
   <meta name="twitter:url" content={canonicalUrl} />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
-  <meta name="twitter:image" content={imageUrl} />
-  <meta name="twitter:image:alt" content={cardAlt} />
+  <meta name="twitter:image" content={twitterUrl} />
+  <meta name="twitter:image:alt" content={twitterAlt} />
   <meta name="twitter:site" content="@atreydesai" />
   <meta name="twitter:creator" content="@atreydesai" />
 

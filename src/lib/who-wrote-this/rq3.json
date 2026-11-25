@@ -43,6 +43,11 @@
    "src": "paper/sections/05_rq3_human_vs_human.tex"
   },
   {
+   "view": "list",
+   "t": "Given the list of about 4K ICML 2020 reviewers, Fable 5.2 names the reviewer of 76% of 2K of these reviews, out of a possible 84%.",
+   "src": "not yet in the paper (ICML 2020 reviewer-list run, 24 Nov 2026)"
+  },
+  {
    "view": "domains",
    "t": "On texts published after its training cutoff, it also names the reviewer of 78% of Nature journal reviews, the writer of all 15 stories by authors with >1M Goodreads ratings, at least one author of 46% of arXiv papers, and the username behind 69% of comments made by active Redditors.",
    "src": "paper/sections/02_introduction.tex",
@@ -129,6 +134,25 @@
   "per_tile": 10,
   "tiles": 1514,
   "src": "paper/figures/data/rq3_icml.json"
+ },
+ "list": {
+  "n": 2000,
+  "per_tile": 10,
+  "tiles": 200,
+  "names": "~4K",
+  "without": {
+   "pct": 55.4,
+   "lit": 111
+  },
+  "with": {
+   "pct": 76.1,
+   "lit": 152
+  },
+  "max": {
+   "pct": 84.1,
+   "lit": 168
+  },
+  "src": "not yet in the paper (ICML 2020 reviewer-list run, 24 Nov 2026)"
  },
  "models": [
   {
@@ -475,6 +499,26 @@
   {
    "id": "pct",
    "t": "{pct}%"
+  },
+  {
+   "id": "list.without",
+   "t": "From the review alone"
+  },
+  {
+   "id": "list.with",
+   "t": "Given the list of ~4K reviewers"
+  },
+  {
+   "id": "list.max",
+   "t": "{pct}% at most"
+  },
+  {
+   "id": "list.sub",
+   "t": "2K reviews"
+  },
+  {
+   "id": "spot.go",
+   "t": "See the reviews"
   }
  ],
  "edits": [
@@ -545,6 +589,34 @@
    "shown": "55%",
    "data": "paper/figures/data/rq3_icml.json fable52.lenient (8,387 / 15,136)",
    "text": "paper/sections/02_introduction.tex; paper/sections/05_rq3_human_vs_human.tex"
+  },
+  {
+   "key": "icml_list_without",
+   "value": 55.4,
+   "shown": "55%",
+   "data": "reviewer-list run, 24 Nov 2026",
+   "text": "not yet in the paper (ICML 2020 reviewer-list run, 24 Nov 2026)"
+  },
+  {
+   "key": "icml_list_with",
+   "value": 76.1,
+   "shown": "76%",
+   "data": "reviewer-list run, 24 Nov 2026",
+   "text": "not yet in the paper (ICML 2020 reviewer-list run, 24 Nov 2026)"
+  },
+  {
+   "key": "icml_list_max",
+   "value": 84.1,
+   "shown": "84%",
+   "data": "reviewer-list run, 24 Nov 2026",
+   "text": "not yet in the paper (ICML 2020 reviewer-list run, 24 Nov 2026)"
+  },
+  {
+   "key": "icml_list_n",
+   "value": 2000,
+   "shown": "2K",
+   "data": "reviewer-list run, 24 Nov 2026: a 2K-review subsample",
+   "text": "not yet in the paper (ICML 2020 reviewer-list run, 24 Nov 2026)"
   },
   {
    "key": "dom_famous",
