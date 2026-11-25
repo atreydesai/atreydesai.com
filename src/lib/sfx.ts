@@ -278,6 +278,15 @@ function scaleMidi(octave: number, step: number) {
   return currentRoot + (octave + scaleOctaves) * 12 + interval;
 }
 
+/**
+ * The arcade's master output, for a sound a game schedules itself on the
+ * audio clock (straw stab's practice tick), so the mute switch and the
+ * master level apply to it like every other effect. Null without audio.
+ */
+export function sfxOutput(): AudioNode | null {
+  return audioContext() ? master : null;
+}
+
 export function getMuted() {
   loadMutePreference();
   return muted;

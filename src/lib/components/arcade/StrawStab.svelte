@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
-  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import { arcadeExpert } from "#lib/boba.ts";
   import {
     audioClock,
     resumeAudio,
@@ -23,39 +23,57 @@
   import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
   import {
     BEATS_PER_BAR,
-    DEMO_END_BAR,
-    DEMO_SEED,
     MAX_TIER,
-    NORMAL,
     STAB_COOLDOWN,
     barAtTime,
     barPosition,
     barSeconds,
     barStart,
     beltX,
-    createAutopilot,
+    createPractice,
     cupBeats,
-    demoCaption,
+    endPractice,
     inputSeconds,
     isGoldenCup,
     isMissed,
+    planPracticeCup,
     judgeStab,
     markBar,
     nearestCup,
     pointsForStab,
+    practiceLearned,
+    practiceAt,
+    practiceOn,
+    practiceResult,
     presentSeconds,
-    seededRandom,
     shareRows,
     songTime,
     stabMode,
     steadyOffset,
     tierForBar,
+    type Practice,
     type StabMode,
   } from "#lib/arcade/stab-engine.js";
   import {
+    LESSONS,
+    lessonForMiss,
+    lessonForSong,
+    lessonForStab,
+    ghostPlunge,
+    lessonNow,
+    mayOffer,
+    nextWaiting,
+    type NextCup,
+  } from "#lib/arcade/stab-lessons.js";
+  import {
+    ACCENT,
+    CREAM,
     DRINKS,
+    HALO,
     INK,
     MENU_ICONS,
+    NOTE_BACK,
+    NOTE_GOLD,
     PAPER_WHITE,
     PEARL,
     SPRITE_PAD,
@@ -64,20 +82,27 @@
     addPopup,
     arcadeFont,
     cachedSprite,
+    drawLoop,
     drawParticles,
     fitCanvas,
+    risoColors,
     stepParticles,
     stepPopups,
     type Particle,
     type Popup,
   } from "#lib/arcade/art.ts";
-  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
+  import { createCoach, resetLessons, type Lesson } from "#lib/arcade/core/coach.ts";
+  import { TICK_LOOKAHEAD, createTicks } from "#lib/arcade/stab-tick.ts";
+  import { hexToRgb, mixHex, mixRgb, rgbToHex, type RGB } from "#lib/arcade/core/color.ts";
+  import { bayer, paintBands } from "#lib/arcade/core/dither.ts";
+  import { drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { clamp, quantize, smoothstep, snap } from "#lib/arcade/core/math.ts";
+  import { createRng } from "#lib/arcade/core/rng.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import { REVIVE_BLINK_SECONDS, blinkShows } from "#lib/arcade/blink.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import Coach from "./Coach.svelte";
   import Countdown from "./Countdown.svelte";
-  import DemoBar from "./DemoBar.svelte";
-  import DemoCard from "./DemoCard.svelte";
   import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
@@ -98,7 +123,6 @@
   const PLUNGE_SECONDS = 0.05;
   const RELOAD_SECONDS = 0.1;
   const TUMBLE_SECONDS = 0.45;
-  const HALO = "rgba(253, 248, 243, 0.8)";
   const TIER_LABELS = [
     "easy does it",
     "picking up",
@@ -108,15 +132,17 @@
     "last call",
     "after hours",
   ];
-  const STAB_KEYS = new Set([" ", "Enter", "ArrowDown", "j", "k", "f", "d"]);
-  /** Keys a focused button keeps for itself; the letter and arrow keys always stab. */
-  const BUTTON_KEYS = new Set([" ", "Enter"]);
+  /**
+   * Keys that stab. Not Enter: Enter continues past a lesson's line, and a
+   * focused button keeps it.
+   */
+  const STAB_KEYS = new Set([" ", "ArrowDown", "j", "k", "f", "d"]);
   const LIVES_WORDS = ["No", "One", "Two", "Three", "Four"];
 
   /** Expert is read once, when the game opens; the switch lives on the menu. */
   const expert = get(arcadeExpert);
-  /** The rules of the run being played: expert or not, and always normal in the demo. */
-  let mode: StabMode = stabMode(expert);
+  /** The rules of the run being played. */
+  const mode: StabMode = stabMode(expert);
 
   // --- The scene: a night-market stall at dusk ------------------------------
   //
@@ -125,9 +151,6 @@
 
   /** The scene cell, in CSS px. Every scene element snaps to it. */
   const SC = 4;
-  /** Ordered dithering thresholds, 4 × 4. */
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
-  const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
 
   // The market is the backdrop, not the game: every colour behind the belt
   // is printed with most of its saturation and a little of its light taken
@@ -184,10 +207,6 @@
   const FLOOR_SHADOW = "#2b2440";
   const EMBER = "#8a3251";
   const BELT_FACE = "#f3ead9";
-  const ACCENT = "#e85d4c";
-  const CREAM = "#fdf8f3";
-  const NOTE_BACK = "#141a2e";
-  const NOTE_GOLD = "#ffd166";
   const GOLD = "#f2b84b";
   /** Lantern and firework colours: the drinks, then gold for golden cups, all quietened. */
   const LANTERN_COLORS = [...DRINKS, GOLD].map((c) => calm(c, 0.6, 0.78));
@@ -252,17 +271,25 @@
   const GOLD_PALETTE = { O: "#6d4511", f: "#fff0a6", F: "#f2b84b", b: "#68400d", L: "#f2b84b" };
   const STRAW_PALETTE = { S: STRAW_PINK, W: PAPER_WHITE };
 
-  interface Cup {
+  interface Cup extends NextCup {
     /** Song time when the cup is dead under the straw. */
     time: number;
     /** The bar it rides in, for the share. */
     bar: number;
-    /** The demo's autopilot: seconds off the beat it stabs this cup, or null to let it go by. */
-    aim: number | null;
+    /** Where in its bar it falls, in beats (2.5 is between beats 2 and 3). */
+    beat: number;
+    /** Its bar's tier, which sets how tight a perfect is. */
+    tier: number;
+    /** Planned `number`th in the run, from 1: the first few are a first run's practice. */
+    number: number;
     drink: number;
     golden: boolean;
     resolved: boolean;
     missed: boolean;
+    /** Song time it was stabbed or called missed. */
+    takenAt: number;
+    /** Its practice tick has been scheduled on the audio clock. */
+    ticked: boolean;
     /** Where the straw went in, in px from the cup's center; null until stabbed. */
     straw: number | null;
   }
@@ -286,17 +313,7 @@
   let running = false;
   let paused = false;
   let gameOver = false;
-  let tipVisible = false;
-  /** This device's first run: the tip waits for the first real run, never the demo. */
-  let tipPending = false;
-  /** The first time here: asked whether to watch the demo before the countdown. */
-  let askFirst = false;
-  /** The demo is playing: the belt runs itself, scores nothing, and ignores game keys. */
-  let demoOn = false;
-  let demoEnded = false;
-  let demoText = "";
-  let autopilot = createAutopilot();
-  let lives = NORMAL.lives;
+  let lives = mode.lives;
   /** Seconds the straw in hand has left to flicker after a pearl is lost. */
   let strawBlink = 0;
   let missPulse = 0;
@@ -305,7 +322,7 @@
   let currentBpm = TEMPOS[0];
   let tier = 0;
   let songsReached = 1;
-  let liveMessage = "Straw stab starting";
+  let liveMessage = "Straw stab is starting.";
   let localBest = 0;
   let newBest = false;
   let run = 0;
@@ -313,13 +330,14 @@
   // --- Canvas, clock, and lifecycle state ----------------------------------
 
   let canvas: HTMLCanvasElement;
-  let hud: HTMLElement;
+  /** The playfield and the tickets: where Tab cycles during a run. */
+  let playScope: HTMLElement;
+  /** Where focus rests during a run: not a button, so Space stays the stab. */
+  let playfield: HTMLElement;
   let hudRow: HTMLElement;
   let ctx: CanvasRenderingContext2D | null = null;
-  let hudButtons: HudButtons;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
-  let demoBar: DemoBar;
   /** The run as emoji lines for the results slip's share. */
   let share: string[] = [];
   let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
@@ -350,8 +368,6 @@
   let lastStab = -Infinity;
   /** The worst stab in each bar, for the share. */
   let marks: number[] = [];
-  /** Cup patterns: Math.random in a run, a fixed seed in the demo so it plays the same. */
-  let patternRandom: () => number = Math.random;
 
   // The scene. Its layout is worked out once per resize, its colours once
   // per visible step of the time of day, and nothing is allocated per frame.
@@ -392,8 +408,6 @@
   const timers = createTimers();
   const { later } = timers;
 
-  const clamp = (value: number, low: number, high: number) =>
-    Math.max(low, Math.min(high, value));
   const perfSeconds = () => performance.now() / 1000;
 
   /** Reads the audio clock and steadies the page-to-audio offset. */
@@ -493,37 +507,15 @@
 
   // --- Scene helpers -----------------------------------------------------------
 
-  type RGB = number[];
-  const smooth = (t: number) => {
-    const k = clamp(t, 0, 1);
-    return k * k * (3 - 2 * k);
-  };
-  /** How far a tier-gated layer has eased in: 0 below `from`, 1 a bar after it. */
-  const layerWeight = (from: number) => smooth(tierLevel - (from - 1));
-  /** Fades in printed steps of a quarter, never a smooth ramp. */
-  const quarters = (value: number) => Math.round(clamp(value, 0, 1) * 4) / 4;
-  const snap = (value: number) => Math.round(value / SC) * SC;
-  const nightAt = () => clamp(tierLevel / MAX_TIER, 0, 1);
-  const rgb = (hex: string): RGB => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-  const mix = (a: RGB, b: RGB, t: number): RGB => a.map((value, index) => Math.round(value + (b[index] - value) * t));
-  const toHex = (color: RGB) => `#${color.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
-  const mixHex = (a: string, b: string, t: number) => toHex(mix(rgb(a), rgb(b), t));
+  // Seeded things (the city, the stars, the lanterns, the wood) come from
+  // the core's createRng, so they never reshuffle.
 
-  /** A small seeded generator, so the city and the stars never reshuffle. */
-  function createRng(seed: number) {
-    let a = seed;
-    return () => {
-      a |= 0;
-      a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
+  /** How far a tier-gated layer has eased in: 0 below `from`, 1 a bar after it. */
+  const layerWeight = (from: number) => smoothstep(0, 1, tierLevel - (from - 1));
+  const nightAt = () => clamp(tierLevel / MAX_TIER, 0, 1);
+  const rgb = hexToRgb;
+  const mix = mixRgb;
+  const toHex = rgbToHex;
 
   const DUSK_RGB = SKY_DUSK.map(rgb);
   const TWILIGHT_RGB = SKY_TWILIGHT.map(rgb);
@@ -573,11 +565,11 @@
     span = Math.max(80, beltY - stageTop);
     skyBottom = beltY + BELT_H;
     // The play lane: from a little above the resting straw down to the belt.
-    laneTop = snap(restBottom() - strawH - 3 * SC);
+    laneTop = snap(restBottom() - strawH - 3 * SC, SC);
     // The horizon sits at or above the lane, so the sun sets over it, not behind the cups.
-    horizonY = snap(Math.min(beltY - span * 0.3, laneTop - SC));
+    horizonY = snap(Math.min(beltY - span * 0.3, laneTop - SC), SC);
     sunR = clamp(Math.round((span * 0.07) / SC), 5, 9);
-    sunX = snap(viewW * 0.86);
+    sunX = snap(viewW * 0.86, SC);
     buildSun();
     far = buildFar();
     near = buildNear();
@@ -674,23 +666,8 @@
     const context = skyCanvas.getContext("2d");
     if (!context) return;
     skyImage ??= context.createImageData(width, height);
-    const data = skyImage.data;
-    const stops = SKY_STOPS.map((f) => (f * horizonY) / SC);
-    for (let y = 0; y < height; y++) {
-      let segment = 0;
-      while (segment < stops.length - 2 && y >= stops[segment + 1]) segment++;
-      const t = clamp((y - stops[segment]) / (stops[segment + 1] - stops[segment]), 0, 1);
-      // Flat for most of the band, dithered across the middle of the join.
-      const blend = clamp((t - 0.3) / 0.4, 0, 1);
-      for (let x = 0; x < width; x++) {
-        const color = bands[blend > bayer(x, y) ? segment + 1 : segment];
-        const o = (y * width + x) * 4;
-        data[o] = color[0];
-        data[o + 1] = color[1];
-        data[o + 2] = color[2];
-        data[o + 3] = 255;
-      }
-    }
+    // Flat for most of each band, dithered across the middle of each join.
+    paintBands(skyImage.data, width, height, bands, SKY_STOPS.map((f) => (f * horizonY) / SC));
     context.putImageData(skyImage, 0, 0);
   }
 
@@ -719,7 +696,7 @@
     if (!ctx || !sunCanvas) return;
     const night = nightAt();
     if (night >= 0.46) return;
-    const sink = snap(smooth(night / 0.45) * (sunR + 2) * SC);
+    const sink = snap(smoothstep(0, 1, night / 0.45) * (sunR + 2) * SC, SC);
     const size = sunCanvas.width * SC;
     ctx.drawImage(sunCanvas, sunX - sunR * SC, horizonY + sink - sunR * SC, size, size);
   }
@@ -762,10 +739,10 @@
     // Each star's brightness, in eighths.
     for (let index = 0; index < STARS.length; index++) {
       const star = STARS[index];
-      let alpha = quarters((night - (0.3 + 0.42 * star.y + 0.14 * star.wake)) / 0.12);
+      let alpha = quantize((night - (0.3 + 0.42 * star.y + 0.14 * star.wake)) / 0.12, 4);
       if (star.kind === 0) alpha *= 0.5;
       if (twinkling && star.twinkle && alpha > 0) {
-        alpha *= Math.max(0.25, quarters(0.5 + 0.5 * Math.sin(now * star.speed * 0.5 + star.phase)));
+        alpha *= Math.max(0.25, quantize(0.5 + 0.5 * Math.sin(now * star.speed * 0.5 + star.phase), 4));
       }
       starLevel[index] = Math.round(alpha * 8);
     }
@@ -1029,7 +1006,7 @@
 
   function stripOffset(strip: Strip, scroll: number) {
     const width = strip.period * SC;
-    return ((snap(scroll) % width) + width) % width;
+    return ((snap(scroll, SC) % width) + width) % width;
   }
 
   function drawStrip(strip: Strip | null, scroll: number) {
@@ -1115,7 +1092,7 @@
   function buildRigs() {
     const columns = Math.max(1, Math.ceil(viewW / SC));
     const strawTop = beltY - cupH - 14 - strawH;
-    const bandTop = snap(stageTop) + 2 * SC;
+    const bandTop = snap(stageTop, SC) + 2 * SC;
     // The cord's lowest point leaves room for a swelled lantern above the straw.
     const lowest = strawTop - 16 - (LANTERN_CLEARANCE + 1) * SC;
     const usable = Math.max(SC * 6, lowest - bandTop);
@@ -1260,7 +1237,7 @@
   }
 
   /** Each string's weight as it fades in over a bar, in printed quarters. */
-  const rigWeight = (rig: Rig) => (rig.from === 0 ? 1 : quarters(layerWeight(rig.from)));
+  const rigWeight = (rig: Rig) => (rig.from === 0 ? 1 : quantize(layerWeight(rig.from), 4));
 
   /** Lights one visible string in a stabbed cup's colour. */
   function flashString(now: number, color: number) {
@@ -1303,8 +1280,8 @@
       const t = (now - lanternMissAt) / MISS_DIM_SECONDS;
       if (t >= 0 && t < 1) dim = t < 0.5 ? 2 : 1;
     }
-    const haloWeight = smooth((night - 0.3) / 0.45) * (dim ? 0.4 : 1);
-    const bunting = quarters(layerWeight(3));
+    const haloWeight = smoothstep(0, 1, (night - 0.3) / 0.45) * (dim ? 0.4 : 1);
+    const bunting = quantize(layerWeight(3), 4);
     const flashAge = flash ? now - flash.at : -1;
     // The running light steps one lantern along each string per bar.
     const sceneBar = Math.floor(sceneBeat / BEATS_PER_BAR);
@@ -1475,8 +1452,8 @@
     if (!ctx || !sparkCount) return;
     for (let index = 0; index < sparkCount; index++) {
       const p = sparks[index];
-      const x = snap(p.x);
-      const y = snap(p.y);
+      const x = snap(p.x, SC);
+      const y = snap(p.y, SC);
       // Printed at most at FIREWORK_ALPHA, so a burst stays behind the play.
       if (p.kind === P_ROCKET) {
         ctx.fillStyle = LANTERN_CORE;
@@ -1701,8 +1678,331 @@
     }
     drawPlunge(now);
     drawHand();
+    drawPractice(now);
+    drawCupLesson(now);
     drawParticles(ctx, particles);
+    // A lesson's spotlight, under the notes, which stay legible over it.
+    drawLessonLight();
     drawNotes();
+    placeCoach();
+  }
+
+  // --- Lessons -------------------------------------------------------------------
+  //
+  // Taught once per device, inside the live run: stab-lessons.js says what
+  // and when, and the coach shows one line at a time. Nothing here touches
+  // the beat: lines, loops, the ghost straw and the spotlight are all drawn
+  // for the song time on screen, and play never slows.
+
+  /** Song seconds after the first downbeat that "go" is gone by; nothing is taught before. */
+  const GO_SECONDS = 0.62;
+  /** Coach's distance from an anchor with no loop round it (its 6 + 14 px), and its margin from the window's edges. */
+  const SLIP_GAP = 20;
+  const SLIP_GUTTER = 16;
+  /** A slip's size until it has been on screen to measure: its widest, and two lines with Continue. */
+  const SLIP_GUESS = Object.freeze({ id: "", w: 320, h: 76 });
+  /** How far above the lane's top the judgement notes reach (two rows, the upper one rising). */
+  const NOTES_CLEAR = 52;
+  /** The practice loop: beats it takes to shrink onto the notch, and how much bigger it starts. */
+  const APPROACH_BEATS = 2;
+  const LOOP_GROW = 2.4;
+  /** Song seconds the loop stays snug on the notch after the beat, while the cup is still in reach. */
+  const LOOP_AFTER = 0.12;
+  /** Real seconds a lesson's loop round its cup takes to draw on: quick, as the cup may be close. */
+  const LOOP_DRAW = 0.1;
+  /** The ghost straw shows the stab for this many of the practice's cups. */
+  const GHOST_CUPS = 2;
+  /** Song seconds the ghost straw rides in its cup after the beat, fading over the last part. */
+  const GHOST_RIDE = 0.36;
+  const GHOST_FADE = 0.16;
+  /** The loop's colours: cream pen, its accent print behind it, as on any dark scene. */
+  const LOOP_COLORS = risoColors(true);
+
+  // In development, `?autoplay` stabs for you, mostly dead on and now and
+  // then off (early, late, a graze, a cup let go, a stab at the bare belt),
+  // so every lesson can be seen; `?lessons` forgets them first. Never in a
+  // production build.
+  const devParams = import.meta.env.DEV && typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const autoplay = !!devParams?.has("autoplay");
+  if (devParams?.has("lessons")) resetLessons("stab");
+
+  const coach = createCoach("stab");
+  interface Cue {
+    lesson: Lesson;
+    /** The cup it is about, until that cup is taken or lost; null for the notch itself. */
+    cup: Cup | null;
+  }
+  let cue: Cue | null = null;
+  /** This run's practice (none once the device has learned the stab). */
+  let practice: Practice = createPractice(false);
+  /** The coach's lesson and its place, copied out so the page follows them. */
+  let coachLesson: Lesson | null = null;
+  let coachLeaving = false;
+  let coachX: number | null = null;
+  let coachY: number | null = null;
+  let coachSide: "above" | "below" | "left" = "below";
+  /** The slip's size as Coach laid it out, for the lesson it was read for. */
+  let slipSize: { id: string; w: number; h: number } = SLIP_GUESS;
+  /** The slip offers Continue while it is explaining (not once it is done or on its way out). */
+  let coachContinuable = false;
+  /** How dim the stall is around an explanation, 0..1, eased in real time. */
+  let lessonDim = 0;
+  /** Real seconds since the last lesson came down (none yet this run: forever), so two never run together. */
+  let quietFor = Infinity;
+  /** The belt lane from just behind the notch to the right edge: what stays lit (reused every frame). */
+  const laneLight: FocusBox[] = [{ x: 0, y: 0, w: 0, h: 0 }];
+  /** The practice's tick on each of its cups' beats, on the audio clock. */
+  const ticks = createTicks();
+  /** What the lessons read each frame, kept in one object rather than built every frame. */
+  const moment: { now: number; next: Cup | null; practicing: boolean } = { now: 0, next: null, practicing: false };
+
+  /** The earliest cup still waiting for the straw: the only one a lesson may be about. */
+  const nextCup = () => nextWaiting(cups);
+
+  // The ghost straw, drawn through the core's dither in cream. Its position
+  // is set before each draw, so the paint function is made once.
+  let ghostX = 0;
+  let ghostY = 0;
+  /** The plunge the ghost takes, its heights set each frame from the layout. */
+  const ghostStraw = { rest: 0, lid: 0, stuck: 0, plunge: PLUNGE_SECONDS, ride: GHOST_RIDE, reduce: false };
+  const paintGhostStraw = (g: CanvasRenderingContext2D) =>
+    g.drawImage(cachedSprite("stab-straw", STRAW, px, STRAW_PALETTE, HALO), ghostX, ghostY);
+
+  /**
+   * The practice's hologram, drawn for the song time on screen (the moment
+   * the frame is seen) so it lands with the music: a pen loop round the
+   * notch that shrinks onto the next practice cup as it comes and is snug on
+   * it exactly on its beat, and for the first two cups a ghost straw that
+   * stabs as a dead-on stab should, its tip meeting the lid on the beat, then
+   * rides in the cup a moment. Under Reduce Motion the ghost shows only its
+   * contact pose, from the beat, and doesn't fade.
+   */
+  function drawPractice(now: number) {
+    if (!ctx || !practiceOn(practice) || !running) return;
+    const next = nextCup();
+    if (next && practiceAt(practice, next.time)) {
+      const beat = 60 / barPosition(TEMPOS, next.bar).bpm;
+      const ahead = next.time - now;
+      if (ahead <= APPROACH_BEATS * beat && ahead >= -LOOP_AFTER) {
+        loopCup(strawX, next.number, 1 + (LOOP_GROW - 1) * clamp(ahead / (APPROACH_BEATS * beat), 0, 1));
+      }
+    }
+    // The ghost's tip meets the lid on the beat (see ghostPlunge).
+    ghostStraw.rest = restBottom();
+    ghostStraw.lid = beltY - cupH;
+    ghostStraw.stuck = stuckBottom();
+    ghostStraw.reduce = reduceMotion;
+    for (const cup of cups) {
+      if (cup.number > GHOST_CUPS) break;
+      if (!practiceAt(practice, cup.time)) continue;
+      // Not over a stab the player already made before the beat.
+      if (cup.resolved && cup.takenAt < cup.time) continue;
+      const since = now - cup.time;
+      const share = ghostPlunge(since, ghostStraw);
+      if (share === null) continue;
+      const bottom = ghostStraw.rest + (ghostStraw.stuck - ghostStraw.rest) * share;
+      // Into the cup as it moves; held still in it under Reduce Motion, unfaded.
+      const x = reduceMotion ? cupX(cup, now) : strawX + (cupX(cup, now) - strawX) * share;
+      const density = reduceMotion ? 0.55 : 0.55 * clamp((GHOST_RIDE - since) / GHOST_FADE, 0, 1);
+      ghostX = Math.round(x - strawW / 2) - SPRITE_PAD;
+      ghostY = Math.round(bottom - strawH) - SPRITE_PAD;
+      drawGhost(ctx, ghostX, ghostY, strawW + SPRITE_PAD * 2, strawH + SPRITE_PAD * 2, paintGhostStraw, {
+        color: CREAM,
+        density,
+        cell: px,
+      });
+    }
+  }
+
+  /** A pen loop snug round a cup whose centre is at `x`, `progress` of it drawn. */
+  function loopCup(x: number, index: number, grow = 1, progress = 1) {
+    if (!ctx) return;
+    const w = cupW * 1.9 * grow;
+    const h = cupH * 1.5 * grow;
+    drawLoop(ctx, index, x - w / 2, beltY - cupH / 2 - h / 2, w, h, LOOP_COLORS, 2.5, progress);
+  }
+
+  /**
+   * The golden and off-beat lines ring their cup on the canvas, on the
+   * belt's own clock, so the loop rides the cup exactly; the slip stays put
+   * by the notch, where the cup is headed. Drawn on, unless motion is reduced.
+   */
+  function drawCupLesson(now: number) {
+    if (!cue?.cup || coach.current !== cue.lesson || coach.leaving) return;
+    loopCup(cupX(cue.cup, now), cue.cup.number, 1, reduceMotion ? 1 : Math.min(1, coach.age / LOOP_DRAW));
+  }
+
+  /**
+   * The explanation's spotlight: the stall, the sky and the belt behind the
+   * notch dim under a night wash, and the lane stays lit from just behind
+   * the notch to the right edge, straw to belt, so the cup being taught and
+   * every cup still to come stay in full light while play goes on.
+   */
+  function drawLessonLight() {
+    if (!ctx || lessonDim <= 0.01) return;
+    const box = laneLight[0];
+    box.x = strawX - cupW * 1.5;
+    box.y = laneTop - SC;
+    box.w = viewW - box.x;
+    box.h = beltY + BELT_H + SC - box.y;
+    drawSpotlight(ctx, viewW, viewH, laneLight, lessonDim, { color: NOTE_BACK, cell: SC });
+  }
+
+  /** The slip's size for `lesson`: measured once it is on screen, guessed generously until then. */
+  function slipFor(lesson: Lesson) {
+    if (slipSize.id === lesson.id) return slipSize;
+    const element = playScope?.querySelector<HTMLElement>(".coach .slip");
+    if (element && element.offsetHeight > 0 && element.textContent?.includes(lesson.text)) {
+      slipSize = { id: lesson.id, w: element.offsetWidth, h: element.offsetHeight };
+      return slipSize;
+    }
+    return SLIP_GUESS;
+  }
+
+  /**
+   * Where the slip goes, given its size, clear of the straw, the notes and
+   * the cups still to come: under the belt by the notch; else beside the
+   * notch, on the belt behind it, where every cup has already gone by; else
+   * above the lane, over the notes. Where none of them has room for all of
+   * it, under the belt or beside the notch, whichever spills least.
+   */
+  function slipPlace(w: number, h: number) {
+    const top = stageTop + 8;
+    const belowY = beltY + BELT_H / 2;
+    const belowSpill = belowY + SLIP_GAP + h - (viewH - SLIP_GUTTER);
+    if (belowSpill <= 0) return { side: "below" as const, x: strawX, y: belowY };
+    // Beside the notch: level with a cup on the belt, but never up among the notes.
+    const leftX = strawX - cupW / 2;
+    const leftY = Math.max(beltY - cupH / 2, restBottom() - strawH + 12 + h / 2);
+    const leftSpill = SLIP_GUTTER - (leftX - SLIP_GAP - w);
+    if (leftSpill <= 0) return { side: "left" as const, x: leftX, y: leftY };
+    const aboveY = laneTop - NOTES_CLEAR;
+    if (aboveY - SLIP_GAP - h >= top) return { side: "above" as const, x: strawX, y: aboveY };
+    return belowSpill <= leftSpill
+      ? { side: "below" as const, x: strawX, y: belowY }
+      : { side: "left" as const, x: leftX, y: leftY };
+  }
+
+  /**
+   * Puts the callout by the notch, where every lesson is about (a cup's own
+   * loop is drawn on the canvas, riding the cup in): see `slipPlace`.
+   */
+  function placeCoach() {
+    const lesson = coach.current;
+    if (!lesson || !cue || cue.lesson !== lesson || gameOver) {
+      if (coachLesson) coachLesson = null;
+      if (coachX !== null) coachX = coachY = null;
+      if (coachContinuable) coachContinuable = false;
+      return;
+    }
+    const size = slipFor(lesson);
+    const { side, x, y } = slipPlace(size.w, size.h);
+    if (coachLesson !== lesson) coachLesson = lesson;
+    // The slip stays readable through its minimum life, then fades.
+    if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
+    const continuable = !coach.leaving && !coach.acting;
+    if (continuable !== coachContinuable) coachContinuable = continuable;
+    if (x !== coachX) coachX = x;
+    if (y !== coachY) coachY = y;
+    if (side !== coachSide) coachSide = side;
+  }
+
+  /**
+   * Teaches something that has just happened at the notch, if the device
+   * still needs it and the stage is free: otherwise a later time it happens.
+   */
+  function teach(lesson: Lesson | null) {
+    if (!lesson || gameOver || lastShown < GO_SECONDS) return;
+    if (!mayOffer(lesson, coach.current, coach.age, quietFor) || !coach.offer(lesson)) return;
+    cue = { lesson, cup: null };
+  }
+
+  /** Asks the lessons what is coming that should be taught, once "go" is gone. */
+  function checkLessons(shown: number) {
+    // A line about a cup is over once its cup has been taken or lost; its
+    // loop goes, and the line stays by the notch until it has been read.
+    if (cue?.cup?.resolved) {
+      if (coach.current === cue.lesson && !coach.leaving) coach.done(cue.lesson.id);
+      cue.cup = null;
+    }
+    if (shown >= GO_SECONDS) {
+      moment.now = shown;
+      moment.next = nextCup();
+      moment.practicing = practiceOn(practice);
+      const found = lessonNow(moment, coach.learned);
+      if (
+        found &&
+        found.lesson.id !== coach.current?.id &&
+        mayOffer(found.lesson, coach.current, coach.age, quietFor) &&
+        coach.offer(found.lesson)
+      ) {
+        cue = { lesson: found.lesson, cup: found.cup };
+      }
+    }
+    if (!coach.current) cue = null;
+  }
+
+  /**
+   * One frame of the lessons, on real time: the coach ages the line (it
+   * never slows anything here; its time scale is ignored), lines are asked
+   * for, and the spotlight eases in with an explanation and out as it ends.
+   */
+  function stepLessons(shown: number, realDt: number) {
+    coach.step(realDt);
+    quietFor = coach.current ? 0 : quietFor + realDt;
+    if (!gameOver) checkLessons(shown);
+    const lesson = coach.current;
+    const target = lesson && cue?.lesson === lesson && !coach.leaving && !coach.acting ? 1 : 0;
+    lessonDim = reduceMotion ? target : lessonDim + (target - lessonDim) * (1 - Math.exp(-Math.min(realDt, 0.25) / 0.18));
+  }
+
+  /**
+   * Puts each practice cup's tick on the audio clock as its beat comes
+   * within the look-ahead, so the practice can be followed by ear: the
+   * downbeat is in the clock notes are scheduled in, so a cup's beat there
+   * is the downbeat plus its song time. Without audio there is nothing to
+   * tick, and the visual practice carries on.
+   */
+  function scheduleTicks() {
+    if (!useAudio || !practiceOn(practice)) return;
+    const heard = audioClock();
+    if (heard === null) return;
+    for (const cup of cups) {
+      if (cup.ticked) continue;
+      if (!practiceAt(practice, cup.time) || origin + cup.time - heard > TICK_LOOKAHEAD) break;
+      cup.ticked = true;
+      if (origin + cup.time >= heard) ticks.at(origin + cup.time, PLAYLIST[barPosition(TEMPOS, cup.bar).song]);
+    }
+  }
+
+  /**
+   * The practice is over (two good stabs in a row, its cups all gone, or
+   * Continue): its line goes, counted if it taught the stab, or uncounted
+   * so the next run practises again. A tick already on its way for a cup
+   * that now scores is silenced.
+   */
+  function finishPractice() {
+    ticks.stop();
+    const learned = practiceLearned(practice);
+    if (coach.current?.id === LESSONS.stab.id && !coach.leaving) {
+      if (learned) coach.done(LESSONS.stab.id);
+      else coach.dismiss();
+    } else if (learned) coach.done(LESSONS.stab.id);
+  }
+
+  /**
+   * The player has read it: Continue (Enter on the playfield, or the slip's
+   * button) ends the line and its spotlight. On the practice it ends the
+   * practice too, counted as known, and the belt counts from then on.
+   */
+  function continueLesson() {
+    const lesson = coach.current;
+    if (!lesson || coach.leaving || !running || paused || gameOver) return;
+    if (lesson.id === LESSONS.stab.id && practiceOn(practice)) {
+      endPractice(practice);
+      ticks.stop();
+    }
+    coach.done(lesson.id);
   }
 
   // --- Rules in motion ---------------------------------------------------------
@@ -1712,18 +2012,26 @@
       const bar = plannedBars;
       const start = barStart(TEMPOS, bar);
       const beatLength = 60 / barPosition(TEMPOS, bar).bpm;
-      for (const beat of cupBeats(TEMPOS, bar, patternRandom, mode)) {
+      const barTier = tierForBar(TEMPOS, bar, mode);
+      for (const beat of cupBeats(TEMPOS, bar, Math.random, mode)) {
         cupCount += 1;
+        const time = start + beat * beatLength;
         cups.push({
-          time: start + beat * beatLength,
+          time,
           bar,
-          aim: demoOn ? autopilot(bar) : 0,
+          beat,
+          tier: barTier,
+          number: cupCount,
           drink: (Math.random() * DRINKS.length) | 0,
           golden: isGoldenCup(cupCount),
           resolved: false,
           missed: false,
+          takenAt: 0,
+          ticked: false,
           straw: null,
         });
+        planPracticeCup(practice, cupCount, time, mode);
+        if (autoplay) planAutoplay(time, cupCount, beatLength);
       }
       plannedBars += 1;
     }
@@ -1737,23 +2045,22 @@
     beatPhase = now < 0 ? 1 : beats - Math.floor(beats);
     const beat = now < 0 ? -1 : Math.min(BEATS_PER_BAR - 1, Math.floor(beats));
     if (beat !== beatInBar) beatInBar = beat;
-    if (demoOn) {
-      const bars = bar + clamp(beats / BEATS_PER_BAR, 0, 1);
-      const text = demoCaption(now < 0 ? 0 : bars);
-      if (text !== demoText) demoText = text;
-      if (!demoEnded && bar >= DEMO_END_BAR) demoEnded = true;
-    }
     if (bar === currentBar) return;
 
+    // A new song after the first: its first downbeat is when it is taught.
+    const songs = position.loop * TEMPOS.length + position.song + 1;
+    const newSong = currentBar >= 0 && songs !== songsReached;
     currentBar = bar;
     currentBpm = position.bpm;
-    songsReached = position.loop * TEMPOS.length + position.song + 1;
+    songsReached = songs;
     const nextTier = tierForBar(TEMPOS, bar, mode);
+    const tierRose = nextTier > tier;
     if (nextTier !== tier) {
       tier = nextTier;
       setMusicPhase(tier >= 2 ? "rush" : "steady");
-      if (!demoOn) liveMessage = `${TIER_LABELS[tier]}.`;
+      liveMessage = `${TIER_LABELS[tier]}.`;
     }
+    if (newSong) teach(lessonForSong({ tierRose, practicing: practiceOn(practice) }, coach.learned));
   }
 
   /**
@@ -1793,20 +2100,18 @@
 
   function loseLife(x: number) {
     combo = 0;
-    // The demo shows a pearl going, never the last one.
-    if (!demoOn || lives > 1) lives -= 1;
+    lives -= 1;
     if (lives > 0) strawBlink = REVIVE_BLINK_SECONDS;
     missPulse += 1;
     missFlash = true;
     later(() => (missFlash = false), 250);
     if (lives <= 0) void endGame();
-    else if (!demoOn) liveMessage = `${lives} ${lives === 1 ? "pearl" : "pearls"} left.`;
+    else liveMessage = `${lives} ${lives === 1 ? "pearl" : "pearls"} left.`;
     return pan(x);
   }
 
-  /** Stab input can act: a live run, not the demo, not waiting on audio. */
-  const canStab = () =>
-    running && !paused && !gameOver && !waitingForAudio && !demoOn && !askFirst;
+  /** Stab input can act: a live run, not waiting on audio. */
+  const canStab = () => running && !paused && !gameOver && !waitingForAudio;
 
   /** A key or tap, judged at the moment it happened, not when it was handled. */
   function stabFromEvent(event: Event) {
@@ -1816,15 +2121,15 @@
 
   /**
    * Stabs at song time `at`: the straw goes into the nearest cup still
-   * waiting within the graze window, or hits the belt. Input and the demo's
-   * autopilot both come through here.
+   * waiting within the graze window, or hits the belt. Every stab comes
+   * through here. Up to the practice's boundary on the song clock, its cups
+   * score nothing and nothing costs a pearl, the belt included.
    */
   function stab(at: number) {
     if (at - lastStab < STAB_COOLDOWN) return;
     lastStab = at;
     settlePlunge();
     reload = 0;
-    tipVisible = false;
 
     const index = nearestCup(cups, at, mode);
     const impactY = beltY - cupH + px * 1.5;
@@ -1834,20 +2139,48 @@
       plunge = { cup: null, offset: 0, age: 0 };
       for (let i = 0; i < 7; i++) addParticle(particles, strawX, beltY, i % 2 ? INK : ROLLER, 70, 300);
       addPopup(popups, strawX, noteY, "bonk", "miss");
+      if (practiceAt(practice, at)) {
+        practiceResult(practice, "bonk");
+        sfxWhiff(pan(strawX));
+        liveMessage = "The straw hit the belt.";
+        return;
+      }
       lanternMissAt = at;
       markBar(marks, barAtTime(TEMPOS, at), "miss");
       sfxWhiff(loseLife(strawX));
+      teach(lessonForStab({ result: "bonk", error: 0, practicing: false, expert: mode.expert }, coach.learned));
       return;
     }
 
     const cup = cups[index];
     const error = at - cup.time;
-    const rating = judgeStab(error, mode) ?? "graze";
+    const rating = judgeStab(error, mode, cup.tier) ?? "graze";
     cup.resolved = true;
-    markBar(marks, cup.bar, rating);
+    cup.takenAt = at;
     // Early stabs land left of center and late ones right, as the cup moves.
     const offset = clamp(error / mode.windows.graze, -1, 1) * (cupW / 2 - px * 1.5);
     plunge = { cup, offset, age: 0 };
+
+    if (practiceAt(practice, cup.time)) {
+      // Practice: the stab is rated and placed, said aloud, and nothing is scored.
+      const x = cupX(cup, lastShown) + offset;
+      const count = rating === "perfect" ? 10 : rating === "good" ? 7 : 5;
+      for (let i = 0; i < count; i++) {
+        addParticle(particles, x, impactY, i % 3 === 0 ? PAPER_WHITE : i % 3 === 1 ? ACCENT : DRINKS[cup.drink], 80, 320);
+      }
+      addPopup(popups, strawX, noteY, rating, rating === "perfect" ? "perfect" : "plain");
+      if (rating !== "perfect") addPopup(popups, strawX, noteY - 22, error < 0 ? "early" : "late", "plain");
+      sfxStab(rating, 1, pan(x));
+      const word = `${rating[0].toUpperCase()}${rating.slice(1)}`;
+      liveMessage = rating === "perfect" ? `${word}.` : `${word}, ${error < 0 ? "early" : "late"}.`;
+      // A good stab is kept for later runs at once, so leaving now doesn't
+      // mean practising again; this practice still runs to its streak.
+      if (rating !== "graze") coach.skip(LESSONS.stab.id);
+      if (practiceResult(practice, rating)) finishPractice();
+      return;
+    }
+
+    markBar(marks, cup.bar, rating);
 
     combo += 1;
     bestCombo = Math.max(bestCombo, combo);
@@ -1875,20 +2208,29 @@
     if (rating !== "perfect") addPopup(popups, strawX, noteY - 22, error < 0 ? "early" : "late", "plain");
     if (combo % 20 === 0) {
       sfxMilestone(pan(x));
-      if (!demoOn) liveMessage = `${combo} in a row. Score ${score}.`;
+      liveMessage = `${combo} in a row. Score ${score}.`;
     } else {
       sfxStab(rating, combo, pan(x));
-      if (cup.golden && !demoOn) liveMessage = `Golden cup, ${points} points.`;
+      if (cup.golden) liveMessage = `Golden cup, ${points} points.`;
     }
+    teach(lessonForStab({ result: rating, error, practicing: false, expert: mode.expert }, coach.learned));
   }
 
-  /** The demo's hand: stabs each cup as the screen shows it reaching its aim. */
-  function steer(shown: number) {
-    for (const cup of cups) {
-      if (cup.resolved || cup.aim === null) continue;
-      const at = cup.time + cup.aim;
-      if (at <= shown) stab(at);
-    }
+  /** Seconds off each cup's beat, in turn; null lets that cup go, "bonk" stabs the belt a beat before it. */
+  const AUTOPLAY_AIMS: Array<number | null | "bonk"> = [0, 0, 0.07, 0, -0.07, 0, 0.13, 0, null, 0, "bonk", 0, 0.03];
+  /** The autoplay's stabs still to come, in song time, in order. */
+  let autoplayStabs: number[] = [];
+
+  function planAutoplay(time: number, count: number, beatLength: number) {
+    const aim = AUTOPLAY_AIMS[count % AUTOPLAY_AIMS.length];
+    if (aim === null) return;
+    if (aim === "bonk") autoplayStabs.push(time - beatLength / 2 - 0.02);
+    autoplayStabs.push(time + (aim === "bonk" ? 0 : aim));
+    autoplayStabs.sort((a, b) => a - b);
+  }
+
+  function runAutoplay(shown: number) {
+    while (autoplayStabs.length && autoplayStabs[0] <= shown) stab(autoplayStabs.shift() as number);
   }
 
   function stepStraws(dt: number) {
@@ -1911,10 +2253,8 @@
 
   function beginRun() {
     countdown = 0;
-    if (!demoOn) {
-      goVisible = true;
-      later(() => (goVisible = false), 620);
-    }
+    goVisible = true;
+    later(() => (goVisible = false), 620);
     // Drums from the first bar: the beat is the whole game here. Expert
     // opens in a busy tier, so it opens in the rush arrangement too.
     setMusicPhase(tier >= 2 ? "rush" : "steady");
@@ -1933,7 +2273,7 @@
     }
     sfxStart();
     running = true;
-    liveMessage = demoOn ? "Demo playing." : "Go. Stab on the beat.";
+    liveMessage = "Go. Stab on the beat.";
   }
 
   function frame(timestamp: number) {
@@ -1945,7 +2285,7 @@
     if (rawDt > 0.002 && rawDt < 0.1) frameInterval += (rawDt - frameInterval) * 0.1;
     const dt = Math.min(rawDt, 0.05);
 
-    if (paused || askFirst) {
+    if (paused) {
       draw(running ? lastShown : 0);
       raf = requestAnimationFrame(frame);
       return;
@@ -1990,17 +2330,26 @@
     const shown = songAt(presentSeconds(timestamp, performance.now(), frameInterval));
     lastShown = shown;
     planAhead(shown);
-    if (demoOn) steer(shown);
+    scheduleTicks();
+    if (autoplay) runAutoplay(shown);
     for (const cup of cups) {
       if (!isMissed(cup, now, mode)) continue;
       cup.resolved = true;
       cup.missed = true;
+      cup.takenAt = now;
       const x = cupX(cup, shown);
       addPopup(popups, x, beltY - cupH - 18, "no straw", "miss", 0.8);
+      // A practice cup let go costs nothing.
+      if (practiceAt(practice, cup.time)) {
+        liveMessage = "The cup went by.";
+        if (practiceResult(practice, "miss")) finishPractice();
+        continue;
+      }
       lanternMissAt = now;
       markBar(marks, cup.bar, "miss");
       sfxMiss(loseLife(x));
       if (gameOver) return;
+      teach(lessonForMiss(false, coach.learned));
     }
     cups = cups.filter((cup) => cupX(cup, shown) > -cupW * 2);
     updateBeat(shown);
@@ -2008,6 +2357,7 @@
     stepStraws(dt);
     stepParticles(particles, dt);
     stepPopups(popups, dt);
+    stepLessons(shown, rawDt);
     draw(shown);
     if (active && !gameOver) raf = requestAnimationFrame(frame);
   }
@@ -2015,13 +2365,13 @@
   // --- Pause, restart, and finish -----------------------------------------
 
   async function pauseGame() {
-    if (gameOver || paused || askFirst) return;
+    if (gameOver || paused) return;
     paused = true;
     if (running && !waitingForAudio) {
       heldSong = songNow();
       if (useAudio) suspendAudio();
     }
-    liveMessage = "Game paused";
+    liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
   }
@@ -2040,9 +2390,27 @@
       }
     }
     sfxBlip();
-    liveMessage = "Game resumed";
-    if (demoOn) void tick().then(() => demoBar?.focus());
-    else hudButtons?.focusPause();
+    liveMessage = "The game resumed.";
+    void tick().then(focusPlayfield);
+  }
+
+  /** Puts focus on the playfield, so keys go to the game and Space stabs. */
+  function focusPlayfield() {
+    playfield?.focus({ preventScroll: true });
+  }
+
+  /**
+   * Shift+Tab from the playfield wraps to the last control in the tickets
+   * (or a lesson's Continue): the playfield isn't in the Tab order itself,
+   * so the shell's trap would let it leave the game.
+   */
+  function onPlayfieldTab(event: KeyboardEvent) {
+    if (event.key !== "Tab" || !event.shiftKey || document.activeElement !== playfield) return;
+    const controls = playScope?.querySelectorAll<HTMLElement>("button:not([disabled])");
+    const last = controls?.[controls.length - 1];
+    if (!last) return;
+    event.preventDefault();
+    last.focus();
   }
 
   function togglePause() {
@@ -2056,6 +2424,13 @@
     running = false;
     active = false;
     cancelAnimationFrame(raf);
+    // A line read long enough counts as seen; one cut short comes again.
+    const lesson = coach.current;
+    if (lesson && !lesson.move && !coach.leaving && coach.age >= (lesson.minLife ?? 0.9)) coach.done(lesson.id);
+    coach.dismiss();
+    cue = null;
+    ticks.stop();
+    lessonDim = 0;
     const result = concludeRun("stab", score);
     localBest = result.best;
     newBest = result.newBest;
@@ -2073,9 +2448,6 @@
     timers.clear();
     PLAYLIST = stabPlaylist();
     TEMPOS = songTempos(PLAYLIST);
-    mode = demoOn ? NORMAL : stabMode(expert);
-    patternRandom = demoOn ? seededRandom(DEMO_SEED) : Math.random;
-    autopilot = createAutopilot();
     score = 0;
     lives = mode.lives;
     strawBlink = 0;
@@ -2089,7 +2461,6 @@
     running = false;
     paused = false;
     gameOver = false;
-    tipVisible = false;
     missPulse = 0;
     missFlash = false;
     beatInBar = -1;
@@ -2120,33 +2491,25 @@
     useAudio = false;
     waitingForAudio = false;
     last = 0;
+    // A device that hasn't learned the stab opens on the practice.
+    practice = createPractice(!coach.learned(LESSONS.stab.id));
+    ticks.stop();
+    coach.reset();
+    cue = null;
+    lessonDim = 0;
+    quietFor = Infinity;
+    autoplayStabs = [];
     run += 1;
     active = true;
   }
 
-  /** A real run: the countdown, then the belt. */
+  /** A run: the countdown, then the belt, with focus on the playfield. */
   function restart() {
-    demoOn = false;
-    demoEnded = false;
-    askFirst = false;
     resetRun();
-    // The first-run tip waits for the first real run.
-    tipVisible = tipPending;
-    tipPending = false;
     sfxCountdown(COUNTDOWN_SECONDS);
     liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
     raf = requestAnimationFrame(frame);
-  }
-
-  /** The demo: the belt starts at once and the autopilot stabs on the real rules. */
-  function startDemo() {
-    demoOn = true;
-    demoEnded = false;
-    askFirst = false;
-    demoText = demoCaption(0);
-    resetRun();
-    beginRun();
-    raf = requestAnimationFrame(frame);
+    void tick().then(focusPlayfield);
   }
 
   // --- Sizing and lifecycle ------------------------------------------------
@@ -2160,23 +2523,23 @@
     cupH = CUP.length * px;
     strawW = STRAW[0].length * px;
     strawH = STRAW.length * px;
-    // Measured from the ticket row, not the whole HUD, so the belt stays put
-    // when the first-run tip closes.
+    // Measured from the ticket row, not the whole HUD.
     const playTop = hudRow ? hudRow.getBoundingClientRect().bottom : 80;
     // On the scene's cell grid, so the belt lines up with the stall below it.
-    beltY = snap(
-      clamp(
-        playTop + (viewH - playTop) * 0.62,
-        playTop + strawH + cupH + 48,
-        viewH - Math.max(48, viewH * 0.12),
-      ),
-    );
+    // On a screen too short for both, room for the straw and a cup above the
+    // belt wins over room below it (so not the core clamp, which would let
+    // the floor lose).
+    const lowest = playTop + strawH + cupH + 48;
+    const highest = viewH - Math.max(48, viewH * 0.12);
+    beltY = snap(Math.max(lowest, Math.min(highest, playTop + (viewH - playTop) * 0.62)), SC);
     // On the grid too, so the notch (drawn on the grid) is exactly where a
     // cup's centre is at its beat.
-    strawX = snap(viewW * (viewW < 640 ? 0.24 : 0.3));
+    strawX = snap(viewW * (viewW < 640 ? 0.24 : 0.3), SC);
     speed = clamp((viewW - strawX) / 1.7, 220, 620);
     leadSeconds = (viewW - strawX + cupW) / speed;
     stageTop = playTop;
+    // A lesson's slip may lay out differently at the new size: measure it again.
+    slipSize = SLIP_GUESS;
     sizeScene();
     draw(running ? lastShown : 0);
   }
@@ -2189,14 +2552,24 @@
 
   function onKey(event: KeyboardEvent) {
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+    // Enter on the playfield continues past the line that is up; a focused
+    // button (pause, mute, Continue itself) keeps its own Enter.
+    if (key === "Enter") {
+      if (coachContinuable && !paused && !isOnControl(event)) {
+        event.preventDefault();
+        continueLesson();
+      }
+      return;
+    }
     if (!STAB_KEYS.has(key)) return;
-    if (isOnControl(event) && BUTTON_KEYS.has(key)) {
-      // A focused button keeps Space and Enter, except the HUD's own pause and
-      // mute buttons in the middle of a run: there Space is the stab, and the
-      // button lets go of focus so it isn't pressed on the key's release.
-      const hudButton = event.target instanceof HTMLElement && event.target.closest(".boba-hud button");
-      if (!(key === " " && hudButton && canStab())) return;
-      (event.target as HTMLElement).blur();
+    if (key === " ") {
+      // Space on the HUD's own buttons or a lesson's Continue is the stab:
+      // focus goes back to the playfield first, so the button isn't pressed
+      // on the key's release and a later Enter continues a line rather than
+      // pressing it. Any other focused button keeps Space.
+      const ours = event.target instanceof HTMLElement && event.target.closest(".boba-hud button, .coach button");
+      if (ours) focusPlayfield();
+      else if (isOnControl(event)) return;
     }
     event.preventDefault();
     stabFromEvent(event);
@@ -2206,12 +2579,11 @@
     popupFont = arcadeFont();
     const unmountShell = mountShell({
       isOver: () => gameOver,
-      // The demo question is a card like the pause card, and Tab stays in it.
-      isPaused: () => paused || askFirst,
+      isPaused: () => paused,
       pause: () => void pauseGame(),
       togglePause,
-      // During the demo, Tab cycles its bar's buttons (P still pauses).
-      playScope: () => (demoOn ? document.querySelector(".boba-ui.demo") : hud),
+      // Tab cycles the playfield, the tickets' buttons, and a lesson's Continue.
+      playScope: () => playScope,
       onKey,
       onResize: sizeCanvas,
       // The ticket row can change height (a font loading, a narrow screen
@@ -2219,17 +2591,11 @@
       observe: hudRow,
       onReduceMotion: (reduce) => (reduceMotion = reduce),
     });
+    // Ahead of the shell's own Tab handling, which this wraps for the playfield.
+    window.addEventListener("keydown", onPlayfieldTab, true);
     sizeCanvas();
-    tipPending = firstVisit("stab");
-    const intro = demoIntro("stab", takeDemoRequest("stab"));
-    if (intro === "demo") {
-      startDemo();
-    } else if (intro === "ask") {
-      askFirst = true;
-      raf = requestAnimationFrame(frame);
-    } else {
-      restart();
-    }
+    // Straight to the countdown: the belt teaches as it runs.
+    restart();
 
     return () => {
       active = false;
@@ -2237,8 +2603,10 @@
       // Never leave the shared audio clock frozen behind a closed game.
       resumeAudio();
       stopMusic();
+      ticks.stop();
       timers.clear();
       unmountShell();
+      window.removeEventListener("keydown", onPlayfieldTab, true);
     };
   });
 </script>
@@ -2246,75 +2614,74 @@
 <div class="boba-stage ss-stage" style:background={skyTop} on:pointerdown={onPointer} aria-hidden="true"></div>
 <canvas bind:this={canvas} class="boba-canvas" aria-hidden="true"></canvas>
 
-<header bind:this={hud} class="boba-hud boba-ui is-bare" aria-label="Straw stab status">
-  <div bind:this={hudRow} class="boba-hud-row">
-    <div class="boba-ticket boba-ticket-start boba-riso" style="--tilt: -1.2deg">
-      <span class="boba-ticket-icon" aria-hidden="true">
-        <PixelIcon grid={MENU_ICONS.stab.grid} palette={MENU_ICONS.stab.palette} px={3} />
-      </span>
-      <span class="boba-big">{String(score).padStart(3, "0")}</span>
-      <span class="boba-stack">
-        <span class="ss-meta">
-          <span class="boba-meta">points</span>
-          {#if !demoOn}<ExpertTag />{/if}
+<div bind:this={playScope} class="ss-play">
+  <!-- Where focus rests during the run: not a button, so Space stays the stab. -->
+  <div bind:this={playfield} class="sr-only" tabindex="-1" role="group" aria-label="Straw stab playfield"></div>
+  <header class="boba-hud boba-ui is-bare" aria-label="Straw stab status">
+    <div bind:this={hudRow} class="boba-hud-row">
+      <div class="boba-ticket boba-ticket-start boba-riso" style="--tilt: -1.2deg">
+        <span class="boba-ticket-icon" aria-hidden="true">
+          <PixelIcon grid={MENU_ICONS.stab.grid} palette={MENU_ICONS.stab.palette} px={3} />
         </span>
-        {#key combo}
-          <span class="boba-combo" class:active={combo > 1}>
-            {combo > 1 ? `×${combo} combo` : "no combo yet"}
+        <span class="boba-big">{String(score).padStart(3, "0")}</span>
+        <span class="boba-stack">
+          <span class="ss-meta">
+            <span class="boba-meta">points</span>
+            <ExpertTag />
           </span>
+          <span class="boba-line">
+            {#if combo > 1}
+              {#key combo}
+                <span class="boba-combo active">×{combo} combo</span>
+              {/key}
+            {/if}
+          </span>
+        </span>
+      </div>
+
+      <div
+        class="boba-ticket boba-ticket-center boba-riso"
+        class:is-rush={tier >= 2}
+        style="--tilt: 0.9deg"
+      >
+        <span class="beats" aria-hidden="true">
+          {#each [0, 1, 2, 3] as beat}
+            <span class="beat" class:on={running && !paused && beat === beatInBar}></span>
+          {/each}
+        </span>
+        <span class="boba-stack">
+          <span class="boba-meta">{currentBpm} bpm</span>
+          <span class="boba-phase">{TIER_LABELS[tier]}</span>
+        </span>
+        {#key run}
+          <TrackFlag />
         {/key}
-      </span>
+      </div>
+
+      <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.7deg">
+        <Pearls left={lives} total={mode.lives} pulse={missPulse} />
+        <HudButtons {paused} on:pause={togglePause} />
+      </div>
     </div>
+  </header>
 
-    <div
-      class="boba-ticket boba-ticket-center boba-riso"
-      class:is-rush={tier >= 2}
-      style="--tilt: 0.9deg"
-    >
-      <span class="beats" aria-hidden="true">
-        {#each [0, 1, 2, 3] as beat}
-          <span class="beat" class:on={running && !paused && beat === beatInBar}></span>
-        {/each}
-      </span>
-      <span class="boba-stack">
-        <span class="boba-meta">{currentBpm} bpm</span>
-        <span class="boba-phase">{TIER_LABELS[tier]}</span>
-      </span>
-      {#key run}
-        <TrackFlag />
-      {/key}
-    </div>
-
-    <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.7deg">
-      <Pearls left={lives} total={mode.lives} pulse={missPulse} />
-      <HudButtons bind:this={hudButtons} {paused} on:pause={togglePause} />
-    </div>
-  </div>
-
-  {#if tipVisible && !paused}
-    <div class="boba-tip" role="note" aria-label="How to play">
-      <span>stab each cup as it reaches the red notch</span>
-      <span class="boba-keys"><kbd>Space</kbd> stab</span>
-    </div>
-  {/if}
-</header>
-
-{#if !askFirst && !demoOn && (countdown > 0 || goVisible)}
-  <Countdown value={countdown} caption="the belt starts in" goCaption="find the beat" />
-{/if}
-
-{#if askFirst}
-  <DemoCard on:watch={startDemo} on:play={restart} />
-{/if}
-
-{#if demoOn && !paused}
-  <DemoBar
-    bind:this={demoBar}
-    caption={demoText}
-    ended={demoEnded}
-    on:play={restart}
-    on:again={startDemo}
+  <!-- The lesson's callout, under the belt by the notch or the cup it is about. -->
+  <Coach
+    lesson={coachLesson}
+    x={coachX}
+    y={coachY}
+    side={coachSide}
+    leaving={coachLeaving}
+    continuable={coachContinuable}
+    on:continue={continueLesson}
+    returnFocus={focusPlayfield}
+    hidden={paused || gameOver}
+    top={stageTop + 8}
   />
+</div>
+
+{#if countdown > 0 || goVisible}
+  <Countdown value={countdown} />
 {/if}
 
 {#if missFlash}
@@ -2324,7 +2691,6 @@
 {#if paused && !gameOver}
   <PauseCard
     bind:this={pauseCard}
-    deck="The belt is holding its breath. So is the drummer."
     on:resume={resumeGame}
     on:menu={toMenu}
     on:exit={exit}
@@ -2336,7 +2702,7 @@
     bind:this={slip}
     game="stab"
     title="last call"
-    deck={`${LIVES_WORDS[mode.lives]} cups went out strawless. You got ${songsReached} ${songsReached === 1 ? "song" : "songs"} in.`}
+    deck={`${LIVES_WORDS[mode.lives]} cups went by without a straw, ${songsReached} ${songsReached === 1 ? "song" : "songs"} in.`}
     {score}
     {newBest}
     {share}
@@ -2355,6 +2721,11 @@
 <div class="sr-only" aria-live="polite" aria-atomic="true">{liveMessage}</div>
 
 <style>
+  /* The playfield and the tickets, as one Tab scope; no box of its own. */
+  .ss-play {
+    display: contents;
+  }
+
   /* The scene has no light mode: the stage wears the sky's top colour in
      both themes, so the site never shows through behind the canvas. */
   .ss-stage {

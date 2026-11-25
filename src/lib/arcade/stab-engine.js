@@ -3,7 +3,9 @@
 // Cups ride a belt and pass under the straw exactly on the soundtrack's
 // beats. A run plays the songs slowest first, eight bars each, then loops
 // with busier rhythms. The game only needs to know when each bar starts,
-// which beats of a bar carry a cup, and how a stab's timing is judged.
+// which beats of a bar carry a cup, and how a stab's timing is judged. A
+// device's first run opens with a few practice cups that score nothing and
+// cost nothing (see "Practice" below).
 //
 // Timing. Every time here is song time: seconds from the first downbeat as
 // it is heard. The page maps three clocks onto it the same way, through one
@@ -35,23 +37,37 @@ export const EXPERT_WINDOWS = Object.freeze({ perfect: 0.03, good: 0.06, graze: 
  * @property {{ perfect: number, good: number, graze: number }} windows
  * @property {number} lives
  * @property {number} firstTier the pattern tier a run opens on
- * @property {boolean} tierPerSong steps a tier every song, not every half loop
+ * @property {readonly number[]} steps songs played (from the run's start) at which the tier steps up one
  * @property {number} maxTier
+ * @property {number} tightFrom the tier from which a perfect is judged within `tightPerfect`
+ * @property {number} tightPerfect the perfect window in the top tiers, in seconds
  * @property {number} breather tiers the last bar of a song drops back
  * @property {number} offbeat chance a bar's pattern is pushed half a beat late
  */
 
 // Beats of a 4/4 bar that carry a cup, grouped by difficulty tier. Every
 // cup sits on the straight eighth-note grid, which the songs' swing leaves
-// alone, so a cup always lands on something the drums play.
+// alone, so a cup always lands on something the drums play. The ladder is
+// the rhythm games' own: more cups first, then syncopation, then (expert
+// only) whole bars off the beat, with the tempo left to the songs. Each
+// tier from 3 up carries a syncopated bar, an off-beat cup with the beat
+// after it left empty, and a pattern listed twice is drawn twice as often.
+// The syncopated bars of tiers 3 and 4 leave the last half beat empty too,
+// so when expert pushes one half a beat late it loses its downbeat.
 /** @type {number[][][]} */
 const PATTERNS = [
   [[0, 2], [0, 2], [0, 1, 2], [0, 2, 3], [0]],
   [[0, 1, 2, 3], [0, 2, 3], [0, 1, 2], [0, 1.5, 2], [0, 2, 2.5]],
   [[0, 1, 2, 3], [0, 0.5, 1, 2, 3], [0, 1, 2, 2.5, 3], [0, 1.5, 2, 3], [0, 1, 1.5, 2, 3]],
-  [[0, 0.5, 1, 2, 3], [0, 1, 1.5, 2, 2.5, 3], [0, 0.5, 1, 1.5, 2, 3], [0, 1, 2, 2.5, 3, 3.5]],
-  [[0, 0.5, 1, 1.5, 2, 3], [0, 0.5, 1, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 2.5, 3, 3.5]],
-  [[0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], [0, 0.5, 1, 1.5, 2, 3, 3.5], [0, 0.5, 1, 2, 2.5, 3, 3.5]],
+  [[0, 0.5, 1, 2, 3], [0, 1, 1.5, 2, 2.5, 3], [0, 0.5, 1, 1.5, 2, 3], [0, 1, 2, 2.5, 3, 3.5], [0, 0.5, 1, 1.5, 2.5, 3]],
+  [[0, 0.5, 1, 1.5, 2, 3], [0, 0.5, 1, 2, 2.5, 3, 3.5], [0, 1, 1.5, 2, 2.5, 3, 3.5], [0, 0.5, 1.5, 2, 2.5, 3]],
+  [
+    [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
+    [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
+    [0, 0.5, 1, 1.5, 2, 3, 3.5],
+    [0, 0.5, 1, 2, 2.5, 3, 3.5],
+    [0, 0.5, 1, 1.5, 2.5, 3, 3.5],
+  ],
   // Expert only: syncopated, with gaps where the hand expects a cup.
   [
     [0.5, 1, 1.5, 2.5, 3, 3.5],
@@ -59,21 +75,33 @@ const PATTERNS = [
     [0, 1, 1.5, 2.5, 3, 3.5],
     [0.5, 1, 2, 2.5, 3, 3.5],
     [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5],
+    [0.5, 1, 1.5, 2, 2.5, 3, 3.5],
   ],
 ];
+
+/** The pattern tiers, for tests and tuning: every bar a tier can draw. */
+export const TIER_PATTERNS = Object.freeze(PATTERNS.map((tier) => Object.freeze(tier.map((bar) => Object.freeze([...bar])))));
 
 /** The top tier in normal mode; expert has one more. */
 export const MAX_TIER = 5;
 export const EXPERT_MAX_TIER = PATTERNS.length - 1;
 
-/** @type {Readonly<StabMode>} */
+/**
+ * Normal: the first two songs at tier 0, the next two at tier 1, then a
+ * tier every two songs to tier 3, and from there a little steeper: tier 4
+ * at the eighth song and the top at the tenth. In its top two tiers a
+ * perfect is judged a tenth tighter (good and graze never change).
+ * @type {Readonly<StabMode>}
+ */
 export const NORMAL = Object.freeze({
   expert: false,
   windows: WINDOWS,
   lives: LIVES,
   firstTier: 0,
-  tierPerSong: false,
+  steps: Object.freeze([2, 4, 6, 7, 9]),
   maxTier: MAX_TIER,
+  tightFrom: MAX_TIER - 1,
+  tightPerfect: 0.045,
   breather: 2,
   offbeat: 0,
 });
@@ -81,7 +109,8 @@ export const NORMAL = Object.freeze({
 /**
  * Expert: windows a little over half as wide, two pearls, opening two tiers
  * up and climbing a tier every song into a syncopated tier of its own, a
- * shorter breather, and a third of bars pushed half a beat off the beat.
+ * shorter breather, and a third of bars pushed half a beat off the beat. Its
+ * top two tiers tighten the perfect by the same tenth.
  * @type {Readonly<StabMode>}
  */
 export const EXPERT = Object.freeze({
@@ -89,8 +118,10 @@ export const EXPERT = Object.freeze({
   windows: EXPERT_WINDOWS,
   lives: 2,
   firstTier: 2,
-  tierPerSong: true,
+  steps: Object.freeze([1, 2, 3, 4]),
   maxTier: EXPERT_MAX_TIER,
+  tightFrom: EXPERT_MAX_TIER - 1,
+  tightPerfect: 0.027,
   breather: 1,
   offbeat: 0.35,
 });
@@ -174,20 +205,20 @@ export function timeAtBar(tempos, bars) {
 }
 
 /**
- * Difficulty tier. Normal: the tempo already climbs within a loop, so tiers
- * only step at the halfway song and at each new loop. Expert opens higher
- * and steps every song.
+ * Difficulty tier: the mode's first tier, plus one for each of its steps
+ * reached, counted in songs played since the run began. Normal: the tempo
+ * already climbs within a loop, so tiers step every other song at first.
+ * Expert opens higher and steps every song.
  * @param {number[]} tempos
  * @param {number} bar
  * @param {StabMode} [mode]
  */
 export function tierForBar(tempos, bar, mode = NORMAL) {
   const { loop, song } = barPosition(tempos, bar);
-  if (mode.tierPerSong) {
-    return Math.min(mode.maxTier, mode.firstTier + loop * tempos.length + song);
-  }
-  const secondHalf = song >= Math.ceil(tempos.length / 2) ? 1 : 0;
-  return Math.min(mode.maxTier, mode.firstTier + loop * 2 + secondHalf);
+  const played = loop * tempos.length + song;
+  let tier = mode.firstTier;
+  for (const at of mode.steps) if (played >= at) tier += 1;
+  return Math.min(mode.maxTier, tier);
 }
 
 /**
@@ -213,14 +244,25 @@ export function cupBeats(tempos, bar, random = Math.random, mode = NORMAL) {
 }
 
 /**
+ * The perfect window for a cup in `tier`: the mode's own, or a tenth tighter
+ * in its top two tiers.
+ * @param {StabMode} mode
+ * @param {number} tier
+ */
+export function perfectWindow(mode, tier) {
+  return tier >= mode.tightFrom ? mode.tightPerfect : mode.windows.perfect;
+}
+
+/**
  * @param {number} error signed seconds between the stab and the beat
  * @param {StabMode} [mode]
+ * @param {number} [tier] the tier of the cup's bar (the opening tier judges as the mode always has)
  * @returns {StabRating | null}
  */
-export function judgeStab(error, mode = NORMAL) {
+export function judgeStab(error, mode = NORMAL, tier = 0) {
   const size = Math.abs(error);
   const { windows } = mode;
-  if (size <= windows.perfect) return "perfect";
+  if (size <= perfectWindow(mode, tier)) return "perfect";
   if (size <= windows.good) return "good";
   if (size <= windows.graze) return "graze";
   return null;
@@ -405,66 +447,103 @@ export function shareRows(marks, maxRows = 4) {
   return kept;
 }
 
-// --- The demo --------------------------------------------------------------
+// --- Practice ---------------------------------------------------------------
+
+/** A device's first run opens with this many practice cups: unscored, and free. */
+export const PRACTICE_CUPS = 4;
+/** Practice ends early once this many stabs in a row are good or better. */
+export const PRACTICE_STREAK = 2;
 
 /**
- * The demo, in bars of song time: what its caption says from each point on,
- * and when it is over. Each slip below lands while its caption is up.
+ * @typedef {object} Practice
+ * @property {number} cups practice cups this run (0: none)
+ * @property {number} judged practice cups stabbed or let go so far
+ * @property {number} streak good or perfect stabs in a row
+ * @property {number} goods good or perfect stabs in all
+ * @property {boolean} over ended early (two goods in a row, Continue) or every practice cup judged
+ * @property {number} until song time the practice ends at: the close of the last
+ *   practice cup's window (Infinity until that cup is planned)
  */
-export const DEMO_CAPTIONS = Object.freeze([
-  { bar: 0, text: "Every notch on the belt is a beat of the song." },
-  { bar: 1.5, text: "Stab each cup as it reaches the red notch." },
-  { bar: 4.5, text: "Close to the notch still counts, for fewer points." },
-  { bar: 6.5, text: "Let a cup go by and you lose a pearl." },
-  { bar: 8, text: "Each new song runs a little faster." },
-  { bar: 10, text: "Lose all your pearls and it’s last call." },
-]);
-export const DEMO_END_BAR = 12;
-/** Bars from which the demo's first cup is stabbed off the beat, or let go (null). */
-export const DEMO_SLIPS = Object.freeze([
-  { bar: 5, offset: 0.075 },
-  { bar: 6, offset: -0.125 },
-  { bar: 7, offset: null },
-]);
-export const DEMO_SEED = 4242;
 
 /**
- * The demo's caption at a fractional bar.
- * @param {number} bars
+ * A run's practice: the first `PRACTICE_CUPS` cups on a device that hasn't
+ * learned the stab, none otherwise.
+ * @param {boolean} on
+ * @returns {Practice}
  */
-export function demoCaption(bars) {
-  let text = "";
-  for (const line of DEMO_CAPTIONS) if (bars >= line.bar) text = line.text;
-  return text;
+export function createPractice(on) {
+  return { cups: on ? PRACTICE_CUPS : 0, judged: 0, streak: 0, goods: 0, over: !on, until: Infinity };
 }
 
 /**
- * The demo's autopilot. Given each planned cup's bar in order, says when to
- * stab it: seconds off its beat (0 is dead on), or null to let it go by.
+ * Notes a cup as it is planned (`count`th in the run, from 1, its beat at
+ * song time `time`): the last practice cup sets where the practice ends on
+ * the song clock, as that cup's window closes.
+ * @param {Practice} practice
+ * @param {number} count
+ * @param {number} time
+ * @param {StabMode} [mode]
  */
-export function createAutopilot() {
-  let slip = 0;
-  /** @param {number} bar */
-  return (bar) => {
-    const next = DEMO_SLIPS[slip];
-    if (next && bar >= next.bar) {
-      slip += 1;
-      return next.offset;
-    }
-    return 0;
-  };
+export function planPracticeCup(practice, count, time, mode = NORMAL) {
+  if (count === practice.cups) practice.until = time + mode.windows.graze;
 }
 
 /**
- * A small seeded generator, so the demo plays the same cups every time.
- * @param {number} seed
+ * Whether song time `at` falls in the practice: the one boundary for all it
+ * covers. A stab made then scores nothing and costs nothing, at the bare
+ * belt too; a cup whose beat is then is a practice cup however late it is
+ * judged (a stab handled late, or its miss called after the grace). The
+ * first cup past the boundary scores even while the last practice cup is
+ * still within its grace, since no cup's window reaches back across it:
+ * cups are at least half a beat apart and a practice's tier is sparse.
+ * Ending early (two goods in a row, Continue) moves the boundary to then.
+ * @param {Practice} practice
+ * @param {number} at song time
  */
-export function seededRandom(seed) {
-  let a = seed | 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+export function practiceAt(practice, at) {
+  return !practice.over && at <= practice.until;
+}
+
+/**
+ * Whether the practice is still running: its line stays up, and its loop and
+ * ghost are drawn.
+ * @param {Practice} practice
+ */
+export function practiceOn(practice) {
+  return !practice.over;
+}
+
+/**
+ * Records a practice cup's stab (its rating) or its loss ("miss"), or a stab
+ * at the bare belt ("bonk", which breaks a streak but uses no cup). Practice
+ * is over after two good stabs in a row, or once every practice cup is gone.
+ * Returns true when this ended it.
+ * @param {Practice} practice
+ * @param {StabRating | "miss" | "bonk"} result
+ */
+export function practiceResult(practice, result) {
+  if (practice.over) return false;
+  const good = result === "perfect" || result === "good";
+  practice.streak = good ? practice.streak + 1 : 0;
+  if (good) practice.goods += 1;
+  if (result !== "bonk") practice.judged += 1;
+  practice.over = practice.streak >= PRACTICE_STREAK || practice.judged >= practice.cups;
+  return practice.over;
+}
+
+/**
+ * Ends the practice now (the player continued past it).
+ * @param {Practice} practice
+ */
+export function endPractice(practice) {
+  practice.over = true;
+}
+
+/**
+ * Whether the practice taught the stab: at least one good stab in it. One
+ * with none is practised again on the next run.
+ * @param {Practice} practice
+ */
+export function practiceLearned(practice) {
+  return practice.goods > 0;
 }
