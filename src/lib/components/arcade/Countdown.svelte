@@ -3,8 +3,9 @@
 
   /** 3, 2, 1… then 0 for "go". */
   export let value: number;
-  export let caption = "shift starts in";
-  export let goCaption = "catch the rush";
+  /** A line under the number, only if the player needs one (most games don't: the number says it). */
+  export let caption = "";
+  export let goCaption = "";
 
   $: loop = LOOPS[value % LOOPS.length];
 </script>
@@ -27,7 +28,9 @@
       <span class="boba-count-num">{value > 0 ? value : "go"}</span>
     </div>
   {/key}
-  <span class="boba-count-caption">{value > 0 ? caption : goCaption}</span>
+  {#if value > 0 ? caption : goCaption}
+    <span class="boba-count-caption">{value > 0 ? caption : goCaption}</span>
+  {/if}
 </div>
 
 <style>

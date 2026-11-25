@@ -295,7 +295,7 @@
   let trimFor: Piece | null = null;
   let trimBelow = true;
 
-  let liveMessage = "Cup stack starting";
+  let liveMessage = "Cup stack is starting.";
   let localBest = 0;
   let previousBest = 0;
   let newBest = false;
@@ -2205,7 +2205,7 @@
     if (gameOver || paused || !playing) return;
     paused = true;
     setMusicPaused(true);
-    liveMessage = "Game paused";
+    liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
   }
@@ -2216,7 +2216,7 @@
     loop.resync();
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = "Game resumed";
+    liveMessage = "The game resumed.";
     focusPlayfield();
   }
 
@@ -2231,7 +2231,7 @@
     const result = concludeRun("stack", stacked);
     localBest = result.best;
     newBest = result.newBest;
-    liveMessage = `Timber. ${stacked} cups high.`;
+    liveMessage = `The tower fell at ${stacked} cups high.`;
     await tick();
     slip?.focus();
   }
@@ -2425,20 +2425,24 @@
         <span class="boba-big">{String(stacked).padStart(2, "0")}</span>
         <span class="boba-stack">
           <span class="boba-meta">cups high</span>
-          {#key streak}
-            <span class="boba-combo" class:active={streak > 1}>
-              {streak > 1 ? `×${streak} perfect` : streak === 1 ? "perfect" : "line them up"}
-            </span>
-          {/key}
+          {#if streak > 0}
+            {#key streak}
+              <span class="boba-combo" class:active={streak > 1}>
+                {streak > 1 ? `×${streak} perfect` : "perfect"}
+              </span>
+            {/key}
+          {/if}
         </span>
         <ExpertTag />
       </div>
 
       <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.6deg">
-        <span class="boba-stack">
-          <span class="boba-meta">best</span>
-          <span class="boba-phase">{previousBest ? `${previousBest} high` : "none yet"}</span>
-        </span>
+        {#if previousBest}
+          <span class="boba-stack">
+            <span class="boba-meta">best</span>
+            <span class="boba-phase">{previousBest} high</span>
+          </span>
+        {/if}
         <HudButtons {paused} disabled={!playing} on:pause={togglePause} />
       </div>
     </div>
@@ -2464,7 +2468,6 @@
 {#if paused && !gameOver}
   <PauseCard
     bind:this={pauseCard}
-    deck="The tower is holding still for you. Mostly."
     on:resume={resumeGame}
     on:menu={toMenu}
     on:exit={exit}
@@ -2477,8 +2480,8 @@
     game="stack"
     title="timber"
     deck={stacked === 0
-      ? "Not one cup landed. The tray is very clean."
-      : `${stacked} ${stacked === 1 ? "cup" : "cups"} high before gravity won.`}
+      ? "Not one cup landed."
+      : `The tower fell at ${stacked} ${stacked === 1 ? "cup" : "cups"} high.`}
     score={stacked}
     unit="cups"
     {newBest}

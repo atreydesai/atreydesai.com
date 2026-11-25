@@ -229,7 +229,7 @@
   let phase: GamePhase = "opening";
   let missPulse = 0;
   let missFlash = false;
-  let liveMessage = "Boba catch starting";
+  let liveMessage = "Boba catch is starting.";
   let localBest = 0;
   let newBest = false;
   let share: string[] = [];
@@ -772,9 +772,9 @@
     if (restored) {
       liveMessage = `Golden cup caught. A pearl is back, ${lives.left} left.`;
     } else if (boba.golden) {
-      liveMessage = `Golden cup caught for ${points} points`;
+      liveMessage = `You caught a golden cup for ${points} points.`;
     } else if (perfect) {
-      liveMessage = `Perfect catch for ${points} points`;
+      liveMessage = `A perfect catch, for ${points} points.`;
     } else if (caughtCount % 5 === 0) {
       liveMessage = `${caughtCount} cups caught. Score ${score}.`;
     }
@@ -1325,7 +1325,7 @@
     if (gameOver || !active || paused) return;
     paused = true;
     setMusicPaused(true);
-    liveMessage = "Game paused";
+    liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
   }
@@ -1336,7 +1336,7 @@
     loop.resync();
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = countdown > 0 ? `Countdown ${countdown}` : "Game resumed";
+    liveMessage = countdown > 0 ? `Countdown ${countdown}` : "The game resumed.";
     focusPlayfield();
   }
 
@@ -1364,7 +1364,7 @@
     const cells = shiftCells(events, elapsed);
     // The time on shift is already one of the shared stats.
     share = emojiRows(cells, cells.length <= 12 ? 12 : 10, 3);
-    liveMessage = `Game over after ${formatShift(elapsed)} on shift. Final score ${score}.`;
+    liveMessage = `The game is over after ${formatShift(elapsed)} on shift. Your final score is ${score}.`;
     await tick();
     slip?.focus();
   }
@@ -1460,11 +1460,11 @@
       <span class="boba-big">{String(score).padStart(3, "0")}</span>
       <span class="boba-stack">
         <span class="boba-meta">points</span>
-        {#key combo}
-          <span class="boba-combo" class:active={combo > 1}>
-            {combo > 1 ? `×${combo} combo` : "no combo yet"}
-          </span>
-        {/key}
+        {#if combo > 1}
+          {#key combo}
+            <span class="boba-combo active">×{combo} combo</span>
+          {/key}
+        {/if}
       </span>
       <ExpertTag />
     </div>
@@ -1535,7 +1535,7 @@
     bind:this={slip}
     game="catch"
     title="game over"
-    deck="The last pearl dropped. The floor is sticky now."
+    deck="The last pearl dropped."
     {score}
     {newBest}
     {share}

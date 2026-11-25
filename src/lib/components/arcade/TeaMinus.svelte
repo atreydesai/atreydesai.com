@@ -387,7 +387,7 @@
   let bestLanding = 0;
   let paused = false;
   let gameOver = false;
-  let liveMessage = "Tea minus starting";
+  let liveMessage = "Tea minus is starting.";
   let localBest = 0;
   let newBest = false;
   let countdown = COUNTDOWN_SECONDS;
@@ -2990,7 +2990,7 @@
     releaseAll();
     setThruster(0);
     setMusicPaused(true);
-    liveMessage = "Game paused";
+    liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
   }
@@ -3001,7 +3001,7 @@
     loop.resync();
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = "Game resumed";
+    liveMessage = "The game resumed.";
     focusPlayfield();
   }
 
@@ -3042,7 +3042,7 @@
     const result = concludeRun("lander", score);
     localBest = result.best;
     newBest = result.newBest;
-    liveMessage = `Splashdown. Final score ${score}.`;
+    liveMessage = `The mission is over. Your final score is ${score}.`;
     await tick();
     slip?.focus();
   }
@@ -3680,13 +3680,12 @@
 </div>
 
 {#if countdown > 0 || goVisible}
-  <Countdown value={countdown} caption="tea minus" goCaption="go for landing" />
+  <Countdown value={countdown} />
 {/if}
 
 {#if paused && !gameOver}
   <PauseCard
     bind:this={pauseCard}
-    deck="Mission clock stopped. The tea is staying warm."
     on:resume={resumeGame}
     on:menu={toMenu}
     on:exit={exit}

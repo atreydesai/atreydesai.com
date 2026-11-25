@@ -203,7 +203,9 @@
     <div class="top">
       <div class="score">
         <h2 id="boba-over-title" class="boba-title">{title}</h2>
-        <p class="boba-deck">{deck}</p>
+        {#if deck}
+          <p class="boba-deck">{deck}</p>
+        {/if}
 
         <div class="final">
           <span class="circle">

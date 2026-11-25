@@ -798,7 +798,7 @@
   let mode: Mode = "countdown";
   let paused = false;
   let gameOver = false;
-  let liveMessage = "Sugar rush starting";
+  let liveMessage = "Sugar rush is starting.";
   let localBest = 0;
   let newBest = false;
   let countdown = COUNTDOWN_SECONDS;
@@ -3040,7 +3040,7 @@
         case "rushStart":
           sfxRushStart();
           rushFlashAt = clock;
-          liveMessage = "Sugar rush.";
+          liveMessage = "The sugar rush is on.";
           coach.done("rush");
           dustBurst(ev.x, ev.y, 10, 1.4);
           break;
@@ -3078,7 +3078,7 @@
           setRunGlide(0);
           fallAt = clock;
           kick(0.3);
-          liveMessage = "Fell off the roofs.";
+          liveMessage = "The runner fell off the roofs.";
           break;
         case "dry":
           sfxRunSpill(1);
@@ -3094,7 +3094,7 @@
           else spawn(B_POP, ev.x, ev.y, 0, 0, 0.32, 1.5, NOTE_GOLD);
           followSpares(state.spare);
           coach.done("spare");
-          liveMessage = `Picked up a spare cup. ${spareWords(ev.held)}.`;
+          liveMessage = `You picked up a spare cup. ${spareWords(ev.held)}.`;
           break;
         case "spareBonus":
           sfxRunDeliver(true);
@@ -3151,7 +3151,7 @@
     handoffAt = clock;
     refillFrom = Math.min(displayTea, ev.tea);
     refillAt = clock;
-    liveMessage = `Delivered${ev.full ? " a full cup" : ""} for ${ev.points} points.`;
+    liveMessage = `You delivered${ev.full ? " a full cup" : " the tea"} for ${ev.points} points.`;
     const thrown = throws.find((t) => !t.on) ?? throws[0];
     thrown.on = true;
     thrown.t = 0;
@@ -3708,7 +3708,7 @@
     releaseAll();
     setRunGlide(0);
     setMusicPaused(true);
-    liveMessage = "Game paused";
+    liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
   }
@@ -3719,7 +3719,7 @@
     loop.resync();
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = "Game resumed";
+    liveMessage = "The game resumed.";
     focusPlayfield();
   }
 
@@ -3754,7 +3754,7 @@
     const result = concludeRun("runner", state.score);
     localBest = result.best;
     newBest = result.newBest;
-    liveMessage = `Clocked out. Final score ${state.score}.`;
+    liveMessage = `The run is over. Your final score is ${state.score}.`;
     await tick();
     slip?.focus();
   }
@@ -4164,14 +4164,13 @@
 </div>
 
 {#if countdown > 0 || goVisible}
-  <Countdown value={countdown} caption="out for delivery" goCaption="run" />
+  <Countdown value={countdown} />
 {/if}
 
 
 {#if paused && !gameOver}
   <PauseCard
     bind:this={pauseCard}
-    deck="The tea is holding still. The customer is not."
     on:resume={resumeGame}
     on:menu={toMenu}
     on:exit={exit}

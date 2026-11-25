@@ -205,8 +205,8 @@ under the runner, between the thumb pads on a phone.
   the top five of each, for the mode the switch is on, the leader in the
   accent, with a `play` link into each game. A board nobody has signed shows
   only its name. Back or Escape returns to the menu.
-- **Pause says each thing once.** A title, one sentence, and three buttons
-  that carry their own key chips, on one line. Nothing else.
+- **Pause says each thing once.** A title and three buttons that carry
+  their own key chips, on one line. Nothing else.
 - **Share.** The results slip's secondary `Share` button turns the board
   over to a share panel (`Board` turns it back): the run's card as it will
   be sent, with `Copy image` and `Copy text` beside it (under it on a
@@ -275,19 +275,28 @@ differ by arrangement, not volume.
 
 ## Voice
 
-Lowercase titles and labels, sentence-case actions. Calm, specific, dry. No
-exclamation marks, no “Oops”.
+People skim screens and skip anything wordy, so every extra word hides the
+ones that matter (Joel Spolsky, "Designing for People Who Have Better Things
+to Do with Their Lives"). Keep only what the player acts on: a fact they
+need, the next step, or why something failed. Cut slogans, flavor text,
+reassurance, how the game works inside, words that restate a label or a
+control's own state, and "please". Say what happened, not how or when the
+game decided it.
 
-- **One thing at a time.** The first-run tip is one instruction plus the main
-  action's key (“drop each cup onto the last” `Space`). A caption or toast is
-  one line. No kicker above it, no second clause after it.
+- **Full sentences, never fragments.** A lesson, a deck, a live-region
+  message is one short full sentence in sentence case with a full stop
+  ("Hold jump to go higher.", "The last pearl dropped."). Labels and titles
+  stay lowercase words (`points`, `paused`, `clocked out`).
+- **One thing at a time.** A lesson is one sentence of eight words or fewer,
+  plus its key. No kicker above it, no second clause after it.
+- **Nothing to say, say nothing.** An empty state shows nothing: no "no
+  combo yet", no "none yet", no line under a countdown that only repeats the
+  number. The pause card is its title and its buttons. A results deck is
+  there only when it says what ended the run.
 - **No dot separators.** Not the drawn dot, not `·`, in tips, captions,
   popups, or receipts. If two facts need a separator, one of them should go.
-- **No filler.** An empty state shows nothing: no “nobody yet”, no “score
-  something to sign the board”. One light joke may live in a deck (“The
-  pearls will wait.”); copy elsewhere is functional.
-- Live-region messages are plain sentences that say what happened and what it
-  cost or earned.
+- Live-region messages are plain sentences that say what happened and what
+  it cost or earned ("You delivered a full cup for 150 points.").
 
 ## Every game
 
@@ -311,13 +320,29 @@ exclamation marks, no “Oops”.
     lit pad, on a phone), a dotted tail, and a pen loop around the thing.
   - **A move slows play.** About a second before a move is needed the game
     eases into slow motion, and a ghost of the player's own sprite, dithered
-    through a Bayer screen door in cream, runs the move from where to make
-    it along a line of chalk dashes. Play comes back to speed the moment the
-    move is made. A move made before it is taught is never taught; a move
+    through a Bayer screen door in cream (in the page's ink where a game
+    plays on the page itself), runs the move from where to make it along a
+    line of chalk dashes. Play comes back to speed the moment the move is
+    made, and the lesson counts once the move has worked. A move made before
+    it is taught is never taught; a move
     missed takes its lesson down so the next one teaches it, and play never
     stays slow.
-  - **A thing says what it's for as it comes into view**, at full speed: a
-    golden cup, a hazard, a power-up (named in italic, then one sentence).
+  - **A thing says what it's for as it comes into view**: a golden cup, a
+    hazard, a power-up (named in italic, then one sentence). In the fast
+    games (sugar rush, boba catch, tea minus, cup stack in normal) every
+    explanation slows play while it is up, so nothing has to be read at
+    full speed, and a Continue button on the slip (`Enter` on the
+    playfield; a focused button keeps its own Enter) ends it and brings
+    play back to speed. Running past the thing ends it too, and no
+    explanation holds longer than about seven seconds of real time.
+  - **The spotlight.** While something is being explained, the scene dims
+    under a flat wash and what matters stays in full light: the player and
+    the thing, stepped down at the edge by one band of half the wash, never
+    a soft glow. It eases in and out in a moment (at once under Reduce
+    Motion) and goes as soon as the move is made.
+  - **Smooth at any speed.** Where a game steps its rules at a fixed rate,
+    slow motion draws the player and the camera between the last two steps,
+    so it glides rather than judders; the rules themselves never change.
   - **Where time can't bend** (a beat on the audio clock, a window in
     milliseconds), a ghost and a highlight teach instead of slow motion.
   - Ghosts and loops are the arcade's only "holograms": dither, chalk and pen,
@@ -332,7 +357,9 @@ exclamation marks, no “Oops”.
 - **New rules, new board.** When a game's scoring changes enough that old
   scores can't be matched (catch going endless, sugar rush and cup stack
   getting much harder), its best cookie and its board move to a new version;
-  the old board is kept, not shown.
+  the old board is kept, not shown. A change that leaves the opening alone
+  keeps its board: sugar rush's second climb, which only makes the late game
+  harder, kept existing bests and the existing board.
 
 ## Game by game
 
@@ -363,10 +390,29 @@ page itself. It needs a mouse.
 - **The tickets.** The middle ticket counts time on shift up, with the
   pace's name under it. The end ticket carries the pearls, the song flag,
   and the HUD buttons.
-- **The demo** moves the basket itself, a little late and a little off
-  centre like a hand, lets one cup fall to show a pearl dropping, and jumps
-  to rush hour for its last stretch. Its strip sits under the tickets, clear
-  of the basket, and no link behind it throws.
+- **Taught on shift** (`catch-lessons.js`, timed on simulated shifts by
+  `tests/catch-lessons.test.mjs`). Every lesson slows the whole shift to
+  under a third of its pace while it explains; the page dims under a wash
+  of ink, and only the basket and what the lesson is about stay lit.
+  Continue (Enter, or the slip's button) ends it, and play eases back. The
+  first link to light up is ringed in pen with "A glowing link is about to
+  throw." When its cup flies, the way down is chalked to a dithered ghost
+  basket where it will land, with "Move the basket under the cup." beside
+  it; play comes back to speed once the basket has settled under the cup (a
+  sweep through doesn't count), and a cup let go past takes the lesson down
+  for a later cup to teach. A lesson whose cup is overtaken by a later throw
+  stands down for it; the catch moves to that cup if there is still time to
+  reach it, and if it is still unmade after seven seconds it waits for a
+  later run. The first golden cup, the first golden cup while
+  a pearl is down (never on expert), and the first pair, lob and flick each
+  get a line riding beside the cup until it is caught or goes past. A lost
+  pearl and the bonus point are said beside the basket, where it was when
+  they happened. A lesson about a cup
+  is only ever about the next cup down, so following it never lets another
+  fall (a test proves slowing to explain never costs a pearl), and lessons
+  leave a second and a half of full-speed play between them. Because catch
+  plays on the page, its marks print in ink on the light theme and cream on
+  the dark.
 - **The share** is one square per fifteen seconds on shift (a clean stretch,
   a golden cup, a pearl won back, or a pearl dropped), then the time on
   shift.
@@ -423,10 +469,10 @@ A conveyor belt carries cups past a straw; stab each on the beat.
 ### Order up
 
 Guests walk up to the counter and hand over a ticket, which goes up and is
-clipped to the rail. You take one ticket at a time through the stations: drop
-in the ice, pump the syrup, hold a tap to pour the tea to the ice line, drop
-each topping from a swinging ladle, shake, and the drink is sealed, graded,
-and handed over.
+clipped to the rail. You take one ticket at a time through the stations:
+pump the syrup, drop in the ice, hold a tap to pour the tea to the ice line,
+drop each topping from a swinging ladle, shake, and the drink is sealed,
+graded, and handed over.
 
 - **Tickets read like a boba shop's:** the tea, the sugar as 0 to 100% in
   quarters, the ice as no, less, regular or extra, and any toppings. Sugar
@@ -460,8 +506,36 @@ and handed over.
 - **Expert** puts four tickets on the rail, sends guests faster with less
   patience and bigger orders, tightens every grading window, swings the ladle
   and the sealer faster, gives two samples, and sends the critic twice.
-- **A demo first.** A first-time visitor is offered a short demo before the
-  shift starts; the menu's demo button opens it directly.
+- **Taught on the shift** (`orders-lessons.js`, tested by
+  `tests/orders-lessons.test.mjs`). The counter opens on its countdown, and
+  the first drink on a device is walked through station by station, each
+  line beside the ticket or the making card's line in play, ended by the
+  action; the guests wait at half speed meanwhile, never the bench. Ghosts
+  show the tea's line, the ladle over the cup and the needle in the band.
+  While a line is up the shop dims and the drink in hand stays lit, and
+  whatever has focus keeps full contrast. Later things are named once while
+  the hands are free, and hold until Continue. The slip never covers the
+  rail: a ticket's line sits beside the rail where there's room, or in the
+  strip under it. If a tap runs dry mid-pour, letting go isn't judged; the
+  line says to brew, and the pour goes on after.
+- **The making card.** The ticket being made is pinned under the cup: the
+  drink's stations in the order it is built, with what each wants, the one
+  at hand marked and the ones behind graded, and the guest's patience. The
+  cup starts under its tea's tap. Dump pours the cup out and starts the same
+  drink again; an empty cup can still go to another ticket; ↓ takes back the
+  last pump or cube until the cup moves on. On a phone the card's lines sit
+  in two rows, and a finished line shows its grade. A notice takes the
+  guest's name's place, never their patience.
+- **Patience** is a bar on every ticket and on the card. At 30% the ticket
+  says *leaving* and earns a slab, and at 25% it jitters (not under Reduce
+  Motion).
+- **The pace** climbs smoothly between the phases, holding each phase's
+  values at its middle. The first two orders of a normal shift are plain,
+  the critic waits for three drinks to be served, and the ladle dips into
+  the next scoop's jar by itself, except in expert.
+- **The hand-off.** A perfect drink turns once on the counter as it goes
+  over (sprite stacking), and is served at the same moment as any other; the
+  receipt rises over the guest who took it.
 - **The shop, kept quiet.** The wall behind the play area is one flat tone;
   the room lives in the side walls, mixed toward the wall colour: a menu
   board, a few large jars, a clock whose hand shows the shift's time left,
@@ -489,8 +563,8 @@ A cup slides over the tower; drop it, and what overhangs is sliced off.
   It then snaps to the unit grid toward the tower, never away from it, so an
   edge that looks supported is never cut.
 - **Perfect is earned.** The perfect window is a time either side of centre,
-  turned into distance at the slide's speed: `30` ms at the first cup,
-  tightening to `14` ms by 24 cups (about half a unit throughout, as the
+  turned into distance at the slide's speed: `32` ms at the first cup,
+  tightening to `15` ms by 24 cups (about half a unit throughout, as the
   slide speeds up). It is never narrower than one frame of the slide at
   60 fps plus half a pixel, so no pass can skip over it. A drop just outside
   it still snaps onto the centre whole, so the game says “a hair off”: it
@@ -503,11 +577,21 @@ A cup slides over the tower; drop it, and what overhangs is sliced off.
   (±20%), the narrowest perfect window allowed (about `14` to `11` ms), and
   slower regrowth: the fourth perfect in a row, then every second one. The
   music rushes sooner.
-- **The demo** plays fourteen scripted cups on the real rules, in normal
-  mode, through the same drop the player's input calls: perfects, trims, a
-  regrowth, a near miss, then a miss and the fall. Its strip sits at the
-  top, clear of the tower. Pressing Play mid-demo drops its cup and brings
-  the sky home as a fall does, then a real run starts.
+- **Taught on the tower** (`stack-lessons.js`, tested on the real rules and
+  the real coach by `tests/stack-lessons.test.mjs`). In normal, each first
+  is explained in slow motion: the game eases to a quarter speed and a
+  spotlight dims everything but the row the cup slides in and the tower's
+  top, until Continue (`Enter`, or the slip's button) or a drop. The first
+  cup slides over a dithered cream ghost of itself, sitting exactly where a
+  perfect drop lands, under "Drop the cup when it covers the ghost."; a cup
+  covering the ghost always lands whole. Then come the first slice (which
+  alone falls slowly, riding with the tower, while it is named), the first
+  perfect, a streak one perfect short of growing the cup back (learned only
+  when it does), and the personal best's line, named beside the tower as it
+  comes down. Expert shows the same lines and ghost at full speed and never
+  slows, so its board's timing is untouched. Callouts never cover the row
+  the cup slides in, whose edges are what a drop is judged by. A missed
+  first cup is taught again.
 - **Sharing** draws the run as a little tower: a square per drop, ten to a
   row, newest row on top, ending on the cup that fell (gold perfect, white
   whole, orange trimmed, red fell).
@@ -557,12 +641,28 @@ level in the cup on screen and in the HUD's cup drains together.
   past it even the autopilot can't hold still over the narrowest coaster. A
   test flies the autopilot to every expert coaster from the start, landing
   with 15% of the cup to spare.
-- **The demo is the real game flying itself.** The engine's autopilot (the
-  same one the tests fly) presses the three keys on a calm first site and
-  lands on its ×5 coaster in about fifteen seconds, under four lines: hold
-  burn to slow the fall, the tea is the fuel, line up over a coaster, come
-  down slow and level. On touch the hold buttons light as it presses them,
-  and the strip sits at the top, under the tickets.
+- **Taught in flight** (`lander-lessons.js`, timed on real sites by
+  `tests/lander-lessons.test.mjs`). The game opens on its countdown, and the
+  first site's intro is read during it. Every lesson eases play into slow
+  motion, dims the scene to the cup and what it names, and ends on Continue
+  (Enter, or the slip's button) or after seven seconds. Burning comes first,
+  just after "go": a dithered cream ghost of the cup holds burn below it
+  until its fall stops. The coaster is named next, ×5 first. Then the tilt:
+  the ghost flies the path the engine's own autopilot would take to a
+  coaster from here, along chalk dashes, and the tilt counts once burns
+  against the drift have the cup lined up over a coaster. A touchdown about
+  to go wrong (too fast, leaning, drifting) is warned about a second before
+  the fix is needed, and only while coming down slow, level and still from
+  there would still land by the engine's own rules; otherwise no warning
+  comes, and one already up is withdrawn. The tea, a windy site's pennants,
+  a lander lost to a crash, and a feather landing each get a line the first
+  time they matter. A move made before it is taught is never taught; one
+  that times out comes down uncounted and waits for a later run. On touch
+  the hold button to press earns its slab, and each key, pointer and button
+  holds on its own. Captions sit low over the regolith and never share the
+  screen with a lesson. The cup and camera are drawn between physics steps,
+  so slow motion is smooth, and replays prove the same inputs land the same
+  at any speed or frame rate.
 - **Sharing** gives one emoji per attempt (the coaster's keycap for a
   landing, a burst for a crash) after a moon, and a feather for each feather
   landing.
@@ -590,6 +690,24 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   nearly double by two and a half. Set pieces unlock and remix with
   difficulty, and the flat roof between them shrinks, so they come faster
   still.
+- **Then it climbs again.** Once every set piece is out (a minute and a
+  half in, 44 seconds in expert), a second climb runs to about five minutes
+  (two and a half in expert). Set pieces start to chain: two, later three,
+  back to back with only a short run-in between instead of a plain roof,
+  picked so the moves change (hop, slide, hop; slam, slide). A chain never
+  lays anything after a piece that comes down from the air, never puts two
+  timed pieces together, and pairs two that can kill only in the second
+  half; anything lethal keeps its full runway. Pieces carry more (up to six
+  to hop or slide under), gaps lose their easy end, lethal pieces come up
+  twice as often, and the top speed creeps from 390 to 415 (430 to 460 in
+  expert). After every eight or so chained pieces (ten in expert) comes a
+  breather, a plain roof and a line of pearls, so the climb comes in waves
+  rather than a wall. Four pieces belong to it, made of the same things: a
+  barrage (barrels, then a drone to slide under), steamworks (a row of pipes
+  on one rolling timer), a wire walk (chimney tops over low roofs live from
+  wall to wall; in a rush the hops carry too far, so slam onto each top),
+  and boards that crumble into a railway gap. The opening is untouched, and
+  the test bot runs the whole climb in both modes without losing a cup.
 - **Spare cups are the lives.** A run starts with one and can hold two; the
   HUD shows a slot for each, the cup when held, a dashed outline when not.
   Running into anything you should have hopped or slid under (a crate, a
@@ -630,7 +748,7 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   seconds, with afterimages and speed lines. The meter and the tea ride on
   the tray under the runner, not in the tickets; the tray earns a slab when
   the meter is full.
-- **The course is authored, then shuffled.** Twenty-seven set pieces unlock
+- **The course is authored, then shuffled.** Thirty-one set pieces unlock
   with distance and never repeat back to back. Besides awnings that bounce,
   vents that lift, cables to ride, crates, pigeons and split routes, things
   move or keep time: barrels that roll at the runner, a rival's drone at
@@ -639,7 +757,8 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   that give way a moment after they take the weight. A test bot (also the
   demo's player) runs long stretches on many seeds, in both modes, without
   losing a cup, so every gap is clearable and everything can be avoided.
-- **Expert** starts at 215 and climbs to 430 in about a minute and a half,
+- **Expert** starts at 215 and climbs to 430 in about a minute and a half
+  (creeping on to 460 over its second climb),
   reaches full difficulty twice as soon, starts with no spare cup and finds
   one only every fifty thousand units or so after the first forty thousand,
   and brings lethal pieces in at half their usual distance and more often.

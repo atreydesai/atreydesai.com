@@ -586,7 +586,7 @@
   /** How each guest left, in order, for the share. */
   let history: Reaction[] = [];
   let shareLines: string[] = [];
-  let liveMessage = "Order up starting";
+  let liveMessage = "Order up is starting.";
   let localBest = 0;
   let newBest = false;
 
@@ -4469,7 +4469,7 @@
     paused = true;
     releaseAll();
     setMusicPaused(true);
-    liveMessage = "Game paused";
+    liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
   }
@@ -4480,7 +4480,7 @@
     loop.resync();
     setMusicPaused(false);
     sfxBlip();
-    liveMessage = "Game resumed";
+    liveMessage = "The game resumed.";
     focusPlayfield();
   }
 
@@ -5233,14 +5233,13 @@
 </div>
 
 {#if countdown > 0 || goVisible}
-  <Countdown value={countdown} caption="the counter opens in" goCaption="orders up" />
+  <Countdown value={countdown} />
 {/if}
 
 
 {#if paused && !gameOver}
   <PauseCard
     bind:this={pauseCard}
-    deck="The shift is on hold."
     resumeLabel="Resume shift"
     on:resume={resumeGame}
     on:menu={toMenu}
@@ -5253,9 +5252,7 @@
     bind:this={slip}
     game="orders"
     title={endReason === "time" ? "shift complete" : "kitchen’s closed"}
-    deck={endReason === "time"
-      ? "The shift is over."
-      : "Three guests left without a drink."}
+    deck={endReason === "time" ? "" : "Three guests left without a drink."}
     {score}
     {newBest}
     stats={[
