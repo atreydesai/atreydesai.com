@@ -8,8 +8,8 @@ seoTitle: "Who wrote this? Frontier models need only one text to unmask its huma
 seoDescription: "Given a single text and a simple zero-shot prompt, frontier models can answer who wrote this at three increasingly specific levels: whether an AI or human wrote it, if an AI, which lab, and if a human, often exactly who."
 image: "/images/og/who-wrote-this-icml.jpg"
 imageSquare: "/images/og/who-wrote-this-icml-sq.jpg"
-imageAlt: "Fable 5.2 names the reviewer of 55% of 15K anonymous ICML 2020 reviews: the 55% large in clay, the ICML mark above, and a faint fingerprint whose ridges are lines of text."
-imageSquareAlt: "Fable 5.2 names the reviewer of 55% of 15K anonymous ICML 2020 reviews: the 55% large in clay, the ICML mark above, and a faint fingerprint whose ridges are lines of text."
+imageAlt: "Fable 5.2 names the reviewer of 55% of 15K anonymous ICML 2020 reviews, with the 55% large in clay over a faint fingerprint whose ridges are lines of text. Along the bottom: the AD monogram, Atrey Desai, atreydesai.com/blog/who-wrote-this."
+imageSquareAlt: "Fable 5.2 names the reviewer of 55% of 15K anonymous ICML 2020 reviews, with the 55% large in clay over a faint fingerprint whose ridges are lines of text. Along the bottom: the AD monogram, Atrey Desai, atreydesai.com/blog/who-wrote-this."
 published: true
 unlisted: false
 ---
