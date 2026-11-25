@@ -13,7 +13,7 @@
 // guests appear in place, their faces still change, and they stand a moment
 // before they go.
 
-import { SPRITE_PAD, addParticle, cachedSprite, drawParticles, stepParticles, type Particle } from "./art";
+import { NOTE_GOLD, SPRITE_PAD, addParticle, cachedSprite, drawParticles, stepParticles, type Particle } from "./art";
 import { JAR_SIZE, waitingMood } from "./orders-engine.js";
 import type { Reaction, WaitMood } from "./orders-engine.js";
 import { COIN, EMOTES, FIGURE_ABOVE, FIGURE_W, JAR, JAR_H, JAR_W, TAKEAWAY, dropFor, figure } from "./orders-guests.js";
@@ -68,16 +68,6 @@ export interface CrowdHooks {
   full(): void;
 }
 
-export interface CrowdState {
-  walkers: Walker[];
-  coins: Coin[];
-  particles: Particle[];
-  notes: Note[];
-  jar: number;
-  jarFlash: number;
-  clock: number;
-}
-
 /** A served or departing guest stands this long with their face before walking. */
 const LINGER = 0.55;
 const LINGER_CROSS = 0.3;
@@ -89,9 +79,10 @@ const COIN_GAP = 0.08;
 const JAR_FLASH = 0.5;
 const CLOCK_EVERY = 4.5;
 const CLOCK_SHOWS = 1.3;
+/** A shade more opaque than the shared halo (art.ts's 0.8), as the guests have always been drawn. */
 const HALO = "rgba(253, 248, 243, 0.85)";
+/** The jar's note backing: the bench's scene ink, not the shared popup chip's night blue. */
 const NOTE_INK = "#1a1a1a";
-const NOTE_GOLD = "#ffd166";
 
 const REACTION_EMOTES: Partial<Record<Reaction, Emote>> = {
   starry: "star",
@@ -234,28 +225,6 @@ export class Crowd {
   note(text: string) {
     const x = this.jarX + (JAR_W / 2) * this.fp;
     this.notes.push({ x, y: this.base - (JAR_H + 2) * this.fp, text, life: 1.6, maxLife: 1.6 });
-  }
-
-  snapshot(): CrowdState {
-    return {
-      walkers: this.walkers,
-      coins: this.coins,
-      particles: this.particles,
-      notes: this.notes,
-      jar: this.jar,
-      jarFlash: this.jarFlash,
-      clock: this.clock,
-    };
-  }
-
-  restore(state: CrowdState) {
-    this.walkers = state.walkers;
-    this.coins = state.coins;
-    this.particles = state.particles;
-    this.notes = state.notes;
-    this.jar = state.jar;
-    this.jarFlash = state.jarFlash;
-    this.clock = state.clock;
   }
 
   reset(jar = 0) {

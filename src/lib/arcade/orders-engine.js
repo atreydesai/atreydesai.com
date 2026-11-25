@@ -4,9 +4,9 @@
 // Guests walk up to the counter, hand over a ticket that goes up on the rail,
 // and wait. Every order sets a tea, a sugar level and an ice level the way a
 // boba shop tickets them ("50% sugar, less ice"), and maybe toppings. The
-// player takes one ticket at a time to the stations: drop the ice cubes in,
-// pump the syrup, pour the tea to the ice line, pick each topping's jar and drop it from a swinging ladle, shake
-// it, and stamp the seal while the sealer is hot. Every station grades out of
+// player takes one ticket at a time to the stations: pump the syrup, drop
+// the ice cubes in, pour the tea to the ice line, drop each topping from a
+// swinging ladle, shake it, and stamp the seal while the sealer is hot. Every station grades out of
 // 100, and the receipt mixes those with how long the guest waited. Around that:
 // tea tanks run dry and need brewing, free samples buy an impatient guest time,
 // a critic visits, and one tea is the day's special.
@@ -190,30 +190,64 @@ export function phaseForElapsed(elapsed) {
 }
 
 /**
- * How often customers arrive, how long they wait, how much they pile on, and
- * how fast the ladle swings. Expert sends guests much faster, with far less
- * patience, a scoop more on every drink, and a quicker ladle.
+ * Each phase's pace, set in full at the middle of its stretch of the shift
+ * (PACE_KEYS): how often guests arrive, how long they wait, how much they
+ * pile on, and how fast the ladle swings. Expert sends guests much faster,
+ * with far less patience, a scoop more on every drink, and a quicker ladle.
+ */
+const PACES = {
+  normal: [
+    { arrivalEvery: 10, patience: 34, minScoops: 0, maxScoops: 1, swing: 2.4 },
+    { arrivalEvery: 8, patience: 30, minScoops: 1, maxScoops: 2, swing: 3.0 },
+    { arrivalEvery: 6.5, patience: 26, minScoops: 2, maxScoops: 3, swing: 3.6 },
+  ],
+  expert: [
+    { arrivalEvery: 7.5, patience: 24, minScoops: 1, maxScoops: 2, swing: 3.1 },
+    { arrivalEvery: 6, patience: 21, minScoops: 2, maxScoops: 3, swing: 3.9 },
+    { arrivalEvery: 5, patience: 18, minScoops: 3, maxScoops: 4, swing: 4.7 },
+  ],
+};
+
+/**
+ * Where each phase's pace holds exactly: the middle of opening (0–30 s),
+ * steady (30–80 s) and rush (80–120 s). Between them it moves in a straight
+ * line, so the shift climbs without a jump at 30 and 80 seconds, and it
+ * holds before the first and after the last, so the shift opens and ends
+ * where it always did.
+ */
+export const PACE_KEYS = /** @type {const} */ ([15, 55, 100]);
+
+/**
+ * A value of the pace at `elapsed`, along the three keys.
+ * @param {number} elapsed @param {number} opening @param {number} steady @param {number} rush
+ */
+function alongShift(elapsed, opening, steady, rush) {
+  const [a, b, c] = PACE_KEYS;
+  if (elapsed <= a) return opening;
+  if (elapsed <= b) return opening + ((steady - opening) * (elapsed - a)) / (b - a);
+  if (elapsed <= c) return steady + ((rush - steady) * (elapsed - b)) / (c - b);
+  return rush;
+}
+
+/**
+ * The pace at a point in the shift. Arrivals, patience and the ladle's
+ * swing move smoothly between the phases' keys; the size of an order (its
+ * scoops) and the music follow the phase itself.
  * @param {number} elapsed
  * @param {boolean} [expert]
  */
 export function paceForElapsed(elapsed, expert = false) {
   const phase = phaseForElapsed(elapsed);
-  if (expert) {
-    if (phase === "opening") {
-      return { phase, arrivalEvery: 7.5, patience: 24, minScoops: 1, maxScoops: 2, swing: 3.1 };
-    }
-    if (phase === "steady") {
-      return { phase, arrivalEvery: 6, patience: 21, minScoops: 2, maxScoops: 3, swing: 3.9 };
-    }
-    return { phase, arrivalEvery: 5, patience: 18, minScoops: 3, maxScoops: 4, swing: 4.7 };
-  }
-  if (phase === "opening") {
-    return { phase, arrivalEvery: 10, patience: 34, minScoops: 0, maxScoops: 1, swing: 2.4 };
-  }
-  if (phase === "steady") {
-    return { phase, arrivalEvery: 8, patience: 30, minScoops: 1, maxScoops: 2, swing: 3.0 };
-  }
-  return { phase, arrivalEvery: 6.5, patience: 26, minScoops: 2, maxScoops: 3, swing: 3.6 };
+  const [opening, steady, rush] = expert ? PACES.expert : PACES.normal;
+  const now = phase === "opening" ? opening : phase === "steady" ? steady : rush;
+  return {
+    phase,
+    arrivalEvery: alongShift(elapsed, opening.arrivalEvery, steady.arrivalEvery, rush.arrivalEvery),
+    patience: alongShift(elapsed, opening.patience, steady.patience, rush.patience),
+    minScoops: now.minScoops,
+    maxScoops: now.maxScoops,
+    swing: alongShift(elapsed, opening.swing, steady.swing, rush.swing),
+  };
 }
 
 /** An empty counter (nobody on the line, no cup in progress) refills this fast. */
@@ -253,18 +287,24 @@ export function pickRegular(exclude, random = Math.random) {
   return pick(free.length ? free : REGULARS, random);
 }
 
+/** The first orders of a normal shift come with no toppings, so the ladle comes in once the rest is going. */
+export const PLAIN_ORDERS = 2;
+
 /**
  * A random drink for this point in the shift, with a regular's usual order
  * laid over the top of it. The critic always orders the most toppings the
  * phase allows, to see how the place holds up. In expert a loaded drink is
- * more often split across two jars.
+ * more often split across two jars. In a normal shift the first
+ * PLAIN_ORDERS drinks (`number` counts orders from 0) have no toppings,
+ * whatever the regular usually has.
  * @param {number} elapsed
  * @param {Regular | null} [regular]
  * @param {() => number} [random]
  * @param {boolean} [expert]
+ * @param {number} [number] the order's place in the shift, from 0
  * @returns {Order}
  */
-export function makeOrder(elapsed, regular = null, random = Math.random, expert = false) {
+export function makeOrder(elapsed, regular = null, random = Math.random, expert = false, number = Infinity) {
   const { minScoops, maxScoops } = paceForElapsed(elapsed, expert);
   const tea = pick(TEAS, random);
   const ice = pick(ICE, random);
@@ -291,11 +331,12 @@ export function makeOrder(elapsed, regular = null, random = Math.random, expert 
   }
 
   const usual = regular?.order;
+  const plain = !expert && number < PLAIN_ORDERS;
   return {
     tea: usual?.tea ?? tea,
     sugar: usual?.sugar ?? sugar,
     ice: usual?.ice ?? ice,
-    toppings: usual?.toppings ? usual.toppings.map((line) => ({ ...line })) : toppings,
+    toppings: plain ? [] : usual?.toppings ? usual.toppings.map((line) => ({ ...line })) : toppings,
   };
 }
 
@@ -330,21 +371,31 @@ export function activePatienceRate(expert = false) {
 }
 
 /**
- * The stations this drink visits, in order. Ice goes in first, cube by cube,
- * then the syrup, pump by pump, unless the order wants none of either; a
- * drink without toppings skips the ladle.
+ * The stations this drink visits, in order. The syrup goes in first, pump
+ * by pump, at the bottle; then the cup moves under its tea's tap once, for
+ * the ice cube by cube and the pour. A drink that wants no syrup or no ice
+ * skips that station; one without toppings skips the ladle.
  * @param {Order} order
  * @returns {Station[]}
  */
 export function stationsFor(order) {
   /** @type {Station[]} */
   const list = [];
-  if (ICE_CUBES[order.ice] > 0) list.push("ice");
   if (sugarPumps(order.sugar) > 0) list.push("sugar");
+  if (ICE_CUBES[order.ice] > 0) list.push("ice");
   list.push("pour");
   if (totalScoops(order) > 0) list.push("scoop");
   list.push("shake", "seal");
   return list;
+}
+
+/**
+ * The tap a drink's tea pours from: where the cup goes when its ticket is
+ * taken, so Space pours the right tea unless the player moves it.
+ * @param {Order} order
+ */
+export function tapFor(order) {
+  return TEAS.indexOf(order.tea);
 }
 
 /**
@@ -555,6 +606,13 @@ export function shakeGrade(seconds, expert = false) {
 
 // --- Seal: stamp while the sealer is hot enough --------------------------------
 
+/**
+ * From the stamp to the hand-off: the drink is served (scored, tipped, the
+ * line cheered, the bench free) this long after it is sealed, however it is
+ * drawn going over, in every mode.
+ */
+export const HAND_OFF_SECONDS = 0.7;
+
 /** Seconds for the needle to rise and fall once (expert: RULES.expert.sealPeriod). */
 export const SEAL_PERIOD = RULES.normal.sealPeriod;
 /** The good part of the gauge, 0 cold to 1 scorching (expert: narrower). */
@@ -698,17 +756,20 @@ export function sampleTarget(guests, exceptId = null) {
 export const CRITIC = { name: "the critic", tag: "writes for the weekly", quirk: "critic" };
 /** The first guest at or after this many seconds is the critic, once a shift (twice in expert). */
 export const CRITIC_AT = RULES.normal.critics[0];
+/** The critic waits until this many drinks have been served, so they never come before the counter is going. */
+export const CRITIC_AFTER = 3;
 
 /**
  * Whether the next guest through the door is the critic.
  * @param {number} elapsed
  * @param {boolean | number} seen how many times the critic has come in this shift (true is once)
  * @param {boolean} [expert]
+ * @param {number} [served] drinks served so far this shift
  */
-export function criticDue(elapsed, seen, expert = false) {
+export function criticDue(elapsed, seen, expert = false, served = Infinity) {
   const count = typeof seen === "number" ? seen : seen ? 1 : 0;
   const at = rulesFor(expert).critics[count];
-  return at !== undefined && elapsed >= at;
+  return at !== undefined && elapsed >= at && served >= CRITIC_AFTER;
 }
 
 /** Extra points for serving the day's special tea. */
@@ -876,8 +937,10 @@ export function cheer(left, patience, expert = false) {
 
 /** Below this share of patience a guest starts glancing at the clock. */
 export const GLANCE_AT = 0.6;
-/** Below this they are cross, and their ticket earns the slab. */
+/** Below this they are cross, and their ticket earns the slab (and says "leaving"). */
 export const CROSS_AT = 0.3;
+/** Below this they are about to go: the ticket's slab jitters. */
+export const RUSH_AT = 0.25;
 /** Served with at least this share of patience left is served fast. */
 export const FAST_SERVE = 0.8;
 

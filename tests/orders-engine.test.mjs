@@ -44,6 +44,11 @@ import {
   comboFor,
   comboProgress,
   criticDue,
+  CRITIC_AFTER,
+  PACE_KEYS,
+  PLAIN_ORDERS,
+  RUSH_AT,
+  tapFor,
   drawFromTank,
   fillJar,
   gradeDrink,
@@ -129,22 +134,59 @@ test("the shift moves from opening to steady to rush", () => {
 });
 
 test("each phase has its pace, and the pace climbs", () => {
-  assert.deepEqual(paceForElapsed(0), {
+  // Each phase's pace holds in full at its key, the middle of its stretch.
+  assert.deepEqual(PACE_KEYS, [15, 55, 100]);
+  assert.deepEqual(paceForElapsed(PACE_KEYS[0]), {
     phase: "opening", arrivalEvery: 10, patience: 34, minScoops: 0, maxScoops: 1, swing: 2.4,
   });
-  assert.deepEqual(paceForElapsed(30), {
-    phase: "steady", arrivalEvery: 8, patience: 30, minScoops: 1, maxScoops: 2, swing: 3.0,
-  });
-  assert.deepEqual(paceForElapsed(80), {
+  const steady = paceForElapsed(PACE_KEYS[1]);
+  assert.equal(steady.phase, "steady");
+  assert.equal(steady.arrivalEvery, 8);
+  assert.equal(steady.patience, 30);
+  assert.ok(near(steady.swing, 3.0));
+  assert.deepEqual([steady.minScoops, steady.maxScoops], [1, 2]);
+  assert.deepEqual(paceForElapsed(PACE_KEYS[2]), {
     phase: "rush", arrivalEvery: 6.5, patience: 26, minScoops: 2, maxScoops: 3, swing: 3.6,
   });
-  const paces = [0, 30, 80].map(paceForElapsed);
+  // The shift opens and ends where it always did.
+  for (const expert of [false, true]) {
+    assert.deepEqual(paceForElapsed(0, expert), paceForElapsed(PACE_KEYS[0], expert));
+    assert.deepEqual(paceForElapsed(SHIFT_SECONDS, expert), paceForElapsed(PACE_KEYS[2], expert));
+  }
+  const paces = PACE_KEYS.map((at) => paceForElapsed(at));
   for (let i = 1; i < paces.length; i++) {
     assert.ok(paces[i].arrivalEvery < paces[i - 1].arrivalEvery, "arrivals quicken");
     assert.ok(paces[i].patience < paces[i - 1].patience, "patience shortens");
     assert.ok(paces[i].swing > paces[i - 1].swing, "the ladle speeds up");
     assert.ok(paces[i].maxScoops > paces[i - 1].maxScoops);
   }
+});
+
+test("the pace climbs smoothly, never jumping, and never eases off", () => {
+  for (const expert of [false, true]) {
+    let last = paceForElapsed(0, expert);
+    for (let t = 0.1; t <= SHIFT_SECONDS + 1e-9; t += 0.1) {
+      const now = paceForElapsed(t, expert);
+      // A tenth of a second never moves arrivals or patience by more than a few hundredths of a second.
+      assert.ok(Math.abs(now.arrivalEvery - last.arrivalEvery) < 0.01, `arrivals jump at ${t.toFixed(1)}`);
+      assert.ok(Math.abs(now.patience - last.patience) < 0.02, `patience jumps at ${t.toFixed(1)}`);
+      assert.ok(Math.abs(now.swing - last.swing) < 0.01, `the swing jumps at ${t.toFixed(1)}`);
+      assert.ok(now.arrivalEvery <= last.arrivalEvery + 1e-9 && now.patience <= last.patience + 1e-9 && now.swing >= last.swing - 1e-9);
+      last = now;
+    }
+  }
+  // Over the shift it asks about what the stepped phases did: the average
+  // arrival gap and patience stay within half a second of them.
+  const stepped = (t) => (t < 30 ? [10, 34] : t < 80 ? [8, 30] : [6.5, 26]);
+  let gap = 0;
+  let wait = 0;
+  for (let t = 0; t < SHIFT_SECONDS; t += 0.1) {
+    const now = paceForElapsed(t);
+    gap += (now.arrivalEvery - stepped(t)[0]) * 0.1;
+    wait += (now.patience - stepped(t)[1]) * 0.1;
+  }
+  assert.ok(Math.abs(gap / SHIFT_SECONDS) < 0.5, `arrival gap off by ${(gap / SHIFT_SECONDS).toFixed(2)} s on average`);
+  assert.ok(Math.abs(wait / SHIFT_SECONDS) < 0.5, `patience off by ${(wait / SHIFT_SECONDS).toFixed(2)} s on average`);
 });
 
 test("guests arrive on the pace, and an empty counter refills quickly", () => {
@@ -301,13 +343,14 @@ test("a regular's usual order overrides what it names", () => {
 test("patience grows with scoops and bends to quirks", () => {
   const order = { tea: "milk", sugar: 50, ice: "less", toppings: [{ kind: "pearls", scoops: 2 }] };
   assert.equal(patienceFor(order, plain, 0), 40);
-  assert.equal(patienceFor(order, null, 80), 32);
+  // The pace holds each phase's patience at its key (the middle of the phase).
+  assert.equal(patienceFor(order, null, PACE_KEYS[2]), 32);
   assert.ok(near(patienceFor(order, byName("tofu"), 0), 40 * 0.7));
   assert.ok(near(patienceFor(order, byName("mochi"), 0), 40 * 1.4));
   assert.equal(patienceFor(order, byName("clementine"), 0), 40);
-  assert.equal(patienceFor({ ...order, toppings: [] }, plain, 30), 30);
+  assert.equal(patienceFor({ ...order, toppings: [] }, plain, PACE_KEYS[1]), 30);
   assert.ok(near(patienceFor(order, CRITIC, 0), 40 * 0.9));
-  assert.ok(near(patienceFor(order, CRITIC, 80), 32 * 0.9));
+  assert.ok(near(patienceFor(order, CRITIC, PACE_KEYS[2]), 32 * 0.9));
 });
 
 test("stations skip the ladle for a plain drink, and scoops queue one by one", () => {
@@ -320,7 +363,7 @@ test("stations skip the ladle for a plain drink, and scoops queue one by one", (
   };
   assert.deepEqual(stationsFor(plainDrink), ["pour", "shake", "seal"]);
   assert.deepEqual(stationsFor(loaded), ["pour", "scoop", "shake", "seal"]);
-  // Ice comes first whenever the order has any.
+  // Ice comes before the pour whenever the order has any.
   assert.deepEqual(stationsFor({ ...plainDrink, ice: "less" }), ["ice", "pour", "shake", "seal"]);
   assert.deepEqual(stationsFor({ ...loaded, ice: "extra" }), ["ice", "pour", "scoop", "shake", "seal"]);
   assert.deepEqual(scoopQueue(plainDrink), []);
@@ -803,6 +846,37 @@ test("the critic is due once, from forty seconds in", () => {
   assert.equal(criticDue(40, false), true);
   assert.equal(criticDue(100, false), true);
   assert.equal(criticDue(100, true), false);
+  // Never before the counter is going: three drinks served first.
+  assert.equal(CRITIC_AFTER, 3);
+  assert.equal(criticDue(60, 0, false, 2), false);
+  assert.equal(criticDue(60, 0, false, 3), true);
+  assert.equal(criticDue(110, 1, true, 2), false);
+  assert.equal(criticDue(110, 1, true, 5), true);
+});
+
+test("the first two orders of a normal shift come with no toppings", () => {
+  assert.equal(PLAIN_ORDERS, 2);
+  for (const seed of SEEDS) {
+    const random = seeded(seed);
+    for (let number = 0; number < 40; number++) {
+      for (const regular of [null, byName("biscuit"), byName("kiwi")]) {
+        const order = makeOrder(0, regular, random, false, number);
+        if (number < PLAIN_ORDERS) assert.deepEqual(order.toppings, [], `order ${number}`);
+      }
+    }
+  }
+  // Regulars keep the rest of their usual; expert opens loaded as ever.
+  assert.equal(makeOrder(0, byName("biscuit"), seeded(1), false, 0).toppings.length, 0);
+  assert.equal(makeOrder(0, byName("biscuit"), seeded(1), false, 2).toppings[0].scoops, 2);
+  assert.ok(totalScoops(makeOrder(0, null, seeded(1), true, 0)) >= 1);
+});
+
+test("a guest about to leave reads in steps: glancing, cross and leaving, then rushing", () => {
+  assert.ok(GLANCE_AT > CROSS_AT && CROSS_AT > RUSH_AT && RUSH_AT > 0);
+});
+
+test("the cup goes under its tea's tap", () => {
+  for (const tea of TEAS) assert.equal(TEAS[tapFor({ tea, sugar: 0, ice: "none", toppings: [] })], tea);
 });
 
 test("the critic always orders the phase's most toppings", () => {
@@ -993,7 +1067,8 @@ test("every order has a sugar level, and the syrup station only when there is so
     }
     assert.equal(seen.size, SUGARS.length);
   }
-  assert.deepEqual(stationsFor({ tea: "milk", sugar: 75, ice: "regular", toppings: [] }), ["ice", "sugar", "pour", "shake", "seal"]);
+  // The syrup first, at the bottle; then the ice and the pour, both under the tea's tap.
+  assert.deepEqual(stationsFor({ tea: "milk", sugar: 75, ice: "regular", toppings: [] }), ["sugar", "ice", "pour", "shake", "seal"]);
   assert.deepEqual(stationsFor({ tea: "milk", sugar: 0, ice: "none", toppings: [] }), ["pour", "shake", "seal"]);
   // Regulars keep their sweet tooth.
   assert.equal(makeOrder(0, byName("basil"), seeded(2)).sugar, 0);

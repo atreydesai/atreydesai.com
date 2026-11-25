@@ -5,7 +5,6 @@
   import { get } from "svelte/store";
 
   import {
-    setDemoPourStream,
     setMusicPaused,
     setMusicPhase,
     setPourStream,
@@ -40,10 +39,11 @@
     BREW_SECONDS,
     CRITIC,
     CROSS_AT,
+    RUSH_AT,
     FILL_LINE,
+    HAND_OFF_SECONDS,
     ICE_CUBES,
     ICE_MAX,
-    JAR_SIZE,
     LIVES,
     POUR_MAX,
     SHAKES_NEEDED,
@@ -82,6 +82,7 @@
     sampleBoost,
     sampleTarget,
     samplesFor,
+    tapFor,
     scoopQueue,
     scoopResult,
     sealGrade,
@@ -110,31 +111,25 @@
     Topping,
     WaitMood,
   } from "#lib/arcade/orders-engine.js";
-  import { Crowd, type CrowdState } from "#lib/arcade/orders-crowd.ts";
-  import { FIGURE_W, JAR_W } from "#lib/arcade/orders-guests.js";
-  import { GLYPHS, GLYPH_ROWS, ICONS, wordWidth } from "#lib/arcade/orders-labels.js";
+  import { Crowd } from "#lib/arcade/orders-crowd.ts";
+  import { botAct, createBot, type BotView } from "#lib/arcade/orders-bot.js";
+  import { TURN_FRAMES, TURN_FROM, drinkGrid, toppingKey, turnIndex, turnShare } from "#lib/arcade/orders-drink.js";
+  import { FIGURE_W, JAR_H, JAR_W } from "#lib/arcade/orders-guests.js";
+  import { GLYPHS, GLYPH_ROWS, ICONS, TEA_WORDS, wordWidth } from "#lib/arcade/orders-labels.js";
+  import { CARD_STEPS, STATION_LESSON, followLessons, lessonMemory, type LessonView, type Target } from "#lib/arcade/orders-lessons.js";
+  import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
+  import { hexToRgb, mixHex, mixRgb, type RGB } from "#lib/arcade/core/color.ts";
+  import { bayer } from "#lib/arcade/core/dither.ts";
+  import { beckon, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { createFrameLoop, every } from "#lib/arcade/core/loop.ts";
+  import { clamp, damp, lerp, smooth } from "#lib/arcade/core/math.ts";
   import {
-    DEMO_DROP_WITHIN,
-    DEMO_JAR_START,
-    DEMO_ORDER,
-    DEMO_PATIENCE,
-    DEMO_PRESS_SECONDS,
-    DEMO_REGULAR,
-    DEMO_SCRIPT,
-    DEMO_SEAL_AIM,
-    DEMO_SEAL_WITHIN,
-    DEMO_START_JAR,
-    DEMO_START_TAP,
-    demoIceCubes,
-    demoPourTarget,
-    demoSugarPumps,
-    reachedTarget,
-  } from "#lib/arcade/orders-demo.js";
-  import type { DemoStep } from "#lib/arcade/orders-demo.js";
-  import {
+    ACCENT,
+    CREAM,
     INK,
     LID,
     MENU_ICONS,
+    NOTE_GOLD,
     PEARL,
     STRAW_PINK,
     addParticle,
@@ -152,15 +147,14 @@
     type Particle,
     type Popup,
   } from "#lib/arcade/art.ts";
-  import { demoIntro, firstVisit } from "#lib/arcade/scores.ts";
   import { emojiRows } from "#lib/arcade/share.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
-  import { arcadeExpert, takeDemoRequest } from "#lib/boba.ts";
+  import { arcadeExpert } from "#lib/boba.ts";
   import Mark from "#lib/components/Mark.svelte";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import Coach from "./Coach.svelte";
   import Countdown from "./Countdown.svelte";
   import CupTimer from "./CupTimer.svelte";
-  import DemoCard from "./DemoCard.svelte";
   import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
   import PauseCard from "./PauseCard.svelte";
@@ -168,16 +162,18 @@
   import ResultsSlip from "./ResultsSlip.svelte";
 
   // Order up: regulars walk up and hang a ticket on the rail, each with a
-  // drink in mind. Take a ticket, then work the bench by hand: drop in the
-  // ice cube by cube and pour to the line, pick each topping's jar and drop
-  // it from a swinging ladle, shake it, and stamp the seal while the sealer
-  // is hot. Around that, tanks run dry and brew, samples buy a guest time,
+  // drink in mind. Take a ticket (its card pins under the cup), then work
+  // the bench by hand: pump the syrup, drop in the ice cube by cube and pour
+  // to the line, drop each topping from a swinging ladle, shake it, and
+  // stamp the seal while the sealer is hot. Around that, tanks run dry and brew, samples buy a guest time,
   // the critic visits, and one tea is the special. Serving well climbs a
   // combo, fills the tip jar, and cheers the line. Every rule, number and
   // grade lives in orders-engine.js; the guests' art in orders-guests.js and
   // their walk in orders-crowd.ts; this file steps it, draws the bench, and
-  // wires it to the arcade. The demo (orders-demo.js) plays one drink
-  // through the same functions.
+  // wires it to the arcade. The shift teaches itself as it is played: the
+  // first drink on a device is walked through station by station, and later
+  // things are named as they first matter (orders-lessons.js says what and
+  // when; the shared coach shows one line at a time).
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
@@ -227,14 +223,6 @@
     critic: "critic",
   };
 
-  const PROMPTS: Record<Station, string> = {
-    ice: "add ice until the cup's marks are full",
-    sugar: "pump syrup until the bottle's marks are full",
-    pour: "hold to pour, let go at the line",
-    scoop: "pick the jar, drop when the ladle is over the cup",
-    shake: "shake",
-    seal: "stamp when the needle is in the band",
-  };
   const HAND_LABELS: Record<Station, string> = {
     ice: "Add ice",
     sugar: "Pump syrup",
@@ -259,8 +247,6 @@
   const ICE_ARC_SECONDS = 0.28;
   /** Once the last cube the ticket wants has landed, this beat, then the pour. */
   const ICE_SETTLE = 0.12;
-  /** From the stamp to the serve. */
-  const SEAL_SECONDS = 0.7;
   /** Within the seal, from the stamp: the plate lands, the straw pops, the cup hops off. */
   const PRESS_LANDS = 0.24;
   const PRESS_LIFTS = 0.34;
@@ -269,11 +255,14 @@
   const STRAW_UP = 0.42;
   const HOP_START = 0.46;
   const RECEIPT_SECONDS = 2.4;
-  const DUMP_LOCKOUT = 0.4;
   const NOTICE_SECONDS = 1.8;
   const RECENT_NAMES = 6;
   /** A drink graded this or better is perfect. */
   const PERFECT = 95;
+  /** A taught station counts as learned at this grade or better ("fine"); below it, the next drink teaches it again. */
+  const LESSON_PASS = 55;
+  /** The receipt stays this much longer while a lesson is about it. */
+  const RECEIPT_LESSON_SECONDS = 1.4;
 
   // --- Pixel art ----------------------------------------------------------------
 
@@ -353,7 +342,7 @@
   ];
   /** A small star for the critic and the day's special. */
   const STAR = ["..O..", "OOOOO", ".OOO.", ".O.O."];
-  /** Light on any page, so dark pearls read against the night theme too. */
+  /** Light on any page, so dark pearls read against the night theme too. A shade more opaque than art.ts's HALO (0.8), as the bench has always been drawn. */
   const HALO = "rgba(253, 248, 243, 0.85)";
 
   // Each topping: a 5×3 heaped scoop (ladle, fall, pile, jars) and a 3×2
@@ -491,6 +480,8 @@
     sealed: boolean;
     /** The perfect-drink burst has been decided for this cup. */
     burst: boolean;
+    /** A perfect drink, turning once on the counter as it is handed over. */
+    turning: boolean;
   }
 
   /** A cube of ice on its way from the bin to the cup. */
@@ -529,6 +520,8 @@
 
   interface Receipt {
     id: number;
+    /** Where the guest stood, in bench px: the slip rises over them. */
+    x: number;
     name: string;
     sentBack: boolean;
     rows: Array<{ label: string; word: string }>;
@@ -544,7 +537,7 @@
   }
 
   interface Step {
-    id: string;
+    id: Station;
     label: string;
     state: "todo" | "current" | "done";
     word: string;
@@ -552,7 +545,7 @@
 
   // --- State -----------------------------------------------------------------
 
-  /** Expert mode, read once as the game opens (the switch lives on the menu). The demo always plays normal. */
+  /** Expert mode, read once as the game opens (the switch lives on the menu). */
   const expert = get(arcadeExpert);
   const ticketCap = maxTickets(expert);
   const sampleCap = samplesFor(expert);
@@ -593,8 +586,6 @@
   /** How each guest left, in order, for the share. */
   let history: Reaction[] = [];
   let shareLines: string[] = [];
-  /** The first time here: asked whether to watch the demo before the countdown. */
-  let askFirst = false;
   let liveMessage = "Order up starting";
   let localBest = 0;
   let newBest = false;
@@ -607,18 +598,21 @@
   let benchArt: HTMLElement;
   let canvas: HTMLCanvasElement;
   let tapEls: HTMLButtonElement[] = [];
+  /** Each tap's Brew chip, while its tank wants brewing. */
+  let brewEls: Array<HTMLButtonElement | null> = [];
   let iceEl: HTMLButtonElement;
+  let sampleEl: HTMLButtonElement;
+  let receiptEl: HTMLElement | null = null;
+  let cardEl: HTMLElement;
+  let streakEl: HTMLElement | null = null;
   let ctx: CanvasRenderingContext2D | null = null;
-  let firstCard: HTMLElement;
-  let demoBar: HTMLElement;
-  let skipButton: HTMLButtonElement;
-  let endCard: HTMLElement;
-  let endButton: HTMLButtonElement;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
   let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
   let reduceMotion = false;
   let small = false;
+  /** A touch device: lessons name the gesture and light the pad, not a key. */
+  let touchUI = false;
 
   // The bench, in CSS px.
   let W = 0;
@@ -643,9 +637,9 @@
   let arrivalTimer = 0;
   /** Seconds until the next guest walks in; see nextArrivalIn. */
   let arrivalIn = Infinity;
-  let guestRefresh = 0;
-  let takeLockUntil = 0;
   let nextId = 1;
+  /** Orders taken this shift, so the first few can come plain. */
+  let ordersMade = 0;
   let receiptId = 0;
   let recent: string[] = [];
   /** Things the cup in progress waits for, in game time. Cleared with the cup. */
@@ -679,62 +673,89 @@
     coin: (count) => sfxCoin(count),
     full: () => {
       sfxTipJar();
-      crowd.note(demoOn ? "jar full" : `jar +${jarPayout(1, LIVES).points}`);
+      crowd.note(`jar +${jarPayout(1, LIVES).points}`);
     },
   });
 
-  // --- The demo ---------------------------------------------------------------
-  // It plays on the same bench and line as the shift. Opening it sets the
-  // shift's state aside (`shelved`) and lays a fresh one in its place;
-  // closing it puts the shift back exactly as it was. Score, pearls and
-  // stats are never touched while it plays.
+  // --- Lessons ----------------------------------------------------------------
+  // The shift teaches itself (orders-lessons.js says what and when; the
+  // coach shows one line at a time and remembers it on the device). While a
+  // station is taught the guests' patience and arrivals slow to WALK_SLOW;
+  // the bench never slows, so every station is learned at its real speed.
 
-  interface Shelved {
-    guests: Guest[];
-    making: Cup | null;
-    tapIndex: number;
-    jarIndex: number;
-    tanks: number[];
-    brewEnds: number[];
-    receipt: Receipt | null;
-    notice: { text: string; until: number } | null;
-    clock: number;
-    takeLockUntil: number;
-    beats: Array<{ at: number; run: () => void }>;
-    falling: Falling[];
-    particles: Particle[];
-    popups: Popup[];
-    iceArcs: IceArc[];
-    cupX: number;
-    wobble: number;
-    crowd: CrowdState;
-    flights: Flight[];
-  }
+  const coach = createCoach("orders");
+  /** The lesson on screen and what it points at, and any station's lesson standing down for this drink. */
+  const lessons = lessonMemory();
+  /** The coach's lesson and whether it's fading (done, and up long enough to read), copied out so the page follows them. */
+  let coachLesson: Lesson | null = null;
+  let coachLeaving = false;
+  /** The explanation is still up (not done, not acted on): a line that holds shows Continue only then. */
+  let coachOpen = false;
+  let coachX: number | null = null;
+  let coachY: number | null = null;
+  let coachRing = 0;
+  /** Half the width of a wide target (a ticket, a machine, the shake marks), so the loop stretches round it rather than growing tall. */
+  let coachWidth = 0;
+  let coachSide: "above" | "below" | "left" | "right" = "below";
+  let coachScene: "dark" | "light" = "light";
+  /** On touch, the pad the lesson is about lights up: the hand, or the Sample button. */
+  let handLit = false;
+  let sampleLit = false;
+  /** How dim the shop is around a lesson, 0..1, eased in real time (at once under Reduce Motion). */
+  let lessonDim = 0;
+  /** The page's own pieces dim with the shop (a class); these stay lit for the lesson they are about. */
+  let dimOthers = false;
+  let litTicket = -1;
+  let litCard = false;
+  let litHand = false;
+  let litSample = false;
+  let litReceipt = false;
+  /** The tea machine the lesson is about (its Brew chip and special star stay lit), or -1. */
+  let litTap = -1;
+  let litLess = false;
+  /** The bench clock when the shift began, and how long "go" stays up before anything is taught. */
+  let begunAt = 0;
+  const GO_SECONDS = 0.62;
+  /** Real seconds the lessons have been on screen (stops when paused): drives the ghosts. */
+  let lessonClock = 0;
+  /** The counter as the lessons read it, updated in place each frame. */
+  const lessonView: LessonView = {
+    coarse: false,
+    tapIndex: 0,
+    jarIndex: 0,
+    holding: false,
+    loaded: false,
+    cup: null,
+    guests: [],
+    tanks: [],
+    brewEnds: [],
+    samplesLeft: 0,
+    special: "milk",
+    jar: 0,
+    receipt: null,
+  };
+  /** Where the lesson's DOM target sits on screen, read when it is offered and about ten times a second. */
+  let anchorBox: DOMRect | null = null;
+  /** The bench canvas on screen, for targets drawn on it. */
+  let benchBox: DOMRect | null = null;
+  /** The rail of tickets on screen: a lesson's slip never sits over it. */
+  let railBox: DOMRect | null = null;
+  /** How far down the slip must sit: under the HUD, or under the whole rail for a ticket's lesson. */
+  let coachTop = 72;
+  const refreshTick = every(0.1);
 
-  /** True from opening the demo until it is closed, end card included. */
-  let demoOn = false;
-  /** The end card is up. */
-  let demoEnd = false;
-  /** Opened in the middle of a shift (rather than before one). */
-  let demoMidShift = false;
-  let shelved: Shelved | null = null;
-  let demoCaption = "";
-  /** The control the script is pressing, so it shows pressed. */
-  let demoPress = "";
-  let demoPressUntil = 0;
-  let demoIndex = 0;
-  let demoWait = 0;
-  /** The step in progress: stepped each frame until it says it is done. */
-  let demoTask: ((dt: number) => boolean) | null = null;
-
-  let last = 0;
-  let raf = 0;
-  let active = true;
   const timers = createTimers();
+  const loop = createFrameLoop({
+    update: (dt, rawDt) => advance(dt, rawDt),
+    draw: () => {
+      drawRoom();
+      draw();
+      placeCoach();
+    },
+    isPaused: () => paused,
+  });
 
-  const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-  /** A stable 0–1 value per integer, so seeded marks never shimmer. */
+  /** A stable 0–1 value per integer, so seeded marks never shimmer. (Not core's hash: the room is seeded by this one.) */
   const hash = (n: number) => {
     const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
     return s - Math.floor(s);
@@ -745,9 +766,8 @@
 
   // --- Derived for the template ---------------------------------------------------
 
-  // The hand and the ice follow the bench, demo included; the player's own
-  // input is shut out of the demo in the handlers instead. With nothing on
-  // the bench the hand takes the next ticket: whoever is closest to leaving.
+  // The hand and the ice follow the bench. With nothing on the bench the
+  // hand takes the next ticket: whoever is closest to leaving.
   $: handLive = making ? !(making.station === "seal" && making.stampAt !== null) : guests.length > 0;
   $: handLabel = making ? HAND_LABELS[making.station] : "Next ticket";
   $: combo = comboProgress(streak, expert);
@@ -756,12 +776,13 @@
   $: sugarTarget = making ? sugarPumps(making.order.sugar) : 0;
   $: syrupOpen = sugarAdjustable(making);
   $: steps = stepsFor(making);
-  // In the demo the caption above the bench says it instead.
-  $: prompt = demoOn ? "" : notice ? notice.text : making ? PROMPTS[making.station] : "";
+  /** The guest whose drink is on the bench, and how much patience they have left (refreshed with the line). */
+  $: makingGuest = making ? (guests.find((guest) => guest.id === making?.guestId) ?? null) : null;
+  $: makingShare = makingGuest ? clamp(makingGuest.left / makingGuest.patience, 0, 1) : 1;
   $: averageGrade = served ? Math.round(gradeTotal / served) : 0;
   /** Anyone else on the line to hand a sample to; whether they need it is checked on the press. */
   $: sampleAnyone = mostImpatient(guests, making?.guestId ?? null);
-  $: canSample = !demoOn && running && !paused && !gameOver && samplesLeft > 0 && sampleAnyone >= 0;
+  $: canSample = running && !paused && !gameOver && samplesLeft > 0 && sampleAnyone >= 0;
   $: iceCount = making?.ice ?? 0;
   $: iceOpen = iceAdjustable(making);
   $: tankStates = tanks.map((tank) => tankState(tank));
@@ -772,11 +793,6 @@
   function refreshTanks() {
     tanks = tanks;
     brewing = brewEnds.map((end) => (end > 0 ? clamp(1 - (end - clock) / BREW_SECONDS, 0, 1) : -1));
-  }
-
-  /** The demo plays by normal rules; the shift by the mode it was opened in. */
-  function hard() {
-    return expert && !demoOn;
   }
 
   /** The stations before the tea: pressing a tap there moves straight on to the pour. */
@@ -793,7 +809,7 @@
     );
   }
 
-  /** Syrup goes in at its own station; it can't come back out. */
+  /** Syrup goes in (and the last pump can come back out) at its own station, under the bottle. */
   function sugarAdjustable(cup: Cup | null) {
     return !!cup && cup.station === "sugar" && !cup.busy;
   }
@@ -819,38 +835,49 @@
     return Math.round(cup.drops.reduce((total, grade) => total + grade, 0) / Math.max(1, cup.drops.length));
   }
 
-  /** The stepper: a step is done once its grade is known, and the first undone is current. */
+  /** The card's lines before any ticket is taken, dimmed: the stations a drink goes through. */
+  const IDLE_STEPS: Step[] = (["sugar", "ice", "pour", "scoop", "shake", "seal"] as Station[]).map((id) => ({
+    id,
+    label: id === "sugar" ? "syrup" : id === "pour" ? "tea" : id === "scoop" ? "scoops" : id,
+    state: "todo",
+    word: "",
+  }));
+
+  /**
+   * The making card's lines: the drink's stations in the order it is built,
+   * the one the cup is at current, those behind it done with their grade.
+   */
   function stepsFor(cup: Cup | null): Step[] {
-    if (!cup) {
-      return ["ice", "sugar", "pour", "scoop", "shake", "seal", "serve"].map((label): Step => ({ id: label, label, state: "todo", word: "" }));
-    }
-    const list: Step[] = [];
-    const past = (station: Station) => cup.stations.indexOf(cup.station) > cup.stations.indexOf(station);
-    if (cup.stations.includes("ice")) {
-      const word = cup.station === "ice" ? "" : gradeWord(iceGrade(cup.ice, cup.order.ice, hard()));
-      list.push({ id: "ice", label: "ice", state: "todo", word });
-    }
-    if (cup.stations.includes("sugar")) {
-      const word = past("sugar") ? gradeWord(sugarGrade(cup.sugar, cup.order.sugar, hard())) : "";
-      list.push({ id: "sugar", label: "sugar", state: "todo", word });
-    }
-    list.push({ id: "pour", label: "pour", state: "todo", word: cup.pourGrade === null ? "" : gradeWord(cup.pourGrade) });
-    if (cup.stations.includes("scoop")) {
-      const done = cup.drops.length === cup.queue.length;
-      list.push({ id: "scoop", label: "scoop", state: "todo", word: done ? gradeWord(scoopAverage(cup)) : "" });
-    }
-    list.push({ id: "shake", label: "shake", state: "todo", word: cup.shakeSeconds === null ? "" : gradeWord(shakeGrade(cup.shakeSeconds, hard())) });
-    list.push({ id: "seal", label: "seal", state: "todo", word: cup.sealValue === null ? "" : SEAL_WORDS[sealResult(cup.sealValue, hard())] });
-    list.push({ id: "serve", label: "serve", state: "todo", word: "" });
-    let current = false;
-    for (const step of list) {
-      if (step.word) step.state = "done";
-      else if (!current) {
-        step.state = "current";
-        current = true;
+    if (!cup) return IDLE_STEPS;
+    const at = cup.stations.indexOf(cup.station);
+    const sealed = cup.sealValue !== null;
+    return cup.stations.map((id, index): Step => {
+      const state = sealed || index < at ? "done" : index === at ? "current" : "todo";
+      let word = "";
+      if (state === "done") {
+        if (id === "sugar") word = gradeWord(sugarGrade(cup.sugar, cup.order.sugar, expert));
+        else if (id === "ice") word = gradeWord(iceGrade(cup.ice, cup.order.ice, expert));
+        else if (id === "pour" && cup.pourGrade !== null) word = gradeWord(cup.pourGrade);
+        else if (id === "scoop") word = gradeWord(scoopAverage(cup));
+        else if (id === "shake" && cup.shakeSeconds !== null) word = gradeWord(shakeGrade(cup.shakeSeconds, expert));
+        else if (id === "seal" && cup.sealValue !== null) word = SEAL_WORDS[sealResult(cup.sealValue, expert)];
       }
+      const label = id === "sugar" ? "syrup" : id === "pour" ? TEA_WORDS[cup.order.tea] : id === "scoop" ? "scoops" : id;
+      return { id, label, state, word };
+    });
+  }
+
+  /** What a card line holds, in words, for a screen reader (the marks say it to the eye). */
+  function stepAmount(cup: Cup, id: Station) {
+    if (id === "sugar") return `, ${cup.sugar} of ${sugarPumps(cup.order.sugar)} pumps`;
+    if (id === "ice") return `, ${cup.ice} of ${ICE_CUBES[cup.order.ice]} cubes`;
+    if (id === "pour") return `, ${TEA_NAMES[cup.order.tea]}`;
+    if (id === "scoop") {
+      const wanted = cup.order.toppings.map((line) => `${line.scoops} ${TOPPING_NAMES[line.kind]}`).join(" and ");
+      return `, ${wanted}, ${cup.drops.length} of ${cup.queue.length} in`;
     }
-    return list;
+    if (id === "shake") return `, ${cup.shakes} of ${SHAKES_NEEDED} shakes`;
+    return "";
   }
 
   function describeOrder(order: Order) {
@@ -890,14 +917,9 @@
     liveMessage = text;
   }
 
-  /** The shift's input is live: running and not paused, and no demo in the way. */
+  /** The shift's input is live: running and not paused. */
   function playing() {
-    return running && !paused && !gameOver && !demoOn;
-  }
-
-  /** The bench can act: in a live shift, or in the demo's sandbox. */
-  function benchLive() {
-    return !paused && !gameOver && (demoOn ? !demoEnd : running);
+    return running && !paused && !gameOver;
   }
 
   /** Svelte only sees the cup change when it is reassigned. */
@@ -906,7 +928,24 @@
   }
 
   function after(seconds: number, run: () => void) {
-    beats.push({ at: clock + seconds, run });
+    const beat = { at: clock + seconds, run };
+    beats.push(beat);
+    return beat;
+  }
+
+  /**
+   * The beat that moves the cup on once the last pump or cube is in. Until
+   * it comes, ↓ can still take that one back out, which cancels it.
+   */
+  let settle: { at: number; run: () => void } | null = null;
+
+  /** ↓ during the settle: the last pump or cube comes back out and the cup stays. */
+  function unsettle(cup: Cup) {
+    if (!settle || !cup.busy) return false;
+    beats = beats.filter((beat) => beat !== settle);
+    settle = null;
+    cup.busy = false;
+    return true;
   }
 
   // --- Guests on the line -----------------------------------------------------------
@@ -933,10 +972,11 @@
   function addGuest() {
     const exclude = [...guests.map((guest) => guest.regular.name), ...recent];
     // The first guest through the door after the critic's hour is the critic (twice a shift in expert).
-    const critic = criticDue(elapsed, criticsSeen, expert);
+    const critic = criticDue(elapsed, criticsSeen, expert, served);
     const regular = critic ? CRITIC : pickRegular(exclude);
     if (critic) criticsSeen += 1;
-    const order = makeOrder(elapsed, regular, Math.random, expert);
+    // The first orders of a shift come plain (makeOrder counts them).
+    const order = makeOrder(elapsed, regular, Math.random, expert, ordersMade++);
     const patience = patienceFor(order, regular, elapsed, expert);
     const guest: Guest = {
       id: nextId++,
@@ -1031,7 +1071,6 @@
     guest.outcome = outcome;
     guests = guests.filter((item) => item !== guest);
     crowd.leave(guest.id, reaction, coins);
-    if (demoOn) return;
     rememberName(guest.regular.name);
     history = [...history, reaction];
   }
@@ -1061,7 +1100,7 @@
     let cheered = 0;
     for (const guest of guests) {
       if (!guest.placed) continue;
-      guest.left = cheer(guest.left, guest.patience, hard());
+      guest.left = cheer(guest.left, guest.patience, expert);
       crowd.react(guest.id, "content");
       cheered += 1;
     }
@@ -1071,20 +1110,41 @@
 
   // --- Taking a ticket, dumping it ---------------------------------------------------
 
+  /**
+   * Takes a guest's ticket to the bench. A cup with nothing in it yet can
+   * still go to another ticket (taken by mistake, or just poured out); one
+   * with anything in it is finished or dumped first.
+   */
   function take(index: number) {
-    if (!benchLive()) return;
+    if (!playing()) return;
     const guest = guests[index];
     if (!guest) return;
     if (making) {
-      if (making.guestId !== guest.id) note("finish or dump this one first");
-      return;
+      if (making.guestId === guest.id) return;
+      if (!untouched(making)) {
+        note("finish or dump this one first");
+        return;
+      }
+      binCup();
     }
-    if (clock < takeLockUntil) return;
+    startCup(guest);
+  }
+
+  /** Nothing has gone into the cup yet, and it is waiting at its first station. */
+  function untouched(cup: Cup) {
+    return cup.station === cup.stations[0] && !cup.busy && cup.sugar === 0 && cup.ice === 0 && !cup.tea && cup.level === 0;
+  }
+
+  /** A fresh cup for this guest's ticket, under the tap of the tea they ordered. */
+  function startCup(guest: Guest) {
     // Taken straight from their hand: it goes on the rail now.
     if (!guest.placed) landTicket(guest.id);
     receipt = null;
     notice = null;
     const stations = stationsFor(guest.order);
+    // The cup goes under the ordered tea's tap, so Space pours the right
+    // tea; the arrows or another tap still move it.
+    tapIndex = tapFor(guest.order);
     making = {
       guestId: guest.id,
       name: guest.regular.name,
@@ -1115,21 +1175,17 @@
       stampAt: null,
       sealed: false,
       burst: false,
+      turning: false,
     };
     holds.clear();
     iceArcs = [];
     streamOn = false;
-    cupX = spoutX[tapIndex] ?? W / 2;
+    cupX = stationX(making);
     wobble = 0;
     sfxBlip();
     guests = guests;
-    const first =
-      stations[0] === "ice"
-        ? `Add ${cubes(ICE_CUBES[guest.order.ice])} of ice.`
-        : stations[0] === "sugar"
-          ? `Pump the syrup ${pumps(sugarPumps(guest.order.sugar))}.`
-          : `At the pour, under the ${TEA_NAMES[TEAS[tapIndex]]} tap.`;
-    liveMessage = `Making ${guest.regular.name}'s ${describeOrder(guest.order)}. ${first}`;
+    coach.done("ticket");
+    liveMessage = `Making ${guest.regular.name}'s ${describeOrder(guest.order)}. ${stationMessage(making)}`;
   }
 
   /** The hand with an empty bench: the ticket of whoever is closest to leaving. */
@@ -1142,6 +1198,7 @@
   function binCup() {
     making = null;
     beats = [];
+    settle = null;
     falling = [];
     iceArcs = [];
     holds.clear();
@@ -1150,12 +1207,20 @@
     guests = guests;
   }
 
+  /**
+   * Pours the cup out and starts the same drink again with an empty one; the
+   * ticket stays theirs. While the new cup is empty, another ticket can still
+   * be taken instead.
+   */
   function dump() {
     if (!playing() || !making || making.stampAt !== null) return;
+    const guest = guests.find((item) => item.id === making?.guestId);
     binCup();
     sfxDump();
-    takeLockUntil = clock + DUMP_LOCKOUT;
+    if (guest) startCup(guest);
+    const started = guest ? liveMessage : "";
     note("poured out");
+    if (started) liveMessage = `Poured out. ${started}`;
   }
 
   // --- Ice --------------------------------------------------------------------------
@@ -1181,7 +1246,7 @@
   /** One cube from the bin. */
   function addIce() {
     const cup = making;
-    if (!cup || !benchLive() || !iceAdjustable(cup)) return false;
+    if (!cup || !playing() || !iceAdjustable(cup)) return false;
     if (cup.ice >= ICE_MAX) {
       note("the cup holds no more ice");
       return false;
@@ -1194,8 +1259,10 @@
     if (cup.station === "ice" && cup.ice >= target) {
       // Right on: once the cube lands, a ding, and on to the pour.
       cup.busy = true;
-      after((reduceMotion ? 0 : ICE_ARC_SECONDS) + ICE_SETTLE, () => {
+      settle = after((reduceMotion ? 0 : ICE_ARC_SECONDS) + ICE_SETTLE, () => {
+        settle = null;
         sfxIceFull();
+        coach.done("ice");
         enterStation(nextStation(cup));
       });
     } else if (cup.ice > target) {
@@ -1210,7 +1277,8 @@
   /** One cube back out, while there is still no tea on it. */
   function removeIce() {
     const cup = making;
-    if (!cup || !benchLive() || !iceAdjustable(cup) || cup.ice === 0) return;
+    if (!cup || !playing() || cup.ice === 0) return;
+    if (!(cup.station === "ice" && cup.busy && unsettle(cup)) && !iceAdjustable(cup)) return;
     cup.ice -= 1;
     // A cube still in the air is the one that comes back.
     if (iceArcs.length) iceArcs.pop();
@@ -1222,7 +1290,7 @@
   /** One pump of syrup into the cup under the bottle. */
   function pumpSyrup() {
     const cup = making;
-    if (!cup || !benchLive() || !sugarAdjustable(cup)) return false;
+    if (!cup || !playing() || !sugarAdjustable(cup)) return false;
     if (cup.sugar >= SUGAR_MAX) return false;
     cup.sugar += 1;
     pumpAge = 0;
@@ -1230,15 +1298,30 @@
     const target = sugarPumps(cup.order.sugar);
     liveMessage = `${cup.sugar} of ${target} ${target === 1 ? "pump" : "pumps"} of syrup.`;
     if (cup.sugar >= target) {
-      // Right on: a ding, and on to the pour.
+      // Right on: a ding, and on to the next station.
       cup.busy = true;
-      after(ICE_SETTLE + 0.1, () => {
+      settle = after(ICE_SETTLE + 0.1, () => {
+        settle = null;
         sfxIceFull();
+        coach.done("syrup");
         enterStation(nextStation(cup));
       });
     }
     refresh();
     return true;
+  }
+
+  /** One pump back out, at the bottle, before the drink moves on. */
+  function removeSyrup() {
+    const cup = making;
+    if (!cup || !playing() || cup.station !== "sugar" || cup.sugar === 0) return;
+    if (cup.busy && !unsettle(cup)) return;
+    cup.sugar -= 1;
+    pumpAge = 10;
+    sfxPump(0);
+    const target = sugarPumps(cup.order.sugar);
+    liveMessage = `${cup.sugar} of ${target} ${target === 1 ? "pump" : "pumps"} of syrup.`;
+    refresh();
   }
 
   /**
@@ -1260,12 +1343,6 @@
 
   // --- The pour --------------------------------------------------------------------
 
-  /** The pour's sound: heard through the shift's paused music while the demo plays. */
-  function streamSound(level: number, fill = 0) {
-    if (demoOn) setDemoPourStream(level, fill);
-    else setPourStream(level, fill);
-  }
-
   function selectTap(index: number) {
     const cup = making;
     if (!cup || !beforeTea(cup.station) || cup.busy || holds.size) return false;
@@ -1276,6 +1353,8 @@
     if (index !== tapIndex) {
       tapIndex = index;
       liveMessage = `Under the ${TEA_NAMES[TEAS[index]]} tap.`;
+      // Moved under the ordered tea's tap: the move is known.
+      if (TEAS[index] === cup.order.tea) coach.done("tap");
     }
     return true;
   }
@@ -1286,7 +1365,7 @@
 
   function startHold(source: string) {
     const cup = making;
-    if (!cup || cup.station !== "pour" || cup.busy || !benchLive()) return;
+    if (!cup || cup.station !== "pour" || cup.busy || !playing()) return;
     if (cup.tea && cup.tea !== TEAS[tapIndex]) return;
     const tea = TEA_NAMES[TEAS[tapIndex]];
     if (brewEnds[tapIndex] > 0) {
@@ -1296,6 +1375,8 @@
     if (!holds.size) {
       cup.heldSeconds = 0;
       if (tankState(tanks[tapIndex]) === "empty") note(`the ${tea} tank is empty`);
+      // The pour's lesson stays up through the hold, to say where to let go.
+      coach.acted("pour");
     }
     holds.add(source);
     refresh();
@@ -1310,16 +1391,32 @@
     streamOn = false;
     setPourStream(0);
     const cup = making;
-    if (commit && cup && cup.station === "pour" && !cup.busy && cup.level >= MIN_POUR) commitPour();
-    else refresh();
+    // A tap let go after it has run dry isn't judged: brew, and the pour carries on.
+    const dry = !!cup && tankState(tanks[tapIndex]) === "empty";
+    if (commit && cup && cup.station === "pour" && !cup.busy && cup.level >= MIN_POUR && !dry) {
+      commitPour();
+      return;
+    }
+    // Let go too soon, taken back, or dry: nothing was judged, so the pour's
+    // lesson (if it was waiting on this hold) comes back as it was.
+    if (coach.current?.id === "pour" && coach.acting && !coach.leaving) {
+      coach.dismiss();
+      lessons.cue = null;
+    }
+    refresh();
   }
 
-  /** Closes the tap without judging the pour (pause, blur, game over, the demo). */
+  /** Closes the tap without judging the pour (pause, blur, game over). */
   function releaseAll() {
     holds.clear();
     streamOn = false;
     lastShakeArrow = null;
     setPourStream(0);
+    // A hold taken back (a pause, the window losing focus) wasn't an answer: the pour's lesson comes back.
+    if (coach.current?.id === "pour" && coach.acting && !coach.leaving) {
+      coach.dismiss();
+      lessons.cue = null;
+    }
   }
 
   function commitPour() {
@@ -1329,10 +1426,11 @@
     streamOn = false;
     setPourStream(0);
     cup.busy = true;
-    cup.pourGrade = pourGrade(cup.level, cup.order.ice, hard());
+    cup.pourGrade = pourGrade(cup.level, cup.order.ice, expert);
     const word = gradeWord(cup.pourGrade);
     popBeside(word, popupKind(cup.pourGrade), 1.1, 5);
     liveMessage = `Pour ${word}.`;
+    lessonResult("pour", cup.tea === cup.order.tea && cup.pourGrade >= LESSON_PASS);
     refresh();
     after(AFTER_POUR, () => enterStation(cup.stations.includes("scoop") ? "scoop" : "shake"));
   }
@@ -1350,34 +1448,56 @@
     streamOn = false;
     setPourStream(0);
     lastShakeArrow = null;
-    if (next === "sugar") {
-      liveMessage = `Syrup: pump ${pumps(sugarPumps(cup.order.sugar))} for ${sugarName(cup.order.sugar)}.`;
-    } else if (next === "pour") {
-      liveMessage = `Pour: hold the ${TEA_NAMES[cup.order.tea]} tap and let go at the line.`;
-    } else if (next === "scoop") {
+    if (next === "scoop") {
       cup.scoopStart = clock;
-      // The demo swings at the opening pace, whenever it is opened.
-      cup.swing = paceForElapsed(demoOn ? 0 : elapsed, hard()).swing;
+      cup.swing = paceForElapsed(elapsed, expert).swing;
       cup.loadedAt = 0;
+      // The ladle goes straight into the first scoop's jar. In expert the
+      // jar is still the player's to pick: its drinks split across two jars
+      // more often on purpose.
+      if (!expert) jarIndex = Math.max(0, TOPPINGS.indexOf(cup.queue[0]));
       dipJar(cup);
-      const count = cup.queue.length;
-      liveMessage = `Scoop: ${count} ${count === 1 ? "scoop" : "scoops"}, ${cup.queue.map((kind) => TOPPING_NAMES[kind]).join(", ")}. The ladle is in the ${TOPPING_NAMES[cup.chosen]} jar.`;
-    } else if (next === "shake") {
-      liveMessage = `Shake: ${SHAKES_NEEDED} quick shakes.`;
     } else if (next === "seal") {
       cup.sealStart = clock;
       cup.sealValue = null;
       cup.stampAt = null;
       cup.sealed = false;
-      liveMessage = "Seal: stamp when the needle is in the band.";
     }
+    const message = stationMessage(cup);
+    if (message) liveMessage = message;
     refresh();
+  }
+
+  /**
+   * What the live region says as the cup reaches its station. Nothing while
+   * that station's lesson is still to be taught: the coach's own line says
+   * it beside the station, and it shouldn't be heard twice.
+   */
+  function stationMessage(cup: Cup) {
+    const id = STATION_LESSON[cup.station];
+    if (!coach.learned(id) && !lessons.held.has(id)) return "";
+    switch (cup.station) {
+      case "sugar":
+        return `Syrup: pump ${pumps(sugarPumps(cup.order.sugar))} for ${sugarName(cup.order.sugar)}.`;
+      case "ice":
+        return `Ice: add ${cubes(ICE_CUBES[cup.order.ice])}.`;
+      case "pour":
+        return `Pour: hold the ${TEA_NAMES[cup.order.tea]} tap and let go at the line.`;
+      case "scoop": {
+        const count = cup.queue.length;
+        return `Scoop: ${count} ${count === 1 ? "scoop" : "scoops"}, ${cup.queue.map((kind) => TOPPING_NAMES[kind]).join(", ")}. The ladle is in the ${TOPPING_NAMES[cup.chosen]} jar.`;
+      }
+      case "shake":
+        return `Shake: ${SHAKES_NEEDED} quick shakes.`;
+      default:
+        return "Seal: stamp when the needle is in the band.";
+    }
   }
 
   // --- The ladle ----------------------------------------------------------------------
 
   /** The ladle's swing radius: the cup's mouth edge sits at exactly the mode's cup mouth. */
-  const ladleRadius = () => ((CUP_W / 2) * cell) / rulesFor(hard()).cupMouth;
+  const ladleRadius = () => ((CUP_W / 2) * cell) / rulesFor(expert).cupMouth;
 
   function ladleNow(cup: Cup) {
     const x = ladleAt(clock - cup.scoopStart, cup.swing, Math.PI / 2);
@@ -1397,12 +1517,13 @@
   /** Marks a jar and loads the ladle from it. */
   function selectJar(index: number) {
     const cup = making;
-    if (!cup || cup.station !== "scoop" || cup.busy || !benchLive()) return false;
+    if (!cup || cup.station !== "scoop" || cup.busy || !playing()) return false;
     const next = clamp(index, 0, TOPPINGS.length - 1);
     if (next === jarIndex) return true;
     jarIndex = next;
     dipJar(cup);
     liveMessage = `The ladle is in the ${TOPPING_NAMES[TOPPINGS[next]]} jar.`;
+    if (TOPPINGS[next] === cup.queue[cup.drops.length]) coach.done("jar");
     refresh();
     return true;
   }
@@ -1413,15 +1534,15 @@
 
   function drop() {
     const cup = making;
-    if (!cup || cup.station !== "scoop" || cup.busy || clock < cup.loadedAt || !benchLive()) return;
+    if (!cup || cup.station !== "scoop" || cup.busy || clock < cup.loadedAt || !playing()) return;
     const index = cup.drops.length;
     const wanted = cup.queue[index];
     if (!wanted) return;
     const kind = cup.chosen;
     const ladle = ladleNow(cup);
     // A wrong jar still falls where the ladle was; it just counts for nothing.
-    const landed = scoopResult(ladle.x, hard());
-    const judged = judgeScoop(wanted, kind, ladle.x, hard());
+    const landed = scoopResult(ladle.x, expert);
+    const judged = judgeScoop(wanted, kind, ladle.x, expert);
     cup.drops.push(judged.grade);
     cup.results.push(judged.result);
     sfxScoop(landed, index);
@@ -1442,14 +1563,20 @@
     const word =
       judged.result === "wrong" ? "wrong jar" : landed === "clean" ? "clean" : landed === "rim" ? "off the rim" : "missed";
     popBeside(word, judged.result === "clean" ? "perfect" : judged.result === "rim" ? "plain" : "miss", 0.8, 9);
+    lessonResult("drop", judged.result === "clean" || judged.result === "rim");
     liveMessage =
       judged.result === "wrong"
         ? `Scoop ${index + 1} of ${cup.queue.length}, wrong jar: ${TOPPING_NAMES[kind]}, not ${TOPPING_NAMES[wanted]}.`
         : `Scoop ${index + 1} of ${cup.queue.length}, ${word}.`;
     cup.loadedAt = clock + RELOAD;
-    if (cup.drops.length === cup.queue.length) {
+    const next = cup.queue[cup.drops.length];
+    if (!next) {
       cup.busy = true;
       after(AFTER_SCOOPS, () => enterStation("shake"));
+    } else if (!expert && TOPPINGS[jarIndex] !== next) {
+      // The ladle reloads from the next scoop's jar (the arrows still choose another).
+      jarIndex = TOPPINGS.indexOf(next);
+      dipJar(cup);
     }
     refresh();
   }
@@ -1458,7 +1585,7 @@
 
   function shake() {
     const cup = making;
-    if (!cup || cup.station !== "shake" || cup.busy || !benchLive()) return;
+    if (!cup || cup.station !== "shake" || cup.busy || !playing()) return;
     cup.shakes += 1;
     if (cup.shakes === 1) cup.shakeStart = clock;
     joltDir = cup.shakes % 2 ? 1 : -1;
@@ -1469,10 +1596,11 @@
       flashAge = 0;
       cup.shakeSeconds = clock - cup.shakeStart;
       cup.busy = true;
-      const grade = shakeGrade(cup.shakeSeconds, hard());
+      const grade = shakeGrade(cup.shakeSeconds, expert);
       const word = gradeWord(grade);
       popBeside(word, popupKind(grade), 1.1, 5);
       liveMessage = `Shake ${word}.`;
+      lessonResult("shake", grade >= LESSON_PASS);
       after(AFTER_SHAKE, () => enterStation("seal"));
     }
     refresh();
@@ -1483,21 +1611,31 @@
   /** Stamps the press at wherever the needle is. The press, straw and hop follow in stepCup. */
   function stamp() {
     const cup = making;
-    if (!cup || cup.station !== "seal" || cup.busy || cup.stampAt !== null || !benchLive()) return;
-    const value = sealNeedle(clock - cup.sealStart, hard());
+    if (!cup || cup.station !== "seal" || cup.busy || cup.stampAt !== null || !playing()) return;
+    const value = sealNeedle(clock - cup.sealStart, expert);
     cup.sealValue = value;
     cup.stampAt = clock;
     cup.busy = true;
-    const result = sealResult(value, hard());
-    const grade = sealGrade(value, hard());
+    const result = sealResult(value, expert);
+    const grade = sealGrade(value, expert);
     popBeside(SEAL_WORDS[result], result === "sealed" ? "perfect" : grade >= 55 ? "plain" : "miss", 1.1, 5);
     liveMessage = `Seal ${SEAL_WORDS[result]}.`;
+    // A perfect drink turns once on the counter as it goes (drawn only
+    // without Reduce Motion, checked as it is drawn; its timing never changes).
+    const judged = judge(cup);
+    cup.turning = !!judged?.result.accepted && judged.result.total >= PERFECT;
+    if (cup.turning) {
+      warming.tea = cup.tea ?? cup.order.tea;
+      warming.key = toppingKey(cup.order.toppings);
+      warming.next = 0;
+    }
+    lessonResult("seal", grade >= LESSON_PASS);
     refresh();
   }
 
   /** The hand: whatever the station needs from one press. */
   function act(source: string) {
-    if (!benchLive()) return;
+    if (!playing()) return;
     const cup = making;
     if (!cup) {
       takeNext();
@@ -1528,6 +1666,8 @@
     }
     brewEnds[index] = clock + BREW_SECONDS;
     sfxBrew();
+    coach.done("brew");
+    coach.done("dry");
     refreshTanks();
     liveMessage = `Brewing ${tea}.`;
   }
@@ -1555,6 +1695,7 @@
     guest.left = sampleBoost(guest.left, guest.patience);
     samplesLeft -= 1;
     sfxPlop(sampleCap - samplesLeft);
+    coach.done("sample");
     guests = guests;
     note(`sample for ${guest.regular.name}`);
     liveMessage = `A free sample for ${guest.regular.name}; they will wait longer. ${samplesLeft} ${samplesLeft === 1 ? "sample" : "samples"} left.`;
@@ -1576,7 +1717,7 @@
       shakeSeconds: cup.shakeSeconds ?? 99,
       sealValue: cup.sealValue ?? 0,
       patienceFraction: clamp(guest.left / guest.patience, 0, 1),
-      expert: hard(),
+      expert: expert,
     });
     return { guest, tea: cup.tea, result, patienceFraction: clamp(guest.left / guest.patience, 0, 1) };
   }
@@ -1594,8 +1735,9 @@
     }
     const { guest, tea, result, patienceFraction } = judged;
     const name = guest.regular.name;
-    // The demo's receipt stays until its end card; the script decides how long.
-    const until = clock + (demoOn ? 99 : RECEIPT_SECONDS);
+    const until = clock + RECEIPT_SECONDS;
+    // The receipt rises where the guest stands, as they take the drink.
+    const x = crowd.xOf(guest.id) ?? cupX;
 
     if (!result.accepted) {
       sfxWrong();
@@ -1603,6 +1745,7 @@
       const line = `${name} ordered ${TEA_NAMES[cup.order.tea]}, not ${TEA_NAMES[tea]}`;
       receipt = {
         id: ++receiptId,
+        x,
         name,
         sentBack: true,
         rows: [],
@@ -1614,38 +1757,34 @@
         until,
       };
       if (!reduceMotion) veilAge = 0;
-      if (demoOn) return;
       liveMessage = `${line}. Sent back. You lose a pearl.`;
       loseLife();
       return;
     }
 
     const nextStreak = keepsStreak(result.total) ? streak + 1 : 0;
-    const pay = pointsForDrink(result.total, guest.regular, nextStreak, cup.order.tea === special, hard());
+    const pay = pointsForDrink(result.total, guest.regular, nextStreak, cup.order.tea === special, expert);
     const perfect = result.total >= PERFECT;
     const reaction = servedMood(result.total, patienceFraction);
     const before = comboFor(streak, expert);
     let jarPaid = 0;
     let pearlBack = false;
-    // The demo shows what a drink earns but never banks it.
-    if (!demoOn) {
-      streak = nextStreak;
-      bestStreak = Math.max(bestStreak, streak);
-      score += pay.points;
-      served += 1;
-      gradeTotal += result.total;
-      if (perfect) perfects += 1;
-      // Tips into the jar; a full jar pays out and buys back a lost pearl.
-      const filled = fillJar(jar, pay.coins);
-      jar = filled.jar;
-      if (filled.payouts) {
-        const paid = jarPayout(filled.payouts, lives);
-        jarPaid = paid.points;
-        pearlBack = paid.lives > lives;
-        score += paid.points;
-        lives = paid.lives;
-        jarsCashed += filled.payouts;
-      }
+    streak = nextStreak;
+    bestStreak = Math.max(bestStreak, streak);
+    score += pay.points;
+    served += 1;
+    gradeTotal += result.total;
+    if (perfect) perfects += 1;
+    // Tips into the jar; a full jar pays out and buys back a lost pearl.
+    const filled = fillJar(jar, pay.coins);
+    jar = filled.jar;
+    if (filled.payouts) {
+      const paid = jarPayout(filled.payouts, lives);
+      jarPaid = paid.points;
+      pearlBack = paid.lives > lives;
+      score += paid.points;
+      lives = paid.lives;
+      jarsCashed += filled.payouts;
     }
     sfxServe(pay.tip > 0);
     // The fanfare comes in just after the serve chime.
@@ -1654,15 +1793,13 @@
     if (perfect && !reduceMotion) flareAge = 0;
     removeGuest(guest, "served", reaction, pay.coins);
     const cheered = perfect ? cheerLine() : 0;
-    if (!demoOn) {
-      if (pay.multiplier > before) {
-        // The combo steps up: a louder chord each step, and the lamps answer.
-        timers.later(() => sfxCombo(pay.multiplier), perfect ? 520 : 200);
-        popBeside(`×${pay.multiplier} combo`, "perfect", 1.4, 2);
-        if (!reduceMotion) flareAge = 0;
-      } else if (!keepsStreak(result.total) && before > 1) {
-        popBeside("combo lost", "miss", 1.1, 2);
-      }
+    if (pay.multiplier > before) {
+      // The combo steps up: a louder chord each step, and the lamps answer.
+      timers.later(() => sfxCombo(pay.multiplier), perfect ? 520 : 200);
+      popBeside(`×${pay.multiplier} combo`, "perfect", 1.4, 2);
+      if (!reduceMotion) flareAge = 0;
+    } else if (!keepsStreak(result.total) && before > 1) {
+      popBeside("combo lost", "miss", 1.1, 2);
     }
 
     const rows = [
@@ -1687,6 +1824,7 @@
     ].filter(Boolean);
     receipt = {
       id: ++receiptId,
+      x,
       name,
       sentBack: false,
       rows,
@@ -1695,7 +1833,8 @@
       combo: pay.multiplier > 1 ? pay.multiplier : 0,
       perfect,
       line: "",
-      until,
+      // Held a moment longer the first time a lesson is about it.
+      until: until + (!coach.learned("serve") || (pay.multiplier > 1 && !coach.learned("combo")) ? RECEIPT_LESSON_SECONDS : 0),
     };
     const extras = [
       pay.tip > 0 ? `a tip of ${pay.tip}` : "",
@@ -1807,10 +1946,10 @@
 
   /** Each tea's label: a short printed word, and a flavour mark for a jar too narrow for it. */
   const TEA_LABELS: Record<Tea, { word: string; icon: keyof typeof ICONS }> = {
-    milk: { word: "milk", icon: "milk" },
-    taro: { word: "taro", icon: "taro" },
-    matcha: { word: "matcha", icon: "leaf" },
-    strawberry: { word: "berry", icon: "berry" },
+    milk: { word: TEA_WORDS.milk, icon: "milk" },
+    taro: { word: TEA_WORDS.taro, icon: "taro" },
+    matcha: { word: TEA_WORDS.matcha, icon: "leaf" },
+    strawberry: { word: TEA_WORDS.strawberry, icon: "berry" },
   };
   const LABEL_PAPER = "#ede0c6";
   const LABEL_SHADE = "#d4c3a3";
@@ -2277,7 +2416,7 @@
     }
     if (cup.sealed && cup.sealValue !== null) {
       // Clean, crooked (loose), or browned (scorched).
-      const result = sealResult(cup.sealValue, hard());
+      const result = sealResult(cup.sealValue, expert);
       const film = result === "scorched" ? SCORCHED : LID;
       const palette = { O: colors.ink, L: film };
       if (result === "loose") {
@@ -2303,6 +2442,58 @@
       g.fillStyle = STRAW_PINK;
       for (const [column, row] of above.slice(0, strawCells)) g.fillRect(left + column * c, top + row * c, c, c);
     }
+  }
+
+  /** Each tea's palette for the stacked drink, made once. */
+  const drinkPalettes = new Map<Tea, Record<string, string>>();
+
+  function drinkPalette(tea: Tea) {
+    let palette = drinkPalettes.get(tea);
+    if (!palette) {
+      palette = {
+        O: INK,
+        t: TEA_COLORS[tea],
+        T: mixHex(TEA_COLORS[tea], INK, 0.22),
+        F: LID,
+        f: mixHex(LID, INK, 0.18),
+        S: STRAW_PINK,
+        P: PEARL,
+        D: TOPPING_ART.pudding.palette.P,
+        J: TOPPING_ART.jelly.palette.J,
+        R: TOPPING_ART.redbean.palette.R,
+      };
+      drinkPalettes.set(tea, palette);
+    }
+    return palette;
+  }
+
+  /** One turn's sprite for this drink, made (once) as a cached sprite. */
+  function drinkSprite(tea: Tea, key: string, index: number) {
+    const frame = drinkGrid(index, key);
+    return { frame, sprite: cachedSprite(`orders-drink-${tea}-${key}-${index}`, frame.grid, cell, drinkPalette(tea), HALO) };
+  }
+
+  /**
+   * A perfect drink's turn is made before it plays: from the stamp, a few
+   * of its sprites a frame (there are TURN_FRAMES), so the turn itself only
+   * draws.
+   */
+  const warming = { tea: "milk" as Tea, key: "", next: TURN_FRAMES };
+
+  function warmTurn() {
+    for (let count = 0; count < 4 && warming.next < TURN_FRAMES; count++) drinkSprite(warming.tea, warming.key, warming.next++);
+  }
+
+  /**
+   * The sealed drink as a stacked sprite (orders-drink.js), `share` of the
+   * way through one turn, standing with its foot at (`x`, `base`).
+   */
+  function drawTurningDrink(g: CanvasRenderingContext2D, cup: Cup, x: number, base: number, share: number, alpha: number) {
+    const { frame, sprite } = drinkSprite(cup.tea ?? cup.order.tea, toppingKey(cup.order.toppings), turnIndex(share));
+    g.save();
+    g.globalAlpha = alpha;
+    g.drawImage(sprite, Math.round(x - frame.anchorX * cell) - SPRITE_PAD, Math.round(base - (frame.foot + 1) * cell) - SPRITE_PAD);
+    g.restore();
   }
 
   /** How many cells of straw show above the film (0 before it pops in). */
@@ -2583,8 +2774,8 @@
   function drawSealGauge(g: CanvasRenderingContext2D, colors: Colors, cup: Cup) {
     const c = cell;
     if (cup.stampAt !== null && clock - cup.stampAt > HOP_START) return;
-    const value = cup.sealValue ?? sealNeedle(clock - cup.sealStart, hard());
-    const band = rulesFor(hard()).sealBand;
+    const value = cup.sealValue ?? sealNeedle(clock - cup.sealStart, expert);
+    const band = rulesFor(expert).sealBand;
     const width = GAUGE_COLS * c;
     const height = GAUGE_ROWS * c;
     const left = Math.round(cupX + (CUP_W / 2 + 4) * c);
@@ -2640,7 +2831,7 @@
       if (end <= 0 || x === undefined) return;
       // Off whichever side of the tank, from about its shoulder.
       const side = Math.random() < 0.5 ? -1 : 1;
-      addParticle(particles, x + side * (tankW / 2 - 1) * cell, shelfTop() - MACHINE_ROWS * cell, "#fdf8f3", 14, -60);
+      addParticle(particles, x + side * (tankW / 2 - 1) * cell, shelfTop() - MACHINE_ROWS * cell, CREAM, 14, -60);
     });
   }
 
@@ -2656,7 +2847,7 @@
       tilt = joltDir * 0.07 * k;
     }
     if (cup.station === "seal" && cup.stampAt !== null && !reduceMotion) {
-      const u = clamp((clock - cup.stampAt - HOP_START) / (SEAL_SECONDS - HOP_START), 0, 1);
+      const u = clamp((clock - cup.stampAt - HOP_START) / (HAND_OFF_SECONDS - HOP_START), 0, 1);
       // A hop along the counter to the guest it's for, fading into their hands.
       const to = crowd.xOf(cup.guestId);
       if (to !== null) dx = (to - cupX) * cubicOut(u);
@@ -2672,13 +2863,19 @@
     drawSpill(g, cup);
 
     const pivotY = cupTop + CUP_H * c;
-    g.save();
-    g.globalAlpha = alpha;
-    g.translate(cupX + dx, pivotY + dy);
-    if (tilt) g.rotate(tilt);
-    g.translate(-cupX, -pivotY);
-    drawCup(g, colors, cup, cupX, cupTop);
-    g.restore();
+    const sinceStamp = cup.stampAt !== null ? clock - cup.stampAt : -1;
+    if (cup.turning && !reduceMotion && sinceStamp >= TURN_FROM) {
+      // A perfect drink, seen from a little above, turns once as it goes.
+      drawTurningDrink(g, cup, cupX + dx, pivotY + dy, turnShare(sinceStamp), alpha);
+    } else {
+      g.save();
+      g.globalAlpha = alpha;
+      g.translate(cupX + dx, pivotY + dy);
+      if (tilt) g.rotate(tilt);
+      g.translate(-cupX, -pivotY);
+      drawCup(g, colors, cup, cupX, cupTop);
+      g.restore();
+    }
 
     drawStream(g, cup);
     if (cup.station === "shake") {
@@ -2691,7 +2888,7 @@
     }
   }
 
-  /** Draws whatever is on the bench now: the shift's, or the demo's while it plays. */
+  /** Draws whatever is on the bench now. */
   function draw() {
     const g = ctx;
     if (!g || !W || !H) return;
@@ -2704,11 +2901,13 @@
     crowd.drawBack(g);
     if (!making) drawIdleProps(g, colors);
     if (making) drawMaking(g, colors, making);
+    drawLessonGhost(g);
     drawIceArcs(g);
     drawSyrup(g);
     for (const item of falling) drawTopping(g, item.kind, item.x, item.y, item.angle, item.alpha);
     drawParticles(g, particles);
     crowd.drawFront(g, popupFont);
+    drawLessonLight(g);
     drawNotes(g);
   }
 
@@ -2726,7 +2925,7 @@
       g.globalAlpha = Math.max(0, Math.min(1, (popup.life / popup.maxLife) * 2));
       g.fillStyle = SCENE_INK;
       g.fillRect(Math.round(x - width / 2), y - 10, width, 20);
-      g.fillStyle = popup.kind === "perfect" ? "#ffd166" : popup.kind === "miss" ? "#f18272" : SCENE_CREAM;
+      g.fillStyle = popup.kind === "perfect" ? NOTE_GOLD : popup.kind === "miss" ? "#f18272" : CREAM;
       g.fillText(popup.text, x, y + 0.5);
     }
     g.restore();
@@ -2810,7 +3009,7 @@
   function stepEffects(dt: number) {
     const cup = making;
     const target = !cup ? cupX : stationX(cup);
-    cupX = reduceMotion ? target : cupX + (target - cupX) * (1 - Math.exp(-dt * 24));
+    cupX = reduceMotion ? target : damp(cupX, target, 24, dt);
     if (Math.abs(target - cupX) < 0.3) cupX = target;
 
     pumpAge += dt;
@@ -2858,21 +3057,9 @@
   // drink or a lost guest, both kept off the play area. The palette is fixed:
   // the room looks the same in both site themes.
 
+  // Ordered dithering (`bayer`) and colour mixing come from the arcade's core.
   const SC = 4;
-  /** Ordered dithering thresholds, 4 × 4. */
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((value) => (value + 0.5) / 16);
-  const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
-  type RGB = [number, number, number];
-  const rgb = (hex: string): RGB => [
-    parseInt(hex.slice(1, 3), 16),
-    parseInt(hex.slice(3, 5), 16),
-    parseInt(hex.slice(5, 7), 16),
-  ];
-  const mixRgb = (a: RGB, b: RGB, t: number): RGB => [
-    Math.round(lerp(a[0], b[0], t)),
-    Math.round(lerp(a[1], b[1], t)),
-    Math.round(lerp(a[2], b[2], t)),
-  ];
+  const rgb = hexToRgb;
   const css = (color: RGB) => `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
 
   /**
@@ -2895,11 +3082,11 @@
   const SILL = rgb("#a77a52");
   const SOFFIT = rgb("#3a2a26");
   const SOFFIT_BEAM = rgb("#4f3a33");
-  const GOLD = rgb("#ffd166");
+  const GOLD = rgb(NOTE_GOLD);
   const CREAM_RGB = rgb("#f6eee2");
   const DEEP = rgb("#2a1c18");
+  /** The popups' dark backing: the scene's own ink, not art.ts's night-blue chip. */
   const SCENE_INK = "#1a1a1a";
-  const SCENE_CREAM = "#fdf8f3";
   /** The bench's art keeps its light-theme colours over the room, always. */
   const BENCH = risoColors(false);
   const EMPTY_CUP = "#f6eee2";
@@ -3287,7 +3474,7 @@
     const rim = quiet(SOFFIT, 0.4);
     disc(b, x, y, r, rim);
     disc(b, x, y, r - 1, quiet(CREAM_RGB, 0.4));
-    px(b, x, y - r + 1, quiet(rgb("#e85d4c"), 0.45));
+    px(b, x, y - r + 1, quiet(rgb(ACCENT), 0.45));
     px(b, x + r - 1, y, rim);
     px(b, x, y + r - 1, rim);
     px(b, x - r + 1, y, rim);
@@ -3369,6 +3556,7 @@
     drawClockHand(g);
     g.drawImage(counterLayer, 0, Math.round(room.counterPx) - URN_ROWS * SC, w, counterLayer.height * SC);
     drawRoomEffects(g);
+    drawRoomWash(g, w, h);
   }
 
   function resetRoom() {
@@ -3403,6 +3591,7 @@
     startMusic();
     sfxStart();
     running = true;
+    begunAt = clock;
     arrivalTimer = 0;
     arrivalIn = Infinity;
     addGuest();
@@ -3411,13 +3600,6 @@
     if (document.activeElement instanceof HTMLButtonElement && playScope?.contains(document.activeElement)) {
       focusPlayfield();
     }
-  }
-
-  function startCountdown() {
-    countdown = COUNTDOWN_SECONDS;
-    countdownElapsed = 0;
-    sfxCountdown(COUNTDOWN_SECONDS);
-    liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
   }
 
   function stepCup(dt: number) {
@@ -3442,9 +3624,9 @@
           refresh();
         }
         cup.level = Math.min(POUR_MAX, cup.level + drawn.poured);
-        streamSound(1, cup.level);
+        setPourStream(1, cup.level);
       } else {
-        streamSound(0);
+        setPourStream(0);
         if (was) {
           sfxSputter();
           note(`the ${TEA_NAMES[TEAS[tapIndex]]} tank ran dry`);
@@ -3458,7 +3640,7 @@
       if (!cup.sealed && t >= PRESS_LANDS) {
         cup.sealed = true;
         sfxSeal();
-        if (cup.sealValue !== null && sealResult(cup.sealValue, hard()) === "scorched") {
+        if (cup.sealValue !== null && sealResult(cup.sealValue, expert) === "scorched") {
           sfxScorch();
           smokePuff();
         }
@@ -3468,7 +3650,8 @@
         const judged = judge(cup);
         if (judged?.result.accepted && judged.result.total >= PERFECT) pearlBurst();
       }
-      if (t >= SEAL_SECONDS) serveCup();
+      // Served at a fixed time after the stamp, however it is drawn going over.
+      if (t >= HAND_OFF_SECONDS) serveCup();
     }
   }
 
@@ -3480,45 +3663,13 @@
     for (const beat of due) beat.run();
   }
 
-  function frame(timestamp: number) {
-    if (!active) return;
-    if (!last) last = timestamp;
-    const rawDt = (timestamp - last) / 1000;
-    last = timestamp;
-    const dt = Math.min(rawDt, 0.05);
-
-    if (paused || askFirst || demoEnd) {
-      // Still drawn, so the theme toggle shows through a card; the room
-      // holds still, since its time is the game's.
-      drawRoom();
-      draw();
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-
-    if (demoOn) {
-      // The demo's own clock; the shift's is set aside, so it holds.
-      clock += dt;
-      stepDemo(dt);
-      stepCup(dt);
-      stepBeats();
-      if (receipt && clock >= receipt.until) receipt = null;
-      if (notice && clock >= notice.until) notice = null;
-      guestRefresh += dt;
-      if (guestRefresh >= 0.1) {
-        guestRefresh = 0;
-        guests = guests;
-        refreshTanks();
-      }
-      stepEffects(dt);
-      stepCrowd(dt);
-      stepRoom(dt);
-      drawRoom();
-      draw();
-      raf = requestAnimationFrame(frame);
-      return;
-    }
-
+  /**
+   * One step of the game by `realDt` seconds (capped by the frame loop); the
+   * countdown reads the uncapped `rawDt`, as it always has. While a station
+   * is taught the line (patience and arrivals) runs at the coach's slower
+   * pace; the bench, the shift's clock and the room keep real time.
+   */
+  function advance(realDt: number, rawDt: number) {
     if (!running) {
       const step = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
       countdownElapsed = step.elapsed;
@@ -3527,12 +3678,16 @@
         sfxCountdown(countdown);
       }
       if (step.done) beginShift();
-      drawRoom();
-      draw();
-      raf = requestAnimationFrame(frame);
       return;
     }
 
+    const dt = realDt;
+    // Lessons age on real time (uncapped), and the line's slower step never exceeds the frame's cap.
+    const lineDt = coach.step(rawDt, realDt);
+    lessonClock += realDt;
+    // The spotlight comes up with a lesson and goes as it is done or the move is made.
+    const dimTarget = coach.current && !coach.leaving && !coach.acting ? 1 : 0;
+    lessonDim = reduceMotion ? dimTarget : lessonDim + (dimTarget - lessonDim) * (1 - Math.exp(-realDt / SPOT_EASE));
     clock += dt;
     elapsed += dt;
     timeLeft = timeRemaining(elapsed);
@@ -3550,8 +3705,8 @@
 
     // The next guest is due on the pace, or soon after the counter empties.
     // A full line means they wait at the door.
-    arrivalTimer = Math.min(arrivalTimer + dt, pace.arrivalEvery);
-    arrivalIn = Math.min(arrivalIn - dt, nextArrivalIn(pace, guests.length, arrivalTimer));
+    arrivalTimer = Math.min(arrivalTimer + lineDt, pace.arrivalEvery);
+    arrivalIn = Math.min(arrivalIn - lineDt, nextArrivalIn(pace, guests.length, arrivalTimer));
     if (arrivalIn <= 0 && guests.length < ticketCap) {
       arrivalTimer = 0;
       arrivalIn = Infinity;
@@ -3565,32 +3720,31 @@
       if (!guest.placed) continue;
       const mine = making?.guestId === guest.id;
       if (mine && making?.stampAt !== null) continue;
-      guest.left -= dt * (mine ? activeRate : 1);
+      guest.left -= lineDt * (mine ? activeRate : 1);
       if (guest.left <= 0) {
         walkOut(guest);
         if (gameOver) return;
       }
     }
     stepBrewing();
-    guestRefresh += dt;
-    if (guestRefresh >= 0.1) {
-      guestRefresh = 0;
+    if (refreshTick(realDt)) {
       guests = guests;
       refreshTanks();
+      if (lessons.cue) measureAnchor();
     }
 
     stepCup(dt);
     stepBeats();
     if (gameOver) return;
+    warmTurn();
     if (receipt && clock >= receipt.until) receipt = null;
     if (notice && clock >= notice.until) notice = null;
+    checkLessons();
+    stepBot(realDt);
 
     stepEffects(dt);
     stepCrowd(dt);
     stepRoom(dt);
-    drawRoom();
-    draw();
-    raf = requestAnimationFrame(frame);
   }
 
   // --- The line of guests ---------------------------------------------------------
@@ -3622,373 +3776,546 @@
     crowd.layout(W, H, guestPx, counterY, spots, tipJarLeft());
   }
 
-  // --- The demo, in motion -------------------------------------------------------------
+  // --- Lessons, in play -------------------------------------------------------------
 
-  function shelve(): Shelved {
-    return {
-      guests,
-      making,
-      tapIndex,
-      jarIndex,
-      tanks,
-      brewEnds,
-      receipt,
-      notice,
-      clock,
-      takeLockUntil,
-      beats,
-      falling,
-      particles,
-      popups,
-      iceArcs,
-      cupX,
-      wobble,
-      crowd: crowd.snapshot(),
-      flights,
-    };
-  }
+  /** How wide a lesson's slip can be (Coach's 20rem), for choosing a side it fits on (px). */
+  const SLIP_ROOM = 320;
+  /** The lessons a touch player answers on the hand, which lights up with them. */
+  const HAND_LESSONS = new Set(["ticket", "ice", "syrup", "pour", "drop", "shake", "seal"]);
+  /** Ghosts on the bench are dithered ink: the wall and the cup's inside are light, so cream would vanish. */
+  const GHOST_INK = SCENE_INK;
 
-  function unshelve(saved: Shelved) {
-    guests = saved.guests;
-    making = saved.making;
-    tapIndex = saved.tapIndex;
-    jarIndex = saved.jarIndex;
-    tanks = saved.tanks;
-    brewEnds = saved.brewEnds;
-    receipt = saved.receipt;
-    notice = saved.notice;
-    clock = saved.clock;
-    takeLockUntil = saved.takeLockUntil;
-    beats = saved.beats;
-    falling = saved.falling;
-    particles = saved.particles;
-    popups = saved.popups;
-    iceArcs = saved.iceArcs;
-    cupX = saved.cupX;
-    wobble = saved.wobble;
-    crowd.restore(saved.crowd);
-    flights = saved.flights;
-    refreshTanks();
-  }
-
-  /** A fresh bench for the demo: its own guest (still to come), cup, and full tanks. */
-  function layDemo() {
-    holds.clear();
-    streamOn = false;
-    guests = [];
-    making = null;
-    tapIndex = DEMO_START_TAP;
-    jarIndex = DEMO_START_JAR;
-    tanks = TEAS.map(() => TANK_CAPACITY);
-    brewEnds = TEAS.map(() => 0);
-    refreshTanks();
-    receipt = null;
-    notice = null;
-    clock = 0;
-    takeLockUntil = 0;
-    beats = [];
-    falling = [];
-    particles = [];
-    popups = [];
-    iceArcs = [];
-    cupX = spoutX[tapIndex] ?? W / 2;
-    wobble = 0;
-    // A jar one good tip from full, so the demo's drink shows it paying out.
-    crowd.reset(DEMO_JAR_START);
-    flights = [];
-    demoTask = null;
-    demoCaption = "";
-    enterDemoStep(0);
-    demoPress = "";
-    demoEnd = false;
-  }
-
-  /** Opens the demo; mid-shift, the shift freezes exactly as a pause would. */
-  async function openDemo() {
-    if (demoOn || gameOver || paused) return;
-    askFirst = false;
-    releaseAll();
-    demoMidShift = running;
-    if (running) setMusicPaused(true);
-    shelved = shelve();
-    demoOn = true;
-    layDemo();
-    sfxBlip();
-    liveMessage = "Demo: one drink, made start to finish.";
-    last = 0;
-    await tick();
-    skipButton?.focus();
-  }
-
-  async function finishDemo() {
-    if (!demoOn || demoEnd) return;
-    demoTask = null;
-    releaseAll();
-    demoPress = "";
-    demoCaption = "";
-    demoEnd = true;
-    liveMessage = "Demo over. Your turn.";
-    await tick();
-    endButton?.focus();
-  }
-
-  async function watchAgain() {
-    if (!demoOn) return;
-    layDemo();
-    sfxBlip();
-    last = 0;
-    await tick();
-    skipButton?.focus();
-  }
-
-  /** Puts the shift back as it was and carries on: resumed, or on to the countdown. */
-  function closeDemo() {
-    if (!demoOn || !shelved) return;
-    releaseAll();
-    const saved = shelved;
-    shelved = null;
-    demoOn = false;
-    demoEnd = false;
-    demoTask = null;
-    demoCaption = "";
-    demoPress = "";
-    unshelve(saved);
-    last = 0;
-    sfxBlip();
-    if (demoMidShift && running) {
-      setMusicPaused(false);
-      liveMessage = "Shift resumed";
-    } else if (!running) {
-      startCountdown();
-    }
-    focusPlayfield();
-  }
-
-  function askAboutDemo() {
-    askFirst = true;
-    liveMessage = "First time here? Watch one drink being made, or open the counter.";
-  }
-
-  function answerFirst(watch: boolean) {
-    if (!askFirst) return;
-    askFirst = false;
-    if (watch) {
-      void openDemo();
-      return;
-    }
-    sfxBlip();
-    startCountdown();
-    focusPlayfield();
-  }
-
-  /** Shows a control as pressed while the script uses it. */
-  function pressFor(id: string, seconds = DEMO_PRESS_SECONDS) {
-    demoPress = id;
-    demoPressUntil = clock + seconds;
-  }
-
-  let demoGuestId = -1;
-
-  function addDemoGuest() {
-    const order = { ...DEMO_ORDER, toppings: DEMO_ORDER.toppings.map((line) => ({ ...line })) };
-    const guest: Guest = {
-      id: demoGuestId--,
-      regular: DEMO_REGULAR,
-      order,
-      patience: DEMO_PATIENCE,
-      left: DEMO_PATIENCE,
-      tilt: -0.8,
-      placed: false,
-      outcome: null,
-    };
-    guests = [guest];
-    crowd.arrive(guest.id, DEMO_REGULAR.name, 0);
-    liveMessage = `${DEMO_REGULAR.name} is waiting: ${describeOrder(order)}.`;
-  }
-
-  /** Runs the script: waits, then starts each step and steps it until it is done. */
-  function stepDemo(dt: number) {
-    if (demoEnd) return;
-    if (demoPress && clock >= demoPressUntil) demoPress = "";
-    if (demoTask) {
-      if (!demoTask(dt)) return;
-      demoTask = null;
-      enterDemoStep(demoIndex + 1);
-    }
-    demoWait -= dt;
-    if (demoWait > 0) return;
-    const step = DEMO_SCRIPT[demoIndex];
-    if (!step) {
-      void finishDemo();
-      return;
-    }
-    demoTask = demoAction(step);
+  /** Copies what the lessons read about the counter into their view, in place. */
+  function syncLessonView() {
+    const view = lessonView;
+    view.coarse = touchUI;
+    view.tapIndex = tapIndex;
+    view.jarIndex = jarIndex;
+    view.holding = holds.size > 0;
+    view.loaded = !!making && clock >= making.loadedAt;
+    view.cup = making;
+    view.guests = guests;
+    view.tanks = tanks;
+    view.brewEnds = brewEnds;
+    view.samplesLeft = samplesLeft;
+    view.special = special;
+    view.jar = crowd.jar;
+    view.receipt = receipt;
   }
 
   /**
-   * Makes a step current: its caption shows straight away, so it reads
-   * during the step's wait (the beat before the action) and stays until
-   * the next step begins. The receipt's caption waits for the receipt.
+   * Asks the lessons what this moment should teach and keeps the coach in
+   * step with the bench (followLessons in orders-lessons.js): a station's
+   * lesson whose moment has gone comes down uncounted, one left unanswered
+   * stands down for the drink, and the line on screen follows its target.
    */
-  function enterDemoStep(index: number) {
-    demoIndex = index;
-    const step = DEMO_SCRIPT[index];
-    demoWait = step?.wait ?? 0;
-    if (step?.caption && step.act !== "receipt") showCaption(step.caption);
-  }
-
-  function showCaption(text: string) {
-    demoCaption = text;
-    liveMessage = text;
+  function checkLessons() {
+    // Nothing new while "go" is still on screen.
+    if (clock - begunAt < GO_SECONDS) return;
+    syncLessonView();
+    if (followLessons(coach, lessonView, lessons, clock)) {
+      measureAnchor(true);
+      // Once more after the page has caught up (a ticket just placed, a chip just shown).
+      void tick().then(() => measureAnchor());
+    }
   }
 
   /**
-   * One step of the script, as a task stepped each frame until it returns
-   * true. Each calls what the player's own input calls, at a human pace.
+   * A taught move's result: worked, it is learned (or simply known, if it
+   * was never shown); didn't, and it comes down uncounted so the next one
+   * teaches it again.
    */
-  function demoAction(step: DemoStep): (dt: number) => boolean {
-    switch (step.act) {
-      case "arrive": {
-        // The guest walks up; the step is done once their ticket is on the rail.
-        let added = false;
-        return () => {
-          if (!added) {
-            addDemoGuest();
-            added = true;
-          }
-          return guests[0]?.placed ?? true;
-        };
-      }
-      case "take":
-        return () => {
-          pressFor("ticket-0");
-          take(0);
-          return true;
-        };
-      case "ice": {
-        // The hand, once per cube: the same press a player makes.
-        let left = demoIceCubes(making?.order ?? DEMO_ORDER);
-        let timer = 0;
-        return (dt) => {
-          if (left <= 0 || !making) return true;
-          timer -= dt;
-          if (timer > 0) return false;
-          pressFor("hand");
-          addIce();
-          left -= 1;
-          timer = step.every ?? 0.45;
-          return left <= 0;
-        };
-      }
-      case "sugar": {
-        // The hand, once per pump.
-        let left = demoSugarPumps(making?.order ?? DEMO_ORDER);
-        let timer = 0;
-        return (dt) => {
-          if (left <= 0 || !making) return true;
-          if (making.station !== "sugar") return false;
-          timer -= dt;
-          if (timer > 0) return false;
-          pressFor("hand");
-          pumpSyrup();
-          left -= 1;
-          timer = step.every ?? 0.45;
-          return left <= 0;
-        };
-      }
-      case "pour": {
-        const index = step.tap ?? 0;
-        const target = demoPourTarget(making?.order ?? DEMO_ORDER);
-        let since = -1;
-        return (dt) => {
-          const cup = making;
-          if (!cup) return true;
-          if (since < 0) {
-            // Press the tap: the cup slides under it, and a beat later the tea runs.
-            selectTap(index);
-            pressFor(`tap-${index}`, Infinity);
-            since = 0;
-            return false;
-          }
-          since += dt;
-          if (since < 0.35) return false;
-          if (!holds.has("demo") && cup.station === "pour" && !cup.busy) startHold("demo");
-          if (cup.level >= target || cup.busy || cup.station !== "pour") {
-            endHold("demo", true);
-            demoPress = "";
-            return true;
-          }
-          return false;
-        };
-      }
-      case "jar":
-        return () => {
-          moveJar(step.dir ?? 0);
-          return true;
-        };
-      case "drop": {
-        let previous = Number.NaN;
-        return () => {
-          const cup = making;
-          if (!cup || cup.station !== "scoop") return !cup;
-          if (cup.busy || clock < cup.loadedAt) return false;
-          const x = ladleNow(cup).x;
-          const hit = Number.isFinite(previous) && reachedTarget(previous, x, 0, DEMO_DROP_WITHIN);
-          previous = x;
-          if (!hit) return false;
-          pressFor("hand");
-          drop();
-          return true;
-        };
-      }
-      case "shake": {
-        let left = step.count ?? SHAKES_NEEDED;
-        let timer = 0;
-        return (dt) => {
-          const cup = making;
-          if (!cup || left <= 0) return true;
-          if (cup.station !== "shake" || cup.busy) return false;
-          timer -= dt;
-          if (timer > 0) return false;
-          pressFor("hand", 0.09);
-          shake();
-          left -= 1;
-          timer = step.every ?? 0.16;
-          return left <= 0;
-        };
-      }
-      case "seal": {
-        let previous = Number.NaN;
-        return () => {
-          const cup = making;
-          if (!cup) return true;
-          if (cup.station !== "seal" || cup.busy) return false;
-          const value = sealNeedle(clock - cup.sealStart, hard());
-          const hit = Number.isFinite(previous) && reachedTarget(previous, value, DEMO_SEAL_AIM, DEMO_SEAL_WITHIN);
-          previous = value;
-          if (!hit) return false;
-          pressFor("hand");
-          stamp();
-          return true;
-        };
-      }
-      case "receipt": {
-        let shownAt = -1;
-        return () => {
-          if (shownAt < 0) {
-            if (!receipt) return false;
-            shownAt = clock;
-            if (step.caption) showCaption(step.caption);
-          }
-          return clock - shownAt >= (step.hold ?? 2.5);
-        };
-      }
+  function lessonResult(id: string, worked: boolean) {
+    if (worked) {
+      coach.done(id);
+    } else if (coach.current?.id === id && !coach.leaving) {
+      coach.dismiss();
+      lessons.cue = null;
+    }
+  }
+
+  /** The DOM thing a lesson points at, if it is one. */
+  function anchorElement(at: Target): Element | null {
+    switch (at.kind) {
+      case "step":
+        return cardEl?.querySelector(`[data-step="${CARD_STEPS[at.index]}"]`) ?? null;
+      case "ticket":
+      case "patience":
+        return lineEl?.querySelector(`[data-guest="${at.guest}"] .ou-guest`) ?? null;
+      case "tap":
+        return tapEls[at.index] ?? null;
+      case "brew":
+        return brewEls[at.index] ?? null;
+      case "sample":
+        return sampleEl ?? null;
+      case "receipt":
+        return receiptEl;
+      case "streak":
+        return streakEl ?? receiptEl;
       default:
-        return () => {
-          void finishDemo();
-          return true;
-        };
+        return null;
     }
+  }
+
+  /**
+   * Reads where the lesson's target is on screen. A target that has just
+   * gone (a receipt cleared, a ticket served) keeps its last place, so the
+   * line fades where it was; a new target with nothing to show yet has none.
+   */
+  function measureAnchor(fresh = false) {
+    if (canvas) benchBox = canvas.getBoundingClientRect();
+    const at = lessons.cue?.at;
+    if (lineEl) railBox = lineEl.getBoundingClientRect();
+    if (at && (at.kind === "ticket" || at.kind === "patience")) {
+      // A ticket by its slot on the rail: its settled place, not where its
+      // unfold has got to; the patience lesson by its track along the foot.
+      const slot = lineEl?.querySelector(`[data-guest="${at.guest}"]`);
+      const box = slot?.getBoundingClientRect();
+      const track = at.kind === "patience" ? slot?.querySelector(".ou-patience")?.getBoundingClientRect() : null;
+      if (box && track) anchorBox = new DOMRect(box.left + 12, track.top, box.width - 24, track.height);
+      else if (box) anchorBox = box;
+      else if (fresh) anchorBox = null;
+      return;
+    }
+    const element = at ? anchorElement(at) : null;
+    if (element) anchorBox = element.getBoundingClientRect();
+    else if (fresh) anchorBox = null;
+  }
+
+  /** A lesson's target drawn on the bench: where it is in bench px, its loop's radius, and its half-width if wide (reused each frame). */
+  const benchSpot = { x: 0, y: 0, r: 0, w: 0 };
+
+  /** Finds a target drawn on the bench, or returns null for one in the page. */
+  function benchPoint(at: Target): typeof benchSpot | null {
+    const c = cell;
+    const spot = benchSpot;
+    spot.w = 0;
+    switch (at.kind) {
+      case "jar":
+        spot.x = jarCentres()[at.index] ?? workX();
+        spot.y = counterY - (JAR_ROWS / 2) * c;
+        spot.r = (JAR_COLS / 2 + 1.5) * c;
+        return spot;
+      case "ladle":
+        // Where the ladle should be when it drops: right over the cup.
+        spot.x = workX();
+        spot.y = cupTop - 4 * c;
+        spot.r = 4.5 * c;
+        return spot;
+      case "line":
+        // The pennant pointing at the fill line.
+        spot.x = cupLeftAt(cupX) + (CUP_W + 1.5) * c;
+        spot.y = cupTop + 17 * c - FILL_LINE[making?.order.ice ?? "regular"] * INSIDE_ROWS * c;
+        spot.r = 2.5 * c;
+        return spot;
+      case "gauge": {
+        const band = rulesFor(expert).sealBand;
+        spot.x = Math.round(cupX + (CUP_W / 2 + 4) * c) + (GAUGE_COLS * c) / 2;
+        spot.y = Math.round(cupTop + c) + (1 - (band[0] + band[1]) / 2) * GAUGE_ROWS * c;
+        spot.r = 3.2 * c;
+        return spot;
+      }
+      case "tipjar":
+        spot.x = tipJarLeft() + (JAR_W / 2) * guestPx;
+        spot.y = counterY - (JAR_H / 2) * guestPx;
+        spot.r = Math.max(JAR_W, JAR_H) * guestPx * 0.62;
+        return spot;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Puts the lesson's line beside its target, with a loop round it, and
+   * lights the pad it is about on touch. Lines about the back bar, the rail
+   * and the receipt sit under them, between them and the cup; lines about
+   * the counter sit above, clear of the guests' faces.
+   */
+  function placeCoach() {
+    const lesson = coach.current;
+    const cue = lessons.cue;
+    const at = lesson && cue && cue.lesson.id === lesson.id && running && !gameOver ? cue.at : null;
+    const point = at ? benchPoint(at) : null;
+    // The page's pieces follow the spotlight.
+    const dim = !!lesson && !!cue && running && !gameOver && !coach.leaving && !coach.acting;
+    if (dim !== dimOthers) dimOthers = dim;
+    if (dim && lesson && cue) {
+      const ticket = cue.at.kind === "ticket" || cue.at.kind === "patience" ? cue.at.guest : -1;
+      if (ticket !== litTicket) litTicket = ticket;
+      // The drink in hand, its card and the hand stay lit through any lesson.
+      const card = !!making;
+      if (card !== litCard) litCard = card;
+      const hand = !!lesson.move || !!making;
+      if (hand !== litHand) litHand = hand;
+      const sample = lesson.id === "sample";
+      if (sample !== litSample) litSample = sample;
+      const slip = cue.at.kind === "receipt" || cue.at.kind === "streak";
+      if (slip !== litReceipt) litReceipt = slip;
+      const tap = cue.at.kind === "brew" || cue.at.kind === "tap" ? cue.at.index : lesson.id === "pour" && making ? tapFor(making.order) : -1;
+      if (tap !== litTap) litTap = tap;
+      const less = lesson.id === "ice";
+      if (less !== litLess) litLess = less;
+    }
+    // A ticket on the rail is followed frame by frame (it moves as others leave).
+    if (at && (at.kind === "ticket" || at.kind === "patience")) measureAnchor();
+    if (!lesson || !cue || !at || (point ? !benchBox : !anchorBox)) {
+      // The last line stays mounted, faded, so the live region keeps its
+      // words until the next lesson replaces them.
+      if (!coachLeaving) coachLeaving = true;
+      if (coachOpen) coachOpen = false;
+      if (handLit) handLit = false;
+      if (sampleLit) sampleLit = false;
+      return;
+    }
+    let x: number;
+    let y: number;
+    let ring: number;
+    let half = 0;
+    if (point && benchBox) {
+      x = benchBox.left + point.x;
+      y = benchBox.top + point.y;
+      ring = point.r;
+      half = point.w;
+    } else if (anchorBox) {
+      const box = anchorBox;
+      x = box.left + box.width / 2;
+      if (at.kind === "patience") {
+        // The patience track along the ticket's foot: a low loop as wide as the track.
+        y = box.top + box.height / 2;
+        ring = 10;
+        half = box.width / 2;
+      } else {
+        // A loop as tall as the thing, stretched to its width when that is wider.
+        y = box.top + box.height / 2;
+        ring = (box.height / 1.75) * 1.1;
+        half = box.width / 2 > ring * 1.15 ? box.width / 2 : 0;
+      }
+    } else {
+      return;
+    }
+    if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
+    // The line fades only once it has been up long enough to read; its Continue goes as soon as it is done.
+    if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
+    const open = !coach.leaving && !coach.acting;
+    if (open !== coachOpen) coachOpen = open;
+    x = Math.round(x);
+    y = Math.round(y);
+    ring = Math.round(Math.max(14, ring));
+    if (x !== coachX) coachX = x;
+    if (y !== coachY) coachY = y;
+    if (ring !== coachRing) coachRing = ring;
+    half = Math.round(half);
+    if (half !== coachWidth) coachWidth = half;
+    // A line of the making card: beside it on the left, over the card's
+    // finished lines, where there is room (a phone puts it above). A
+    // ticket's: beside the rail if it is at the rail's end and the slip
+    // fits there, otherwise in the strip under the whole rail.
+    let side: typeof coachSide = "below";
+    let floor = hudHeight + 8;
+    if (at.kind === "ticket" || at.kind === "patience") {
+      const rail = railBox;
+      const slot = anchorBox;
+      const room = SLIP_ROOM + 40;
+      if (rail && slot && slot.left - rail.left < 12 && rail.left - room >= 16) side = "left";
+      else if (rail && slot && rail.right - slot.right < 12 && window.innerWidth - rail.right - room >= 16) side = "right";
+      else if (rail) floor = Math.round(rail.bottom + 8);
+    } else if (at.kind === "step") {
+      side = x - half - SLIP_ROOM > 16 ? "left" : "above";
+    } else if (at.kind === "line") {
+      side = "right";
+    } else if (at.kind === "jar" || at.kind === "ladle" || at.kind === "gauge" || at.kind === "tipjar" || at.kind === "sample") {
+      side = "above";
+    }
+    if (side !== coachSide) coachSide = side;
+    if (floor !== coachTop) coachTop = floor;
+    // The hand row sits on the counter's dark wood; everything else on the light wall.
+    const scene = at.kind === "sample" ? "dark" : "light";
+    if (scene !== coachScene) coachScene = scene;
+    const live = touchUI && !coach.leaving && !coach.acting;
+    const hand =
+      live &&
+      HAND_LESSONS.has(lesson.id) &&
+      // On a pad the hand pours from whichever tap the cup is under: lit only once that is the ordered one.
+      (lesson.id !== "pour" || (!!making && TEAS[tapIndex] === making.order.tea));
+    if (hand !== handLit) handLit = hand;
+    const sample = live && lesson.id === "sample";
+    if (sample !== sampleLit) sampleLit = sample;
+  }
+
+  // --- The spotlight ---------------------------------------------------------------
+  // While a lesson is up the shop dims and what it is about stays lit: on the
+  // bench canvas the cup and the station in play (drawSpotlight's pixel-
+  // stepped edge), on the room canvas everything round the bench, and on the
+  // page the tickets, the card and the hand row not in play (a class).
+
+  /** The wash: the room's own deep brown, so the light shop dims warm. */
+  const SPOT_WASH = "#2a1c18";
+  /** How quickly the spotlight comes up and goes (seconds). */
+  const SPOT_EASE = 0.18;
+  /** What stays lit on the bench, in bench px (drawSpotlight merges any that overlap). */
+  const focusBoxes: FocusBox[] = [0, 1, 2, 3].map(() => ({ x: 0, y: 0, w: 0, h: 0 }));
+  let focusCount = 0;
+  const litBoxes: FocusBox[] = [];
+
+  function pushFocus(x: number, y: number, w: number, h: number) {
+    if (focusCount >= focusBoxes.length) return;
+    const box = focusBoxes[focusCount++];
+    box.x = x;
+    box.y = y;
+    box.w = w;
+    box.h = h;
+  }
+
+  /** A tea machine's column on the shelf, down to its spout. */
+  function machineFocus(index: number) {
+    const c = cell;
+    const x = spoutX[index];
+    if (x === undefined) return;
+    const top = shelfTop() - (MACHINE_ROWS + 1) * c;
+    pushFocus(x - (tankW / 2 + 1) * c, top, (tankW + 2) * c, nozzleBottom() - top + c);
+  }
+
+  /** What the current lesson keeps lit on the bench. */
+  function lessonFocus(lessonId: string, at: Target) {
+    focusCount = 0;
+    const c = cell;
+    const cup = making;
+    if (cup) {
+      // The cup in hand stays lit for any lesson, with room above it for the stream, the shaker and the press.
+      pushFocus(cupLeftAt(cupX) - 2 * c, cupTop - 7 * c, (CUP_W + 4) * c, counterY - cupTop + 8 * c);
+    }
+    switch (lessonId) {
+      case "syrup": {
+        const top = shelfTop() - (PUMP_ROWS + 1) * c;
+        pushFocus(pumpX - (PUMP_W / 2 + 3) * c, top, (PUMP_W + 4) * c, nozzleBottom() - top + c);
+        break;
+      }
+      case "ice":
+        pushFocus(binLeft() - c, shelfTop() - (ICE_BIN.length + 1) * c, (ICE_BIN[0].length + 2) * c, (ICE_BIN.length + SHELF_ROWS + 2) * c);
+        break;
+      case "pour":
+        if (cup) machineFocus(tapFor(cup.order));
+        break;
+      case "brew":
+        machineFocus(at.index);
+        break;
+      case "jar": {
+        const centre = jarCentres()[at.index];
+        if (centre !== undefined) pushFocus(centre - (JAR_COLS / 2 + 1) * c, counterY - (JAR_ROWS + 3) * c, (JAR_COLS + 2) * c, (JAR_ROWS + 4) * c);
+        break;
+      }
+      case "drop":
+        pushFocus(workX() - 7 * c, cupTop - 16 * c, 14 * c, 16 * c);
+        break;
+      case "seal":
+        pushFocus(cupX + (CUP_W / 2 + 2) * c, cupTop, (GAUGE_COLS + 6) * c, counterY - cupTop + c);
+        break;
+      case "tipjar":
+        pushFocus(tipJarLeft() - c, counterY - (JAR_H + 2) * guestPx, JAR_W * guestPx + 2 * c, (JAR_H + 2) * guestPx + c);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** The bench's part of the spotlight: dim everything but the lit boxes. */
+  function drawLessonLight(g: CanvasRenderingContext2D) {
+    if (lessonDim <= 0.01) return;
+    const lesson = coach.current;
+    const cue = lessons.cue;
+    if (lesson && cue && cue.lesson.id === lesson.id) lessonFocus(lesson.id, cue.at);
+    litBoxes.length = 0;
+    for (let index = 0; index < focusCount; index++) litBoxes.push(focusBoxes[index]);
+    drawSpotlight(g, W, H, litBoxes, lessonDim, { color: SPOT_WASH, cell });
+  }
+
+  /** The room's part: everything round the bench dims with it (the bench draws its own). */
+  function drawRoomWash(g: CanvasRenderingContext2D, w: number, h: number) {
+    if (lessonDim <= 0.01 || !benchBox) return;
+    g.save();
+    g.globalAlpha = 0.5 * lessonDim;
+    g.fillStyle = SPOT_WASH;
+    g.beginPath();
+    g.rect(0, 0, w, h);
+    g.rect(Math.round(benchBox.left), Math.round(benchBox.top), Math.round(benchBox.width), Math.round(benchBox.height));
+    g.fill("evenodd");
+    g.restore();
+  }
+
+  /**
+   * The player has read it: Continue (Enter, or the slip's button) ends a
+   * line that holds, and counts it. A station's lesson ends on its action.
+   */
+  function continueLesson() {
+    const lesson = coach.current;
+    if (!lesson || lesson.move || coach.leaving || !running || paused) return;
+    coach.done(lesson.id);
+  }
+
+  /**
+   * The lesson's ghost, where the motion is the lesson: the tea rising to
+   * the line before the tap is held, the ladle right over the cup (when to
+   * drop), and the needle in the middle of the band (when to stamp). Each is
+   * dithered ink, breathing slowly, still while paused.
+   */
+  function drawLessonGhost(g: CanvasRenderingContext2D) {
+    const lesson = coach.current;
+    const cup = making;
+    if (!lesson || !cup || paused || coach.leaving || coach.acting || lessons.cue?.lesson.id !== lesson.id) return;
+    const density = 0.4 + 0.25 * beckon(lessonClock, reduceMotion);
+    if (lesson.id === "pour" && cup.station === "pour" && !holds.size) drawPourGhost(g, cup, density);
+    else if (lesson.id === "drop" && cup.station === "scoop" && !cup.busy) drawLadleGhost(g, cup, density);
+    else if (lesson.id === "seal" && cup.station === "seal" && cup.stampAt === null) drawNeedleGhost(g, density);
+  }
+
+  // Each ghost is painted by one function made once, reading where to paint
+  // from `ghostAt`, so a frame allocates nothing for it.
+  const ghostAt = { left: 0, surface: 0, x: 0, y: 0, width: 0, arm: 0, art: TOPPING_ART.pearls };
+  const ghostStyle = { color: GHOST_INK, density: 0.5, cell: 4 };
+
+  /** The ghost's colour and screen door for this frame, on the bench's grid. */
+  function styleGhost(color: string, density: number) {
+    ghostStyle.color = color;
+    ghostStyle.density = density;
+    ghostStyle.cell = cell;
+    return ghostStyle;
+  }
+
+  /** The tea up to `ghostAt.surface` inside the cup at `ghostAt.left`, row by row inside its tapering walls. */
+  const paintPourGhost = (ghost: CanvasRenderingContext2D) => {
+    const c = cell;
+    for (let row = 1; row <= INSIDE_ROWS; row++) {
+      const y0 = cupTop + row * c;
+      if (y0 + c <= ghostAt.surface) continue;
+      const inset = wallInset(row);
+      const from = Math.max(y0, ghostAt.surface);
+      ghost.fillRect(ghostAt.left + (inset + 1) * c, from, (12 - 2 * inset) * c, y0 + c - from);
+    }
+  };
+
+  /** The ladle hanging straight down at `ghostAt.x`, its bowl's top at `ghostAt.y`, loaded with `ghostAt.art`. */
+  const paintLadleGhost = (ghost: CanvasRenderingContext2D) => {
+    const c = cell;
+    const { x, y, arm, art } = ghostAt;
+    ghost.fillRect(Math.round(x - arm / 2), y - 9 * c, arm, 9 * c);
+    drawSprite(ghost, LADLE_BOWL, x - (LADLE_BOWL[0].length / 2) * c, y, c, { O: GHOST_INK });
+    drawSprite(ghost, art.grid, x - (SCOOP_COLS / 2) * c, y, c, art.palette);
+  };
+
+  /** The needle at `ghostAt.y` on a gauge `ghostAt.width` wide from `ghostAt.left`. */
+  const paintNeedleGhost = (ghost: CanvasRenderingContext2D) => {
+    const c = cell;
+    const { left, y, width } = ghostAt;
+    ghost.fillRect(left, y - 1, width, 2);
+    ghost.beginPath();
+    ghost.moveTo(left + width - 1, y);
+    ghost.lineTo(left + width + 2.5 * c, y - 1.4 * c);
+    ghost.lineTo(left + width + 2.5 * c, y + 1.4 * c);
+    ghost.closePath();
+    ghost.fill();
+  };
+
+  /** The tea rising from where it is to the fill line, a beat there, and again (at the line under Reduce Motion). */
+  function drawPourGhost(g: CanvasRenderingContext2D, cup: Cup, density: number) {
+    const c = cell;
+    const line = FILL_LINE[cup.order.ice];
+    const t = reduceMotion ? 1 : clamp((lessonClock % 1.8) / 1.26, 0, 1);
+    const level = lerp(Math.min(cup.level, line), line, smooth(t));
+    ghostAt.left = cupLeftAt(cupX);
+    ghostAt.surface = Math.round(cupTop + 17 * c - level * INSIDE_ROWS * c);
+    drawGhost(g, ghostAt.left, cupTop, CUP_W * c, CUP_H * c, paintPourGhost, styleGhost(TEA_COLORS[cup.order.tea], density));
+  }
+
+  /** The ladle as it should be at the drop: hanging straight down over the middle of the cup, loaded. */
+  function drawLadleGhost(g: CanvasRenderingContext2D, cup: Cup, density: number) {
+    const c = cell;
+    ghostAt.x = workX();
+    ghostAt.y = cupTop - 5 * c;
+    ghostAt.arm = Math.max(3, Math.round(c * 0.6));
+    ghostAt.art = TOPPING_ART[cup.queue[cup.drops.length] ?? cup.chosen];
+    const half = (LADLE_BOWL[0].length / 2 + 1) * c;
+    drawGhost(g, ghostAt.x - half, ghostAt.y - 10 * c, 2 * half, 14 * c, paintLadleGhost, styleGhost(GHOST_INK, density));
+  }
+
+  /** The needle where a stamp seals cleanly: the middle of the band. */
+  function drawNeedleGhost(g: CanvasRenderingContext2D, density: number) {
+    const c = cell;
+    const band = rulesFor(expert).sealBand;
+    ghostAt.width = GAUGE_COLS * c;
+    ghostAt.left = Math.round(cupX + (CUP_W / 2 + 4) * c);
+    ghostAt.y = Math.round(Math.round(cupTop + c) + (1 - (band[0] + band[1]) / 2) * GAUGE_ROWS * c);
+    drawGhost(g, ghostAt.left - c, ghostAt.y - 2 * c, ghostAt.width + 5 * c, 4 * c, paintNeedleGhost, styleGhost(GHOST_INK, density));
+  }
+
+  // --- The test bot (development only) ------------------------------------------------
+  // `?autoplay` hands the counter to the bot in orders-bot.js, which plays
+  // like a steady person; `?autoplay=careless` sometimes forgets to check the
+  // tap or the jar. Each shift's tally goes to the console as it ends. While
+  // a lesson is new the bot waits a second, so every lesson can be watched.
+
+  let autoplay: ReturnType<typeof createBot> | null = null;
+  const botCup: NonNullable<BotView["cup"]> = {
+    guestId: 0, station: "", busy: false, tea: null, orderTea: "", drops: 0, queue: [], stampAt: null, level: 0, line: 0,
+    scoopStart: 0, swing: 1, loaded: false, sealStart: 0, sealPeriod: rulesFor(expert).sealPeriod, band: rulesFor(expert).sealBand,
+  };
+  const botView: BotView = {
+    now: 0, cup: null, holding: false, dry: false, tapIndex: 0, target: 0, jarIndex: 0, wanted: 0, teaReady: true, lowTank: -1, restless: false, ticket: false,
+  };
+
+  function devBot() {
+    if (!import.meta.env.DEV) return null;
+    const mode = new URLSearchParams(window.location.search).get("autoplay");
+    if (mode === null) return null;
+    return createBot(Math.floor(Math.random() * 2 ** 31), { slip: mode === "careless" ? 0.15 : 0 });
+  }
+
+  function stepBot(realDt: number) {
+    if (!autoplay || !running || paused) return;
+    const lesson = coach.current;
+    if (lesson && !coach.leaving && coach.age < 1 && !holds.size) return;
+    const cup = making;
+    botView.now = clock;
+    botView.holding = holds.size > 0;
+    botView.dry = holds.size > 0 && tankState(tanks[tapIndex]) === "empty";
+    botView.tapIndex = tapIndex;
+    botView.jarIndex = jarIndex;
+    botView.ticket = guests.some((guest) => guest.placed);
+    const restless = sampleTarget(guests, cup?.guestId ?? null);
+    botView.restless = samplesLeft > 0 && restless >= 0 && guests[restless].left / guests[restless].patience < 0.3;
+    botView.lowTank = tanks.findIndex((tank, index) => brewEnds[index] === 0 && tankState(tank) !== "ok");
+    if (cup) {
+      botCup.guestId = cup.guestId;
+      botCup.station = cup.station;
+      botCup.busy = cup.busy;
+      botCup.tea = cup.tea;
+      botCup.orderTea = cup.order.tea;
+      botCup.drops = cup.drops.length;
+      botCup.queue = cup.queue;
+      botCup.stampAt = cup.stampAt;
+      botCup.level = cup.level;
+      botCup.line = FILL_LINE[cup.order.ice];
+      botCup.scoopStart = cup.scoopStart;
+      botCup.swing = cup.swing;
+      botCup.loaded = clock >= cup.loadedAt;
+      botCup.sealStart = cup.sealStart;
+      botView.cup = botCup;
+      botView.target = tapFor(cup.order);
+      botView.wanted = Math.max(0, TOPPINGS.indexOf(cup.queue[cup.drops.length]));
+      botView.teaReady = brewEnds[tapIndex] === 0 && tanks[tapIndex] > 0.001;
+    } else {
+      botView.cup = null;
+    }
+    const action = botAct(autoplay, botView, realDt);
+    if (action === "take") takeNext();
+    else if (action === "press") act("bot");
+    else if (action === "hold") startHold("bot");
+    else if (action === "release") endHold("bot", true);
+    else if (action === "left" || action === "right") {
+      const direction = action === "left" ? -1 : 1;
+      if (cup?.station === "scoop") moveJar(direction);
+      else moveTap(direction);
+    } else if (action === "brew" && botView.lowTank >= 0) brew(botView.lowTank);
+    else if (action === "sample") giveSample();
   }
 
   // --- Input ---------------------------------------------------------------
@@ -3999,18 +4326,16 @@
       return;
     }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (gameOver || paused || askFirst) return;
+    if (gameOver || paused) return;
     const key = event.key;
+    if (!running) return;
 
-    if (demoOn) {
-      // Space or Enter skips to the end card; a focused button keeps them.
-      if ((key === " " || key === "Enter") && !demoEnd && !isOnControl(event)) {
-        event.preventDefault();
-        if (!event.repeat) void finishDemo();
-      }
+    // Enter (not on a focused control) continues past a line that holds.
+    if (key === "Enter" && !isOnControl(event) && coach.current && !coach.current.move && !coach.leaving) {
+      event.preventDefault();
+      if (!event.repeat) continueLesson();
       return;
     }
-    if (!running) return;
 
     if (key === " " || key === "Enter") {
       // A focused control keeps Space and Enter for itself.
@@ -4037,7 +4362,7 @@
       if (event.repeat || !making) return;
       if (making.station === "sugar") {
         if (key === "ArrowUp") pumpSyrup();
-        else note("syrup can't come back out");
+        else removeSyrup();
         return;
       }
       if (making.station !== "pour" && making.station !== "ice") return;
@@ -4086,7 +4411,7 @@
   function tapDown(event: PointerEvent, index: number) {
     if (!isPrimary(event)) return;
     event.preventDefault();
-    if (demoOn || !tapLive(index) || !selectTap(index)) return;
+    if (!tapLive(index) || !selectTap(index)) return;
     leaveEarly();
     capture(event);
     startHold("tap");
@@ -4099,7 +4424,7 @@
       endHold("tap-key", true);
       return;
     }
-    if (demoOn || event.repeat || !tapLive(index) || !selectTap(index)) return;
+    if (event.repeat || !tapLive(index) || !selectTap(index)) return;
     leaveEarly();
     startHold("tap-key");
   }
@@ -4108,7 +4433,6 @@
   function handDown(event: PointerEvent, source: string) {
     if (!isPrimary(event)) return;
     event.preventDefault();
-    if (demoOn) return;
     capture(event);
     act(source);
   }
@@ -4118,7 +4442,7 @@
     if (!isPrimary(event)) return;
     event.preventDefault();
     const cup = making;
-    if (demoOn || (!cup && !running)) return;
+    if (!cup && !running) return;
     if (cup && cup.station === "scoop" && !cup.busy) {
       const box = canvas.getBoundingClientRect();
       const jar = jarAt(event.clientX - box.left, event.clientY - box.top);
@@ -4135,14 +4459,13 @@
     if (event.key !== " " && event.key !== "Enter") return;
     event.preventDefault();
     if (!down) endHold("hand-key", true);
-    else if (!event.repeat && !demoOn) act("hand-key");
+    else if (!event.repeat) act("hand-key");
   }
 
   // --- Pause, restart, and finish -----------------------------------------
 
   async function pauseGame() {
-    // The demo and the first-shift question already hold the shift.
-    if (gameOver || paused || demoOn || askFirst) return;
+    if (gameOver || paused) return;
     paused = true;
     releaseAll();
     setMusicPaused(true);
@@ -4154,7 +4477,7 @@
   function resumeGame() {
     if (gameOver || !paused) return;
     paused = false;
-    last = 0;
+    loop.resync();
     setMusicPaused(false);
     sfxBlip();
     liveMessage = "Game resumed";
@@ -4183,15 +4506,7 @@
     lastControl.focus();
   }
 
-  /** Where Tab cycles: the first-shift question, the demo's controls, or the game. */
-  function trapScope(): Element | null {
-    if (askFirst) return firstCard ?? null;
-    if (demoOn) return (demoEnd ? endCard : demoBar) ?? null;
-    return playScope;
-  }
-
   function togglePause() {
-    if (demoOn || askFirst) return;
     if (paused) resumeGame();
     else void pauseGame();
   }
@@ -4200,15 +4515,26 @@
     if (gameOver) return;
     gameOver = true;
     running = false;
-    active = false;
     endReason = reason;
-    cancelAnimationFrame(raf);
+    loop.stop();
+    coach.dismiss();
+    lessons.cue = null;
+    // The shop comes back to full light behind the results.
+    lessonDim = 0;
+    dimOthers = false;
     releaseAll();
+    if (autoplay) {
+      const count = (reaction: Reaction) => history.filter((item) => item === reaction).length;
+      console.info("order up autoplay", { reason, score, served, sentBack: count("sentBack"), walkouts: count("storm") });
+    }
     // A half-made cup is abandoned with the shift.
     making = null;
     beats = [];
     falling = [];
     iceArcs = [];
+    // One last frame without the spotlight (the loop has stopped).
+    drawRoom();
+    draw();
     const result = concludeRun("orders", score, reason);
     localBest = result.best;
     newBest = result.newBest;
@@ -4253,7 +4579,7 @@
     elapsed = 0;
     arrivalTimer = 0;
     arrivalIn = Infinity;
-    takeLockUntil = 0;
+    ordersMade = 0;
     recent = [];
     resetShiftExtras();
     resetRoom();
@@ -4262,11 +4588,21 @@
     particles = [];
     popups = [];
     iceArcs = [];
-    last = 0;
-    active = true;
+    coach.reset();
+    autoplay = devBot();
+    lessons.cue = null;
+    coachLesson = null;
+    lessons.held.clear();
+    lessons.announced.clear();
+    settle = null;
+    lessons.quiet = 0;
+    lessonDim = 0;
+    begunAt = 0;
     sfxCountdown(COUNTDOWN_SECONDS);
     liveMessage = `Countdown ${COUNTDOWN_SECONDS}`;
-    raf = requestAnimationFrame(frame);
+    loop.start();
+    // The results slip has gone: focus back on the counter, so Space works the bench.
+    void tick().then(focusPlayfield);
   }
 
   // --- Sizing and lifecycle ------------------------------------------------
@@ -4278,6 +4614,7 @@
     W = Math.max(1, Math.round(rect.width));
     H = Math.max(1, Math.round(rect.height));
     ctx = fitCanvas(canvas, W, H);
+    benchBox = canvas.getBoundingClientRect();
     // Whole-pixel cells, sized so the back bar, the stream and the cup all
     // fit; everything judged from the cup is measured in the same cells.
     cell = Math.max(2, Math.min(Math.floor(H / ROWS_NEEDED), Math.floor(W / COLS_NEEDED)));
@@ -4309,6 +4646,8 @@
     layoutRoom();
     drawRoom();
     draw();
+    // A lesson's target has moved with the layout: measured again, or dropped if it has gone.
+    if (lessons.cue) measureAnchor(true);
   }
 
   function measure() {
@@ -4319,13 +4658,6 @@
   onMount(() => {
     popupFont = arcadeFont();
     special = pickSpecial();
-    // The menu's demo button opens straight on the demo; the first time on
-    // this device asks; otherwise straight to the countdown. Order up asked
-    // its own first-shift question before the shared one existed, so anyone
-    // who has played it before (its first-visit cookie) is never asked again.
-    const requested = takeDemoRequest("orders");
-    const fresh = firstVisit("orders");
-    const intro = demoIntro("orders", requested);
 
     const smallQuery = window.matchMedia("(max-width: 640px)");
     const onSmall = () => {
@@ -4334,15 +4666,20 @@
     };
     small = smallQuery.matches;
     smallQuery.addEventListener("change", onSmall);
+    // On a touch screen the lessons name the gesture and light the pad.
+    const touchQuery = window.matchMedia("(hover: none) and (pointer: coarse)");
+    const onTouch = () => (touchUI = touchQuery.matches);
+    onTouch();
+    touchQuery.addEventListener("change", onTouch);
 
     const unmountShell = mountShell({
       isOver: () => gameOver,
       isPaused: () => paused,
       pause: () => void pauseGame(),
       togglePause,
-      playScope: trapScope,
+      playScope: () => playScope,
       onResize: measure,
-      // The demo row and the HUD's second row change where the counter starts.
+      // The HUD's second row changes where the counter starts.
       observe: hud,
       onReduceMotion: (reduce) => {
         reduceMotion = reduce;
@@ -4356,27 +4693,27 @@
     benchObserver.observe(lineEl);
     benchObserver.observe(columnEl);
 
-
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     // Held keys never outlive the window's focus.
     window.addEventListener("blur", releaseAll);
 
-
+    // Straight to the countdown: the shift teaches itself as it goes.
     measure();
-    if (intro === "demo") void openDemo();
-    else if (intro === "ask" && fresh) askAboutDemo();
-    else sfxCountdown(COUNTDOWN_SECONDS);
-    raf = requestAnimationFrame(frame);
+    // No card in front of the counter any more, so focus lands in the game.
+    focusPlayfield();
+    autoplay = devBot();
+    sfxCountdown(COUNTDOWN_SECONDS);
+    loop.start();
 
     return () => {
-      active = false;
-      cancelAnimationFrame(raf);
+      loop.stop();
       timers.clear();
       setPourStream(0);
       stopMusic();
       benchObserver.disconnect();
       smallQuery.removeEventListener("change", onSmall);
+      touchQuery.removeEventListener("change", onTouch);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", releaseAll);
@@ -4438,49 +4775,19 @@
 
       <div class="boba-ticket boba-ticket-end boba-riso" style="--tilt: -0.8deg">
         <Pearls left={lives} total={LIVES} pulse={missPulse} />
-        <HudButtons {paused} disabled={demoOn || askFirst} on:pause={togglePause} />
+        <HudButtons {paused} on:pause={togglePause} />
       </div>
-
-      <!-- The demo: under the end ticket, before and during a shift (on a
-           phone, beside the timer on the second row). While it plays, the
-           same spot skips it. -->
-      {#if !gameOver}
-        <div bind:this={demoBar} class="ou-demo-bar">
-          {#if demoOn && !demoEnd}
-            <button
-              bind:this={skipButton}
-              type="button"
-              class="boba-btn secondary ou-demo-btn"
-              on:click={() => void finishDemo()}
-            >
-              Skip demo
-            </button>
-          {:else}
-            <button
-              type="button"
-              class="boba-btn secondary ou-demo-btn"
-              disabled={paused || askFirst || demoOn}
-              on:mousedown={keepFocus}
-              on:click={() => void openDemo()}
-            >
-              Demo
-            </button>
-          {/if}
-        </div>
-      {/if}
     </div>
   </header>
 
   <div class="ou-counter boba-ui" style={`--hud-h: ${hudHeight}px`}>
     <div bind:this={columnEl} class="ou-column">
       <!-- The rail: each guest's ticket comes up from the counter and is
-           clipped here. The demo swaps in its own line without the shift's
-           guests playing their exits. -->
+           clipped here. -->
       <section class="ou-line" aria-label="Customers" style={`--cap: ${ticketCap}`}>
         <span class="ou-wire" aria-hidden="true"></span>
         <ol bind:this={lineEl} class="ou-guests" class:is-four={ticketCap > 3}>
-          {#key demoOn}
-            {#each guests as guest, index (guest.id)}
+          {#each guests as guest, index (guest.id)}
               {@const share = Math.max(0, guest.left / guest.patience)}
               {@const mood = waitingMood(share)}
               {@const mine = making?.guestId === guest.id}
@@ -4489,6 +4796,7 @@
               {@const pumpsWanted = sugarPumps(guest.order.sugar)}
               <li
                 class="ou-slot"
+                class:is-dim={dimOthers && litTicket !== guest.id}
                 data-guest={guest.id}
                 out:leave={{ guest }}
                 animate:flip={{ duration: reduceMotion ? 0 : 260 }}
@@ -4497,15 +4805,16 @@
                   type="button"
                   class="ou-guest boba-riso is-small"
                   class:has-slab={guest.placed && share <= CROSS_AT}
+                  class:is-rush={guest.placed && share <= RUSH_AT}
                   class:is-making={mine}
                   class:is-hanging={!guest.placed}
-                  class:is-demo-press={demoPress === `ticket-${index}`}
                   style={`--tilt: ${guest.tilt}deg`}
                   aria-pressed={mine}
                   aria-label={guestLabel(guest, mood, mine)}
+                  disabled={!guest.placed}
                   aria-keyshortcuts={String(index + 1)}
                   on:mousedown={keepFocus}
-                  on:click={() => !demoOn && take(index)}
+                  on:click={() => take(index)}
                 >
                   <span class="ou-clip" aria-hidden="true"></span>
                   <span class="ou-head">
@@ -4517,9 +4826,11 @@
                       <kbd class="ou-key">{index + 1}</kbd>
                     {/if}
                   </span>
-                  {#if mine || guest.regular.quirk}
+                  {#if mine || guest.regular.quirk || (guest.placed && share <= CROSS_AT)}
                     <span class="ou-pills">
                       {#if mine}<span class="ou-pill is-making">making</span>{/if}
+                      <!-- About to walk out: said in words as well as the slab and the accent line. -->
+                      {#if guest.placed && share <= CROSS_AT}<span class="ou-pill is-leaving">leaving</span>{/if}
                       {#if critic}
                         <span class="ou-pill is-star">
                           <PixelIcon grid={STAR} palette={{ O: "currentColor" }} px={2} />critic
@@ -4588,20 +4899,15 @@
                   <span class="ou-patience" class:is-low={share <= CROSS_AT} style={`--left: ${share}`}></span>
                 </button>
               </li>
-            {/each}
-          {/key}
+          {/each}
         </ol>
-        {#if running && !demoOn && !guests.length}
+        {#if running && !guests.length}
           <p class="ou-quiet">no one waiting</p>
         {/if}
       </section>
 
       <!-- The bench: the cup and everything that happens to it. -->
       <div class="ou-bench">
-        {#if demoOn}
-          <!-- The live region reads each caption, so this copy is hidden. -->
-          <p class="ou-caption" aria-hidden="true">{demoCaption}</p>
-        {/if}
         <div bind:this={benchArt} class="ou-bench-art" style={`--taps-top: ${tapsTop}px; --taps-h: ${tapsH}px`}>
           <!-- The back bar's controls, laid over its machines: the ice bin,
                a tap for each tea (hold to pour), and the syrup bottle. Each
@@ -4612,22 +4918,21 @@
                 bind:this={iceEl}
                 type="button"
                 class="ou-tap ou-ice"
-                class:is-demo-press={demoPress === "ice"}
                 aria-label={making && iceTarget
                   ? `Add a cube of ice, ${iceCount} of ${iceTarget} in the cup`
                   : `Add a cube of ice, ${iceCount} in the cup`}
                 aria-keyshortcuts="ArrowUp"
                 disabled={!iceOpen}
                 on:mousedown={keepFocus}
-                on:click={() => !demoOn && addIce()}
+                on:click={() => addIce()}
               ></button>
               {#if iceOpen && iceCount > 0}
                 <button
                   type="button"
                   class="boba-btn secondary ou-chip"
+                  class:is-dim={dimOthers && !litLess}
                   aria-label="Take a cube of ice out"
                   aria-keyshortcuts="ArrowDown"
-                  disabled={demoOn}
                   on:mousedown={keepFocus}
                   on:click={removeIce}
                 >
@@ -4643,7 +4948,6 @@
                   bind:this={tapEls[index]}
                   type="button"
                   class="ou-tap"
-                  class:is-demo-press={demoPress === `tap-${index}`}
                   aria-pressed={!!making && tapIndex === index}
                   aria-label={tapLabel(index, special, brewing, tankStates)}
                   disabled={!tapLive(index, making)}
@@ -4660,7 +4964,7 @@
                   <!-- Today's special: a star by the lid. Brewing: a bar
                        filling along the foot. -->
                   {#if tea === special}
-                    <span class="ou-tap-star" aria-hidden="true"><PixelIcon grid={STAR} palette={{ O: "currentColor" }} px={2} /></span>
+                    <span class="ou-tap-star" class:is-dim={dimOthers && litTap !== index} aria-hidden="true"><PixelIcon grid={STAR} palette={{ O: "currentColor" }} px={2} /></span>
                   {/if}
                   {#if brewNow >= 0}
                     <span class="ou-brew-bar" style={`--done: ${brewNow}`} aria-hidden="true"></span>
@@ -4668,10 +4972,12 @@
                 </button>
                 {#if brewNow < 0 && tank !== "ok"}
                   <button
+                    bind:this={brewEls[index]}
                     type="button"
                     class="boba-btn secondary ou-chip"
+                    class:is-dim={dimOthers && litTap !== index}
                     aria-label={`Brew ${TEA_NAMES[tea]}`}
-                    disabled={!running || demoOn}
+                    disabled={!running}
                     on:mousedown={keepFocus}
                     on:click={() => brew(index)}
                   >
@@ -4685,13 +4991,12 @@
                 bind:this={syrupEl}
                 type="button"
                 class="ou-tap ou-syrup"
-                class:is-demo-press={demoPress === "syrup"}
                 aria-label={making && sugarTarget
                   ? `Pump the syrup, ${sugarCount} of ${sugarTarget} pumps in`
                   : "Pump the syrup"}
                 disabled={!syrupOpen}
                 on:mousedown={keepFocus}
-                on:click={() => !demoOn && pumpSyrup()}
+                on:click={() => pumpSyrup()}
               ></button>
             </div>
           </div>
@@ -4708,7 +5013,13 @@
           <!-- The live region carries the same news, so this copy is hidden. -->
           {#if receipt}
             {#key receipt.id}
-              <div class="ou-receipt boba-riso is-small" aria-hidden="true">
+              <div
+                bind:this={receiptEl}
+                class="ou-receipt boba-riso is-small"
+                class:is-dim={dimOthers && !litReceipt}
+                style={`--x: ${Math.round(receipt.x)}px`}
+                aria-hidden="true"
+              >
                 {#if receipt.perfect}
                   <span class="ou-stamp is-perfect">perfect</span>
                 {/if}
@@ -4726,7 +5037,7 @@
                       </span>
                     {/if}
                     {#if receipt.combo > 0}
-                      <span class="ou-receipt-streak">×{receipt.combo} combo</span>
+                      <span bind:this={streakEl} class="ou-receipt-streak">×{receipt.combo} combo</span>
                     {/if}
                   {/if}
                   {#if receipt.line}<p class="ou-receipt-line">{receipt.line}</p>{/if}
@@ -4746,22 +5057,77 @@
           {/if}
         </div>
 
-        <!-- The stepper and the prompt share one paper chip over the room. -->
-        <div class="ou-status">
-          <ol class="ou-steps" class:is-idle={!making} aria-label="Steps">
+        <!-- The drink being made, pinned under the cup: its stations in the
+             order it is built, with what each wants (the syrup's pumps, the
+             ice's cubes, the tea, the scoops), the one at hand marked and the
+             ones behind graded; and under them the guest's patience. It earns
+             a slab when they are about to leave, and jitters near the end. -->
+        <div
+          bind:this={cardEl}
+          class="ou-card boba-riso is-small"
+          class:has-slab={!!making && makingShare <= CROSS_AT}
+          class:is-rush={!!making && makingShare <= RUSH_AT}
+          class:is-dim={dimOthers && !litCard}
+        >
+          <ol class="ou-steps" class:is-idle={!making} aria-label="The drink">
             {#each steps as step (step.id)}
               <li
                 class="ou-step"
+                data-step={step.id}
                 class:is-current={!!making && step.state === "current"}
+                class:is-done={step.state === "done"}
                 aria-current={making && step.state === "current" ? "step" : undefined}
               >
                 {#if making && step.state === "current"}<Mark kind="caret" />{/if}
+                {#if making && step.id === "sugar"}
+                  <span class="ou-cubes" aria-hidden="true">
+                    {#each Array(Math.max(sugarTarget, sugarCount)) as _, drop}
+                      <span class="ou-drop" class:is-empty={drop >= sugarCount} class:is-over={drop >= sugarTarget}></span>
+                    {/each}
+                  </span>
+                {:else if making && step.id === "ice"}
+                  <span class="ou-cubes" aria-hidden="true">
+                    {#each Array(Math.max(iceTarget, iceCount)) as _, cube}
+                      <span class="ou-cube" class:is-empty={cube >= iceCount} class:is-over={cube >= iceTarget}></span>
+                    {/each}
+                  </span>
+                {:else if making && step.id === "pour"}
+                  <span class="ou-swatch" style={`--swatch: ${TEA_COLORS[making.order.tea]}`} aria-hidden="true"></span>
+                {:else if making && step.id === "scoop"}
+                  {#each making.order.toppings as line}
+                    <span class="ou-card-scoop" aria-hidden="true">
+                      <PixelIcon grid={TOPPING_ART[line.kind].icon} palette={toppingIconPalette(line.kind)} px={2} />×{line.scoops}
+                    </span>
+                  {/each}
+                {/if}
                 <span>{step.label}</span>
+                {#if making}<span class="sr-only">{stepAmount(making, step.id)}</span>{/if}
                 {#if step.word}<span class="ou-step-word">{step.word}</span>{/if}
               </li>
             {/each}
           </ol>
-          <p class="ou-prompt" class:is-notice={!!notice}>{prompt}</p>
+          <!-- Who it's for and their patience; a notice takes the name's
+               place, never the patience. -->
+          <p class="ou-card-foot">
+            {#if notice}
+              <span class="ou-card-notice">{notice.text}</span>
+            {:else if making}
+              <span class="ou-card-for">for {making.name}</span>
+            {/if}
+            {#if making}
+              <span
+                class="ou-card-patience"
+                class:is-low={makingShare <= CROSS_AT}
+                style={`--left: ${makingShare}`}
+                role="meter"
+                aria-label={`${making.name}'s patience`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(makingShare * 10) * 10}
+              ></span>
+              {#if makingShare <= CROSS_AT}<span class="ou-card-leaving">leaving</span>{/if}
+            {/if}
+          </p>
         </div>
       </div>
 
@@ -4771,7 +5137,8 @@
         <button
           type="button"
           class="boba-btn ou-hand-btn"
-          class:is-demo-press={demoPress === "hand"}
+          class:is-lit={handLit}
+          class:is-dim={dimOthers && !litHand}
           disabled={!handLive}
           on:mousedown={keepFocus}
           on:pointerdown={(event) => handDown(event, "hand")}
@@ -4799,21 +5166,25 @@
               {/each}
             </span>
           {/if}
-          {#if handLive && !demoOn}<kbd aria-hidden="true">Space</kbd>{/if}
+          {#if handLive}<kbd aria-hidden="true">Space</kbd>{/if}
         </button>
         <button
           type="button"
           class="boba-btn secondary"
+          class:is-dim={dimOthers}
           aria-keyshortcuts="Backspace"
-          disabled={!handLive || demoOn}
+          disabled={!handLive}
           on:mousedown={keepFocus}
           on:click={dump}
         >
           Dump <kbd aria-hidden="true">⌫</kbd>
         </button>
         <button
+          bind:this={sampleEl}
           type="button"
           class="boba-btn secondary ou-sample"
+          class:is-lit={sampleLit}
+          class:is-dim={dimOthers && !litSample}
           aria-keyshortcuts="S"
           aria-label={`Sample for the guest closest to leaving, ${samplesLeft} left`}
           disabled={!canSample}
@@ -4829,6 +5200,24 @@
       </div>
     </div>
   </div>
+  <!-- The lesson, beside the station or the thing it is about: inside the
+       game's own scope, so Tab reaches its Continue. -->
+  <Coach
+    lesson={coachLesson}
+    x={coachX}
+    y={coachY}
+    side={coachSide}
+    ring={coachRing}
+    width={coachWidth}
+    scene={coachScene}
+    leaving={coachLeaving}
+    hidden={paused || gameOver}
+    top={coachTop}
+    touch={touchUI}
+    continuable={!!coachLesson && !coachLesson.move && coachOpen}
+    on:continue={continueLesson}
+    returnFocus={focusPlayfield}
+  />
 </div>
 
 <!-- Tickets on their way from a guest's hand up to the rail. -->
@@ -4843,34 +5232,10 @@
   {/each}
 </div>
 
-{#if (countdown > 0 || goVisible) && !askFirst && !demoOn}
+{#if countdown > 0 || goVisible}
   <Countdown value={countdown} caption="the counter opens in" goCaption="orders up" />
 {/if}
 
-{#if askFirst}
-  <!-- The shared first-time card; the wrapper is only for the focus trap. -->
-  <div bind:this={firstCard} class="ou-first">
-    <DemoCard
-      deck="Watch one drink made start to finish, or open the counter."
-      on:watch={() => answerFirst(true)}
-      on:play={() => answerFirst(false)}
-    />
-  </div>
-{/if}
-
-{#if demoOn && demoEnd}
-  <div class="boba-scrim boba-ui" role="dialog" aria-modal="true" aria-labelledby="ou-end-title">
-    <div bind:this={endCard} class="boba-card boba-riso" tabindex="-1">
-      <h2 id="ou-end-title" class="boba-title">your turn</h2>
-      <div class="boba-actions is-start">
-        <button bind:this={endButton} type="button" class="boba-btn" on:click={closeDemo}>
-          {demoMidShift && running ? "Back to the shift" : "Start shift"}
-        </button>
-        <button type="button" class="boba-btn secondary" on:click={() => void watchAgain()}>Watch again</button>
-      </div>
-    </div>
-  </div>
-{/if}
 
 {#if paused && !gameOver}
   <PauseCard
@@ -4937,62 +5302,9 @@
     filter: saturate(0.8);
   }
 
-  /* --- The demo --- */
-
-  /* A grid item of the HUD row: under the end ticket, right-aligned with it. */
-  .ou-demo-bar {
-    display: flex;
-    grid-column: 3;
-    grid-row: 2;
-    align-self: center;
-    justify-self: end;
-  }
-
-  .ou-demo-btn {
-    min-height: 2rem;
-    padding: 0 var(--space-3);
-    font-size: 0.75rem;
-    pointer-events: auto;
-  }
-
-  /* Each caption in a paper chip above the bench, one line. */
-  .ou-caption {
-    flex: none;
-    align-self: center;
-    max-width: 100%;
-    min-height: calc(1.35em + var(--space-1) * 2 + 2px);
-    margin: 0;
-    padding: var(--space-1) var(--space-3);
-    overflow: hidden;
-    color: var(--b-strong);
-    background: var(--b-paper);
-    border: 1px solid var(--b-rule);
-    border-radius: var(--radius-inline);
-    font-size: 0.875rem;
-    font-weight: 500;
-    line-height: 1.35;
-    text-align: center;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .ou-caption:empty {
-    visibility: hidden;
-  }
-
-  /* The control the demo is using shows pressed, with an accent ring. */
-  .ou-guest.is-demo-press,
-  .ou-tap.is-demo-press {
-    box-shadow: 0 0 0 3px var(--b-accent);
-  }
-
-  .ou-tap.is-demo-press {
-    transform: translateY(1px);
-  }
-
-  .ou-hand-btn.is-demo-press {
-    --lift: 2px;
-
+  /* On touch, the pad a lesson is about: an accent ring, like a finger on it. */
+  .ou-hand-btn.is-lit,
+  .ou-sample.is-lit {
     box-shadow: 0 0 0 3px var(--b-accent);
   }
 
@@ -5176,6 +5488,12 @@
     font-weight: 500;
   }
 
+  .ou-pill.is-leaving {
+    color: var(--b-accent);
+    border-color: currentColor;
+    font-weight: 500;
+  }
+
   .ou-order {
     display: grid;
     gap: var(--space-0-5);
@@ -5244,8 +5562,9 @@
 
   /* Patience is a pencil line that shortens, turning accent near the end
      (when the face is already frowning, so colour never says it alone). */
+  /* Thick enough to read at a glance from the bench. */
   .ou-patience {
-    height: 3px;
+    height: 5px;
     margin-top: var(--space-0-5);
     background: var(--b-line);
     border-radius: 2px;
@@ -5456,10 +5775,6 @@
     height: 0.375rem;
   }
 
-  .ou-first {
-    display: contents;
-  }
-
   .ou-star {
     display: inline-flex;
     margin-left: calc(var(--space-1) * -0.5);
@@ -5496,17 +5811,21 @@
     -webkit-touch-callout: none;
   }
 
-  /* Up on the wall, clear of the counter, so the guest's face as they take
-     the drink is never under it. */
+  /* Up on the wall over the guest who took the drink (--x, their place on
+     the bench), held inside the bench at either end. */
   .ou-receipt {
+    --receipt-w: min(100%, 22rem);
+
     position: relative;
     z-index: 3;
     display: flex;
     grid-area: 1 / 1;
     align-self: start;
+    justify-self: start;
     align-items: start;
     gap: var(--space-5);
-    width: min(100%, 25rem);
+    width: var(--receipt-w);
+    margin-left: clamp(0px, calc(var(--x, 50%) - 11rem), calc(100% - 22rem));
     padding: var(--space-3) var(--space-4);
     pointer-events: none;
     transform: rotate(-0.8deg);
@@ -5650,25 +5969,30 @@
 
   /* --- Stepper and prompt --- */
 
-  .ou-status {
+  /* The making card: the drink on the bench as a ticket pinned under the
+     cup. One row of its stations, one of the guest and their patience, at
+     every width, so the bench above never changes height mid-drink. */
+  .ou-card {
+    --tilt: -0.4deg;
+
     display: grid;
     flex: none;
     gap: var(--space-1);
     align-self: center;
     max-width: 100%;
     padding: var(--space-1-5) var(--space-3);
-    background: var(--b-paper);
-    border: 1px solid var(--b-rule);
-    border-radius: var(--radius-inline);
   }
 
-  /* One row of steps and one of prompt, at every width, so the bench above
-     never changes height mid-drink. */
+  /* The card's paper sits a little crooked, like a pinned ticket; its text stays level. */
+  .ou-card::after {
+    transform: rotate(var(--tilt));
+  }
+
   .ou-steps {
     display: flex;
     flex-wrap: nowrap;
     justify-content: center;
-    gap: var(--space-1) var(--space-5);
+    gap: var(--space-1) var(--space-4);
     margin: 0;
     padding: 0;
     color: var(--b-muted);
@@ -5683,7 +6007,7 @@
 
   .ou-step {
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-1);
     white-space: nowrap;
   }
@@ -5693,26 +6017,89 @@
     font-weight: 500;
   }
 
+  .ou-step.is-done {
+    color: var(--b-muted);
+  }
+
   .ou-step-word {
     color: var(--b-text);
     font-style: italic;
   }
 
-  .ou-prompt {
+  .ou-card-scoop {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    font-size: 0.6875rem;
+  }
+
+  .ou-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
     min-height: 1.35em;
     margin: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--b-muted);
     font-size: 0.8125rem;
     font-style: italic;
     line-height: 1.35;
-    text-align: center;
   }
 
-  .ou-prompt.is-notice {
+  .ou-card-notice {
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--b-strong);
+  }
+
+  /* The guest's patience, as on their ticket but where the eye already is. */
+  .ou-card-patience {
+    flex: 0 1 8rem;
+    height: 5px;
+    background: var(--b-line);
+    border-radius: 2px;
+    transform: scaleX(var(--left));
+    transform-origin: left;
+    transition: transform 100ms linear;
+  }
+
+  .ou-card-patience.is-low {
+    background: var(--b-accent);
+  }
+
+  .ou-card-leaving {
+    color: var(--b-accent);
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  /* The lesson's spotlight, on the page's own pieces: what the lesson isn't
+     about dims with the shop. */
+  .is-dim {
+    filter: brightness(0.62) saturate(0.85);
+  }
+
+  /* Whatever has focus keeps full contrast, ring and all. */
+  .is-dim:focus-visible,
+  .is-dim:focus-within {
+    filter: none;
+  }
+
+  .ou-card,
+  .ou-receipt,
+  .ou-slot,
+  .ou-tap-star {
+    transition: filter 180ms var(--ease-standard);
+  }
+
+  /* Buttons keep their own lift as well. */
+  .ou-hand > :global(.boba-btn),
+  .ou-chip {
+    transition:
+      transform var(--motion-base) var(--ease-emphasized),
+      filter 180ms var(--ease-standard);
   }
 
   /* --- The hand --- */
@@ -5764,9 +6151,9 @@
   /* --- Phones ---
      The vertical budget at 375 x 640, in px: HUD two rows (104) + 8, line
      (10 + about 104 for the cards), taps (48), bench (canvas at least 176,
-     4, stepper about 43), hand (44), three 8px gaps, 8 at the foot. That is
-     about 460, leaving room for the demo's caption chip (30) and a card
-     with a fourth order line; anything spare goes to the bench. */
+     4, making card about 43), hand (44), three 8px gaps, 8 at the foot. That is
+     about 460, leaving room for a card with a fourth order line; anything
+     spare goes to the bench. */
 
   @media (max-width: 640px) {
     .ou-counter {
@@ -5775,18 +6162,6 @@
 
     .ou-column {
       gap: var(--space-2);
-    }
-
-    /* Beside the centred timer, at the right end of the HUD's second row. */
-    .ou-demo-bar {
-      grid-column: 2;
-      grid-row: 2;
-    }
-
-    .ou-demo-btn {
-      min-height: 1.75rem;
-      padding: 0 var(--space-2);
-      font-size: 0.6875rem;
     }
 
     .ou-line {
@@ -5905,29 +6280,29 @@
       gap: var(--space-1);
     }
 
-    /* The stepper: one row of steps (their grades show on the bench as they
-       land), one of prompt, tight. */
-    .ou-status {
+    /* The making card, tight: its lines in three columns and two rows, so
+       a long expert drink never runs off the side and the card keeps one
+       height. A finished line shows its grade in place of its marks. */
+    .ou-card {
       gap: 2px;
       padding: var(--space-1) var(--space-2-5);
     }
 
     .ou-steps {
-      column-gap: var(--space-3);
-      font-size: 0.75rem;
+      display: grid;
+      grid-template-columns: repeat(3, auto);
+      justify-content: center;
+      gap: 2px var(--space-3);
+      min-height: calc(2.6em + 2px);
+      font-size: 0.6875rem;
     }
 
-    .ou-step-word {
+    .ou-step.is-done :is(.ou-cubes, .ou-swatch, .ou-card-scoop) {
       display: none;
     }
 
-    .ou-prompt {
-      font-size: 0.75rem;
-    }
-
-    .ou-caption {
-      padding-block: var(--space-0-5);
-      font-size: 0.8125rem;
+    .ou-card-foot {
+      font-size: 0.6875rem;
     }
 
     .ou-receipt {
@@ -5974,7 +6349,13 @@
     .ou-guest,
     .ou-tap,
     .ou-patience,
-    .ou-brew-bar {
+    .ou-card-patience,
+    .ou-brew-bar,
+    .ou-card,
+    .ou-hand > :global(.boba-btn),
+    .ou-slot,
+    .ou-chip,
+    .ou-tap-star {
       transition: none;
     }
   }

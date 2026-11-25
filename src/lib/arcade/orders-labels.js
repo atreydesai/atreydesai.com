@@ -5,6 +5,13 @@
 // them on the jar's own cell grid.
 
 /**
+ * The word printed on each tea's tank: short enough for the glass, so
+ * strawberry is "berry". Lessons name a tap by the same word.
+ * @type {Readonly<Record<import("./orders-engine.js").Tea, string>>}
+ */
+export const TEA_WORDS = Object.freeze({ milk: "milk", taro: "taro", matcha: "matcha", strawberry: "berry" });
+
+/**
  * Lowercase letters, five rows each, "#" printed. Mostly three units wide;
  * m and w take five. Descenders are tucked into the last row.
  * @type {Record<string, string[]>}

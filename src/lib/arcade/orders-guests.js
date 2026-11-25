@@ -10,6 +10,7 @@
 // outlined in ink to 14 by 20; the counter cuts it a few rows from the
 // bottom (FIGURE_ABOVE rows show above it).
 
+import { mixHex } from "./core/color.ts";
 import { CRITIC, REGULARS } from "./orders-engine.js";
 
 /** @typedef {"calm" | "blink" | "glance" | "glanceAlt" | "cross" | "storm" | "starry" | "wow" | "content" | "meh" | "unimpressed" | "sentBack"} Face */
@@ -239,17 +240,6 @@ const FEATURES = {
 /** How far each face flushes the skin toward red. @type {Partial<Record<Face, number>>} */
 const FLUSH = { cross: 0.22, storm: 0.42, sentBack: 0.36 };
 const RED = "#e0604c";
-
-/**
- * @param {string} hex
- * @param {string} toward
- * @param {number} t
- */
-export function mixHex(hex, toward, t) {
-  const a = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  const b = [1, 3, 5].map((i) => parseInt(toward.slice(i, i + 2), 16));
-  return `#${a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, "0")).join("")}`;
-}
 
 /**
  * @param {string[]} rows
