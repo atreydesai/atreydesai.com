@@ -3,7 +3,10 @@ import test from "node:test";
 
 import {
   AFTER_HOURS,
+  EVENTS,
   HEIGHT,
+  IN_PIPE,
+  SPILLED,
   ROOMS,
   STEP,
   WIDTH,
@@ -31,7 +34,9 @@ import {
   NEAR,
   REST,
   aim,
+  chooseSide,
   continuable,
+  coverCost,
   coverage,
   createHolds,
   createSpot,
@@ -40,7 +45,9 @@ import {
   follows,
   ghostRoute,
   holds,
+  inItsPart,
   introducedIn,
+  keepClear,
   knownFrom,
   mayOffer,
   planningLesson,
@@ -48,6 +55,8 @@ import {
   ROUTE_ROOM,
   roomFrame,
   routeVerdict,
+  sidesFor,
+  slipRect,
   wordedFor,
   wouldClear,
 } from "../src/lib/arcade/spill-lessons.js";
@@ -351,12 +360,40 @@ test("a lesson holds while it explains, never once done or its move made, never 
   assert.equal(holds(LESSONS.fan, { leaving: true }), false, "done: play runs on at once");
   assert.equal(holds(LESSONS.route, { leaving: false, acting: true }), false);
   assert.equal(holds(LESSONS.fan, { leaving: false, expert: true }), false, "expert's planning time is the rule");
-  assert.equal(holds(LESSONS.fill, up), false, "the pour is live");
+  assert.equal(holds(LESSONS.fill, up), true, "the pour stops while its line is read");
   assert.equal(holds(null, up), false);
-  // Every lesson that holds and can't be acted on ends by itself within its allowance.
   for (const lesson of Object.values(LESSONS)) {
-    if (lesson.hold && !lesson.move) assert.ok((lesson.life ?? 4.5) <= HOLD, `${lesson.id} outlives its hold`);
+    // Nothing runs on while a lesson is read: every one holds its part of the room.
+    assert.equal(lesson.hold, true, `${lesson.id} holds`);
+    // Every lesson that can't be acted on ends by itself within its allowance.
+    if (!lesson.move) assert.ok((lesson.life ?? 4.5) <= HOLD, `${lesson.id} outlives its hold`);
   }
+});
+
+test("a lesson holds only the part of the room it belongs to", () => {
+  const planning = { phase: "play", status: "waiting", poured: false };
+  const pressed = { phase: "play", status: "waiting", poured: true };
+  const pouring = { phase: "play", status: "pouring", poured: true };
+  const settling = { phase: "play", status: "settling", poured: true };
+  const result = { phase: "result", status: "cleared", poured: true };
+  // Planning lessons hold planning, until Pour is pressed.
+  assert.equal(inItsPart(LESSONS.fan, planning), true);
+  assert.equal(inItsPart(LESSONS.fan, pressed), false);
+  assert.equal(inItsPart(LESSONS.dial, pouring), false);
+  // The fill line stops the pour where it is, never planning or a result.
+  assert.equal(inItsPart(LESSONS.fill, pouring), true);
+  assert.equal(inItsPart(LESSONS.fill, settling), true);
+  assert.equal(inItsPart(LESSONS.fill, planning), false);
+  assert.equal(inItsPart(LESSONS.fill, result), false);
+  // Taking a straw back can come up planning or pouring.
+  assert.equal(inItsPart(LESSONS.takeBack, planning), true);
+  assert.equal(inItsPart(LESSONS.takeBack, pouring), true);
+  assert.equal(inItsPart(LESSONS.takeBack, result), false);
+  // A result's lessons hold the next room, and nothing else.
+  assert.equal(inItsPart(LESSONS.stars, result), true);
+  assert.equal(inItsPart(LESSONS.stars, pouring), false);
+  assert.equal(inItsPart(LESSONS.route, { phase: "countdown", status: "waiting", poured: false }), false);
+  assert.equal(inItsPart(null, planning), false);
 });
 
 test("each lesson holds for seven real seconds a visit, however often it is shown", () => {
@@ -411,7 +448,7 @@ function snapshot(world) {
  * time, and lessons holding over the real-time windows in `holds` until Pour
  * is pressed. Returns every step's state and the verdict.
  */
-function play(room, strokes, { pourAt = Infinity, pressAtReal = Infinity, holds = [] }) {
+function play(room, strokes, { pourAt = Infinity, pressAtReal = Infinity, holds = [], pourHolds = [] }) {
   const world = createWorld(room);
   drawStrokes(world, strokes);
   const trace = [];
@@ -424,7 +461,9 @@ function play(room, strokes, { pourAt = Infinity, pressAtReal = Infinity, holds 
       pourNow(world);
       poured = true;
     }
-    const holding = !poured && holds.some(([from, seconds]) => real >= from - 1e-9 && real < from + seconds - 1e-9);
+    const within = ([from, seconds]) => real >= from - 1e-9 && real < from + seconds - 1e-9;
+    // Planning lessons hold until Pour is pressed; a lesson about the pour holds once the tea is coming.
+    const holding = poured && world.status !== "waiting" ? pourHolds.some(within) : !poured && holds.some(within);
     const clock = roomFrame(world, accumulator, frame, holding);
     accumulator = clock.accumulator;
     for (let k = 0; k < clock.steps; k++) {
@@ -465,6 +504,23 @@ test("a hold freezes the room: from the same planning time it plays out step for
         // And the verdict: cleared or not, stars, points, early bonus.
         assert.deepEqual(held.result, plain.result);
       }
+    }
+  }
+});
+
+test("a hold during the pour stops the tea where it is, and it plays out step for step as if never held", () => {
+  for (const id of ["first-pour", "the-belt", "latte", "trolley"]) {
+    const room = ROOMS.find((r) => r.id === id);
+    assert.ok(room, id);
+    const pourAt = room.solution.pourAt ?? 1.5;
+    const plain = play(room, room.solution.strokes, { pourAt });
+    for (const pourHolds of [[[pourAt + 0.4, 2]], [[pourAt + 0.05, 1 / 120], [pourAt + 2, 7]]]) {
+      const held = play(room, room.solution.strokes, { pourAt, pourHolds });
+      assert.equal(held.trace.length, plain.trace.length, `${id}, held ${JSON.stringify(pourHolds)}`);
+      for (let i = 0; i < plain.trace.length; i++) {
+        if (held.trace[i] !== plain.trace[i]) assert.fail(`${id}, held ${JSON.stringify(pourHolds)}: step ${i} differs`);
+      }
+      assert.deepEqual(held.result, plain.result);
     }
   }
 });
@@ -545,4 +601,161 @@ test("a straw lesson points at that straw, and says so when it's gone", () => {
   assert.ok(spot.y - spot.ring * 0.875 <= top && spot.y + spot.ring * 0.875 >= bottom);
   world.strokes.length = 0;
   assert.equal(aim({ kind: "straw", index: id }, world, spot, { cupWall: CUP_WALL }), false);
+});
+
+// --- Where the callout goes ----------------------------------------------------------
+
+/**
+ * Two screens as the game lays them out (measured in a browser): room units
+ * to CSS px, the tickets' bottom, the controls along the foot, and a slip of
+ * the size the callout measures there.
+ */
+const SCREENS = {
+  desktop: {
+    w: 1280,
+    h: 800,
+    S: 1.75,
+    rx: 430,
+    ry: 159,
+    top: 80,
+    slip: { w: 300, h: 76 },
+    bar: [
+      { x: 452, y: 728, w: 96, h: 48 },
+      { x: 560, y: 724, w: 320, h: 56 },
+      { x: 892, y: 728, w: 88, h: 48 },
+    ],
+  },
+  phone: {
+    w: 375,
+    h: 812,
+    S: 1.4375,
+    rx: 15,
+    ry: 192,
+    top: 118,
+    slip: { w: 300, h: 84 },
+    bar: [
+      { x: 12, y: 713, w: 80, h: 48 },
+      { x: 100, y: 716, w: 174, h: 42 },
+      { x: 283, y: 713, w: 80, h: 48 },
+    ],
+  },
+};
+
+/** A phone on its side: the room in the screen's height, the controls in a cabinet beside it. */
+const LANDSCAPE = {
+  w: 667,
+  h: 375,
+  S: 0.8125,
+  rx: 112,
+  ry: 92,
+  top: 72,
+  slip: { w: 300, h: 70 },
+  bar: [
+    { x: 439, y: 307, w: 100, h: 48 },
+    { x: 439, y: 243, w: 208, h: 56 },
+    { x: 547, y: 307, w: 100, h: 48 },
+  ],
+};
+
+/** A room box on `screen`, in CSS px. */
+const px = (screen, box) => ({ x: screen.rx + box.x * screen.S, y: screen.ry + box.y * screen.S, w: box.w * screen.S, h: box.h * screen.S, weight: box.weight ?? 1 });
+
+const overlaps = (a, b) => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.5 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.5;
+
+/** Where the callout about `target` goes on `screen`, as the component chooses it. */
+function placeOn(screen, target, world) {
+  const spot = createSpot();
+  assert.ok(aim(target, world, spot, { cupWall: CUP_WALL }), `${target.kind} is in the room`);
+  const anchor = { x: screen.rx + spot.x * screen.S, y: screen.ry + spot.y * screen.S, ring: spot.ring * screen.S, width: spot.wide * screen.S, height: spot.tall * screen.S };
+  const avoid = [...keepClear(world, spot, target).map((box) => px(screen, box)), ...screen.bar.map((box) => ({ ...box, weight: 0.25 }))];
+  const view = { w: screen.w, h: screen.h, top: screen.top };
+  const side = chooseSide(anchor, screen.slip, view, avoid, sidesFor(target, spot, world.room));
+  return { side, rect: slipRect(side, anchor, screen.slip, view), spot, anchor, view, avoid };
+}
+
+/** The box round a polyline of {x, y} points, padded. */
+function boxRound(points, pad) {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  return { x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + pad * 2, h: Math.max(...ys) - Math.min(...ys) + pad * 2 };
+}
+
+test("Coach's sums: a slip beside its thing fits or says so; above or below is nudged on screen", () => {
+  const view = { w: 400, h: 600, top: 80 };
+  const slip = { w: 200, h: 60 };
+  const anchor = { x: 200, y: 300, ring: 10 };
+  const above = slipRect("above", anchor, slip, view);
+  assert.ok(above.fits && above.y + above.h <= anchor.y - anchor.ring * 0.8);
+  assert.equal(slipRect("right", anchor, slip, view).fits, false, "no room for 200 px on the right of the middle");
+  const high = slipRect("above", { x: 200, y: 120, ring: 10 }, slip, view);
+  assert.equal(high.fits, false);
+  assert.equal(high.y, view.top, "kept under the tickets");
+  // A side beside the thing that doesn't fit is never chosen: Coach would move it.
+  assert.notEqual(chooseSide(anchor, slip, view, [], ["right", "above"]), "right");
+  // The side that covers less wins over the one asked for first.
+  const cup = { x: 120, y: 160, w: 160, h: 100, weight: 1.5 };
+  assert.equal(chooseSide(anchor, slip, view, [cup], ["above", "below"]), "below");
+  assert.ok(coverCost("above", anchor, slip, view, [cup]) > 0);
+  assert.equal(coverCost("below", anchor, slip, view, [cup]), 0);
+});
+
+test("room 1's route lesson keeps clear of the ghost, the cup and the kettle, on a phone and a desktop", () => {
+  const world = createWorld(ROOMS[0]);
+  const route = ghostRoute(world.room);
+  for (const [name, screen] of Object.entries(SCREENS)) {
+    const { rect, side } = placeOn(screen, { kind: "route", index: 0 }, world);
+    assert.ok(!overlaps(rect, px(screen, boxRound(route, 3))), `${name}: the slip (${side}) is off the ghost`);
+    for (const cup of world.cups) assert.ok(!overlaps(rect, px(screen, { x: cup.x - cup.w / 2, y: cup.y - cup.h, w: cup.w, h: cup.h })), `${name}: off the cup`);
+    for (const kettle of world.kettles) assert.ok(!overlaps(rect, px(screen, { x: kettle.x - 30, y: kettle.y - 30, w: 34, h: 40 })), `${name}: off the kettle`);
+  }
+  // Where the room has the width, it goes out over the kitchen wall, covering nothing at all.
+  const desktop = placeOn(SCREENS.desktop, { kind: "route", index: 0 }, world);
+  assert.equal(coverCost(desktop.side, desktop.anchor, SCREENS.desktop.slip, desktop.view, desktop.avoid), 0);
+  // On a phone on its side the room is small: the slip may have to cover the
+  // kettle for a moment, but never the ghost or the cup.
+  const { rect, side } = placeOn(LANDSCAPE, { kind: "route", index: 0 }, world);
+  assert.ok(!overlaps(rect, px(LANDSCAPE, boxRound(route, 3))), `landscape: the slip (${side}) is off the ghost`);
+  for (const cup of world.cups) assert.ok(!overlaps(rect, px(LANDSCAPE, { x: cup.x - cup.w / 2, y: cup.y - cup.h, w: cup.w, h: cup.h })), "landscape: off the cup");
+});
+
+test("the fill line's lesson stops the pour clear of the cup and of the tea coming in", () => {
+  const room = ROOMS[0];
+  const world = createWorld(room);
+  drawStrokes(world, room.solution.strokes);
+  pourNow(world);
+  let into = -1;
+  for (let n = 0; n < 120 * 20 && into < 0; n++) {
+    step(world, STEP);
+    for (let i = 0; i < world.events.count; i++) if (world.events.type[i] === EVENTS.INTO_CUP) into = world.events.a[i];
+  }
+  assert.ok(into >= 0, "the tea reaches the cup");
+  const tea = [];
+  for (let i = 0; i < world.count; i++) {
+    if (world.p.cup[i] >= 0 || world.p.flags[i] & (IN_PIPE | SPILLED)) continue;
+    tea.push({ x: world.p.x[i] - 2, y: world.p.y[i] - 2, w: 4, h: 4 });
+  }
+  assert.ok(tea.length > 0, "tea is on its way");
+  for (const [name, screen] of Object.entries(SCREENS)) {
+    const { rect, side } = placeOn(screen, { kind: "line", index: into }, world);
+    const cup = world.cups[into];
+    assert.ok(!overlaps(rect, px(screen, { x: cup.x - cup.w / 2, y: cup.y - cup.h, w: cup.w, h: cup.h })), `${name}: the slip (${side}) is off the cup`);
+    for (const drop of tea) assert.ok(!overlaps(rect, px(screen, drop)), `${name}: off the tea at ${Math.round(drop.x)}, ${Math.round(drop.y)}`);
+  }
+});
+
+test("a fixture's callout never covers the fixture, in its first room, on a phone and a desktop", () => {
+  for (const fixture of FIXTURES) {
+    const index = introducedIn(fixture.id);
+    const world = createWorld(ROOMS[index]);
+    const cue = planningLesson(world, (id) => id !== fixture.id, { drafting: false });
+    assert.equal(cue?.lesson.id, fixture.id, `${fixture.id} is taught in room ${index + 1}`);
+    for (const [name, screen] of Object.entries(SCREENS)) {
+      const { rect, side, spot } = placeOn(screen, cue.target, world);
+      assert.ok(!overlaps(rect, rect.loop), `${fixture.id} on a ${name}: the slip (${side}) is off its brackets`);
+      // The thing itself: what the spotlight keeps lit, less its margin.
+      const lit = spot.lit[0];
+      const thing = { x: lit.x + 4, y: lit.y + 4, w: lit.w - 8, h: lit.h - 8 };
+      assert.ok(!overlaps(rect, px(screen, thing)), `${fixture.id} on a ${name}: the slip (${side}) is off the thing`);
+    }
+  }
 });

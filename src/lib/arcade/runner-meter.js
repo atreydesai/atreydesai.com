@@ -1,8 +1,10 @@
 // Sugar rush's tea and sugar, drawn into the scene: a dark chip on the
 // scene's own pixel grid, the same family as the lesson callout, holding a
 // pixel cup whose tea drains and ten sugar cubes the pearls fill. It sits
-// low and under the runner, where the eye already is; on touch, between the
-// slide and jump pads, the cubes in two rows of five.
+// low and under the runner, where the eye already is, the cup beside its
+// word and the cubes in a row. On a phone, between the slide and jump pads,
+// it stands taller instead: the word beside the cup and the cubes under
+// both, in two rows of five.
 //
 // DOM-free, so the layout and the readings can be checked with node; the
 // component paints it, in cells of `unit` CSS px.
@@ -13,69 +15,101 @@ import { GLYPHS, wordWidth } from "./orders-labels.js";
 export const METER_PAD = 2;
 /** The stepped corner, in cells. */
 export const METER_CUT = 1;
-/** Cells between the cup and the sugar. */
+/** Cells between the cup and the sugar beside it, and between the cup and the cubes under it. */
 const CUP_GAP = 3;
+const STACK_GAP = 2;
 /** Rows a label stands (the printed alphabet's height). */
 export const LABEL_ROWS = 5;
 /** A cube's side, and the cells between cubes. */
-export const CUBE = 3;
+export const CUBE = 5;
 const CUBE_GAP = 1;
 export const CUBES = 10;
 
 /**
- * The cup, the arcade's boba icon at seven by ten: O outline, S straw, a
- * digit the tea row it is (1 the bottom, 6 the top), b a pearl sat in the tea.
+ * The cup, the arcade's boba icon at nine by eleven: O outline, S straw
+ * (through the lid's dome), a digit the tea row it is (1 the bottom, 6 the
+ * top), b a pearl sat in the tea.
  */
 export const METER_CUP = [
-  "....S..",
-  "...S...",
-  "OOOOOOO",
-  ".O666O.",
-  ".O555O.",
-  ".O444O.",
-  ".O333O.",
-  ".O2b2O.",
-  ".Ob1bO.",
-  "..OOO..",
+  "......SS.",
+  ".....SS..",
+  "..OOSOO..",
+  "OOOOOOOOO",
+  ".O66666O.",
+  ".O55555O.",
+  ".O44444O.",
+  ".O33333O.",
+  ".O22b22O.",
+  ".Ob1b1bO.",
+  "..OOOOO..",
 ];
 const TEA_ROWS = 6;
 
-/** A full sugar cube: h its lit corner, f its face, s its shade. */
-export const CUBE_FULL = ["hhf", "hff", "ffs"];
+/** A full sugar cube: h its lit edges, f its face, s its shaded edges. */
+export const CUBE_FULL = ["hhhhf", "hfffs", "hfffs", "hfffs", "fssss"];
 /** An empty cube's place: an outline only, so full and empty differ by more than colour. */
-export const CUBE_EMPTY = ["eee", "e.e", "eee"];
+export const CUBE_EMPTY = ["eeeee", "e...e", "e...e", "e...e", "eeeee"];
 
 /** The X key, printed on a cream keycap with a shaded foot. */
 export const KEYCAP_X = ["ccccc", "cxcxc", "ccxcc", "cxcxc", "sssss"];
 
 /**
- * Where everything sits, in cells from the chip's top left. `twoRows` lays
- * the cubes out in two rows of five (touch, between the pads).
+ * Where everything sits, in cells from the chip's top left. One row (wide
+ * screens): the cup, then the word over a row of ten cubes. `twoRows`
+ * stands it up for the room between a phone's pads: the cup with the word
+ * beside its foot, and the cubes under both in two rows of five. `sugar` is
+ * the word and the cubes together where they make one block clear of the
+ * cup, else the cubes alone (`label` is the word's own box).
  * @param {boolean} twoRows
  */
 export function meterLayout(twoRows) {
   const perRow = twoRows ? CUBES / 2 : CUBES;
   const cubesW = perRow * CUBE + (perRow - 1) * CUBE_GAP;
-  const labelGap = twoRows ? 1 : 2;
-  const cubesTop = LABEL_ROWS + labelGap;
   const rows = twoRows ? 2 : 1;
-  const columnH = cubesTop + rows * CUBE + (rows - 1) * CUBE_GAP;
+  const cubesH = rows * CUBE + (rows - 1) * CUBE_GAP;
   const cupW = METER_CUP[0].length;
   const cupH = METER_CUP.length;
-  const innerH = Math.max(cupH, columnH);
-  const sugarX = METER_PAD + cupW + CUP_GAP;
+  const labelW = Math.max(wordWidth("sugar"), wordWidth("rush"));
   /** @type {Array<{ x: number, y: number }>} */
   const cubes = [];
-  for (let index = 0; index < CUBES; index++) {
-    const row = Math.floor(index / perRow);
-    const col = index % perRow;
-    cubes.push({ x: sugarX + col * (CUBE + CUBE_GAP), y: METER_PAD + (innerH - columnH) + cubesTop + row * (CUBE + CUBE_GAP) });
+  /** @param {number} x0 @param {number} y0 */
+  const lay = (x0, y0) => {
+    for (let index = 0; index < CUBES; index++) {
+      const row = Math.floor(index / perRow);
+      const col = index % perRow;
+      cubes.push({ x: x0 + col * (CUBE + CUBE_GAP), y: y0 + row * (CUBE + CUBE_GAP) });
+    }
+  };
+  if (twoRows) {
+    // The word sits beside the cup's foot, flush with the cubes' right edge.
+    const innerW = Math.max(cubesW, cupW + 1 + labelW);
+    const cubesY = METER_PAD + cupH + STACK_GAP;
+    const label = { x: METER_PAD + innerW - labelW, y: METER_PAD + cupH - LABEL_ROWS };
+    lay(METER_PAD, cubesY);
+    const cubeBox = { x: METER_PAD, y: cubesY, w: cubesW, h: cubesH };
+    return {
+      width: METER_PAD * 2 + innerW,
+      height: METER_PAD * 2 + cupH + STACK_GAP + cubesH,
+      cup: { x: METER_PAD, y: METER_PAD, w: cupW, h: cupH },
+      label,
+      labelBox: { x: label.x, y: label.y, w: labelW, h: LABEL_ROWS },
+      sugar: cubeBox,
+      cubes,
+    };
   }
+  const labelGap = 2;
+  const cubesTop = LABEL_ROWS + labelGap;
+  const columnH = cubesTop + cubesH;
+  const innerH = Math.max(cupH, columnH);
+  const sugarX = METER_PAD + cupW + CUP_GAP;
+  const label = { x: sugarX, y: METER_PAD + innerH - columnH };
+  lay(sugarX, METER_PAD + (innerH - columnH) + cubesTop);
   return {
     width: sugarX + cubesW + METER_PAD,
     height: METER_PAD * 2 + innerH,
     cup: { x: METER_PAD, y: METER_PAD + innerH - cupH, w: cupW, h: cupH },
-    label: { x: sugarX, y: METER_PAD + innerH - columnH },
+    label,
+    labelBox: { x: label.x, y: label.y, w: labelW, h: LABEL_ROWS },
     sugar: { x: sugarX, y: METER_PAD + innerH - columnH, w: cubesW, h: columnH },
     cubes,
   };

@@ -26,18 +26,30 @@ import {
   tierForBar,
 } from "../src/lib/arcade/stab-engine.js";
 import {
+  BRACKET_AFTER,
+  BRACKET_BEATS,
+  BRACKET_GROW,
   CUP_LEAD,
   HOLD,
+  HOLD_AFTER,
   ghostPlunge,
   LESSONS,
   PRACTICE_LEAD,
+  PRESS_AFTER,
   REST,
+  ROOM_BEATS,
+  ROOM_SECONDS,
+  STOPS,
+  STOP_WITHIN,
+  bracketBox,
   lessonForMiss,
   lessonForSong,
   lessonForStab,
   lessonNow,
   mayOffer,
   nextWaiting,
+  practiceBracket,
+  roomToStop,
 } from "../src/lib/arcade/stab-lessons.js";
 
 const TEMPOS = [124, 138, 150, 164];
@@ -65,19 +77,24 @@ const HANDS = {
 
 /**
  * Plays a run the way StrawStab does, a frame at a time on song time (which
- * is real time here: nothing slows), with the real coach: cups planned a
- * belt's length ahead, the hand's stabs, misses called after the window and
- * grace, the practice applied by its song-time boundary to stabs, misses
- * and the bare belt (a good practice stab kept for later runs at once), a
- * song's first downbeat taught, and each frame the coach stepped and asked
- * what is coming. The run ends when the pearls are gone, as the game does,
- * and nothing is taught after. A player who `reads` presses Continue once a
- * line has been up that long. `coach` carries what an earlier run on the
- * device learned. Returns every lesson offered (with what the belt was doing
- * then), what was up on every frame, the run's cups and pearls, and when it
- * ended for want of pearls (null if it didn't).
+ * is real time here, but for a pearl line's stop), with the real coach: cups
+ * planned a belt's length ahead, the hand's stabs, misses called after the
+ * window and grace, the practice applied by its song-time boundary to stabs,
+ * misses and the bare belt (a good practice stab kept for later runs at
+ * once), a song's first downbeat taught, and each frame the coach stepped
+ * and asked what is coming. A pearl line looks for room to stop the belt
+ * for STOP_WITHIN after it comes up, and stops it HOLD_AFTER after finding
+ * it: song time stands still while real time runs, the line doesn't age,
+ * the hand's presses meanwhile go to nothing, and Continue (after
+ * `readsHeld` real seconds) picks the song up where it stopped. The run ends
+ * when the pearls are gone, as the game does, and nothing is taught after. A
+ * player who `reads` presses Continue once a line has been up that long.
+ * `coach` carries what an earlier run on the device learned. Returns every
+ * lesson offered (with what the belt was doing then), what was up on every
+ * frame, every stop, the run's cups and pearls, and when it ended for want
+ * of pearls (null if it didn't).
  */
-function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab", { persist: false }), reads = Infinity } = {}) {
+function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab", { persist: false }), reads = Infinity, readsHeld = 1.5 } = {}) {
   const random = createRng(seed);
   const practice = createPractice(!coach.learned(LESSONS.stab.id));
   const cups = [];
@@ -97,6 +114,13 @@ function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab",
   let practiceLost = 0;
   let scored = 0;
   let died = null;
+  /** Until when a pearl line looks for room, the song time it stops the belt at, and the stop under way. */
+  let stopUntil = null;
+  let holdAt = null;
+  let lostAtRoom = 0;
+  let hold = null;
+  const holds = [];
+  const beatAt = (time) => 60 / barPosition(TEMPOS, barAtTime(TEMPOS, Math.max(0, time))).bpm;
   coach.reset();
   /**
    * A pearl gone; the last ends the run, as endGame does, taking any line
@@ -118,13 +142,25 @@ function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab",
   // the game's own order, to check the lessons against.
   const earliest = () => cups.reduce((best, cup) => (!cup.resolved && (!best || cup.time < best.time) ? cup : best), null);
   const offer = (lesson, cup) => {
-    const record = { id: lesson.id, at: shown, quiet, cup, earliest: earliest(), over: coach.current, overAge: coach.age, practicing: practiceOn(practice) };
+    const record = { id: lesson.id, at: shown, quiet, cup, earliest: earliest(), over: coach.current, overAge: coach.age, practicing: practiceOn(practice), lostThen: lost };
     if (!mayOffer(lesson, coach.current, coach.age, quiet) || !coach.offer(lesson)) return;
     offers.push(record);
     cue = { lesson, cup };
+    if (STOPS.includes(lesson.id) && !practiceOn(practice)) stopUntil = shown + STOP_WITHIN;
   };
   const teach = (lesson) => {
     if (lesson && shown >= GO_SECONDS) offer(lesson, null);
+  };
+  const lookForStop = () => {
+    if (stopUntil === null) return;
+    if (!coach.current || coach.leaving || !STOPS.includes(coach.current.id) || shown > stopUntil) {
+      stopUntil = null;
+      return;
+    }
+    if (!roomToStop({ now: shown, next: nextCup(), beat: beatAt(shown) })) return;
+    stopUntil = null;
+    holdAt = shown + HOLD_AFTER;
+    lostAtRoom = lost;
   };
   const finishPractice = () => {
     if (coach.current?.id === LESSONS.stab.id && !coach.leaving) {
@@ -133,6 +169,8 @@ function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab",
     } else if (practiceLearned(practice)) coach.done(LESSONS.stab.id);
   };
   const stab = (at) => {
+    // A press while a line stops the belt goes to the line, never the belt.
+    if (hold !== null || holdAt !== null) return;
     if (at - lastStab < STAB_COOLDOWN) return;
     lastStab = at;
     const index = nearestCup(cups, at, mode);
@@ -156,7 +194,29 @@ function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab",
   };
 
   while (shown < seconds && died === null) {
+    if (hold) {
+      // Stopped: real time runs, the song stands still, and the line waits.
+      hold.heldFor += FRAME;
+      if (hold.heldFor >= readsHeld && !coach.leaving) coach.done(coach.current.id);
+      if (!coach.current || coach.leaving) {
+        hold.lostDuring = lost - hold.lostAt;
+        hold = null;
+      }
+      frames.push({ at: shown, id: coach.current?.id ?? null, leaving: coach.leaving, age: coach.age, practicing: practiceOn(practice), held: true });
+      continue;
+    }
     shown += FRAME;
+    lookForStop();
+    if (holdAt !== null && shown >= holdAt) {
+      holdAt = null;
+      if (coach.current && STOPS.includes(coach.current.id) && !coach.leaving) {
+        const next = nextCup();
+        hold = { at: shown, room: next ? next.time - shown : Infinity, beat: beatAt(shown), heldFor: 0, lostAt: lost, lostAtRoom, lostDuring: 0, id: coach.current.id, age: coach.age };
+        holds.push(hold);
+        frames.push({ at: shown, id: coach.current.id, leaving: false, age: coach.age, practicing: practiceOn(practice), held: true });
+        continue;
+      }
+    }
     // Plan a belt's length ahead, and the hand's stabs with it.
     while (barStart(TEMPOS, plannedBars) < shown + LEAD + 0.6) {
       const bar = plannedBars++;
@@ -206,7 +266,7 @@ function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab",
       cue.cup = null;
     }
     if (shown >= GO_SECONDS) {
-      const found = lessonNow({ now: shown, next: nextCup(), practicing: practiceOn(practice) }, coach.learned);
+      const found = lessonNow({ now: shown, next: nextCup(), practicing: practiceOn(practice), seen: LEAD }, coach.learned);
       if (found && found.lesson.id !== coach.current?.id) offer(found.lesson, found.cup);
     }
     if (!coach.current) cue = null;
@@ -215,9 +275,9 @@ function play(mode, hand, { seconds = 120, seed = 7, coach = createCoach("stab",
       if (coach.current.id === LESSONS.stab.id && practiceOn(practice)) endPractice(practice);
       coach.done(coach.current.id);
     }
-    frames.push({ at: shown, id: coach.current?.id ?? null, leaving: coach.leaving, age: coach.age, practicing: practiceOn(practice) });
+    frames.push({ at: shown, id: coach.current?.id ?? null, leaving: coach.leaving, age: coach.age, practicing: practiceOn(practice), held: false });
   }
-  return { offers, frames, cups, lost, practiceLost, scored, practice, coach, died };
+  return { offers, frames, holds, cups, lost, practiceLost, scored, practice, coach, died };
 }
 
 const ids = (run) => run.offers.map((offer) => offer.id);
@@ -356,6 +416,8 @@ test("a line about a cup comes up only once that cup is the next one the straw n
         cueLines += 1;
         assert.equal(offer.cup, offer.earliest, `${offer.id} pointed past an earlier cup`);
         assert.ok(offer.cup.time - offer.at >= CUP_LEAD, `${offer.id} too late to see`);
+        // In view, not still off the screen's edge after a long gap.
+        assert.ok(offer.cup.time - offer.at <= LEAD + 1e-9, `${offer.id} named off screen`);
         // Up until its cup is taken or lost, then on its way out.
         const after = run.frames.filter((frame) => frame.at > offer.cup.time + 0.3 && frame.at < offer.cup.time + 0.5);
         assert.ok(after.every((frame) => frame.id !== offer.id || frame.leaving), `${offer.id} outlived its cup`);
@@ -399,7 +461,8 @@ test("a line is never cut short, a timing note waits for a rest after the last, 
           assert.ok(offer.quiet >= REST, `${offer.id} after ${offer.quiet} s of quiet`);
         }
       }
-      // Up for at most its hold and the fade, practice aside.
+      // Up for at most its hold and the fade, practice aside: a line that
+      // stopped the belt doesn't age while it waits for Continue.
       for (const frame of run.frames) if (frame.id && frame.id !== "stab") assert.ok(frame.age <= HOLD + FADE + FRAME, `${frame.id} ${frame.age}`);
     }
   }
@@ -467,5 +530,158 @@ test("the ghost straw's tip meets the lid exactly on the beat, at any size, and 
     // Under Reduce Motion: nothing before the beat, then the contact pose, still.
     assert.equal(tip(-0.001, true), null);
     assert.ok(Math.abs(tip(0, true) - lid) < 1e-9 && Math.abs(tip(0.3, true) - lid) < 1e-9);
+  }
+});
+
+// --- The pearl lines stop the belt -------------------------------------------------
+
+test("only the pearl lines stop the belt, and only with the next cup far enough off", () => {
+  assert.deepEqual([...STOPS].sort(), ["bonk", "miss"]);
+  for (const id of STOPS) assert.ok(LESSONS[id], id);
+  const beat = 60 / 124;
+  const room = HOLD_AFTER + Math.max(ROOM_SECONDS, ROOM_BEATS * beat);
+  // Nothing waiting, or the next cup at least a beat off once the belt stops.
+  assert.ok(roomToStop({ now: 10, next: null, beat }));
+  assert.ok(roomToStop({ now: 10, next: { time: 10 + room }, beat }));
+  assert.ok(!roomToStop({ now: 10, next: { time: 10 + room - 0.01 }, beat }));
+  // A fast song still leaves at least ROOM_SECONDS of music before the straw is needed.
+  const fast = 60 / 164;
+  assert.ok(!roomToStop({ now: 0, next: { time: HOLD_AFTER + ROOM_SECONDS - 0.01 }, beat: fast }));
+  assert.ok(roomToStop({ now: 0, next: { time: HOLD_AFTER + ROOM_SECONDS }, beat: fast }));
+  // A slow one, a whole beat.
+  const slow = 60 / 100;
+  assert.ok(!roomToStop({ now: 0, next: { time: HOLD_AFTER + slow - 0.01 }, beat: slow }));
+  // Stopping within a beat at any tempo the songs play, once the sound just made is over.
+  assert.ok(HOLD_AFTER >= 0.22 && HOLD_AFTER < 60 / 164);
+  assert.ok(PRESS_AFTER > HOLD_AFTER, "a press as the belt stops is never taken for Continue");
+  assert.ok(STOP_WITHIN <= 1, "a stop comes within a cup or two of its line");
+});
+
+test("a stop holds the song still until Continue, costs nothing, and picks up with the next cup at least a beat off", () => {
+  let stops = 0;
+  let said = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+    for (const [mode, hand] of [
+      [NORMAL, HANDS.sloppy],
+      [EXPERT, HANDS.expertSloppy],
+      [EXPERT, HANDS.expertBonky],
+    ]) {
+      const run = play(mode, hand, { seconds: 200, seed, readsHeld: 2.5 });
+      for (const offer of run.offers.filter((offer) => STOPS.includes(offer.id))) {
+        const hold = run.holds.find((h) => h.id === offer.id && h.at >= offer.at);
+        if (!hold) {
+          said += 1;
+          continue;
+        }
+        // Within STOP_WITHIN of the line, then HOLD_AFTER for the sound.
+        assert.ok(hold.at - offer.at <= STOP_WITHIN + HOLD_AFTER + 2 * FRAME, `${offer.id} stopped ${(hold.at - offer.at).toFixed(2)} s on`);
+        // Nothing lost in the moment between finding room and stopping.
+        assert.equal(hold.lostAt, hold.lostAtRoom);
+      }
+      for (const hold of run.holds) {
+        stops += 1;
+        assert.ok(STOPS.includes(hold.id), hold.id);
+        // The music plays at least a beat (and ROOM_SECONDS) before the straw is needed again.
+        assert.ok(hold.room >= Math.max(ROOM_SECONDS, ROOM_BEATS * hold.beat) - FRAME, `${hold.id}: ${hold.room.toFixed(3)} s of room`);
+        // It holds until the player goes on, the line not ageing, and no pearl goes meanwhile.
+        assert.ok(hold.heldFor >= 2.5 - FRAME, `${hold.id} let go after ${hold.heldFor}`);
+        assert.equal(hold.lostDuring, 0);
+        const during = run.frames.filter((frame) => frame.held && frame.at === hold.at);
+        assert.ok(during.length >= Math.floor(2.5 / FRAME), "the song moved while stopped");
+        assert.ok(during.every((frame) => frame.age === hold.age), "the line aged while stopped");
+      }
+    }
+  }
+  assert.ok(stops >= 6, `${stops} stops checked`);
+  // Some come with no room within reach, and are said over the running belt.
+  assert.ok(said >= 1, `${said} said without a stop`);
+});
+
+test("a line about a cup waits for its cup to be in view", () => {
+  const none = () => false;
+  const golden = { time: 10, beat: 0, golden: true };
+  // The next cup, but still past the screen's edge after a long gap.
+  assert.equal(lessonNow({ now: 8, next: golden, practicing: false, seen: 1.5 }, none), null);
+  assert.equal(lessonNow({ now: 8.5, next: golden, practicing: false, seen: 1.5 }, none).lesson, LESSONS.golden);
+  // The practice line comes up as its cup rides in, in view or not.
+  assert.equal(lessonNow({ now: 8, next: golden, practicing: true, seen: 1 }, none).lesson, LESSONS.stab);
+});
+
+// --- The brackets ----------------------------------------------------------------
+
+/** StrawStab's layout: the 9 × 9 cup in art pixels of 4 px (a phone) or 6 px. */
+const layoutFor = (px) => ({ beltY: 600, cupW: 9 * px, cupH: 9 * px, px });
+
+test("brackets ring a cup snug with two art pixels to spare, centred on it, on whole art pixels", () => {
+  for (const px of [4, 6]) {
+    const layout = layoutFor(px);
+    for (const x of [300, 300.25, 301.5, 517.8]) {
+      const box = bracketBox(x, layout);
+      // The cup's sprite spans [x - cupW / 2, x + cupW / 2] × [beltY - cupH, beltY].
+      assert.ok(Math.abs(box.x - (x - layout.cupW / 2 - 2 * px)) < 1e-9);
+      assert.ok(Math.abs(box.x + box.w - (x + layout.cupW / 2 + 2 * px)) < 1e-9);
+      assert.equal(box.y, layout.beltY - layout.cupH - 2 * px);
+      assert.equal(box.y + box.h, layout.beltY + 2 * px);
+    }
+    let last = { w: 0, h: 0 };
+    for (let grow = 1; grow <= BRACKET_GROW + 1e-9; grow += 0.01) {
+      const box = bracketBox(300, layout, grow);
+      // Centred on the cup however open, and a whole number of art pixels round it.
+      assert.ok(Math.abs(box.x + box.w / 2 - 300) < 1e-9);
+      assert.ok(Math.abs(box.y + box.h / 2 - (layout.beltY - layout.cupH / 2)) < 1e-9);
+      assert.equal(((box.w - layout.cupW) / 2) % px, 0);
+      assert.equal(((box.h - layout.cupH) / 2) % px, 0);
+      // At least `grow` times snug, by less than an art pixel a side, and only snug at exactly 1.
+      const snug = layout.cupW + 4 * px;
+      assert.ok(box.w >= grow * snug - 1e-9 && box.w < grow * snug + 2 * px + 1e-9);
+      if (grow > 1 + 1e-9) assert.ok(box.w > snug, `grow ${grow}`);
+      // Never smaller as it opens.
+      assert.ok(box.w >= last.w && box.h >= last.h);
+      last = box;
+    }
+  }
+});
+
+test("the practice's brackets close onto the notch in time with the song, snug on the cup exactly on its beat", () => {
+  for (const bpm of [124, 138, 150, 164]) {
+    const beat = 60 / bpm;
+    const span = BRACKET_BEATS * beat;
+    // Shown from BRACKET_BEATS beats out, at their widest, to BRACKET_AFTER after the beat.
+    assert.equal(practiceBracket(span + 0.001, beat), null);
+    assert.equal(practiceBracket(span, beat), BRACKET_GROW);
+    assert.equal(practiceBracket(0, beat), 1);
+    assert.equal(practiceBracket(-BRACKET_AFTER, beat), 1);
+    assert.equal(practiceBracket(-BRACKET_AFTER - 0.001, beat), null);
+    for (const fps of [30, 60, 120, 144]) {
+      for (const px of [4, 6]) {
+        const layout = layoutFor(px);
+        const snug = bracketBox(0, layout).w;
+        // Frames drawn for the song time on screen, at any phase against the beat.
+        for (let phase = 0; phase < 1; phase += 0.25) {
+          let last = Infinity;
+          let snugAt = null;
+          for (let k = -Math.ceil(span * fps) - 2; k <= Math.ceil(BRACKET_AFTER * fps) + 2; k++) {
+            const ahead = -(k + phase) / fps;
+            const grow = practiceBracket(ahead, beat);
+            if (grow === null) continue;
+            const { w } = bracketBox(0, layout, grow);
+            // Closing all the way in: never opening again before the beat.
+            assert.ok(w <= last, `${bpm} bpm ${fps} fps: opened at ${ahead}`);
+            last = w;
+            if (ahead > 1e-9) assert.ok(w > snug, `${bpm} bpm ${fps} fps: snug ${ahead.toFixed(3)} s early`);
+            else {
+              assert.equal(w, snug);
+              snugAt ??= ahead;
+            }
+          }
+          // Snug on the first frame at or after the beat.
+          assert.ok(snugAt !== null && snugAt > -1 / fps - 1e-9, `${bpm} bpm ${fps} fps`);
+        }
+      }
+    }
+    // Under Reduce Motion: closed throughout the same span, still timed to the beat.
+    assert.equal(practiceBracket(span, beat, true), 1);
+    assert.equal(practiceBracket(span + 0.001, beat, true), null);
+    assert.equal(practiceBracket(-BRACKET_AFTER - 0.001, beat, true), null);
   }
 });

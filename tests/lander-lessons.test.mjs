@@ -17,17 +17,33 @@ import {
 } from "../src/lib/arcade/lander-engine.js";
 import {
   BURN_LEARNED,
+  CUP,
+  FIRST_SITE_SEED,
+  GUIDED_SLIP_H,
   LESSONS,
   LESSON_START,
-  MOVE_PATIENCE,
   MOVE_PROOF,
   STEER_PROOF,
+  TIE,
+  TOUCHDOWN_LEAD,
+  byReach,
+  calloutFor,
+  covered,
   landsFromHere,
   createFlightLessons,
+  guidedStartLimit,
+  leadOn,
   lessonAhead,
+  nearestBelow,
+  nearestOnPath,
   padBelow,
+  placeCallout,
   planApproach,
+  planGuide,
+  pointAt,
+  slipBox,
   teaRows,
+  touchdownFault,
 } from "../src/lib/arcade/lander-lessons.js";
 
 const H = 1 / 120;
@@ -44,36 +60,49 @@ function viewAround(ship, site, viewH, units = 800) {
   return { left: ship.x - units / (2 * z), right: ship.x + units / (2 * z), bottom: camY - viewH / (2 * z), top: camY + viewH / (2 * z) };
 }
 
+/** The coach that remembers nothing, as a test wants it. */
+const freshCoach = () => createCoach("lander", { persist: false });
+
 /**
  * One flight as the game runs it: frames of real time, the coach turning
- * them into game time (slow while a move is taught), fixed engine steps,
- * and the lessons told about each step and each frame. `player` picks the
- * keys for a step from what is on screen.
+ * them into game time (none while a lesson holds play), fixed engine steps,
+ * and the lessons told about each frame's controls, each step and each
+ * frame. `player` picks the keys for a step from what is on screen; while a
+ * move lesson holds play still it is asked each frame, as the game reads
+ * the keys held, and making the move brings play back. A thing paused for
+ * is continued `read` real seconds after it appears (never, for Infinity),
+ * and a move frozen for is continued after `skip`.
  */
-function fly(site, player, { viewH = 455, coach = createCoach("lander", { persist: false }), lessons = createFlightLessons(coach), revived = false, seconds = 80 } = {}) {
-  lessons.start({ revived });
+function fly(site, player, { viewH = 455, coach = freshCoach(), lessons = createFlightLessons(coach), revived = false, seconds = 80, read = 0.8, skip = Infinity, top = Infinity } = {}) {
   const ship = newShip(site, viewH);
+  ship.y = Math.min(ship.y, top);
   const ceiling = viewH + 30;
+  lessons.start({ revived, flight: { ship, site, time: 0 }, ceiling });
   const cues = [];
   let acc = 0;
   let time = 0;
   let real = 0;
   let result = null;
-  // The longest stretch one lesson (or none) has held play slow.
-  let slowSince = -1;
-  let slowFor = undefined;
-  let longestSlow = 0;
+  // The longest stretch one lesson (or none) has held play still.
+  let stillSince = -1;
+  let stillFor = undefined;
+  let longestStill = 0;
   while (real < seconds && !result) {
     real += FRAME;
+    const current = coach.current;
+    if (current && !coach.leaving && !coach.acting) {
+      if (coach.age >= (current.move ? skip : read)) coach.done(current.id);
+      else if (current.move) lessons.input(player(ship, coach, lessons, time) ?? IDLE);
+    }
     acc += coach.step(FRAME);
     const holding = coach.current?.id ?? null;
-    if (coach.scale < 0.99) {
-      if (slowSince < 0 || holding !== slowFor) {
-        slowSince = real;
-        slowFor = holding;
+    if (coach.scale < 0.01) {
+      if (stillSince < 0 || holding !== stillFor) {
+        stillSince = real;
+        stillFor = holding;
       }
-      longestSlow = Math.max(longestSlow, real - slowSince);
-    } else slowSince = -1;
+      longestStill = Math.max(longestStill, real - stillSince);
+    } else stillSince = -1;
     while (acc >= H && !result) {
       acc -= H;
       const keys = player(ship, coach, lessons, time) ?? IDLE;
@@ -86,35 +115,52 @@ function fly(site, player, { viewH = 455, coach = createCoach("lander", { persis
     lessons.check({ ship, site, time }, viewAround(ship, site, viewH), ceiling);
     const cue = lessons.cue;
     if (cue && cues[cues.length - 1]?.cue !== cue) {
-      cues.push({ cue, time, real, altitude: altitudeOf(ship, site), ship: { ...ship } });
+      cues.push({ cue, time, real, altitude: altitudeOf(ship, site), ship: { ...ship }, guide: lessons.guide, along: lessons.along });
     }
   }
-  return { result, cues, ship, coach, lessons, real, time, longestSlow };
+  return { result, cues, ship, coach, lessons, real, time, longestStill };
 }
 
 /**
  * A newcomer: does nothing until a lesson says what to do, a beat after it
  * appears. Burn: holds it until the fall slows, then keeps falling slowly.
- * Tilt: flies the ghost's path (the autopilot's) from there on.
+ * Tilt: presses the tilt its ghost leans into first, then flies the
+ * ghost's path (the autopilot's) from there on. A touchdown warning: makes
+ * the fix it names (burn, or the tilt back upright or against the drift).
  */
 function newcomer(site, react = 0.4) {
   let mode = "idle";
-  let burned = 0;
+  let burnFrom = 0;
   let pilot = null;
+  let lean = 0;
   return (ship, coach, lessons, time) => {
     const id = coach.current && !coach.leaving ? coach.current.id : null;
-    if (id === "burn" && coach.age >= react && mode === "idle") mode = "burn";
+    if (id === "burn" && coach.age >= react && mode === "idle") {
+      mode = "burn";
+      burnFrom = time;
+    }
     if (id === "steer" && coach.age >= react && mode !== "pilot") {
       mode = "pilot";
-      pilot = createPilot(lessons.cue.path.pad, ship);
+      const path = lessons.cue.path;
+      pilot = createPilot(path.pad, ship);
+      lean = Math.sign(path.points.find((p) => Math.abs(p.a) > 0.05)?.a ?? 1);
     }
     if (mode === "burn") {
-      burned += H;
-      if (burned >= BURN_LEARNED) mode = "slow";
+      if (time - burnFrom >= BURN_LEARNED) mode = "slow";
       return { ...IDLE, thrust: true };
     }
     if (mode === "slow") return { ...IDLE, thrust: ship.vy < -9 };
-    if (mode === "pilot") return pilotControls(pilot, ship, site, time);
+    if (id === "touchdown" && !coach.acting && coach.age >= react) {
+      const fault = lessons.cue?.fault;
+      if (fault === "fast") return { ...IDLE, thrust: true };
+      const turn = fault === "tilt" ? ship.angle : ship.vx;
+      return { ...IDLE, left: turn > 0, right: turn <= 0 };
+    }
+    if (mode === "pilot") {
+      // Frozen for the tilt, the first press is the ghost's lean.
+      if (id === "steer" && !coach.acting) return { ...IDLE, left: lean < 0, right: lean > 0 };
+      return pilotControls(pilot, ship, site, time);
+    }
     return IDLE;
   };
 }
@@ -125,9 +171,9 @@ test("every lesson fits the arcade's one-line voice", () => {
     assert.ok(words.length <= 8, `${lesson.id} runs to ${words.length} words`);
     assert.ok(!/[!·]/.test(lesson.text), `${lesson.id} uses a mark the voice avoids`);
     assert.match(lesson.text, /^[A-Z][^.]*[^.\s]\.$/, `${lesson.id} isn't one full sentence`);
-    // Every lesson explains in slow motion, but a flight is steered continuously: not too slow.
-    assert.ok(lesson.slow >= 0.25 && lesson.slow <= 0.4, `${lesson.id} slows play to ${lesson.slow}`);
-    assert.ok(lesson.move ? lesson.life === Infinity : lesson.life <= 7.5, `${lesson.id} holds for ${lesson.life} s`);
+    // Every lesson pauses play, and holds it until the move or Continue.
+    assert.equal(lesson.slow, 0, `${lesson.id} slows play to ${lesson.slow} instead of pausing it`);
+    assert.equal(lesson.life, Infinity, `${lesson.id} ends by itself after ${lesson.life} s`);
   }
 });
 
@@ -183,27 +229,56 @@ test("a newcomer who does what each lesson says lands on a coaster", () => {
   }
 });
 
-test("a move nobody makes never keeps play slow, and is taught again next time", () => {
+test("a move freezes play at its moment until the move is made, and the move brings play back", () => {
   const site = makeSite(1, SEEDS[1]);
-  // Never presses anything: the burn waits a few seconds, then play is back to speed.
-  const idle = fly(site, () => IDLE, { seconds: 60 });
-  assert.equal(idle.result?.kind, "crash");
-  assert.equal(idle.cues[0]?.cue.lesson.id, "burn");
-  // No lesson holds play slow past its time-out (then the coach eases back to speed).
-  assert.ok(idle.longestSlow <= MOVE_PATIENCE + 0.2, `play stayed slow for ${idle.longestSlow.toFixed(1)} s`);
-  assert.equal(idle.coach.learned("burn"), false, "a burn never made was counted as learned");
-  assert.equal(idle.coach.current, null, "the lesson outlived the flight");
-  // Timed out, it isn't slowed for again on this run's next lander, only on a later run.
-  const next = fly(site, () => IDLE, { coach: idle.coach, lessons: idle.lessons, seconds: 3 });
-  assert.equal(next.cues.length, 0, "the timed-out burn came back in the same run");
-  idle.lessons.newRun();
-  const later = fly(site, () => IDLE, { coach: idle.coach, lessons: idle.lessons, seconds: 2 });
+  // Nobody presses anything: the burn holds play still, however long it waits.
+  const idle = fly(site, () => IDLE, { seconds: 30 });
+  assert.equal(idle.result, null, "the flight went on with the burn untaught");
+  assert.equal(idle.coach.current?.id, "burn");
+  assert.ok(idle.coach.paused, "play isn't held still for the burn");
+  assert.ok(idle.time < LESSON_START + 0.1, `play ran on to ${idle.time.toFixed(2)} s`);
+  assert.ok(idle.longestStill > 25, `play was held only ${idle.longestStill.toFixed(1)} s`);
+  assert.equal(idle.coach.learned("burn"), false);
+
+  // The burn itself, pressed while frozen, brings play back, and burning teaches it.
+  idle.lessons.input({ ...IDLE, thrust: true });
+  assert.ok(idle.coach.acting, "the burn didn't count as made");
+  let scale = 0;
+  for (let t = 0; t < 1.5; t += FRAME) scale = idle.coach.step(FRAME, FRAME) / FRAME;
+  assert.ok(scale > 0.99, `play came back only to ${scale.toFixed(2)}`);
+  // A tilt is not the burn: it leaves play frozen.
+  const other = fly(site, () => IDLE, { seconds: 2 });
+  other.lessons.input({ ...IDLE, left: true });
+  assert.equal(other.coach.acting, false, "a tilt made the burn");
+
+  // Continue counts the burn as known, and play goes on.
+  const skipped = fly(site, () => IDLE, { seconds: 3, skip: 1 });
+  assert.ok(skipped.coach.learned("burn"), "Continue didn't count the burn");
+  assert.ok(skipped.time > idle.time + 0.1, "play didn't go on after Continue");
+});
+
+test("a move made without working comes down uncounted, and waits for a later run", () => {
+  const site = makeSite(1, SEEDS[1]);
+  // Taps burn once while frozen, then never again: the burn never slowed the fall.
+  const tap = (ship, coach) => ({ ...IDLE, thrust: coach.current?.id === "burn" && !coach.acting });
+  const first = fly(site, tap, { seconds: 60 });
+  assert.equal(first.result?.kind, "crash");
+  assert.equal(first.cues[0]?.cue.lesson.id, "burn");
+  assert.equal(first.coach.learned("burn"), false, "a burn that never worked was counted as learned");
+  assert.equal(first.coach.current, null, "the lesson outlived the flight");
+  // Play ran on once the burn was made: it was never frozen past the move.
+  assert.ok(first.longestStill < 1, `play was held ${first.longestStill.toFixed(1)} s after the move`);
+  // Missed, it isn't taught again on this run's next lander, only on a later run.
+  const next = fly(site, () => IDLE, { coach: first.coach, lessons: first.lessons, seconds: 3 });
+  assert.equal(next.cues.length, 0, "the missed burn came back in the same run");
+  first.lessons.newRun();
+  const later = fly(site, () => IDLE, { coach: first.coach, lessons: first.lessons, seconds: 2 });
   assert.equal(later.cues[0]?.cue.lesson.id, "burn", "a later run wasn't taught the burn");
 
-  // Burns but never tilts: the tilt lesson lets play go back to speed too.
-  const burner = fly(site, (ship) => ({ ...IDLE, thrust: ship.vy < -6 }), { seconds: 40 });
+  // Burns, taps a tilt once when frozen for it, then never tilts again.
+  const tilter = (ship, coach) => ({ ...IDLE, thrust: ship.vy < -6, left: coach.current?.id === "steer" && !coach.acting });
+  const burner = fly(site, tilter, { seconds: 40 });
   assert.ok(burner.cues.some((c) => c.cue.lesson.id === "steer"), "the tilt was never taught");
-  assert.ok(burner.longestSlow <= MOVE_PATIENCE + 0.2, `play stayed slow for ${burner.longestSlow.toFixed(1)} s`);
   assert.equal(burner.coach.learned("steer"), false);
 });
 
@@ -223,7 +298,8 @@ test("the tilt lesson's ghost is the autopilot landing on a coaster, planned wit
         planned++;
         const where = `${site.terrain} n${n} seed ${seed}`;
         assert.ok(path.pad && site.pads.includes(path.pad), where);
-        assert.deepEqual(path.points[0], { x: ship.x, y: ship.y, a: ship.angle }, `${where}: the path doesn't start at the cup`);
+        const [x0, y0, a0] = [path.points[0].x, path.points[0].y, path.points[0].a];
+        assert.deepEqual([x0, y0, a0], [ship.x, ship.y, ship.angle], `${where}: the path doesn't start at the cup`);
         assert.ok(path.points.length <= 24 / 0.1 + 2, `${where}: ${path.points.length} points`);
         assert.ok(path.land, where);
         assert.ok(Math.abs(path.land.y - (path.pad.y + FOOT_DROP)) < 1e-6, `${where}: the ghost doesn't rest on its coaster`);
@@ -274,6 +350,9 @@ test("the touchdown lesson comes only when doing what it says still lands, low t
               assert.equal(cue.lesson.id, "touchdown", where);
               assert.equal(padBelow(ship, site)?.pad, cue.pad, `${where}: not over its coaster`);
               assert.ok(ship.vy < 0, where);
+              // At the moment to act, not a second early.
+              const lead = touchdownFault(ship, site, ship.y - FOOT_DROP - cue.pad.y)?.lead ?? -1;
+              assert.ok(lead >= TOUCHDOWN_LEAD[0] && lead <= TOUCHDOWN_LEAD[1], `${where}: frozen ${lead.toFixed(2)} s before the fix is needed`);
               // Judged by the engine itself: slow, level and still from here lands.
               const outcome = flyFix(ship, site, t + H, cue.pad);
               assert.equal(outcome?.kind, "land", `${where}: the fix ${outcome ? `crashes (${outcome.reason})` : "never lands"}`);
@@ -297,7 +376,8 @@ test("no warning once a safe landing is out of reach, and one up comes down as t
   assert.equal(landsFromHere(lost, site, 5), false);
   assert.equal(lessonAhead({ ship: lost, site, time: 5 }, (id) => id !== "touchdown", viewAround(lost, site, 455)), null);
 
-  // A warning shown in time, then nothing done: it is withdrawn before the crash, uncounted.
+  // A warning shown in time, its fix tapped once and then nothing done: it
+  // is withdrawn before the crash, uncounted.
   const coach = createCoach("lander", { persist: false });
   for (const id of ["burn", "coaster", "steer", "wind", "fuel"]) coach.skip(id);
   const lessons = createFlightLessons(coach);
@@ -307,7 +387,9 @@ test("no warning once a safe landing is out of reach, and one up comes down as t
   let warnedOnce = false;
   const flight = fly(site3, (ship, c, l, time) => {
     pilot ??= createPilot(target, ship);
-    // Hot: the autopilot holding off its burn on the way down, until warned; then hands off.
+    // Hot: the autopilot holding off its burn on the way down, until warned;
+    // then the fix pressed while frozen, and hands off.
+    if (c.current?.id === "touchdown" && !c.acting) return { ...IDLE, thrust: true, left: true };
     warnedOnce ||= c.current?.id === "touchdown";
     if (warnedOnce) return IDLE;
     const keys = pilotControls(pilot, ship, site3, time);
@@ -401,8 +483,9 @@ test("the tilt is learned by braking the drift over a coaster, never by burning 
   const wrong = fly(site, (ship, coach, lessons, time) => {
     const keys = { ...IDLE, thrust: ship.vy < -6 || time > 1 };
     if (time > 1) {
-      keys.right = ship.angle < 0.35;
-      keys.left = ship.angle > 0.45;
+      // Frozen for the tilt, it tilts with the drift.
+      keys.right = ship.angle < 0.35 || (coach.current?.id === "steer" && !coach.acting);
+      keys.left = !keys.right && ship.angle > 0.45;
     }
     return keys;
   }, { seconds: 30 });
@@ -589,5 +672,301 @@ test("a learned lesson is never taught again", () => {
       const { cues } = fly(site, newcomer(site), { coach, revived: true, seconds: 20 });
       assert.equal(cues.length, 0);
     }
+  }
+});
+
+// --- The guided first flight --------------------------------------------------------
+
+test("the coaster aimed at is the one nearest straight below, a near tie going to the lower one", () => {
+  const pad = (cx, y, multiplier = 2) => ({ cx, y, width: 60, multiplier });
+  const a = pad(150, 80);
+  const b = pad(400, 40, 5);
+  const c = pad(-60, 90, 3);
+  assert.equal(nearestBelow(100, [a, b, c]).pad, a);
+  // Within TIE of the nearest, the lower-lying wins, wherever it is.
+  const low = pad(100 - 50 - TIE + 1, 30);
+  assert.equal(nearestBelow(100, [a, low]).pad, low);
+  const far = pad(100 - 50 - TIE - 1, 30);
+  assert.equal(nearestBelow(100, [a, far]).pad, a);
+  // On the wrapped moon, the copy nearest the cup counts.
+  const behind = pad(1180, 60);
+  assert.deepEqual(nearestBelow(100, [b, behind]), { pad: behind, cx: -20 });
+  assert.deepEqual(byReach(100, [b, c, a]), [a, c, b]);
+  assert.equal(nearestBelow(100, []), null);
+});
+
+test("a device that has never landed is guided the whole way down, by the autopilot's path to the coaster below the start", () => {
+  let guided = 0;
+  for (const expert of [false, true]) {
+    for (const seed of [FIRST_SITE_SEED, ...SEEDS.slice(0, 8)]) {
+      for (const viewH of [200, 455, 700]) {
+        const site = makeSite(1, seed, "mare", { expert });
+        const ship = newShip(site, viewH);
+        const coach = freshCoach();
+        const lessons = createFlightLessons(coach);
+        lessons.start({ flight: { ship, site, time: 0 }, ceiling: viewH + 30 });
+        const where = `${expert ? "expert" : "normal"} seed ${seed} view ${viewH}`;
+        const guide = lessons.guide;
+        assert.ok(lessons.guided && guide, `${where}: no guide`);
+        guided++;
+        assert.equal(guide.pad, nearestBelow(ship.x, site.pads).pad, `${where}: aimed at ×${guide.pad.multiplier}, not the coaster below the start`);
+        assert.deepEqual([guide.points[0].x, guide.points[0].y], [ship.x, ship.y], `${where}: the path doesn't start at the cup`);
+        assert.ok(Math.abs(guide.land.y - (guide.pad.y + FOOT_DROP)) < 1e-6 && padBelow(guide.land, site)?.pad === guide.pad, `${where}: the path doesn't end on its coaster`);
+        // Once the device has landed, no flight is guided.
+        coach.skip("touchdown");
+        lessons.start({ flight: { ship, site, time: 0 }, ceiling: viewH + 30 });
+        assert.equal(lessons.guide, null, `${where}: guided after a landing`);
+      }
+    }
+  }
+  assert.equal(guided, 2 * 9 * 3);
+});
+
+test("the guide follows the cup the whole way, and is flown again only once the cup has strayed far from it", () => {
+  for (const expert of [false, true]) {
+    for (const seed of [FIRST_SITE_SEED, ...SEEDS.slice(0, 6)]) {
+      const site = makeSite(1, seed, "mare", { expert });
+      const coach = freshCoach();
+      const lessons = createFlightLessons(coach);
+      const plans = new Set();
+      let back = 0;
+      let last = 0;
+      let flying = 0;
+      let missing = 0;
+      const player = newcomer(site);
+      const flight = fly(site, (ship, c, l, time) => {
+        const guide = l.guide;
+        if (!guide) missing++;
+        else if (!plans.has(guide)) {
+          plans.add(guide);
+          last = 0;
+        } else {
+          if (l.along < last - 2.01) back++;
+          last = l.along;
+        }
+        flying++;
+        return player(ship, c, l, time);
+      }, { coach, lessons });
+      const where = `${expert ? "expert" : "normal"} seed ${seed}`;
+      assert.equal(flight.result?.kind, "land", `${where}: ${flight.result?.kind ?? "still flying"}`);
+      assert.equal(missing, 0, `${where}: the guide went missing in flight`);
+      assert.equal(back, 0, `${where}: the cup was sent back along the guide`);
+      // Planned at the start, again for the tilt, and otherwise only when strayed.
+      assert.ok(plans.size >= 2 && plans.size <= 5, `${where}: planned ${plans.size} times`);
+      // It stays to the touchdown (for the game to fade), and the next flight is not guided.
+      assert.ok(lessons.guide, `${where}: the guide was gone at the touchdown`);
+      lessons.start({ flight: { ship: newShip(site, 455), site, time: 0 }, ceiling: 485 });
+      assert.equal(lessons.guide, null, `${where}: still guided after a landing`);
+    }
+  }
+});
+
+test("a path is followed by where on it the cup is, and its ghost leads the cup", () => {
+  const points = Array.from({ length: 11 }, (_, i) => ({ x: i * 10, y: 100 - i * 5, a: i * 0.05, b: i > 5 }));
+  const path = { points, pad: null, land: null, relative: false, sample: 0.1 };
+  assert.deepEqual(pointAt(points, 2.5), { x: 25, y: 87.5, a: 0.125, b: false });
+  assert.deepEqual(pointAt(points, 99), points[10]);
+  const near = nearestOnPath(points, 31, 87, 0);
+  assert.ok(Math.abs(near.s - 3) < 1e-9 && Math.abs(near.distance - Math.hypot(1, 2)) < 1e-9, JSON.stringify(near));
+  // Never more than a couple of points back from where the cup was.
+  assert.ok(nearestOnPath(points, 0, 100, 8).s >= 6);
+  // A second on, and never nearer than its reach.
+  assert.equal(leadOn(path, 2, { seconds: 0.3, reach: 0 }), 5);
+  const lead = leadOn(path, 2, { seconds: 0, reach: 34 });
+  const [a, b] = [pointAt(points, 2), pointAt(points, lead)];
+  assert.ok(Math.abs(Math.hypot(b.x - a.x, b.y - a.y) - 34) < 1e-6);
+  assert.equal(leadOn(path, 9.5), 10);
+});
+
+test("a guided device's first site is flat under the start, with a wide coaster just ahead that a newcomer lands on", () => {
+  for (const expert of [false, true]) {
+    const site = makeSite(1, FIRST_SITE_SEED, "mare", { expert });
+    const start = newShip(site, 455);
+    const { pad, cx } = nearestBelow(start.x, site.pads);
+    const where = expert ? "expert" : "normal";
+    assert.equal(pad.multiplier, 2, `${where}: the coaster below the start is ×${pad.multiplier}`);
+    assert.equal(pad.width, Math.max(...site.pads.map((p) => p.width)), `${where}: not the widest coaster`);
+    // Ahead of the cup, which drifts right: the drift carries it over.
+    assert.ok(cx - start.x > 20 && cx - start.x < 80, `${where}: ${(cx - start.x).toFixed(0)} ahead`);
+    let low = Infinity;
+    let high = -Infinity;
+    for (let x = start.x - 60; x <= cx + 80; x += 2) {
+      low = Math.min(low, groundAt(site, x));
+      high = Math.max(high, groundAt(site, x));
+    }
+    assert.ok(high - low < 3, `${where}: the ground under the start rises and falls ${(high - low).toFixed(1)}`);
+    // The ×5 is in view at the start on a wide screen, so the coaster lesson's ×5 can be seen.
+    const five = site.pads.find((p) => p.multiplier === 5);
+    const view = viewAround(start, site, 455);
+    const fiveX = five.cx + Math.round((start.x - five.cx) / 1200) * 1200;
+    assert.ok(fiveX > view.left && fiveX < view.right, `${where}: the ×5 is out of view`);
+    for (const viewH of [200, 330, 455, 600, 700]) {
+      const { result, ship, cues } = fly(site, newcomer(site), { viewH });
+      assert.equal(result?.kind, "land", `${where} view ${viewH}: ${result?.kind ?? "still flying"} ${result?.reason ?? ""}`);
+      assert.equal(result.pad, pad, `${where} view ${viewH}: landed on another coaster`);
+      assert.ok(ship.fuel >= site.fuel * 0.4, `${where} view ${viewH}: landed with ${ship.fuel.toFixed(0)} of ${site.fuel}`);
+      // The coaster named is the one aimed at.
+      const named = cues.find((c) => c.cue.lesson.id === "coaster");
+      assert.equal(named?.cue.pad, pad, `${where} view ${viewH}: named another coaster`);
+    }
+  }
+});
+
+test("off the guided flight, the coaster named and the tilt's ghost go to the coaster nearest below the cup", () => {
+  for (const seed of SEEDS.slice(0, 8)) {
+    const site = makeSite(1, seed);
+    const coach = freshCoach();
+    // A device that has landed before, but never been shown the coaster.
+    coach.skip("touchdown");
+    coach.skip("burn");
+    const { cues } = fly(site, newcomer(site), { coach, seconds: 30 });
+    const named = cues.find((c) => c.cue.lesson.id === "coaster");
+    assert.ok(named, `seed ${seed}: no coaster named`);
+    const view = viewAround(named.ship, site, 455);
+    const seen = site.pads.filter((p) => {
+      const x = p.cx + Math.round((named.ship.x - p.cx) / 1200) * 1200;
+      return x >= view.left + 24 && x <= view.right - 24 && p.y >= view.bottom + 24 && p.y <= view.top - 24;
+    });
+    assert.equal(named.cue.pad, nearestBelow(named.ship.x, seen).pad, `seed ${seed}: named ×${named.cue.pad.multiplier}`);
+    const tilt = cues.find((c) => c.cue.lesson.id === "steer");
+    if (tilt) assert.equal(tilt.cue.path.pad, byReach(tilt.ship.x, site.pads).find((p) => p === tilt.cue.path.pad), `seed ${seed}`);
+  }
+});
+
+// --- Where the callout goes ----------------------------------------------------------
+
+/** Screens to try: desktop and tablet with keys, phones with the touch pads. */
+const SCREENS = [
+  { name: "desktop", w: 1440, h: 900, top: 84, touch: false },
+  { name: "laptop", w: 1280, h: 720, top: 84, touch: false },
+  { name: "tablet", w: 1024, h: 768, top: 84, touch: true },
+  { name: "phone", w: 390, h: 844, top: 112, touch: true },
+  { name: "small phone", w: 375, h: 667, top: 112, touch: true },
+];
+
+/** The game's camera over the cup, without its lag, and how it draws the world on this screen. */
+function screenFor(ship, site, sc) {
+  const padsTop = sc.touch ? sc.h - 100 : sc.h;
+  const bottom = Math.max(sc.top + 160, Math.min(sc.h, padsTop - 8));
+  const units = sc.w >= sc.h * 1.05 ? 800 : 440;
+  const base = sc.w / units;
+  const viewH = (bottom - sc.top) / base;
+  const z = 1 + 1.5 * zoomForClearance(clearance(ship, site));
+  const f = (z - 1) / 1.5;
+  const rest = viewH / 2 - 6;
+  const camY = rest + (Math.max(viewH / (2 * z) - 6, groundAt(site, ship.x) + (0.27 * viewH) / z) - rest) * f;
+  const scale = base * z;
+  const mid = (sc.top + bottom) / 2;
+  const pads = sc.touch
+    ? [
+        { x: 20, y: sc.h - 84, w: 156, h: 64 },
+        { x: sc.w - 116, y: sc.h - 100, w: 96, h: 80 },
+      ]
+    : [];
+  return {
+    viewH,
+    base,
+    toX: (x) => sc.w / 2 + (x - ship.x) * scale,
+    toY: (y) => mid - (y - camY) * scale,
+    scale,
+    screen: { w: sc.w, h: sc.h, top: sc.top + 8, bottom },
+    pads,
+  };
+}
+
+/**
+ * The slip's size, as Coach lays it out: its widest, and on a phone a
+ * longer line wraps to two, over the Continue key.
+ */
+const slipFor = (lesson, sc) => ({ w: 304, h: sc.w < 500 && lesson.text.length > 30 ? GUIDED_SLIP_H : 80 });
+
+test("the callout never covers the cup, the path it is about to fly, or the coaster it aims at", () => {
+  let placed = 0;
+  for (const expert of [false, true]) {
+    const site = makeSite(1, FIRST_SITE_SEED, "mare", { expert });
+    for (const sc of SCREENS) {
+      const { viewH: units, base } = screenFor(newShip(site, 455), site, sc);
+      // As the game starts a guided flight: low enough for a line above the cup.
+      const { cues } = fly(site, newcomer(site), { viewH: units, top: guidedStartLimit(units, base) });
+      assert.ok(cues.length >= 3, `${sc.name}: only ${cues.map((c) => c.cue.lesson.id)}`);
+      for (const { cue, ship, guide, along } of cues) {
+        const g = screenFor(ship, site, sc);
+        const slip = slipFor(cue.lesson, sc);
+        const at = calloutFor(cue, { cup: ship, guide, along, toX: g.toX, toY: g.toY, scale: g.scale, screen: g.screen, slip, avoid: g.pads });
+        const box = slipBox(at.side, at, slip, g.screen);
+        const where = `${expert ? "expert" : "normal"} ${sc.name} ${cue.lesson.id}: ${at.side}`;
+        if (process.env.TM_PLACES) console.log(where, at.clear, JSON.stringify(box));
+        placed++;
+        // A phone is too narrow for the slip beside a coaster or its
+        // pennant, and too short below them: there, their line sits over the
+        // last of the way down, never over the cup or the coaster itself.
+        const phone = sc.w < 500;
+        if (phone && !cue.ship) {
+          const cup = { x: g.toX(ship.x - CUP.half), y: g.toY(ship.y + CUP.high), w: CUP.half * 2 * g.scale, h: (CUP.high - CUP.low) * g.scale };
+          assert.equal(covered(box, [cup, ...g.pads], []), 0, `${where} covers the cup or the pads`);
+          assert.ok(box.y + box.h < g.toY(guide.pad.y + 14), `${where} covers the coaster`);
+        } else {
+          assert.ok(at.clear, `${where} covers something`);
+        }
+        // Kept on screen, under the tickets and over the touch pads.
+        assert.ok(box.y >= g.screen.top && box.y + box.h <= g.screen.bottom && box.x >= 16 && box.x + box.w <= sc.w - 16, `${where}: off the play area`);
+      }
+    }
+  }
+  assert.ok(placed >= 30, `only ${placed} callouts placed`);
+});
+
+test("a callout keeps its side while it still fits, and takes the clear side when it must", () => {
+  const screen = { w: 800, h: 600, top: 80, bottom: 600 };
+  const slip = { w: 200, h: 60 };
+  const at = { x: 400, y: 300, ring: 0, width: 15, height: 15 };
+  const cup = { x: 385, y: 285, w: 30, h: 30 };
+  // A path heading right: the left is clear, the right isn't.
+  const path = Array.from({ length: 20 }, (_, i) => ({ x: 420 + i * 10, y: 300 + i }));
+  assert.equal(placeCallout({ at, slip, screen, sides: ["right", "left", "above"], avoid: [cup], path }).side, "left");
+  assert.equal(placeCallout({ at, slip, screen, sides: ["right", "left", "above"], avoid: [cup], path, prefer: "above" }).side, "above");
+  // Too little room beside: above, where nothing is in the way.
+  const narrow = { ...screen, w: 420 };
+  const tight = placeCallout({ at: { ...at, x: 210 }, slip, screen: narrow, sides: ["left", "right", "above", "below"], avoid: [{ ...cup, x: 195 }] });
+  assert.equal(tight.side, "above");
+  assert.equal(covered(tight.box, [{ ...cup, x: 195 }], []), 0);
+});
+
+test("play held still for a lesson and brought back lands exactly as it would have", () => {
+  for (const [seed, n, expert] of [[SEEDS[0], 1, false], [FIRST_SITE_SEED, 1, true], [SEEDS[9], 2, false]]) {
+    const site = makeSite(n, seed, undefined, { expert });
+    const recorded = [];
+    {
+      const ship = newShip(site, 455);
+      const pilot = createPilot(site.pads[2], ship);
+      for (let k = 0; k < 120 * 40; k++) {
+        const keys = pilotControls(pilot, ship, site, k * H);
+        recorded.push(keys);
+        if (stepShip(ship, keys, site, k * H, H, 485)) break;
+      }
+    }
+    /** Replays the inputs, a lesson holding play still from `at` real seconds for `hold`. */
+    const replay = (at, hold) => {
+      const coach = freshCoach();
+      const ship = newShip(site, 455);
+      let acc = 0;
+      let k = 0;
+      for (let frame = 0, real = 0; frame < 200000; frame++, real += FRAME) {
+        if (real >= at && !coach.current && real < at + hold) coach.offer({ id: "hold", text: "Hold.", slow: 0, life: Infinity, move: true });
+        if (coach.current && real >= at + hold) coach.acted("hold");
+        acc += coach.step(FRAME, FRAME);
+        while (acc >= H) {
+          acc -= H;
+          const result = stepShip(ship, recorded[k] ?? IDLE, site, k * H, H, 485);
+          k++;
+          if (result) return { kind: result.kind, points: result.kind === "land" ? result.points : 0, steps: k, x: ship.x, fuel: ship.fuel };
+        }
+      }
+      return null;
+    };
+    const straight = replay(Infinity, 0);
+    assert.equal(straight?.kind, "land", `seed ${seed}`);
+    assert.deepEqual(replay(1, 5), straight, `seed ${seed}: a pause changed the landing`);
+    assert.deepEqual(replay(3.3, 0.4), straight, `seed ${seed}: a short pause changed the landing`);
   }
 });

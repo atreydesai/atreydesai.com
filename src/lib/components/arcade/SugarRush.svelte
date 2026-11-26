@@ -62,7 +62,7 @@
     swingBox,
     swingReach,
   } from "#lib/arcade/runner-engine.js";
-  import { LESSONS, lessonAhead, type LessonCue } from "#lib/arcade/runner-lessons.js";
+  import { LESSONS, LESSON_CONTROL, lessonAhead, moveAhead, placeCallout, slamPath, type LessonCue } from "#lib/arcade/runner-lessons.js";
   import { botInput, createBot } from "#lib/arcade/runner-bot.js";
   import { CUBE_EMPTY, CUBE_FULL, GLYPHS, KEYCAP_X, LABEL_ROWS, METER_CUP, METER_CUT, meterLayout, meterWord, sugarReading, teaCellLit, teaHalfRows, wordWidth } from "#lib/arcade/runner-meter.js";
   import { RIM, WINDOW, stripSkyline } from "#lib/arcade/core/city.ts";
@@ -115,7 +115,8 @@
   // 120 Hz, paints the city around it, and answers each event with a sound
   // and a mark. It teaches in the run itself: the first time each move or
   // thing matters on this device, runner-lessons.js says so, and the shared
-  // coach slows play, sets a line beside it, and a ghost shows the move.
+  // coach pauses play and sets a line beside it; a move pauses at its post,
+  // a ghost shows it, and making it resumes play.
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
@@ -785,8 +786,8 @@
   let countdown = COUNTDOWN_SECONDS;
   let countdownElapsed = 0;
   let goVisible = false;
-  // Lessons, once per device (runner-lessons.js says what and when; the
-  // coach slows play and shows one at a time). `cue` is the one on screen.
+  // Lessons, once per device (runner-lessons.js says what, when and where;
+  // the coach pauses play and shows one at a time). `cue` is the one on screen.
   const coach = createCoach("runner");
   let cue: LessonCue | null = null;
   /** The coach's lesson and whether it's fading, copied out so the page follows them. */
@@ -797,13 +798,24 @@
   let coachX: number | null = null;
   let coachY: number | null = null;
   let coachRing = 0;
-  let coachSide: "above" | "below" = "above";
+  let coachWidth = 0;
+  let coachHeight = 0;
+  type CalloutSide = "above" | "below" | "left" | "right";
+  let coachSide: CalloutSide = "above";
+  /**
+   * The side the callout took for the lesson up, chosen once its slip has
+   * been measured and then kept, so it never jumps from side to side.
+   */
+  let calloutSide: CalloutSide | null = null;
+  let calloutFor = "";
+  /** The callout's measured size, while it is up. */
+  let slipSize = { w: 0, h: 0 };
   /** Which part of the meter a lesson is about, so it stays lit too. */
   let meterLit: "tea" | "sugar" | null = null;
   /** The scene clock when the run began, and how long "go" stays up. */
   let begunAt = 0;
   const GO_SECONDS = 0.62;
-  /** Real seconds the lessons have been on screen (stops when paused): drives the ghost. */
+  /** Real seconds since the game opened (stops when paused): crawls the ghost's chalk. */
   let lessonClock = 0;
   const ghostPoints: Array<{ x: number; y: number }> = [];
   /** On touch, the pad a move lesson is about. */
@@ -917,11 +929,20 @@
   let slideDustClock = 0;
   let firstChunk = 0;
 
+  /** The pads' pictures, pixel art on the keys' own grid, in the key's ink. */
+  const PAD_ICONS = {
+    slide: ["#.......#", "##.....##", ".##...##.", "..##.##..", "...###...", "....#....", ".........", "#########"],
+    jump: ["....#....", "...###...", "..##.##..", ".##...##.", "##.....##", ".........", "....#....", "...###...", "..##.##..", ".##...##.", "##.....##"],
+    rush: ["....###", "...###.", "..###..", ".######", "######.", "..###..", ".###...", "###...."],
+  };
+  const PAD_ICON_PAL = { "#": "currentColor" };
+
   /** What the hold buttons hold now, which draws them pressed (`input` keeps it; see Input). */
   let touchHeld: Held = { jump: false, down: false, rush: false };
   /**
    * The bot's keys, held back while a lesson is new (a second to read it)
-   * and off the rush until it has been taught, so each lesson is seen.
+   * and off the rush until it has been taught, so each lesson is seen. (Play
+   * stopped for a lesson takes no keys; `advance` moves it on for the bot.)
    */
   function autoplayInput(bot: ReturnType<typeof createBot>) {
     const keys = botInput(bot, state);
@@ -1883,7 +1904,8 @@
           const p = pigeonPosition(item);
           if (p.x < left || p.x > right) continue;
           let frame = "sit0";
-          if (item.state === "fly") frame = Math.floor(clock * 14 + item.x) % 2 ? "fly0" : "fly1";
+          // A quick flap: a flock bursting up, not drifting.
+          if (item.state === "fly") frame = Math.floor(clock * 24 + item.x) % 2 ? "fly0" : "fly1";
           else if (!reduceMotion && Math.floor(clock * 1.6 + item.x * 0.37) % 3 === 0) frame = "sit1";
           blit(`sr-pigeon-${frame}`, PIGEON[frame], PIGEON_PAL, p.x - 6, p.y + 4 * CELL);
         } else if (item.type === "pearl") {
@@ -2352,10 +2374,11 @@
     }
   }
 
+  /** Feathers burst out fast, then float down. */
   function feathers(x: number, y: number, count: number) {
     for (let k = 0; k < count; k++) {
       if (reduceMotion) still(B_FEATHER, x + (k - count / 2) * 3, y + 4, 1, FEATHERS[k % 2], 0.3);
-      else spawn(B_FEATHER, x + (Math.random() - 0.5) * 10, y + 4 + Math.random() * 6, (Math.random() - 0.5) * 60, 20 + Math.random() * 40, 0.9 + Math.random() * 0.6, 1, FEATHERS[k % 2]);
+      else spawn(B_FEATHER, x + (Math.random() - 0.5) * 10, y + 4 + Math.random() * 6, (Math.random() - 0.5) * 170, 50 + Math.random() * 90, 0.6 + Math.random() * 0.4, 1, FEATHERS[k % 2]);
     }
   }
 
@@ -2403,8 +2426,8 @@
             bit.vy -= 900 * dt;
             break;
           case B_FEATHER:
-            bit.vy = Math.max(bit.vy - 140 * dt, -26);
-            bit.vx = bit.vx * Math.max(0, 1 - 2 * dt) + Math.sin(bit.age * 7 + bit.seed * 6) * 50 * dt;
+            bit.vy = Math.max(bit.vy - 340 * dt, -26);
+            bit.vx = bit.vx * Math.max(0, 1 - 5 * dt) + Math.sin(bit.age * 7 + bit.seed * 6) * 50 * dt;
             break;
           case B_SPARK:
           case B_CONFETTI:
@@ -2819,8 +2842,8 @@
         case "jump":
           sfxRunJump();
           dustBurst(ev.x, ev.y, 4, 0.7);
-          // A jump is the first half of the jump, hold, glide and slam lessons.
-          if (coach.current?.move && !coach.acting && ["jump", "hold", "glide", "slam"].includes(coach.current.id)) beginTrial(coach.current.id);
+          // A jump makes the jump, hold and glide lessons' move (the slam is taught once in the air).
+          if (coach.current?.move && !coach.acting && ["jump", "hold", "glide"].includes(coach.current.id)) beginTrial(coach.current.id);
           else knownMove("jump");
           break;
         case "slide":
@@ -3111,11 +3134,13 @@
         coach.dismiss();
         cue = null;
       } else if (!coach.acting && cue.ghost) {
-        // Not made in time: past the post, already falling below its roof, or
-        // simply up too long. The next one teaches it again, and play never stays slow.
+        // The moment went by after all: past the post, already falling below
+        // its roof, or (taught in the air) down on something first. Play is
+        // held at the post, so this is rare; the next one teaches it again.
         const late = r.x > cue.ghost.takeoff + 0.35 * Math.max(1, r.vx);
         const falling = !r.grounded && !r.cable && r.y < cue.ghost.top - 6;
-        if (late || falling || coach.age > MOVE_WAIT_SECONDS) {
+        const landed = !!cue.ghost.air && r.grounded;
+        if (late || falling || landed) {
           coach.dismiss();
           cue = null;
         }
@@ -3124,15 +3149,18 @@
     // A lesson about something that moves stays on that very thing.
     if (current && cue?.item && cue.lesson.id === current.id) {
       const it = cue.item;
+      const w = it.type === "barrel" ? BARREL_W : DRONE_W;
+      const h = it.type === "barrel" ? BARREL_H : DRONE_H;
       cue.x = it.x;
-      cue.y = it.y + (it.type === "barrel" ? BARREL_H / 2 : DRONE_H / 2);
+      cue.y = it.y + h / 2;
       cue.clear = it.x;
+      cue.box = { x0: it.x - w / 2, x1: it.x + w / 2, y0: it.y, y1: it.y + h };
       if (it.state === "hit" || it.state === "broken" || it.state === "fell") {
         if (!coach.leaving) coach.done(current.id);
       }
     }
-    // A thing the runner has gone past has been seen: its explanation ends, and play speeds up.
-    if (current && !current.move && !coach.leaving && cue?.lesson.id === current.id && current.id !== "spill" && state.runner.x > cue.clear + 0.1 * Math.max(1, state.runner.vx)) {
+    // A thing the runner has gone past has been seen: its explanation ends.
+    if (current && !current.move && !coach.leaving && cue?.lesson.id === current.id && !cue.onRunner && state.runner.x > cue.clear + 0.1 * Math.max(1, state.runner.vx)) {
       coach.done(current.id);
     }
     // Nothing new while "go" is still on screen.
@@ -3141,17 +3169,22 @@
     if (current && !coach.leaving && current.move && !MOVING_LESSONS.has(current.id)) return;
     const view = viewW > 0 ? (viewW * (1 - lead)) / S : 600;
     const next = lessonAhead(state, coach.learned, { view });
-    if (next) {
-      // A lesson stays on the thing it first pointed at, following it only
-      // if it moves; a new lesson waits its turn.
-      if (coach.current?.id === next.lesson.id) {
-        // Followed through its item (above); the power-up follows the runner.
-        if (next.lesson.id === "rush") cue = next;
-      } else if (coach.offer(next.lesson)) {
-        cue = next;
-      }
-    }
+    // A lesson stays on the thing it first pointed at, following it only if
+    // it moves; a new lesson waits its turn.
+    if (next && coach.current?.id !== next.lesson.id && coach.offer(next.lesson)) cue = next;
     if (!coach.current) cue = null;
+  }
+
+  /**
+   * For the test bot (development only): play stopped for a lesson moves on
+   * after a moment, as a player would, the move left to the bot to make.
+   */
+  function autoplayLesson() {
+    const lesson = coach.current;
+    if (!autoplay || !lesson || !coach.paused || coach.age < 1.2) return;
+    if (lesson.id === "rush") coach.acted("rush");
+    else if (lesson.move) beginTrial(lesson.id);
+    else continueLesson();
   }
 
   /**
@@ -3163,6 +3196,8 @@
     const lesson = coach.current;
     if (!lesson || coach.leaving || mode !== "running") return;
     coach.done(lesson.id);
+    // Nothing pressed while play was stopped carries into it.
+    input.clearPresses();
   }
 
   /** A move the current lesson asks for was made: wait to see it work; otherwise it's simply known. */
@@ -3187,8 +3222,6 @@
   // crates broken. Anything else, or too long, takes the lesson down
   // uncounted, so the next one teaches it again.
   const TRIAL_SECONDS = 2.5;
-  /** Real seconds a move lesson waits for its move before giving up (a little game time, in slow motion). */
-  const MOVE_WAIT_SECONDS = 8;
   const trial = { id: "", time: 0, held: 0, glided: false, slammed: false };
 
   function beginTrial(id: string) {
@@ -3224,14 +3257,24 @@
     }
   }
 
-  /** Teaches something that just happened, beside the runner (a hard landing's spill). */
+  /** Teaches something that just happened, beside the runner (a hard landing's spill), unless a move is coming. */
   function teachNow(id: keyof typeof LESSONS) {
     const lesson = LESSONS[id];
-    if (!coach.offer(lesson)) return;
-    cue = { lesson, x: state.runner.x, y: state.runner.y + 20, size: 12, ghost: null, clear: state.runner.x };
+    if (moveAhead(state, coach.learned) || !coach.offer(lesson)) return;
+    cue = { lesson, x: state.runner.x, y: state.runner.y + 20, size: 12, ghost: null, clear: state.runner.x, onRunner: true };
   }
 
-  /** Puts the callout beside its thing on screen, and lights what it is about. */
+  /** What the callout keeps off besides the scene: the meter, and the pads on touch (placed on a resize). */
+  const calloutAvoid: Array<{ x: number; y: number; w: number; h: number }> = [];
+  const calloutCam = { sx, sy, S: 2, runner: { x: 0, y: 0 } };
+  const calloutView = { w: 0, h: 0, top: 0 };
+
+  /**
+   * Puts the callout beside its thing on screen, clear of the runner, the
+   * way ahead and the thing itself (runner-lessons.js chooses the side,
+   * once its slip is measured), and lights what it is about. Once the
+   * lesson is over the callout holds where it is.
+   */
   function placeCoach() {
     const lesson = coach.current;
     if (!lesson || !cue || cue.lesson.id !== lesson.id || mode !== "running") {
@@ -3239,26 +3282,41 @@
       if (coachX !== null) coachX = coachY = null;
       if (meterLit) meterLit = null;
       if (padLit) padLit = null;
+      calloutFor = "";
       return;
+    }
+    if (calloutFor !== lesson.id) {
+      calloutFor = lesson.id;
+      calloutSide = null;
     }
     if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
     const ending = coach.leaving || coach.acting;
     if (ending !== coachEnding) coachEnding = ending;
-    // A move points at where to make it; a thing gets a loop around it.
-    const x = Math.round(sx(cue.ghost ? cue.ghost.takeoff : cue.x));
-    const y = Math.round(sy(cue.ghost ? cue.ghost.top + 30 : cue.y));
-    if (x !== coachX) coachX = x;
-    if (y !== coachY) coachY = y;
-    const ring = cue.ghost ? 0 : Math.round(Math.max(14, cue.size * S));
-    if (ring !== coachRing) coachRing = ring;
-    // Whatever is well above the runner gets its line underneath, near the runner.
-    const side = y < sy(state.runner.y) - 140 ? "below" : "above";
-    if (side !== coachSide) coachSide = side;
+    if (!ending) {
+      calloutCam.S = S;
+      calloutCam.runner.x = drawX;
+      calloutCam.runner.y = drawY;
+      calloutView.w = viewW;
+      calloutView.h = viewH;
+      calloutView.top = playTop + 8;
+      // Until the slip has been measured (it steps in unseen for a moment), a likely size.
+      const measured = coach.age >= 0.1 && slipSize.w > 0 && slipSize.h > 0;
+      const slip = measured ? slipSize : { w: Math.min(304, viewW - 32), h: 88 };
+      const { spot } = placeCallout(cue, state, calloutCam, slip, calloutView, calloutAvoid, calloutSide);
+      if (measured && !calloutSide) calloutSide = spot.side;
+      const x = Math.round(spot.x);
+      const y = Math.round(spot.y);
+      if (x !== coachX) coachX = x;
+      if (y !== coachY) coachY = y;
+      if (spot.ring !== coachRing) coachRing = spot.ring;
+      if (spot.width !== coachWidth) coachWidth = spot.width;
+      if (spot.height !== coachHeight) coachHeight = spot.height;
+      if (spot.side !== coachSide) coachSide = spot.side;
+    }
     const lit = lesson.id === "pearls" || lesson.id === "rush" ? "sugar" : lesson.id === "spill" || lesson.id === "customer" ? "tea" : null;
     if (lit !== meterLit) meterLit = lit;
-    const pad: keyof Held | null =
-      coach.leaving || coach.acting || !touchUI ? null : lesson.id === "rush" ? "rush" : lesson.id === "slide" || lesson.id === "slam" ? "down" : lesson.move ? "jump" : null;
+    const pad: keyof Held | null = ending || !touchUI ? null : (LESSON_CONTROL[lesson.id] ?? null);
     if (pad !== padLit) padLit = pad;
   }
 
@@ -3277,22 +3335,45 @@
 
   /**
    * Places the meter: under the runner on a wide screen, between the pads on
-   * touch (smaller if a phone has too little room there). Only on a resize.
+   * touch (in one row where there is room, as on a tablet or a phone on its
+   * side; standing up in two on a phone; smaller if even that is short).
+   * Only on a resize, and with it what the callout keeps off.
    */
   function placeMeter() {
+    placeMeterOnly();
+    calloutAvoid.length = 0;
+    calloutAvoid.push({ x: meterX, y: meterY, w: meter.width * meterU, h: meter.height * meterU });
     if (touchUI && padsRow) {
-      meter = meterLayout(true);
+      for (const pad of padsRow.querySelectorAll("button")) {
+        const box = pad.getBoundingClientRect();
+        if (box.width > 0) calloutAvoid.push({ x: box.left, y: box.top, w: box.width, h: box.height });
+      }
+    }
+  }
+
+  function placeMeterOnly() {
+    if (touchUI && padsRow) {
       const row = padsRow.getBoundingClientRect();
       const slide = padsRow.firstElementChild?.getBoundingClientRect();
       const stack = padsRow.lastElementChild;
       const from = slide?.right ?? row.left;
       const to = stack?.getBoundingClientRect().left ?? row.right;
-      const fit = [SC, 3].find((u) => meter.width * u <= to - from - 16);
+      const wide = meterLayout(false);
+      const tall = meterLayout(true);
+      const fit = (
+        [
+          [wide, SC],
+          [tall, SC],
+          [tall, 3],
+        ] as const
+      ).find(([layout, u]) => layout.width * u <= to - from - 16);
+      meter = fit ? fit[0] : tall;
       meterLow = true;
       if (fit) {
-        meterU = fit;
-        meterX = Math.round((from + to - meter.width * fit) / 2);
-        meterY = Math.round(row.bottom - meter.height * fit);
+        const u = fit[1];
+        meterU = u;
+        meterX = Math.round((from + to - meter.width * u) / 2);
+        meterY = Math.round(row.bottom - meter.height * u);
         return;
       }
       // Larger text leaves no room between the pads: centred just over all
@@ -3363,8 +3444,8 @@
   /**
    * The meter, in the scene: a dark chip like the lesson callout's, with the
    * cup of tea that hard landings spill and the ten sugar cubes the pearls
-   * fill. Read straight from the run each frame, so it moves smoothly in
-   * slow motion; it sits outside the shake and under the lesson's dim.
+   * fill. Read straight from the run each frame, so it moves smoothly as
+   * play eases; it sits outside the shake and under the lesson's dim.
    */
   function drawMeter() {
     if (!ctx || !viewW) return;
@@ -3431,7 +3512,7 @@
 
   /** How dim the scene is around a lesson, 0..1, eased in real time. */
   let lessonDim = 0;
-  const focusBoxes: FocusBox[] = [{ x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }];
+  const focusBoxes: FocusBox[] = Array.from({ length: 4 }, () => ({ x: 0, y: 0, w: 0, h: 0 }));
   /** The boxes lit this frame, reused. */
   const litBoxes: FocusBox[] = [];
 
@@ -3451,7 +3532,7 @@
     runnerBox.h = 24 * S + pad * 2;
     litBoxes.length = 0;
     litBoxes.push(runnerBox);
-    if (cue) {
+    if (cue && !cue.onRunner) {
       const thing = focusBoxes[1];
       if (cue.ghost) {
         // The way from the post to past what the move clears, roof to the top of the ghost's arc.
@@ -3477,19 +3558,33 @@
       }
       litBoxes.push(thing);
     }
-    // A lesson about the tea or the sugar keeps that part of the meter lit.
+    // A lesson about the tea or the sugar keeps that part of the meter lit (the sugar's word too).
     if (meterLit && meterPart(meterLit, focusBoxes[2])) litBoxes.push(focusBoxes[2]);
+    if (meterLit === "sugar") {
+      const word = focusBoxes[3];
+      word.x = meterX + (meter.labelBox.x - 1) * meterU;
+      word.y = meterY + (meter.labelBox.y - 1) * meterU;
+      word.w = (meter.labelBox.w + 2) * meterU;
+      word.h = (meter.labelBox.h + 2) * meterU;
+      litBoxes.push(word);
+    }
     drawSpotlight(ctx, viewW, viewH, litBoxes, lessonDim, { color: NOTE_BACK, cell: SC });
   }
 
+  /** The ghost waits at the post this long before each run of the move, and holds where it comes down this long. */
+  const GHOST_WAIT = 0.3;
+  const GHOST_HOLD = 0.35;
+
   /**
-   * A move's ghost: chalk dashes along the path from where to make it, and a
-   * dithered runner running it over and over, a little ahead of the real one.
+   * A move's ghost: chalk dashes along the path from where to make it, the
+   * post on the roof there, and a dithered runner making the move from the
+   * post in real time, over and over, while play is held there.
    */
   function drawLessonGhost() {
     const ghost = cue?.ghost;
     if (!ctx || !ghost || paused || !coach.current || coach.leaving || coach.acting || coach.current.id !== cue?.lesson.id) return;
-    const path = ghost.path;
+    // Taught in the air, the move starts where the runner hangs.
+    const path = ghost.air ? slamPath(drawX, drawY, ghost.top, Math.max(1, state.runner.vx)) : ghost.path;
     ghostPoints.length = path.length;
     for (let i = 0; i < path.length; i++) {
       const point = (ghostPoints[i] ??= { x: 0, y: 0 });
@@ -3498,32 +3593,37 @@
     }
     const cell = Math.max(2, Math.round(CELL * S));
     chalkPath(ctx, ghostPoints, { color: CREAM, cell, dash: 1, gap: 2, offset: reduceMotion ? 0 : -lessonClock * 24 });
-    // Where to press: a short accent post on the roof.
-    const tx = Math.round(sx(ghost.takeoff) / cell) * cell;
-    const ty = Math.round(sy(ghost.top) / cell) * cell;
-    ctx.fillStyle = ACCENT;
-    ctx.fillRect(tx - cell / 2, ty - cell * 5, cell, cell * 5);
-    ctx.fillRect(tx - cell * 1.5, ty - cell * 6, cell * 3, cell);
+    if (!ghost.air) {
+      // Where to press: a short accent post on the roof.
+      const tx = Math.round(sx(ghost.takeoff) / cell) * cell;
+      const ty = Math.round(sy(ghost.top) / cell) * cell;
+      ctx.fillStyle = ACCENT;
+      ctx.fillRect(tx - cell / 2, ty - cell * 5, cell, cell * 5);
+      ctx.fillRect(tx - cell * 1.5, ty - cell * 6, cell * 3, cell);
+    }
 
-    // The ghost waits at the post for a beat, then runs the move.
-    const loop = reduceMotion ? 0.55 : (lessonClock % 1.5) / 1.5;
-    const t = clamp((loop - 0.2) / 0.75, 0, 1);
-    const along = t * (path.length - 1);
-    const index = Math.min(path.length - 2, Math.floor(along));
+    // Each run: a beat at the post, the move at the speed it is made, a beat where it comes down.
+    const length = path[path.length - 1].t;
+    const cycle = GHOST_WAIT + length + GHOST_HOLD;
+    const at = reduceMotion ? length * 0.5 : clamp((coach.age % cycle) - GHOST_WAIT, 0, length);
+    let index = 0;
+    while (index < path.length - 2 && path[index + 1].t < at) index++;
     const a = path[index];
-    const b = path[index + 1];
-    const f = along - index;
+    const b = path[index + 1] ?? a;
+    const f = b.t > a.t ? clamp((at - a.t) / (b.t - a.t), 0, 1) : 0;
     const gx = a.x + (b.x - a.x) * f;
     const gy = a.y + (b.y - a.y) * f;
     const rising = b.y > a.y + 0.5;
-    let legs = t === 0 ? "run0" : rising ? "tuck" : "fall";
+    const started = at > 0;
+    const down = at >= length;
+    let legs = !started || (down && ghost.kind !== "slam") ? "run0" : rising ? "tuck" : "fall";
     let head = "straw";
-    if (ghost.kind === "slide") legs = t === 0 ? "run0" : "slide";
-    if (ghost.kind === "glide" && !rising && t > 0) {
+    if (ghost.kind === "slide") legs = started && !down ? "slide" : "run0";
+    if (ghost.kind === "glide" && started && !down && !rising && at < (ghost.release ?? length)) {
       head = "rotor0";
       legs = "glide";
     }
-    if (ghost.kind === "slam" && t > 0.85) legs = "slam";
+    if (ghost.kind === "slam" && started) legs = "slam";
     const key = `ghost-${head}-${legs}`;
     const grid = runnerGrid(key, head, legs, 0, TEA_CELLS, false, false);
     const sprite = cachedSprite(key, grid, px, RUNNER_PAL, "");
@@ -3535,26 +3635,44 @@
     drawGhost(ctx, left, top, w, h, (g) => g.drawImage(sprite, left, top, w, h), { color: CREAM, density, cell });
   }
 
-
   // --- Running -------------------------------------------------------------------------------
 
-  // The rules step at a fixed 120 Hz. In slow motion a frame may fall
-  // between steps, so the runner and the camera are drawn where they are
-  // between the last two steps (`drawX`, `drawY`), never where a step left
-  // them: motion stays smooth at any speed, and the physics never changes.
+  // The rules step at a fixed 120 Hz. As play eases into and out of a
+  // lesson's pause a frame may fall between steps, so the runner and the
+  // camera are drawn where they are between the last two steps (`drawX`,
+  // `drawY`), never where a step left them: motion stays smooth at any
+  // speed, and the physics never changes.
   let prevX = 0;
   let prevY = 0;
   let drawX = 0;
   let drawY = 0;
 
+  /**
+   * The post the runner is held at while a move is being taught and hasn't
+   * been made: play eases to a stop there and never runs past it.
+   */
+  function holdAt() {
+    const lesson = coach.current;
+    if (!lesson?.move || coach.leaving || coach.acting || !cue?.ghost || cue.lesson.id !== lesson.id) return null;
+    return cue.ghost.takeoff;
+  }
+
   function run(dt: number) {
     accumulator += dt;
+    const hold = holdAt();
     while (accumulator >= STEP && state.status !== "over") {
+      if (hold !== null && state.runner.x + state.runner.vx * STEP > hold && state.status === "running") {
+        // At the post: drawn where it stands, so it rests rather than steps back.
+        accumulator = 0;
+        prevX = state.runner.x;
+        prevY = state.runner.y;
+        break;
+      }
       accumulator -= STEP;
       prevX = state.runner.x;
       prevY = state.runner.y;
       // A press counts until a step has seen it, so a tap is never lost
-      // between steps, which in a lesson's slow motion are far apart.
+      // between steps, which come far apart as play eases into and out of a lesson.
       const held = autoplay ? autoplayInput(autoplay) : input.read();
       input.clearPresses();
       const events = stepRun(state, held, STEP);
@@ -3669,7 +3787,7 @@
   }
 
   function advance(realDt: number, rawDt = realDt) {
-    // A lesson eases the run into slow motion, and back out once it's done.
+    // A lesson eases the run to a stop, and back to speed once it's done.
     const dt = mode === "running" ? coach.step(rawDt, realDt) : realDt;
     lessonClock += realDt;
     // The spotlight comes up with an explanation and goes as it ends or the move is made.
@@ -3688,6 +3806,7 @@
       if (goVisible && clock - begunAt >= GO_SECONDS) goVisible = false;
       run(dt);
       checkLessons();
+      autoplayLesson();
     } else if (mode === "over" && !gameOver && clock - overAt >= OVER_SECONDS) {
       void endGame();
     }
@@ -3722,6 +3841,48 @@
     onPads: (pads) => (touchHeld = pads),
   });
 
+  /**
+   * What a press of `control` does while a lesson is up. While a move is
+   * taught, its own control makes it ("act": play resumes and the move is
+   * made at once) and the others wait ("drop": held, but no press is kept
+   * for when play comes back). While play is stopped to explain a thing, a
+   * press is dropped too, except the rush's own key in its lesson, which
+   * starts the rush. Otherwise a press goes through as ever ("pass").
+   */
+  function lessonPress(control: keyof Held, fresh: boolean): "act" | "drop" | "pass" {
+    const lesson = coach.current;
+    if (!lesson || coach.leaving || coach.acting || mode !== "running" || autoplay) return "pass";
+    const own = LESSON_CONTROL[lesson.id];
+    if (own && lesson.move && lesson.id !== "rush") return control === own && fresh ? "act" : "drop";
+    if (own === control && fresh) return "act";
+    return coach.paused ? "drop" : "pass";
+  }
+
+  /** The press that makes the move being taught: play resumes, and the next step sees it at the post. */
+  function actOnLesson() {
+    const lesson = coach.current;
+    if (!lesson) return;
+    if (lesson.id === "rush") coach.acted("rush");
+    else beginTrial(lesson.id);
+    accumulator = Math.max(accumulator, STEP);
+  }
+
+  /** A pad pressed: held as ever, with a lesson's say over the press. */
+  function padPress(event: PointerEvent, control: keyof Held) {
+    const what = lessonPress(control, true);
+    if (!input.padDown(event, control)) return;
+    if (what === "drop") input.clearPresses();
+    else if (what === "act") actOnLesson();
+  }
+
+  /** Space or Enter on a focused pad, likewise. */
+  function padKeyDown(event: KeyboardEvent, control: keyof Held) {
+    const what = lessonPress(control, !event.repeat);
+    if (!input.padKey(event, control, true)) return;
+    if (what === "drop") input.clearPresses();
+    else if (what === "act") actOnLesson();
+  }
+
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === "Tab") {
       onPlayfieldTab(event);
@@ -3738,10 +3899,13 @@
       continueLesson();
       return;
     }
-    if (!input.control(key)) return;
+    const control = input.control(key);
+    if (!control) return;
     event.preventDefault();
-    // A key's repeats latch a press too.
-    input.keyDown(key, true);
+    // A key's repeats latch a press too, unless a lesson is holding play for its own move.
+    const what = lessonPress(control, !event.repeat);
+    input.keyDown(key, what !== "drop");
+    if (what === "act") actOnLesson();
   }
 
   function onKeyUp(event: KeyboardEvent) {
@@ -3899,6 +4063,8 @@
     const wide = viewW >= viewH * 1.05;
     lead = wide ? 0.28 : 0.2;
     placeMeter();
+    // A callout up is placed again for the new screen.
+    calloutSide = null;
     // The course stays above the thumb buttons on touch, and above the meter.
     const padsTop = touchUI && padsRow ? padsRow.getBoundingClientRect().top : viewH;
     playBottom = Math.max(playTop + 180, Math.min(viewH, padsTop - 8, meterLow ? meterY - 8 : viewH));
@@ -4075,7 +4241,12 @@
     y={coachY}
     side={coachSide}
     ring={coachRing}
+    width={coachWidth}
+    height={coachHeight}
     leaving={coachLeaving}
+    ended={coachEnding}
+    bind:slipW={slipSize.w}
+    bind:slipH={slipSize.h}
     touch={touchUI}
     continuable={!!coachLesson && !coachEnding && (coachLesson.slow ?? 1) < 1}
     on:continue={continueLesson}
@@ -4089,68 +4260,57 @@
       <div bind:this={padsRow} class="sr-pads-row">
         <button
           type="button"
-          class="sr-pad boba-riso is-small"
+          class="sr-pad boba-key"
           class:is-down={touchHeld.down}
           class:is-lit={padLit === "down"}
-          style="--tilt: -1.2deg"
-          on:pointerdown={(event) => input.padDown(event, "down")}
+          on:pointerdown={(event) => padPress(event, "down")}
           on:pointerup={(event) => input.padUp(event, "down")}
           on:pointercancel={(event) => input.padCancel(event, "down")}
           on:lostpointercapture={(event) => input.padUp(event, "down")}
-          on:keydown={(event) => input.padKey(event, "down", true)}
+          on:keydown={(event) => padKeyDown(event, "down")}
           on:keyup={(event) => input.padKey(event, "down", false)}
           on:blur={() => input.padBlur("down")}
           on:contextmenu={(event) => event.preventDefault()}
         >
-          <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-            <path d="M8 11 L16 19 L24 11" />
-            <path d="M6 25 H26" />
-          </svg>
+          <PixelIcon grid={PAD_ICONS.slide} palette={PAD_ICON_PAL} px={3} />
           <span>slide</span>
         </button>
         <div class="sr-pad-stack">
           <button
             type="button"
-            class="sr-pad sr-rush boba-riso is-small"
+            class="sr-pad sr-rush boba-key is-primary"
             class:is-down={touchHeld.rush}
             class:is-lit={padLit === "rush"}
             class:is-hidden={!rushReady}
             tabindex={rushReady ? 0 : -1}
             aria-hidden={!rushReady}
-            style="--tilt: 1.4deg"
-            on:pointerdown={(event) => input.padDown(event, "rush")}
+            on:pointerdown={(event) => padPress(event, "rush")}
             on:pointerup={(event) => input.padUp(event, "rush")}
             on:pointercancel={(event) => input.padCancel(event, "rush")}
             on:lostpointercapture={(event) => input.padUp(event, "rush")}
-            on:keydown={(event) => input.padKey(event, "rush", true)}
+            on:keydown={(event) => padKeyDown(event, "rush")}
             on:keyup={(event) => input.padKey(event, "rush", false)}
             on:blur={() => input.padBlur("rush")}
             on:contextmenu={(event) => event.preventDefault()}
           >
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <path d="M18 3 L8 18 H16 L13 29 L24 13 H16 Z" />
-            </svg>
+            <PixelIcon grid={PAD_ICONS.rush} palette={PAD_ICON_PAL} px={3} />
             <span>rush</span>
           </button>
           <button
             type="button"
-            class="sr-pad sr-jump boba-riso is-small"
+            class="sr-pad sr-jump boba-key"
             class:is-down={touchHeld.jump}
             class:is-lit={padLit === "jump"}
-            style="--tilt: -0.9deg"
-            on:pointerdown={(event) => input.padDown(event, "jump")}
+            on:pointerdown={(event) => padPress(event, "jump")}
             on:pointerup={(event) => input.padUp(event, "jump")}
             on:pointercancel={(event) => input.padCancel(event, "jump")}
             on:lostpointercapture={(event) => input.padUp(event, "jump")}
-            on:keydown={(event) => input.padKey(event, "jump", true)}
+            on:keydown={(event) => padKeyDown(event, "jump")}
             on:keyup={(event) => input.padKey(event, "jump", false)}
             on:blur={() => input.padBlur("jump")}
             on:contextmenu={(event) => event.preventDefault()}
           >
-            <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-              <path d="M8 20 L16 12 L24 20" />
-              <path d="M8 27 L16 19 L24 27" />
-            </svg>
+            <PixelIcon grid={PAD_ICONS.jump} palette={PAD_ICON_PAL} px={3} />
             <span>jump</span>
           </button>
         </div>
@@ -4402,24 +4562,13 @@
     gap: var(--space-3);
   }
 
+  /* The pads are pixel keys (.boba-key, rush the primary one), at their own sizes. */
   .sr-pad {
-    display: grid;
-    place-items: center;
-    gap: var(--space-0-5);
     width: 5rem;
     height: 4.25rem;
-    padding: 0;
-    color: var(--b-strong);
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    line-height: 1;
+    gap: var(--space-1);
     pointer-events: auto;
     touch-action: none;
-    -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     transition: transform var(--motion-instant) var(--ease-standard);
   }
@@ -4439,48 +4588,30 @@
     visibility: hidden;
   }
 
-  .sr-pad svg {
-    width: 1.75rem;
-    height: 1.75rem;
-    overflow: visible;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+  /* The pad a lesson is about: pixel corner brackets inside it in the
+     accent (cream on rush's accent face), as the lesson rings its thing. */
+  .sr-pad.is-lit {
+    --mark: #e85d4c;
+    background-image:
+      linear-gradient(var(--mark), var(--mark)), linear-gradient(var(--mark), var(--mark)),
+      linear-gradient(var(--mark), var(--mark)), linear-gradient(var(--mark), var(--mark)),
+      linear-gradient(var(--mark), var(--mark)), linear-gradient(var(--mark), var(--mark)),
+      linear-gradient(var(--mark), var(--mark)), linear-gradient(var(--mark), var(--mark));
+    background-repeat: no-repeat;
+    background-size:
+      12px 4px, 4px 12px,
+      12px 4px, 4px 12px,
+      12px 4px, 4px 12px,
+      12px 4px, 4px 12px;
+    background-position:
+      left 6px top 6px, left 6px top 6px,
+      right 6px top 6px, right 6px top 6px,
+      left 6px bottom 10px, left 6px bottom 10px,
+      right 6px bottom 10px, right 6px bottom 10px;
   }
 
-  .sr-rush svg {
-    width: 1.375rem;
-    height: 1.375rem;
-  }
-
-  /* No slab at rest: the pads sit straight on the scene. */
-  .sr-pad::before {
-    display: none;
-  }
-
-  /* Held: the sheet takes the accent and sinks a pixel. */
-  .sr-pad.is-down {
-    color: #1a1a1a;
-    transform: translateY(1px);
-  }
-
-  .sr-pad.is-down::after {
-    background: #e85d4c;
-    border-color: #1a1a1a;
-    border-width: 2.25px;
-  }
-
-  :global(.dark) .sr-pad.is-down::after {
-    background: #f07563;
-    border-color: #fdf8f3;
-  }
-
-  /* The pad a lesson is about: an accent rule under its label. */
-  .sr-pad.is-lit span {
-    text-decoration: underline 2px var(--b-slab);
-    text-underline-offset: 4px;
+  .sr-rush.is-lit {
+    --mark: #fdf8f3;
   }
 
   /* Short, wide screens (a phone on its side): rush moves beside jump. Short

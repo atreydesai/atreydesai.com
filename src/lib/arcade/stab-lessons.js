@@ -1,26 +1,35 @@
 // Straw stab's lessons: what the belt teaches, and when. The beat is the
 // audio clock, so nothing here slows time: a lesson is a line beside the
-// belt, a pen loop, a ghost, and a spotlight on the lane, while the music
-// and the cups carry on at their own pace.
+// belt, pixel brackets, a ghost, and a spotlight on the lane, while the
+// music and the cups carry on at their own pace, or, for the two lines that
+// matter most, the belt and the music stop together until Continue.
 //
 // A device's first run opens with a short practice (the engine's rule: the
 // first few cups score nothing and cost nothing). Its line, "Stab when the
-// cup reaches the notch.", stays up through it, while a pen loop shrinks onto
-// the notch for each practice cup and lands there on its beat, and for the
-// first two a ghost straw stabs on the beat to show it. Two good stabs in a
-// row end the practice early.
+// cup reaches the notch.", stays up through it, while cream brackets close
+// onto the notch for each practice cup and are snug on it on its beat
+// (`practiceBracket`, `bracketBox`), and for the first two a ghost straw
+// stabs on the beat to show it. Two good stabs in a row end the practice
+// early.
 //
 // After that, each thing is named the first time it matters, at the moment
 // it happens: the early and late notes, a perfect, a graze, a lost pearl
 // (a cup let go, or a stab at the bare belt), a new song, nightfall's busier
 // belt, the first golden cup and the first cup between the beats, and in
 // expert the tighter windows. A line about a cup only ever comes up once
-// that cup is the next one the straw needs to take, so following it never
-// costs an earlier cup.
+// that cup is the next one the straw needs to take, and is in view, so
+// following it never costs an earlier cup.
 //
+// The two pearl lines (`STOPS`) also stop the belt, the way the pause card
+// does: the audio clock is suspended, so the music and the belt hold
+// together and pick up exactly where they stopped, on Continue. They stop it
+// at the first moment, within STOP_WITHIN of coming up, that the next cup is
+// at least a beat off (`roomToStop`), so the music plays before the straw is
+// needed again; with no such moment they are said over the running belt.
 // Every line holds (readable, with Continue) for a bounded few seconds of
-// real time, or until its cup is gone; lines leave a rest between them; and
-// nothing but the practice shows while the practice is on.
+// real time while the belt runs (stopped, it waits for Continue), or until
+// its cup is gone; lines leave a rest between them; and nothing but the
+// practice shows while the practice is on.
 //
 // DOM-free: the component asks these functions what to teach and hands the
 // answer to the shared coach (src/lib/arcade/core/coach.ts), which shows
@@ -46,7 +55,11 @@ export const PRACTICE_LEAD = 2;
  * so a cup right behind one taken dead on can be taught.
  */
 export const CUP_LEAD = 0.1;
-/** Real seconds a line holds, readable with Continue, before it goes by itself. */
+/**
+ * Real seconds a line holds over the running belt, readable with Continue,
+ * before it goes by itself. While a line has the belt stopped it doesn't
+ * age: it waits for Continue.
+ */
 export const HOLD = 6;
 /** Real seconds of no line between two lines, so they never run together. */
 export const REST = 1.5;
@@ -83,6 +96,59 @@ export const LESSONS = Object.freeze({
 });
 
 /**
+ * The lines important enough to stop the belt for: the two ways a pearl is
+ * lost, which is how a run ends. The rest stay over the running belt: the
+ * timing notes, a perfect and a graze are feedback on the stab just made,
+ * best taken in the rhythm; a new song's line and the off-beat cup's are
+ * about listening, which a silent stop works against; and golden cups and
+ * nightfall change nothing the player does.
+ */
+export const STOPS = Object.freeze(["miss", "bonk"]);
+
+/**
+ * Song seconds after a pearl line comes up that the game looks for room to
+ * stop the belt (`roomToStop`), a cup or two at most. Past it, the line is
+ * said over the running belt, as every other line is.
+ */
+export const STOP_WITHIN = 1;
+/**
+ * Song seconds from the moment the game finds room to the belt stopping:
+ * within a beat, and long enough for the sound just made (the pearl lost, or
+ * the stab before the gap, and the music's dip under it) to finish, so none
+ * is frozen halfway and finished on Continue.
+ */
+export const HOLD_AFTER = 0.25;
+/**
+ * The belt stops only with the next cup still waiting at least this many
+ * beats from the notch, and at least ROOM_SECONDS: play comes back mid-bar,
+ * exactly where it stopped, so this is the music heard again before the
+ * straw is needed.
+ */
+export const ROOM_BEATS = 1;
+export const ROOM_SECONDS = 0.5;
+
+/**
+ * Real seconds the belt has to have been stopping before a stab press
+ * continues its line. A press sooner (one already on its way as the stop
+ * came) does nothing, so it never skips the line unread; and no press stabs
+ * while the belt is stopping, where it could only hit the bare belt.
+ */
+export const PRESS_AFTER = 0.4;
+
+/**
+ * Whether a line that stops the belt (`STOPS`) may stop it now: HOLD_AFTER
+ * from now, the next cup still waiting will be at least ROOM_BEATS (and
+ * ROOM_SECONDS) from the notch, or none is waiting. Right after a cup is
+ * taken is when there is most room.
+ * @param {{ now: number, next: { time: number } | null, beat: number }} moment
+ *   `now`: the song time as heard; `next`: the earliest cup still waiting;
+ *   `beat`: seconds a beat at the tempo playing.
+ */
+export function roomToStop({ now, next, beat }) {
+  return !next || next.time - now >= HOLD_AFTER + Math.max(ROOM_SECONDS, ROOM_BEATS * beat);
+}
+
+/**
  * @typedef {object} NextCup
  * The cup the straw needs to take next: the earliest one still waiting.
  * @property {number} time its beat, in song time
@@ -114,21 +180,23 @@ const firstUnlearned = (learned, lessons) => lessons.find((lesson) => !learned(l
 /**
  * What the belt should teach now, from what is coming: the practice line as
  * its first cup rides in, then the first golden cup and the first cup between
- * the beats, each only once it is the next cup the straw needs (and far
- * enough off for its loop to be seen). During the practice, nothing else.
+ * the beats, each only once it is the next cup the straw needs, in view (a
+ * long gap can leave the next cup still off the screen's edge), and far
+ * enough off for its brackets to be seen. During the practice, nothing else.
  * @template {NextCup} C
- * @param {{ now: number, next: C | null, practicing: boolean }} moment
- *   `now` is the song time on screen; `next` the earliest cup still waiting.
+ * @param {{ now: number, next: C | null, practicing: boolean, seen?: number }} moment
+ *   `now` is the song time on screen; `next` the earliest cup still waiting;
+ *   `seen` the song seconds before its beat that a cup is wholly on screen.
  * @param {(id: string) => boolean} learned
  * @returns {StabCue<C> | null}
  */
-export function lessonNow({ now, next, practicing }, learned) {
+export function lessonNow({ now, next, practicing, seen = Infinity }, learned) {
   if (!next) return null;
   const ahead = next.time - now;
   if (practicing) {
     return !learned(LESSONS.stab.id) && ahead <= PRACTICE_LEAD ? { lesson: LESSONS.stab, cup: null } : null;
   }
-  if (ahead < CUP_LEAD) return null;
+  if (ahead < CUP_LEAD || ahead > seen) return null;
   if (next.golden && !learned(LESSONS.golden.id)) return { lesson: LESSONS.golden, cup: next };
   if (next.beat % 1 !== 0 && !learned(LESSONS.offbeat.id)) return { lesson: LESSONS.offbeat, cup: next };
   return null;
@@ -225,4 +293,57 @@ export function ghostPlunge(since, { rest, lid, stuck, plunge, ride, reduce }) {
   if (since < -toLid) return null;
   const k = Math.min(1, (since + toLid) / plunge);
   return k * k;
+}
+
+// --- Brackets --------------------------------------------------------------------
+//
+// A thing on the belt is ringed with pixel corner brackets, the mark the
+// lesson callout draws in the page: cream for the practice, closing onto
+// the notch for each practice cup; the accent round a golden or off-beat
+// cup, riding it. They are worked out here, so their timing and geometry can
+// be checked without a canvas.
+
+/** Beats the practice's brackets take to close onto the notch. */
+export const BRACKET_BEATS = 2;
+/** How much bigger than snug they are as they start to close. */
+export const BRACKET_GROW = 2.4;
+/** Song seconds they stay snug on the notch after the beat, while the cup is still in reach. */
+export const BRACKET_AFTER = 0.12;
+
+/**
+ * How open the practice's brackets are round the notch for a cup `ahead`
+ * song seconds before its beat (negative after it): BRACKET_GROW times snug
+ * as it comes within BRACKET_BEATS beats, closing in time with the song to
+ * exactly snug (1) on its beat, held snug for BRACKET_AFTER, and null (not
+ * drawn) outside that. Under Reduce Motion they sit snug throughout the same
+ * span, still timed to the beat.
+ * @param {number} ahead
+ * @param {number} beat seconds a beat at the cup's tempo
+ * @param {boolean} [reduce]
+ * @returns {number | null}
+ */
+export function practiceBracket(ahead, beat, reduce = false) {
+  const span = BRACKET_BEATS * beat;
+  if (!(ahead <= span && ahead >= -BRACKET_AFTER)) return null;
+  if (reduce) return 1;
+  return 1 + (BRACKET_GROW - 1) * Math.min(1, Math.max(0, ahead / span));
+}
+
+/**
+ * The box brackets ring a cup in, px: snug on the cup's sprite (centred at
+ * `x`, standing on the belt at `beltY`) with two art pixels to spare, or
+ * `grow` times that, its margin rounded up to whole art pixels so it closes
+ * in the scene's own pixel steps and is snug only once `grow` is exactly 1.
+ * Centred on the cup: its sides are whole art pixels from the cup's edges.
+ * @param {number} x the cup's centre
+ * @param {{ beltY: number, cupW: number, cupH: number, px: number }} layout
+ * @param {number} [grow]
+ */
+export function bracketBox(x, { beltY, cupW, cupH, px }, grow = 1) {
+  const snugW = cupW + px * 4;
+  const snugH = cupH + px * 4;
+  const pad = (/** @type {number} */ size) => Math.max(0, Math.ceil(((grow - 1) * size) / 2 / px - 1e-9)) * px;
+  const w = snugW + 2 * pad(snugW);
+  const h = snugH + 2 * pad(snugH);
+  return { x: x - w / 2, y: beltY - cupH / 2 - h / 2, w, h };
 }

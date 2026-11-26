@@ -37,7 +37,7 @@ Three rules hold everywhere:
 | ---------- | ------------------------------- | ---------------------------------------------------- | ------------ |
 | boba catch | Catch cups thrown by links      | Mouse                                                | Desktop only |
 | sugar rush | Run the rooftops and deliver    | Space, `↓`, `X`; three buttons on touch              | Everywhere   |
-| tea minus  | Land a cup of tea on a moon     | Arrows or `WASD`, Space; three hold buttons on touch | Everywhere   |
+| tea minus  | Land a cup of tea on a moon     | Arrows or `WASD`, Space; three pixel keys on touch   | Everywhere   |
 | cup stack  | Drop cups onto a tower          | Tap, click, Space                                    | Everywhere   |
 | spill      | Draw straws to steer the pour   | Drag to draw; arrows and Space as a pen              | Everywhere   |
 | straw stab | Stab each cup on the beat       | Tap, click, Space                                    | Everywhere   |
@@ -435,29 +435,38 @@ page itself. It needs a mouse.
 - **The tickets.** The middle ticket counts time on shift up, with the
   pace's name under it. The end ticket carries the pearls, the song flag,
   and the HUD buttons.
+- **Pauses need intent.** The basket follows the mouse's x alone and the
+  pointer is hidden over the page, so it drifts. During play a click on the
+  tickets counts only once the pointer has rested on them; a pointer off
+  the page holds play still for half a second, then pauses. P, Space, Enter
+  on a focused button, and leaving the window or tab pause at once.
 - **Taught on shift** (`catch-lessons.js`, timed on simulated shifts by
-  `tests/catch-lessons.test.mjs`). Every lesson slows the whole shift to
-  under a third of its pace while it explains; the page dims under a wash
-  of ink, and only the basket and what the lesson is about stay lit.
-  Continue (Enter, or the slip's button) ends it, and play eases back. The
-  first link to light up is ringed in pen with "A glowing link is about to
-  throw." When its cup flies, the way down is chalked to a dithered ghost
-  basket where it will land, with "Move the basket under the cup." beside
-  it; play comes back to speed once the basket has settled under the cup (a
-  sweep through doesn't count), and a cup let go past takes the lesson down
-  for a later cup to teach. A lesson whose cup is overtaken by a later throw
-  stands down for it; the catch moves to that cup if there is still time to
-  reach it, and if it is still unmade after seven seconds it waits for a
-  later run. The first golden cup, the first golden cup while
-  a pearl is down (never on expert), and the first pair, lob and flick each
-  get a line riding beside the cup until it is caught or goes past. A lost
-  pearl and the bonus point are said beside the basket, where it was when
-  they happened. A lesson about a cup
-  is only ever about the next cup down, so following it never lets another
-  fall (a test proves slowing to explain never costs a pearl), and lessons
-  leave a second and a half of full-speed play between them. Because catch
-  plays on the page, its marks print in ink on the light theme and cream on
-  the dark.
+  `tests/catch-lessons.test.mjs`). Every lesson stops the whole shift while
+  it explains; the page dims under a wash of ink, and only the basket and
+  what the lesson is about stay lit, in rounded rectangles. Continue (Enter,
+  or the slip's button) ends it, and play eases back. The first link to
+  light up stops play with "A glowing link is about to throw." When its cup
+  leaves the link, play freezes again: the way down is chalked to the catch
+  line and a dithered ghost basket runs from the basket to where the cup
+  will land, again and again (it waits there under Reduce Motion), with
+  "Move the basket under the cup." beside it. The player's own move brings
+  play back (the basket moved once the freeze has held a moment, or already
+  waiting under the cup), and the basket follows the mouse all the while,
+  so no move is lost. A cup let go past takes the lesson down for a later
+  cup; a lesson whose cup is overtaken stands down, and the catch moves to
+  that cup if it can still be reached; unmade after seven seconds it waits
+  for a later run. The first golden cup, the first golden cup while a pearl
+  is down (never on expert), and the first pair, lob and flick each stop
+  play with a line beside the cup. A lost pearl and the bonus point are said
+  beside the basket, where it was. A lesson about a cup is only ever about
+  the next cup down, and play stops only while a hand that went to the
+  slip's button could still get back under that cup (for any other line,
+  from anywhere on the page), so stopping never costs a pearl (a test
+  proves it, with hands that go to the button and back); lessons leave a
+  second and a half of full-speed play between them. The slip never covers
+  the basket, its way along the row to the landing, the cup, its way down,
+  or the landing. Because catch plays on the page, its marks print in ink
+  on the light theme and cream on the dark.
 - **The share** is one square per fifteen seconds on shift (a clean stretch,
   a golden cup, a pearl won back, or a pearl dropped), then the time on
   shift.
@@ -489,19 +498,31 @@ A conveyor belt carries cups past a straw; stab each on the beat.
   slows; a device's first run opens on a practice instead. Its first four
   cups score nothing and cost no pearl, and neither does the bare belt
   meanwhile. "Stab when the cup reaches the notch." sits under the belt by
-  the notch while cream pixel brackets close onto the notch for each
-  practice cup, snug on the cup exactly on its beat; for the first two, a dithered cream
-  ghost straw goes in on the beat as a dead-on stab would. Two good stabs in
-  a row end the practice early; one with no good stab comes back next run.
+  the notch while cream pixel brackets close onto the notch in whole
+  art-pixel steps for each practice cup, drawn over the spotlight, snug on
+  the cup exactly on its beat; for the first two, a dithered cream ghost
+  straw goes in on the beat as a dead-on stab would. Two good stabs in a
+  row end the practice early; one with no good stab comes back next run.
   After that each thing is named as it first happens, under the belt by the
-  notch: the early and late notes, a perfect, a graze, a pearl lost to a cup
-  let go or to the bare belt, a new song's beat, nightfall's busier belt,
-  and in expert the tighter windows. The first golden cup and the first cup
-  between the beats are ringed in pen once they are the next cup the straw
-  needs, never sooner. While a line explains, the sky, the stall and the
-  belt behind the notch dim and the lane stays lit to the right edge; the
-  music never waits. A line holds up to six seconds with Continue (Enter on
-  the playfield, or its button); Enter doesn't stab.
+  notch: the early and late notes, a perfect, a graze, a pearl lost to a
+  cup let go or to the bare belt, a new song's beat, nightfall's busier
+  belt, and in expert the tighter windows. The first golden cup and the
+  first cup between the beats are ringed in accent pixel brackets once they
+  are the next cup the straw needs and wholly in view, never sooner. While
+  a line explains, the sky, the stall and the belt behind the notch dim and
+  the lane stays lit to the right edge. The two pearl lines stop the belt
+  the way the pause card does (the audio clock suspended, so the music and
+  the belt hold together and pick up exactly where they stopped): at the
+  first moment within a second of the line that the next cup will still be
+  a beat, and half a second, off, a quarter second on so the sound just
+  made finishes; with no such moment the line is said over the running
+  belt. Stopped, the line waits for Continue (Enter, its button, or a stab
+  press once the stop has lasted a moment; a press never stabs a stopped
+  belt). Every other line holds up to six seconds with Continue while the
+  music plays on, since it is feedback best taken in the rhythm; Enter
+  doesn't stab.
+- **Beat lights.** The tickets' four beat lights are square pixel cells,
+  lit solid in the accent on their beat.
 - **The climb.** Normal plays two songs at tier 0 and two at tier 1, then
   steps every other song to tier 3, tier 4 at the eighth song and the top
   at the tenth. From tier 3 each tier carries a syncopated bar, and in each
@@ -574,16 +595,27 @@ graded, and handed over.
   and the sealer faster, gives two samples, and sends the critic twice.
 - **Taught on the shift** (`orders-lessons.js`, tested by
   `tests/orders-lessons.test.mjs`). The counter opens on its countdown, and
-  the first drink on a device is walked through station by station, each
-  line beside the ticket or the making card's line in play, ended by the
-  action; the guests wait at half speed meanwhile, never the bench. Ghosts
-  show the tea's line, the ladle over the cup and the needle in the band.
-  While a line is up the shop dims and the drink in hand stays lit, and
-  whatever has focus keeps full contrast. Later things are named once while
-  the hands are free, and hold until Continue. The slip never covers the
-  rail: a ticket's line sits beside the rail where there's room, or in the
-  strip under it. If a tap runs dry mid-pour, letting go isn't judged; the
-  line says to brew, and the pour goes on after.
+  the first drink on a device is walked through one step at a time: the
+  ticket, then each station. Every line stops the whole shift (patience,
+  arrivals, the clock and the bench) until it is answered, so no guest
+  loses patience to reading; the step's own press brings play back and is
+  made at once, and Continue counts it as known. The drop and the stamp stop
+  at the very moment to make them, the ladle right over the cup and the
+  needle mid-band, while a ghost plays the move (syrup squirting, a cube
+  arcing in, the tea rising to the line, the scoop falling, the cup
+  jolting, the press coming down). Each step waits a second of play after
+  the last has gone, and a station already begun isn't taught. Until the
+  shift's first ticket is taken nothing else is said, and that ticket is
+  marked with accent pixel brackets stepping out a cell and back (still
+  under Reduce Motion). Later things are named once each, only with the
+  bench empty, a few seconds apart, and hold play until Continue or the next
+  press. While a line is up the shop dims and the drink in hand stays lit.
+  A slip never covers the cup, the station in use, the hand being taught,
+  or (for a ticket) the rail. If a tap runs dry mid-pour, letting go isn't
+  judged; the line says to brew, and the pour goes on after.
+- **The hand row is on the counter.** The hand, Dump, Sample, Brew and Less
+  are pixel keys (`.boba-key`), the hand's face in the accent; it shows
+  pressed while the tap is held.
 - **The making card.** The ticket being made is pinned under the cup: the
   drink's stations in the order it is built, with what each wants, the one
   at hand marked and the ones behind graded, and the guest's patience. The
@@ -645,19 +677,23 @@ A cup slides over the tower; drop it, and what overhangs is sliced off.
   music rushes sooner.
 - **Taught on the tower** (`stack-lessons.js`, tested on the real rules and
   the real coach by `tests/stack-lessons.test.mjs`). In normal, each first
-  is explained in slow motion: the game eases to a quarter speed and a
-  spotlight dims everything but the row the cup slides in and the tower's
-  top, until Continue (`Enter`, or the slip's button) or a drop. The first
-  cup slides over a dithered cream ghost of itself, sitting exactly where a
-  perfect drop lands, under "Drop the cup when it covers the ghost."; a cup
-  covering the ghost always lands whole. Then come the first slice (which
-  alone falls slowly, riding with the tower, while it is named), the first
-  perfect, a streak one perfect short of growing the cup back (learned only
-  when it does), and the personal best's line, named beside the tower as it
-  comes down. Expert shows the same lines and ghost at full speed and never
-  slows, so its board's timing is untouched. Callouts never cover the row
-  the cup slides in, whose edges are what a drop is judged by. A missed
-  first cup is taught again.
+  stops play: the game comes to a stop within a beat and a spotlight dims
+  everything but the row the cup slides in and the tower's top, until
+  Continue (`Enter`, the slip's button, or a drop press once the line has
+  been up a moment; a press while play is stopped never drops the cup,
+  which stopped wherever the line found it). The first cup slides at full
+  speed over a dithered cream ghost of itself, sitting exactly where a
+  perfect drop lands, and stops the moment it covers it, under "Drop the
+  cup when it covers the ghost."; the drop starts play again and lands
+  perfect, and a cup landed before it gets there counts as known. Then come
+  the first slice (which hangs where it was cut while its line is up,
+  riding with the tower), the first perfect, a streak one perfect short of
+  growing the cup back (in expert, learned only when it does), and the
+  personal best's line, named beside the tower as it comes down. Expert
+  shows the same lines and ghost at full speed and never slows or stops, so
+  its board's timing is untouched; there the named slice falls slowly.
+  Callouts never cover the row the cup slides in, the tower's top or the
+  named slice. A missed first cup is taught again.
 - **Sharing** draws the run as a little tower: a square per drop, ten to a
   row, newest row on top, ending on the cup that fell (gold perfect, white
   whole, orange trimmed, red fell).
@@ -709,26 +745,41 @@ level in the cup on screen and in the HUD's cup drains together.
   with 15% of the cup to spare.
 - **Taught in flight** (`lander-lessons.js`, timed on real sites by
   `tests/lander-lessons.test.mjs`). The game opens on its countdown, and the
-  first site's intro is read during it. Every lesson eases play into slow
-  motion, dims the scene to the cup and what it names, and ends on Continue
-  (Enter, or the slip's button) or after seven seconds. Burning comes first,
-  just after "go": a dithered cream ghost of the cup holds burn below it
-  until its fall stops. The coaster is named next, ×5 first. Then the tilt:
-  the ghost flies the path the engine's own autopilot would take to a
-  coaster from here, along chalk dashes, and the tilt counts once burns
-  against the drift have the cup lined up over a coaster. A touchdown about
-  to go wrong (too fast, leaning, drifting) is warned about a second before
-  the fix is needed, and only while coming down slow, level and still from
-  there would still land by the engine's own rules; otherwise no warning
-  comes, and one already up is withdrawn. The tea, a windy site's pennants,
-  a lander lost to a crash, and a feather landing each get a line the first
-  time they matter. A move made before it is taught is never taught; one
-  that times out comes down uncounted and waits for a later run. On touch
-  the hold button to press earns its slab, and each key, pointer and button
-  holds on its own. Captions sit low over the regolith and never share the
-  screen with a lesson. The cup and camera are drawn between physics steps,
-  so slow motion is smooth, and replays prove the same inputs land the same
-  at any speed or frame rate.
+  first site's intro is read during it. Every lesson pauses play and dims
+  the scene to the cup and what it names. A thing waits for Continue
+  (Enter, or the slip's button); a move freezes play at the moment to make
+  it while its ghost flies it in real time, and the move itself (or
+  Continue) brings play back. Burning comes first, just after "go": a
+  dithered cream ghost of the cup holds burn below it until its fall stops.
+  The coaster is named next: the one the flight aims at, nearest straight
+  below the cup (within 20 units counts as a tie, which the lower one
+  wins). Then the tilt: the ghost flies the path the engine's own autopilot
+  would take to that coaster from here, along chalk dashes, and the tilt
+  counts once burns against the drift have the cup lined up over it. A
+  touchdown about to go wrong (too fast, leaning, drifting) is frozen for
+  when 0.2 to 0.5 s are left to fix it, and only while coming down slow,
+  level and still from there would still land by the engine's own rules;
+  otherwise no warning comes, and one already up is withdrawn. The tea, a
+  windy site's pennants, a lander lost to a crash, and a feather landing
+  each get a line the first time they matter. A move made before it is
+  taught is never taught; one made without working (4 s, 8 for the tilt)
+  comes down uncounted and waits for a later run. On touch the controls are
+  pixel keys with pixel icons, burn the primary key; the key to press earns
+  the accent step (cream behind burn), and each key, pointer and button
+  holds on its own. Captions are pixel chips low over the regolith and
+  never share the screen with a lesson. The cup and camera are drawn
+  between physics steps, so pauses ease smoothly, and replays prove the
+  same inputs land the same at any speed, frame rate or pause.
+- **The first flight is guided.** Until the device has landed once, the
+  autopilot's path from the start to the coaster nearest straight below it
+  is drawn in chalk the whole way down, from the countdown on, with a
+  dithered ghost of the cup a beat ahead of it; the way already flown is
+  the cup's own trail. Strayed 40 units off it, it is flown again from the
+  cup (as it is for the tilt lesson). It goes in three steps at the
+  touchdown. Such a device's site 1 is always the same (`FIRST_SITE_SEED`,
+  a site the engine itself makes, with a wide coaster on a flat plateau
+  just ahead), and its cup starts low enough for a lesson's line to fit
+  above it on a phone.
 - **Sharing** gives one emoji per attempt (the coaster's keycap for a
   landing, a burst for a crash) after a moon, and a feather for each feather
   landing.
@@ -816,15 +867,18 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   in the scene under the runner, not in the tickets
   (`src/lib/arcade/runner-meter.js`): a dark chip on the scene's 4 px grid,
   like the lesson callout, with a pixel cup whose tea drains in half rows
-  (its outline blinks in the accent under a quarter) and ten sugar cubes
-  printed under the word "sugar". Full cubes are solid; empty ones are faint
-  outlines. A full meter turns the cubes gold under "rush", with the X key
-  beside it on a keyboard and a glint along the cubes (still under Reduce
-  Motion); a rush drains them. On a phone it sits between the slide and
-  jump pads, its cubes in two rows of five, smaller if the room is short,
-  just over the pads when larger text leaves none, and under the tickets if
-  even that would squeeze the course. It is placed only on
-  a resize, so it never moves mid-run, and sits outside the screen shake.
+  (its outline blinks in the accent under a quarter) and ten sugar cubes,
+  five cells a side, printed under the word "sugar". Full cubes are solid;
+  empty ones are faint outlines. A full meter turns the cubes gold under
+  "rush", with the X key beside it on a keyboard and a glint along the
+  cubes (still under Reduce Motion); a rush drains them. On a wide screen
+  the cup sits beside the word over a row of ten cubes. Between a phone's
+  slide and jump pads it stands up, the word beside the cup's foot and the
+  cubes under both in two rows of five; in one row where the pads leave
+  room (a tablet, a phone on its side); smaller if the room is short, just
+  over the pads when larger text leaves none, and under the tickets if even
+  that would squeeze the course. It is placed only on a resize, so it never
+  moves mid-run, and sits outside the screen shake.
 - **The course is authored, then shuffled.** Thirty-one set pieces unlock
   with distance and never repeat back to back. Besides awnings that bounce,
   vents that lift, cables to ride, crates, pigeons and split routes, things
@@ -850,16 +904,24 @@ whole way. **Spare cups are the lives; the tea is the pay.**
 - **The scene** is cup stack's city from the side: dusk at the start, full
   night by about a kilometre and a half, windows coming on as it darkens.
 - **Taught on the run** (`runner-lessons.js`, timed on real courses by
-  `tests/runner-lessons.test.mjs`). Each move slows play about a second
-  before it is needed, with the runner's ghost running it from a small
-  accent post on the roof where to press: jump over the first gap or crate,
-  hold for a tall one, slide under the first line, glide off the first long
-  drop, slam the first crates. Pearls, the customer, a spare cup, a golden
-  cup (worth points once both spares are held), hazard stripes, and each set
-  piece get one line as they come into view; the first slosh says what
-  spilled tea costs. The sugar rush names itself the first time the meter is
-  full. A tap is held until the run has seen it, so slow motion never eats
-  one, and each key, pointer and pad holds on its own.
+  `tests/runner-lessons.test.mjs`). Every lesson pauses play. A move stops
+  play at a small accent post on the roof, the moment to make it, while the
+  runner's ghost makes it from there in real time; its own key or pad
+  resumes play and makes the move, and other keys wait: jump over the first
+  gap or crate, hold for a tall one, slide under the first line, glide off
+  the first long drop (letting go over the roof below), and slam the first
+  crates, taught in the air over them at the moment to press down. Pearls,
+  the customer, a spare cup, a golden cup (worth points once both spares
+  are held), hazard stripes and each set piece get one line about half a
+  second before the runner meets them (pigeons just before they take off),
+  never in a move's run-up, and Continue brings play back; the first slosh
+  says what spilled tea costs. The sugar rush names itself the first time
+  the meter is full, on a plain stretch, and X starts it. The callout takes
+  the side clear of the runner, the way ahead and its thing. A tap is held
+  until the run has seen it, a press made while play is stopped never
+  carries into it, and each key, pointer and pad holds on its own. The
+  touch pads are pixel keys with pixel icons, rush in the accent; the pad a
+  lesson is about gets pixel corner brackets.
 - **Sharing** pastes the distance, each coaster as a cup (full, part, or
   missed), and the cups lost, then what ended the run.
 
@@ -870,18 +932,31 @@ room, to steer it into the cup.
 
 - **The liquid is simulated and drawn as pixels,** never as circles: tea,
   milk, and a quantised blend where they mix, with a lighter surface line and
-  duller puddles. Cups fill and overflow. The simulation never stops while
-  a room is on screen: the verdict waits until the tea has come to rest, and
-  the tea keeps moving after it.
+  duller puddles. Cups fill and overflow. The simulation runs while a room
+  is on screen, stopping only while a lesson holds it: the verdict waits
+  until the tea has come to rest, and the tea keeps moving after it.
 - **Straws** are pink and white, drawn by dragging and removed with a tap,
   refunding their length; `Clear` removes them all. There is no undo. They
   can be drawn and removed during the pour, and a straw's end that comes
   close to another straw snaps onto it so a joint never holds tea back.
-- **Straw left is always in sight.** A long striped gauge in the bottom bar
-  shortens as straw is spent, with each straw's cost marked on the spent
-  part and the stroke in progress shown live; it turns coral and says `low`
-  under a fifth, and `out` when gone. While drawing, a dashed ring around the
-  pen shows how far the straw left can still reach.
+- **Straw left is always in sight.** The gauge is painted into the counter
+  between Pour and Clear (`spill-gauge.js`): a dark chip on the kitchen's
+  4 px grid, like the callout, printing "straw" and the figure left in the
+  pixel alphabet over a pixel straw that shortens from the right; the
+  stroke being drawn eats into it live, dithered, and each straw down is a
+  faint outline at its cost. Under a fifth the straw goes coral, the chip's
+  rule blinks in the accent (steady under Reduce Motion) and it says `low`;
+  it says `out` in place of the figure when none is left. On a phone it uses
+  three-pixel cells to share a row with the keys. While drawing, a dashed
+  ring around the pen shows how far the straw left can still reach.
+- **The controls are part of the kitchen.** The room stands on a steel
+  counter the width of the kitchen; Pour (Next once a room is cleared, the
+  same key) and Clear are pixel keys (`.boba-key`, Pour in the accent) set
+  into sockets in its front, with the gauge between them. On a short, wide
+  screen they stand in a steel cabinet beside the room, gauge over keys,
+  the caption over the cabinet, so the room has the screen's height. All of
+  it is measured and painted on a resize only. The caption and the verdict
+  are pixel chips.
 - **Rooms teach one thing, then combine.** Forty-eight authored rooms in
   sixteen pages of three. Each page brings in or deepens one idea and its
   last room combines it with what came before: ramps, fans, moving cups and
@@ -924,24 +999,34 @@ room, to steer it into the cup.
 - **Taught in the room** (`spill-lessons.js`, proven by
   `tests/spill-lessons.test.mjs`). A device that has cleared nothing goes
   straight into room 1 through its countdown; one with progress opens on the
-  level select, as before. Nothing is slowed: a lesson that explains holds
-  the room instead, and during planning the room is frozen outright (dial,
-  belts, rails and all), so it later plays out step for step as it would
-  have from that planning time. Straws can still be drawn and taken back
-  while it waits. Each lesson may hold for seven seconds of a visit.
+  level select, as before. Nothing is slowed: every lesson holds its part of
+  the room instead, frozen outright (dial, belts, rails, the tea in the air
+  and all), so it later plays out step for step from where it stopped: a
+  planning lesson holds planning, the fill line stops the pour on the step
+  tea first reaches a cup, taking a straw back holds whichever part it
+  comes up in, and a result's lessons hold the next room. Straws can still
+  be drawn and taken back while it waits. Each lesson may hold for seven
+  seconds of a visit (planning time is points).
   Continue (`Enter`, or the slip's button), pressing Pour, or doing what the
   lesson asks lets the room run on. While any lesson is up the kitchen dims
   to the thing it is about, in expert too, though expert never holds its
   five seconds. Room 1, the first time on a device, draws its own route as a
   cream ghost straw, with chalk marching the way to draw it from an accent
   post under the stream and the pen keys beside it; the route counts as
-  learned only when the straws as laid would pour into the cup, and then
+  learned when the straws as laid would pour into the cup, or when the
+  player continues past it, and then
   Pour is pointed out. A straw that spoils it is where taking a straw back
   is taught. Each fixture is named, in italic with brackets round it, at
   the start of the first room that has one. The gauge is named the first
   time straw runs low, the dial as the kettle is about to pour by itself,
-  and the fill line as tea first reaches a cup. The stars, the points and a
-  spill's hint are named the first time a room ends that way.
+  and the fill line as tea first reaches a cup, the whole cup bracketed and
+  the slip off to its side, clear of the tea coming in. The stars, the
+  points and a spill's hint are named the first time a room ends that way.
+  The callout's side is chosen as it goes up, from the sides that fit, by
+  what each would cover: the line being taught first, then cups and tea on
+  its way (or where each stream will fall), kettles, what the lesson
+  lights, and least of all a key it isn't about. A fixture bigger than the
+  brackets (a fan's draught, glass, a pipe's whole run) is bracketed whole.
 - **The share** is a square per room by its best stars (green three, yellow
   two, orange one), a page of three to a group and four pages to a line.
 - **The order is drawn on the cup:** a fill line, a two-tone band for a milk

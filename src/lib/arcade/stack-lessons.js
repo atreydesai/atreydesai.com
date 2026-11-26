@@ -8,19 +8,22 @@
 // streak one perfect short of growing the cup back; and the personal best's
 // line as it comes down toward the tower.
 //
-// In normal, each is an explanation: the game eases into slow motion
-// (EXPLAIN_SLOW) while it is up, and holds there until the player presses
-// Continue (Enter, or the slip's button) or drops. In expert everything stays
-// at full speed: its perfect window is the narrowest the game allows, and its
-// board must never get a slower cup. There a line is up just long enough to
-// read. In both, the slice the trim line names falls slowly while it is named.
+// In normal, each one stops play (the coach's `slow: 0`) and holds until the
+// player continues (Enter, the slip's button, or a drop press once the line
+// has been up a moment). The first cup slides at full speed over its ghost
+// and stops the moment it covers it, frozen there under its line, and a drop
+// both starts play again and drops it. In expert everything stays at full
+// speed: its perfect window is the narrowest the game allows, and its board
+// must never get a slower or a stopped cup. There a line is up just long
+// enough to read, and the slice the trim line names falls slowly while it
+// is named; in normal it hangs where it was cut until play goes on.
 //
 // DOM-free: the component asks these after each drop and each frame, and
 // hands the answer to the shared coach (src/lib/arcade/core/coach.ts), which
 // shows one lesson at a time and remembers them.
 
 import { damp } from "./core/math.ts";
-import { NORMAL, widthAfterPerfect } from "./stack-engine.js";
+import { NORMAL, stepSlide, widthAfterPerfect } from "./stack-engine.js";
 
 /** @typedef {import("./stack-engine.js").Rules} Rules */
 /** @typedef {import("./stack-engine.js").Span} Span */
@@ -28,10 +31,13 @@ import { NORMAL, widthAfterPerfect } from "./stack-engine.js";
 /** @typedef {import("./core/coach.ts").Coach} Coach */
 /** @typedef {import("./core/coach.ts").Lesson} Lesson */
 
-/** Normal: the game's speed, as a share, while an explanation is up. */
-export const EXPLAIN_SLOW = 0.25;
-/** Normal: an explanation holds this long at most (real seconds) without Continue or a drop. */
-export const EXPLAIN_SECONDS = 7;
+/**
+ * Normal: real seconds a line that stops play has to have been up before a
+ * drop press continues it. A press sooner (one already on its way as play
+ * stopped) does nothing, so it never skips the line unread, and it never
+ * drops a cup that stopped wherever the line found it.
+ */
+export const PRESS_AFTER = 0.4;
 
 const first = { id: "first", text: "Drop the cup when it covers the ghost.", keys: ["Space"], touch: "tap", minLife: 0.6, move: true };
 const trim = { id: "trim", text: "Whatever hangs over the edge is cut off." };
@@ -46,28 +52,33 @@ const best = { id: "best", text: "Stack past this line to beat your best." };
  */
 const BEST_PRIORITY = 1.5;
 
-/** Normal: each one slows the game and holds until Continue or a drop. */
-const explain = { slow: EXPLAIN_SLOW, life: EXPLAIN_SECONDS, minLife: 1.2 };
+/** Normal: each one stops play and holds until Continue: a stopped game never goes on by itself. */
+const explain = { slow: 0, life: Infinity, minLife: 1.2 };
 
 /**
- * Normal's lessons: one short full sentence each, eight words or fewer. The
- * regrowth line never runs out on its own in the coach (`life: Infinity`):
- * it is learned only when the promised perfect grows the cup, or on
- * Continue, and its window (`growWindow`) takes it down unlearned.
+ * Normal's lessons: one short full sentence each, eight words or fewer.
+ * Each stops play and holds until the player continues; the first cup's
+ * also ends with the drop it asks for.
  * @type {Readonly<Record<string, Lesson>>}
  */
 export const LESSONS = Object.freeze({
-  first: { ...first, slow: EXPLAIN_SLOW, life: Infinity },
+  first: { ...first, slow: 0, life: Infinity },
   trim: { ...trim, ...explain },
   perfect: { ...perfect, ...explain },
-  grow: { ...grow, ...explain, life: Infinity },
+  grow: { ...grow, ...explain },
   best: { ...best, ...explain, priority: BEST_PRIORITY },
 });
 
 /** Expert: a line at full speed, up just long enough to read. */
 const atSpeed = { slow: 1, life: 2.4, minLife: 1.4 };
 
-/** Expert's lessons: the same lines, the same ghost, and never a slower cup. @type {Readonly<Record<string, Lesson>>} */
+/**
+ * Expert's lessons: the same lines, the same ghost, and never a slower cup.
+ * The regrowth line never runs out on its own in the coach (`life:
+ * Infinity`): it is learned only when the promised perfect grows the cup,
+ * and its window (`growWindow`) takes it down unlearned.
+ * @type {Readonly<Record<string, Lesson>>}
+ */
 export const EXPERT_LESSONS = Object.freeze({
   first: { ...first, slow: 1, life: Infinity },
   trim: { ...trim, ...atSpeed },
@@ -85,25 +96,26 @@ export function lessonsFor(rules = NORMAL) {
 }
 
 /**
- * How long the regrowth line stays up without a drop (real seconds): as long
- * as any explanation in normal, a reading's worth in expert. Past it, it
- * comes down unlearned.
+ * How long the regrowth line stays up without a drop (real seconds): in
+ * expert a reading's worth, past which it comes down unlearned. In normal it
+ * stops play, so it holds until Continue.
  * @param {Rules} [rules]
  */
 export function growWindow(rules = NORMAL) {
-  return rules.expert ? 3 : EXPLAIN_SECONDS;
+  return rules.expert ? 3 : Infinity;
 }
 
 /**
- * The first cup's lesson never runs out on its own in the coach either (it
- * is a move: learned when a cup lands). Past this many real seconds without
- * a drop it comes down unlearned, so slow motion is never indefinite.
+ * Expert: the first cup's line, at speed, never runs out on its own in the
+ * coach either (it is a move: learned when a cup lands). Past this many real
+ * seconds without a drop it comes down unlearned. In normal it stops play
+ * with the cup on its ghost and holds until the drop or Continue.
  */
-export const FIRST_SECONDS = EXPLAIN_SECONDS;
+export const FIRST_SECONDS = 7;
 
 /**
  * The first cup's lesson, while the tower is just the tray and the device
- * hasn't yet landed a cup with it: slowed in normal, at speed in expert.
+ * hasn't yet landed a cup with it: it stops play in normal, at speed in expert.
  * @param {number} height cups stacked so far
  * @param {(id: string) => boolean} learned
  * @param {Rules} [rules]
@@ -123,6 +135,25 @@ export function firstCupLesson(height, learned, rules = NORMAL) {
  */
 export function ghostSpan(top, width) {
   return { left: top.left + (top.width - width) / 2, width };
+}
+
+/**
+ * One step of the first cup's slide while its ghost waits for it (normal):
+ * the cup moves as `stepSlide` would, unless this step reaches the ghost, in
+ * which case it stops exactly on it (`reached`), so play stops with the cup
+ * covering its ghost, never a frame past it, and the drop made there lands
+ * perfect.
+ * @param {number} position the cup's left edge, in units
+ * @param {1 | -1} direction
+ * @param {number} distance units to travel this step
+ * @param {{ min: number, max: number }} track
+ * @param {number} target the ghost's left edge
+ * @returns {{ position: number, direction: 1 | -1, reached: boolean }}
+ */
+export function slideOnto(position, direction, distance, track, target) {
+  const ahead = (target - position) * direction;
+  if (ahead >= 0 && ahead <= distance) return { position: target, direction, reached: true };
+  return { ...stepSlide(position, direction, distance, track), reached: false };
 }
 
 /**
@@ -266,14 +297,27 @@ export function bestCallout(g, line) {
 /** How a cut-off slice falls, in screen px: thrown up at `lift` px/s, then `gravity` px/s². */
 export const SLICE_FALL = Object.freeze({ lift: 80, gravity: 2200 });
 /**
- * The slice its line names falls at this share of real speed, in both modes:
- * in expert the game itself keeps its speed, and in normal this is a little
- * slower than the game's slow motion, so on a short screen the slice is still
- * in view once its line has been read.
+ * The slice its line names falls at this share of real speed while it is
+ * named and play goes on (expert keeps its speed; in either mode the line
+ * may wait a moment for the coach), so on a short screen the slice is still
+ * in view once its line has been read. The component steps it at the slower
+ * of this and the game's own time, so in normal, where the line stops play,
+ * the slice hangs where it was cut until play goes on.
  */
 export const SLICE_SLOW = 0.15;
 /** How quickly the slice eases into that slow fall (per second, for `damp`). */
 export const SLICE_EASE = 12;
+
+/**
+ * Real seconds a named slice falls while its line is read: the line's
+ * minimum life where play goes on (expert), none where the line stops play,
+ * and the slice with it (normal).
+ * @param {Rules} [rules]
+ */
+export function sliceReadSeconds(rules = NORMAL) {
+  const line = lessonsFor(rules).trim;
+  return line.slow === 0 ? 0 : (line.minLife ?? 0);
+}
 
 /**
  * How far (px, down) a named slice falls in `seconds` of real time, stepped
@@ -319,20 +363,30 @@ export const PENDING_SECONDS = 1.2;
  * The tower's lessons kept in order around the shared coach, which shows
  * one at a time and remembers them:
  *
- * - A run starts with the first cup's lesson, if the device still needs it.
+ * - A run starts with the first cup's lesson, if the device still needs it:
+ *   in expert it is up at once, at speed; in normal its ghost waits for the
+ *   cup (`ghostDue`), and `reachGhost` brings the line up, stopping play,
+ *   the moment the cup covers it (`slideOnto`); the cup stays there
+ *   (`holdsCup`) until the drop or Continue. A cup landed before that counts
+ *   as known.
  * - Each lesson is shown at most once a run: one that ran out unlearned (a
- *   time-out, a drop before it was read) waits for a later run, so slow
- *   motion never helps twice in one tower.
+ *   time-out, a drop before it was read) waits for a later run, so a stopped
+ *   or slowed cup never helps twice in one tower.
  * - `step` ages the lessons in real time and returns the game's seconds:
- *   slowed (normal only) while an explanation is up, eased back after. The
- *   first cup's lesson comes down unlearned after FIRST_SECONDS without a
+ *   stopped (normal only) while a line is up, eased back after. In expert
+ *   the first cup's line comes down unlearned after FIRST_SECONDS without a
  *   drop, and the regrowth line after its window.
- * - `proceed` is Continue: the explanation up is learned, and play eases
- *   back to speed. A move skipped this way counts as known.
+ * - `proceed` is Continue: the line up is learned, and play eases back to
+ *   speed. A move skipped this way counts as known.
+ * - `press` is a drop press: it drops, except while a line that stopped
+ *   play is up (normal), when it continues instead (once the line has been
+ *   up PRESS_AFTER), since the cup is stopped wherever the line found it,
+ *   often off the tower at the end of its slide. The first cup's line is the
+ *   exception: its drop is the move.
  * - `afterDrop` retires the first cup's lesson the moment a cup lands
- *   (learned), keeps or takes back the regrowth line, ends any explanation
- *   that was up (learned once it has been up long enough to read), and holds
- *   what this drop teaches until the coach is free. In expert a line runs its
+ *   (learned), keeps or takes back the regrowth line, ends any line that was
+ *   up (learned once it has been up long enough to read), and holds what
+ *   this drop teaches until the coach is free. In expert a line runs its
  *   course instead, making way for the next once read. The next drop
  *   replaces what is held, and it goes stale after PENDING_SECONDS.
  * - The regrowth line is learned only when the perfect it promised grows
@@ -342,7 +396,8 @@ export const PENDING_SECONDS = 1.2;
  * - `fell` takes everything down uncounted.
  * - The best line is due while the tower hasn't passed it (counted in cups,
  *   so nothing rounds it away) and the component says it can be shown; it
- *   waits its turn, outranks a line about a drop, and is done once passed.
+ *   waits its turn (and for the first cup's ghost), outranks a line about a
+ *   drop, and is done once passed.
  * @param {Coach} coach
  */
 export function createStackLessons(coach) {
@@ -351,6 +406,8 @@ export function createStackLessons(coach) {
   /** @type {Lesson | null} */
   let pending = null;
   let pendingAge = 0;
+  /** Normal: the first cup's ghost is up, waiting for the cup to cover it before its line stops play. */
+  let ghostDue = false;
   /** The top cup's width when the regrowth line was made: the next perfect must beat it. */
   let promised = 0;
   /** Lessons shown this run. */
@@ -364,7 +421,7 @@ export function createStackLessons(coach) {
     shown.add(lesson.id);
     return true;
   };
-  /** An explanation is up and holding the game slowed. */
+  /** A line is up and holding the game stopped (normal): Continue ends it. */
   const explaining = () => {
     const current = coach.current;
     return !!current && !coach.leaving && !coach.acting && (current.slow ?? 1) < 1;
@@ -375,16 +432,26 @@ export function createStackLessons(coach) {
     get pending() {
       return pending;
     },
-    /** The first cup's lesson is up (and its ghost shows). */
+    /** The first cup's ghost shows: it is waiting for the cup (normal), or its line is up. */
     get firstCup() {
-      return coach.current?.id === "first" && !coach.leaving;
+      return ghostDue || (coach.current?.id === "first" && !coach.leaving);
     },
-    /** An explanation is up and holding the game slowed: Continue ends it. */
+    /** Normal: the ghost is waiting for the first cup to cover it (`slideOnto`, then `reachGhost`). */
+    get ghostDue() {
+      return ghostDue;
+    },
+    /** Normal: the first cup's line holds the cup exactly on its ghost while play is stopped round it. */
+    get holdsCup() {
+      const current = coach.current;
+      return current?.id === "first" && !coach.leaving && !coach.acting && current.slow === 0;
+    },
+    /** A line is up and holding the game stopped (normal): Continue ends it. */
     get explaining() {
       return explaining();
     },
     /**
-     * A fresh run on `next`'s rules. Returns the first cup's lesson when it is taught.
+     * A fresh run on `next`'s rules. Returns the first cup's lesson when it
+     * is taught: up at once in expert, waiting on its ghost in normal.
      * @param {Rules} [next]
      */
     begin(next = NORMAL) {
@@ -393,14 +460,44 @@ export function createStackLessons(coach) {
       pending = null;
       pendingAge = 0;
       shown.clear();
+      ghostDue = false;
       const lesson = firstCupLesson(0, (id) => coach.learned(id), rules);
-      return lesson && offer(lesson) ? lesson : null;
+      if (!lesson) return null;
+      if (lesson.slow === 0) {
+        ghostDue = true;
+        return lesson;
+      }
+      return offer(lesson) ? lesson : null;
     },
-    /** Continue: the explanation up is learned, and play eases back to speed. Returns whether there was one. */
+    /**
+     * Normal: the first cup has just come to cover its ghost, and stops
+     * there: its line comes up and play stops round it. Returns whether it did.
+     */
+    reachGhost() {
+      if (!ghostDue) return false;
+      ghostDue = false;
+      return offer(lessonsFor(rules).first);
+    },
+    /** Continue: the line up is learned, and play eases back to speed. Returns whether there was one. */
     proceed() {
       if (!explaining()) return false;
       coach.done(coach.current?.id);
       return true;
+    },
+    /**
+     * A drop press. While a line that stopped play is up, the cup is stopped
+     * wherever the line found it, so the press continues the line instead
+     * ("continue"), once it has been up PRESS_AFTER, and does nothing before
+     * that ("ignore"). Otherwise, the first cup's line included (its drop is
+     * the move, and the cup is on its ghost), it drops ("drop").
+     * @returns {"drop" | "continue" | "ignore"}
+     */
+    press() {
+      const current = coach.current;
+      if (!explaining() || current?.move) return "drop";
+      if (coach.age < PRESS_AFTER) return "ignore";
+      coach.done(current?.id);
+      return "continue";
     },
     /**
      * A cup landed. Returns the lesson this drop holds for the coach, if any.
@@ -410,7 +507,9 @@ export function createStackLessons(coach) {
      */
     afterDrop({ kind, level, streak, width }) {
       if (level === 0) {
-        // Learned, and taken down at once: its callout never follows cup two.
+        // Learned (known, if it landed before the cup reached its ghost), and
+        // taken down at once: its callout never follows cup two.
+        ghostDue = false;
         coach.done("first");
         if (coach.current?.id === "first") coach.dismiss();
       }
@@ -424,7 +523,8 @@ export function createStackLessons(coach) {
       if (current && !coach.leaving && !current.move) {
         const read = coach.age >= (current.minLife ?? 0);
         if ((current.slow ?? 1) < 1) {
-          // An explanation holds until Continue or a drop: this drop ends it.
+          // A line that stops play holds until Continue (a drop press
+          // continues it, `press`); a drop that gets past that ends it.
           if (read) coach.done(current.id);
           if (!read || lesson) coach.dismiss();
         } else if (lesson && read) {
@@ -453,10 +553,11 @@ export function createStackLessons(coach) {
     fell() {
       coach.dismiss();
       pending = null;
+      ghostDue = false;
     },
     /**
      * Ages the lessons by real seconds, offers what is waiting, and returns
-     * the game's seconds for this frame (slowed while an explanation is up).
+     * the game's seconds for this frame (stopped while a line holds play).
      * @param {number} realDt the frame's real seconds, uncapped (lessons hold for real time)
      * @param {number} [frameDt] the game's own capped step for this frame
      * @param {{ remaining: number, ready: boolean }} [best]
@@ -467,7 +568,8 @@ export function createStackLessons(coach) {
       const gameDt = coach.step(realDt, frameDt);
       const current = coach.current;
       if (current && !coach.leaving) {
-        if (current.id === "first" && coach.age >= FIRST_SECONDS) coach.dismiss();
+        // Only a line at speed runs out: one that stopped play waits for the player.
+        if (current.id === "first" && current.slow !== 0 && coach.age >= FIRST_SECONDS) coach.dismiss();
         else if (current.id === "grow" && coach.age >= growWindow(rules)) coach.dismiss();
       }
       if (pending) {
@@ -477,7 +579,7 @@ export function createStackLessons(coach) {
       if (best) {
         if (coach.current?.id === "best") {
           if (!coach.leaving && best.remaining < 0) coach.done("best");
-        } else if (best.remaining >= 0 && best.ready && !known("best")) {
+        } else if (best.remaining >= 0 && best.ready && !known("best") && !ghostDue) {
           offer(lessonsFor(rules).best);
         }
       }

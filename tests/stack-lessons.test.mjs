@@ -3,7 +3,6 @@ import test from "node:test";
 
 import {
   EXPERT,
-  FRAME_RATE,
   NORMAL,
   dropCup,
   grownSpan,
@@ -11,15 +10,15 @@ import {
   slideFor,
   sliderWidth,
   speedForHeight,
+  trackFor,
   traySpan,
   widthAfterPerfect,
 } from "../src/lib/arcade/stack-engine.js";
 import {
   EXPERT_LESSONS,
-  EXPLAIN_SECONDS,
-  EXPLAIN_SLOW,
   LESSONS,
   PENDING_SECONDS,
+  PRESS_AFTER,
   FIRST_SECONDS,
   SLICE_SLOW,
   SLIP_GUESS,
@@ -33,6 +32,8 @@ import {
   nextPerfectGrows,
   roomUnderSlice,
   sliceFall,
+  sliceReadSeconds,
+  slideOnto,
   slipBox,
   towerCallout,
 } from "../src/lib/arcade/stack-lessons.js";
@@ -55,8 +56,7 @@ test("every lesson fits the arcade's one-line voice", () => {
   }
 });
 
-test("normal explains in slow motion; expert never slows", () => {
-  assert.ok(EXPLAIN_SLOW > 0.15 && EXPLAIN_SLOW <= 0.3);
+test("normal stops play for every lesson until the player goes on; expert never slows", () => {
   assert.deepEqual(Object.keys(EXPERT_LESSONS), Object.keys(LESSONS));
   for (const id of Object.keys(LESSONS)) {
     const normal = LESSONS[id];
@@ -64,14 +64,15 @@ test("normal explains in slow motion; expert never slows", () => {
     // The same line and keys in both modes.
     assert.equal(expert.id, normal.id);
     assert.equal(expert.text, normal.text);
-    assert.equal(normal.slow, EXPLAIN_SLOW, `${id} doesn't slow normal`);
+    assert.equal(normal.slow, 0, `${id} doesn't stop normal`);
     // The perfect window is time turned into distance: a slower cup on the
     // expert board would be judged with a wider window than its rules give.
     assert.equal(expert.slow ?? 1, 1, `${id} slows expert`);
-    // An explanation holds until Continue or a drop, up to its limit.
-    assert.ok((normal.life ?? 0) >= EXPLAIN_SECONDS, `${id} doesn't hold`);
+    // A stopped game never goes on by itself: the line holds until Continue (or the drop).
+    assert.equal(normal.life, Infinity, `${id} runs out while play is stopped`);
     assert.equal(!!normal.move, id === "first");
   }
+  assert.ok(PRESS_AFTER > 0.2 && PRESS_AFTER < (LESSONS.trim.minLife ?? 0.9));
   assert.equal(lessonsFor(NORMAL), LESSONS);
   assert.equal(lessonsFor(EXPERT), EXPERT_LESSONS);
   assert.deepEqual(LESSONS.first.keys, ["Space"]);
@@ -121,27 +122,43 @@ test("following the first lesson literally never fails: a cup covering the ghost
   }
 });
 
-test("in normal's slow motion, every pass still shows a frame on the ghost", () => {
-  for (const rules of MODES) {
-    const tray = traySpan(rules);
-    const width = sliderWidth(tray, rules);
-    const ghost = ghostSpan(tray, width);
-    const base = speedForHeight(0, rules);
-    for (const speed of [base * (1 - rules.vary), base, base * (1 + rules.vary)]) {
-      // The window is judged at the slide's own speed; the lesson only shortens each frame's step.
-      const window = perfectWindow(0, speed, rules);
-      const step = (speed * EXPLAIN_SLOW) / FRAME_RATE;
-      for (const px of PIXEL_SCALES) {
-        for (let phase = 0; phase < 1; phase += 0.05) {
-          let hit = false;
-          for (let k = -60; k <= 60 && !hit; k++) {
-            hit = dropCup(tray, ghost.left + (k + phase) * step, width, { window, px }).kind === "perfect";
-          }
-          assert.ok(hit, `speed ${speed} px ${px} phase ${phase}`);
-        }
+test("normal's first cup stops exactly on its ghost at any frame rate, never past it, and its drop there is perfect", () => {
+  const tray = traySpan(NORMAL);
+  const width = sliderWidth(tray, NORMAL);
+  const ghost = ghostSpan(tray, width);
+  const { speed, fromLeft } = slideFor(0, NORMAL);
+  assert.ok(fromLeft, "the first cup comes from the left");
+  const window = perfectWindow(0, speed, NORMAL);
+  // A phone's narrow screen and a laptop's, in units either side of centre.
+  for (const halfScreen of [45, 60, 120]) {
+    const track = trackFor(tray, halfScreen, width);
+    assert.ok(track.min < ghost.left && ghost.left < track.max);
+    for (const dt of [1 / 144, 1 / 120, 1 / 60, 1 / 30, 0.05, 0.0173]) {
+      let position = track.min;
+      /** @type {1 | -1} */
+      let direction = 1;
+      let steps = 0;
+      let reached = false;
+      while (!reached && steps < 10_000) {
+        const moved = slideOnto(position, direction, speed * dt, track, ghost.left);
+        // Never a frame past it on the way in.
+        assert.ok(moved.position <= ghost.left + 1e-12, `dt ${dt}: ${moved.position} past ${ghost.left}`);
+        position = moved.position;
+        direction = moved.direction;
+        reached = moved.reached;
+        steps++;
       }
+      assert.ok(reached, `dt ${dt}`);
+      assert.equal(position, ghost.left);
+      // It stays put once there: a step of nothing still finds it reached.
+      assert.deepEqual(slideOnto(position, direction, 0, track, ghost.left), { position: ghost.left, direction, reached: true });
+      for (const px of PIXEL_SCALES) assert.equal(dropCup(tray, position, width, { window, px }).kind, "perfect", `dt ${dt} px ${px}`);
     }
   }
+  // Away from the ghost it is the plain slide, bounce included.
+  const track = trackFor(tray, 60, width);
+  const away = slideOnto(track.max - 0.5, 1, 2, track, ghost.left);
+  assert.deepEqual(away, { position: track.max - 1.5, direction: -1, reached: false });
 });
 
 /**
@@ -360,8 +377,11 @@ test("the best line's callout sits on the line beside the tower when it fits, el
 });
 
 test("a named slice stays on screen while its line is read, and says where the line fits", () => {
-  // It falls at a share of real speed in both modes, below normal's slow motion.
-  assert.ok(SLICE_SLOW < EXPLAIN_SLOW);
+  // In normal its line stops play, and the slice hangs where it was cut; in
+  // expert it falls at a share of real speed while its line is read.
+  assert.equal(sliceReadSeconds(NORMAL), 0);
+  assert.equal(sliceReadSeconds(EXPERT), EXPERT_LESSONS.trim.minLife);
+  assert.ok(SLICE_SLOW > 0 && SLICE_SLOW < 0.3);
   const readable = Math.max(LESSONS.trim.minLife, EXPERT_LESSONS.trim.minLife);
   assert.ok(sliceFall(readable) > 0);
   // The tightest case: the first cup's slice on a small phone, right above
@@ -404,33 +424,68 @@ function run(lessons, seconds, best) {
   return game;
 }
 
-test("normal: each first is explained in slow motion until Continue or a drop", () => {
+test("normal: the first cup's ghost waits at full speed, and play stops the moment the cup covers it", () => {
   const { coach, lessons } = device();
   assert.equal(lessons.begin(), LESSONS.first);
-  assert.ok(lessons.firstCup && lessons.explaining);
-  let game = run(lessons, 1.5);
-  assert.ok(Math.abs(game - EXPLAIN_SLOW * DT) < 1e-9, `${game / DT} of full speed`);
-
-  // The first cup lands perfect: its line is learned and taken down at once
-  // (it never follows cup two), and the perfect's explanation takes over.
+  // The ghost shows, but nothing is said and nothing stops until the cup is there.
+  assert.ok(lessons.firstCup && lessons.ghostDue);
+  assert.equal(coach.current, null);
+  assert.ok(!lessons.explaining && !lessons.holdsCup);
+  assert.equal(run(lessons, 1.5), DT);
+  assert.equal(lessons.press(), "drop");
+  // The cup covers it: the line comes up and play stops within a beat,
+  // with the cup held on the ghost.
+  assert.ok(lessons.reachGhost());
+  assert.ok(!lessons.reachGhost(), "once");
+  assert.equal(coach.current, LESSONS.first);
+  assert.ok(lessons.firstCup && !lessons.ghostDue && lessons.holdsCup && lessons.explaining);
+  run(lessons, 0.3);
+  assert.ok(coach.paused);
+  assert.equal(run(lessons, 0.1), 0);
+  // It never goes on by itself, however long it is left.
+  assert.equal(run(lessons, 60), 0);
+  assert.ok(lessons.holdsCup);
+  // The drop is the move: a press drops, and the landing teaches it.
+  assert.equal(lessons.press(), "drop");
   assert.equal(lessons.afterDrop({ kind: "perfect", level: 0, streak: 1, width: 14 }), LESSONS.perfect);
-  assert.ok(coach.learned("first") && !lessons.firstCup);
+  assert.ok(coach.learned("first") && !lessons.firstCup && !lessons.holdsCup);
+});
+
+test("normal: every other lesson stops play until Continue, and a drop press then continues rather than drops", () => {
+  const { coach, lessons } = device(["first"]);
+  lessons.begin();
+  assert.equal(lessons.afterDrop({ kind: "perfect", level: 0, streak: 1, width: 14 }), LESSONS.perfect);
   assert.equal(coach.current?.id, "perfect");
-  // It holds the game slowed until Continue.
-  game = run(lessons, EXPLAIN_SECONDS - 1);
-  assert.ok(game < DT * 0.3 && coach.current?.id === "perfect");
-  assert.ok(lessons.proceed());
+  // A press already on its way as play stopped does nothing: the cup stays
+  // where the line found it and the line stays up.
+  assert.equal(lessons.press(), "ignore");
+  assert.equal(coach.current?.id, "perfect");
+  // Stopped within a beat, and held however long it is left.
+  run(lessons, 0.3);
+  assert.ok(coach.paused);
+  assert.equal(run(lessons, 30), 0);
+  assert.equal(coach.current?.id, "perfect");
+  assert.ok(!coach.leaving);
+  // Then a press is Continue: learned, and play eases back to speed.
+  assert.equal(lessons.press(), "continue");
   assert.ok(coach.learned("perfect") && !lessons.explaining);
   assert.equal(run(lessons, 1.5), DT);
   assert.ok(!lessons.proceed(), "nothing left to continue");
+  assert.equal(lessons.press(), "drop");
 
-  // A cut: the slice's explanation slows the game at once, and a drop once
-  // it has been read ends it, learned.
+  // A cut: the slice's line stops play at once; Continue (Enter) learns it.
   lessons.afterDrop({ kind: "cut", level: 1, streak: 0, width: 12 });
   assert.equal(coach.current?.id, "trim");
-  run(lessons, LESSONS.trim.minLife);
-  lessons.afterDrop({ kind: "clean", level: 2, streak: 0, width: 12 });
+  run(lessons, PRESS_AFTER / 2);
+  assert.ok(lessons.proceed());
   assert.ok(coach.learned("trim"));
+  // A drop that does get past a line (the component never lets one) still ends it, learned once read.
+  const other = device(["first"]);
+  other.lessons.begin();
+  other.lessons.afterDrop({ kind: "cut", level: 1, streak: 0, width: 12 });
+  run(other.lessons, LESSONS.trim.minLife);
+  other.lessons.afterDrop({ kind: "clean", level: 2, streak: 0, width: 12 });
+  assert.ok(other.coach.learned("trim"));
 });
 
 test("a drop before an explanation is read ends it unlearned, and it waits for the next run", () => {
@@ -451,9 +506,9 @@ test("a drop before an explanation is read ends it unlearned, and it waits for t
   assert.equal(coach.current?.id, "trim");
 });
 
-test("the first cup's slow motion runs out: unlearned after its time, and not again that run", () => {
+test("expert: the first cup's line at speed runs out, unlearned after its time, and not again that run", () => {
   const { coach, lessons } = device();
-  lessons.begin();
+  lessons.begin(EXPERT);
   // Real seconds, however slowly frames come: a slow device still runs out.
   let t = 0;
   while (coach.current?.id === "first" && t < FIRST_SECONDS + 1) {
@@ -462,41 +517,60 @@ test("the first cup's slow motion runs out: unlearned after its time, and not ag
   }
   assert.ok(t <= FIRST_SECONDS + 0.2, `held ${t.toFixed(1)} s`);
   assert.equal(coach.current, null);
-  assert.ok(!coach.learned("first"));
+  assert.ok(!coach.learned("first") && !lessons.firstCup);
   assert.equal(run(lessons, 1.5), DT);
   // A drop later lands the first cup: it counts as known, never shown again.
-  lessons.afterDrop({ kind: "perfect", level: 0, streak: 1, width: 14 });
+  lessons.afterDrop({ kind: "perfect", level: 0, streak: 1, width: 10 });
   assert.ok(coach.learned("first"));
   // A fresh device's next run shows it again.
   const fresh = device();
-  fresh.lessons.begin();
+  fresh.lessons.begin(EXPERT);
   run(fresh.lessons, FIRST_SECONDS + 0.5);
-  assert.equal(fresh.lessons.begin(), LESSONS.first);
+  assert.equal(fresh.lessons.begin(EXPERT), EXPERT_LESSONS.first);
 });
 
-test("the game's seconds are its own capped step, slowed only while an explanation is up", () => {
+test("normal: a first cup landed before it covers its ghost counts as known, and is never taught", () => {
+  const { coach, lessons } = device();
+  lessons.begin();
+  run(lessons, 0.5);
+  lessons.afterDrop({ kind: "cut", level: 0, streak: 0, width: 12 });
+  assert.ok(coach.learned("first") && !lessons.firstCup && !lessons.ghostDue);
+  assert.ok(!lessons.reachGhost());
+  assert.notEqual(coach.current?.id, "first");
+});
+
+test("the game's seconds are its own capped step, stopped only while a line holds play", () => {
   const { lessons } = device(["first"]);
   lessons.begin();
   assert.equal(lessons.step(0.2, 0.05), 0.05);
-  const slowed = device();
-  slowed.lessons.begin();
-  for (let t = 0; t < 1; t += 0.1) slowed.lessons.step(0.1, 0.05);
-  assert.ok(Math.abs(slowed.lessons.step(0.2, 0.05) - 0.05 * EXPLAIN_SLOW) < 1e-9);
+  const stopped = device();
+  stopped.lessons.begin();
+  // Waiting on the ghost is full speed.
+  assert.equal(stopped.lessons.step(0.2, 0.05), 0.05);
+  stopped.lessons.reachGhost();
+  for (let t = 0; t < 1; t += 0.1) stopped.lessons.step(0.1, 0.05);
+  assert.equal(stopped.lessons.step(0.2, 0.05), 0);
 });
 
 test("a move skipped with Continue counts as known", () => {
   const { coach, lessons } = device();
   lessons.begin();
+  assert.ok(!lessons.proceed(), "nothing to continue before the cup is on its ghost");
+  lessons.reachGhost();
   assert.ok(lessons.proceed());
-  assert.ok(coach.learned("first") && !lessons.firstCup);
+  assert.ok(coach.learned("first") && !lessons.firstCup && !lessons.holdsCup);
 });
 
 test("expert: every lesson shows at full speed, and Continue has nothing to do", () => {
   const { coach, lessons } = device();
   assert.equal(lessons.begin(EXPERT), EXPERT_LESSONS.first);
-  assert.ok(lessons.firstCup && !lessons.explaining);
+  assert.ok(lessons.firstCup && !lessons.explaining && !lessons.ghostDue && !lessons.holdsCup);
   const full = (best) => {
-    for (let t = 0; t < 1; t += DT) assert.equal(lessons.step(DT, DT, best), DT);
+    for (let t = 0; t < 1; t += DT) {
+      assert.equal(lessons.step(DT, DT, best), DT);
+      // A press is always a drop.
+      assert.equal(lessons.press(), "drop");
+    }
   };
   full();
   assert.ok(!lessons.proceed());
@@ -522,15 +596,19 @@ test("a device that has landed a cup never sees the first lesson", () => {
 });
 
 test("a fall takes the lessons down uncounted, so a missed first cup is taught again", () => {
-  const { coach, lessons } = device();
-  lessons.begin();
-  run(lessons, 2);
-  lessons.fell();
-  assert.equal(coach.current, null);
-  assert.ok(!coach.learned("first"));
-  // Play eases back out of the slow motion as the tower falls.
-  assert.equal(run(lessons, 1.5), DT);
-  assert.equal(lessons.begin(), LESSONS.first);
+  for (const reach of [true, false]) {
+    const { coach, lessons } = device();
+    lessons.begin();
+    if (reach) lessons.reachGhost();
+    run(lessons, 2);
+    lessons.fell();
+    assert.equal(coach.current, null);
+    assert.ok(!coach.learned("first") && !lessons.firstCup && !lessons.ghostDue);
+    // Play comes back to speed as the tower falls.
+    assert.equal(run(lessons, 1.5), DT);
+    assert.equal(lessons.begin(), LESSONS.first);
+    assert.ok(lessons.ghostDue);
+  }
 });
 
 test("the regrowth line is kept by a perfect, taken back by anything else, and helps once a run", () => {
@@ -542,7 +620,7 @@ test("the regrowth line is kept by a perfect, taken back by anything else, and h
   lessons.afterDrop({ kind: "close", level: 5, streak: 0, width: 12 });
   assert.equal(coach.current, null);
   assert.ok(!coach.learned("grow"));
-  // ...and a second streak in the same tower gets no slow motion.
+  // ...and a second streak in the same tower gets no second stop.
   lessons.afterDrop({ kind: "perfect", level: 6, streak: 1, width: 12 });
   assert.equal(lessons.afterDrop({ kind: "perfect", level: 7, streak: 2, width: 12 }), null);
   assert.equal(coach.current, null);
@@ -555,11 +633,21 @@ test("the regrowth line is kept by a perfect, taken back by anything else, and h
 });
 
 test("the regrowth line can't be learned by waiting it out, but Continue learns it", () => {
+  // Expert: its window takes it down unlearned.
+  const fast = device(["first", "perfect", "trim"]);
+  fast.lessons.begin(EXPERT);
+  fast.lessons.afterDrop({ kind: "perfect", level: 4, streak: 3, width: 6 });
+  assert.equal(fast.coach.current?.id, "grow");
+  run(fast.lessons, growWindow(EXPERT) + 0.1);
+  assert.equal(fast.coach.current, null);
+  assert.ok(!fast.coach.learned("grow"));
+  // Normal: it stops play, so it waits for Continue however long it is left.
+  assert.equal(growWindow(NORMAL), Infinity);
   const { coach, lessons } = device(["first", "perfect", "trim"]);
   lessons.begin();
   lessons.afterDrop({ kind: "perfect", level: 4, streak: 2, width: 12 });
-  run(lessons, growWindow(NORMAL) + 0.1);
-  assert.equal(coach.current, null);
+  assert.equal(run(lessons, 30), 0);
+  assert.equal(coach.current?.id, "grow");
   assert.ok(!coach.learned("grow"));
   // A perfect that didn't grow the cup doesn't count either.
   lessons.begin();
@@ -626,8 +714,13 @@ test("expert: a drop's line waits for an unread one, then goes stale, and is tau
 
 test("the best line waits its turn, takes it from a line about a drop, and is done once passed", () => {
   const { coach, lessons } = device(["perfect"]);
-  // A best of one, on a new device: the first cup's lesson holds the stage.
+  // A best of one, on a new device: the first cup's ghost holds the stage,
+  // and its line once the cup covers it.
   lessons.begin();
+  run(lessons, 1, { remaining: 1, ready: true });
+  assert.equal(coach.current, null);
+  assert.ok(lessons.ghostDue);
+  lessons.reachGhost();
   run(lessons, 1, { remaining: 1, ready: true });
   assert.equal(coach.current?.id, "first");
   // The first cup lands, level with the best: the line takes its turn.

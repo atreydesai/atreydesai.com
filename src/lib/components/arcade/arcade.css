@@ -195,9 +195,10 @@ body.boba-active .custom-cursor {
   --key-foot: #120f0e;
   --key-rule: rgb(253 248 243 / 0.22);
 
-  display: inline-grid;
-  place-items: center;
-  gap: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1-5);
   padding: 0 var(--space-3) 4px;
   color: #fdf8f3;
   background: var(--key-face);
@@ -218,9 +219,10 @@ body.boba-active .custom-cursor {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The accent face is accent-dark, so its cream label clears 4.5:1. */
 .boba-key.is-primary {
-  --key-face: #e85d4c;
-  --key-foot: #9e3426;
+  --key-face: #c9462f;
+  --key-foot: #7f2a1c;
   --key-rule: rgb(253 248 243 / 0.3);
 }
 
@@ -249,6 +251,13 @@ body.boba-active .custom-cursor {
   outline: 2px solid transparent;
   box-shadow:
     inset 0 0 0 2px #f18272,
+    inset 0 -4px 0 var(--key-foot);
+}
+
+/* On the accent face the accent ring would vanish: cream there. */
+.boba-key.is-primary:focus-visible {
+  box-shadow:
+    inset 0 0 0 2px #fdf8f3,
     inset 0 -4px 0 var(--key-foot);
 }
 
@@ -918,6 +927,11 @@ body.boba-active .custom-cursor {
   }
 
   .boba-btn.secondary:not(:disabled):active {
+    transform: none;
+  }
+
+  /* A pressed key keeps its sunk foot but doesn't travel. */
+  .boba-key:not(:disabled):is(:active, .is-down) {
     transform: none;
   }
 }

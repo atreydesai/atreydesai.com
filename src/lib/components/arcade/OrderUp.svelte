@@ -116,7 +116,17 @@
   import { TURN_FRAMES, TURN_FROM, drinkGrid, toppingKey, turnIndex, turnShare } from "#lib/arcade/orders-drink.js";
   import { FIGURE_W, JAR_H, JAR_W } from "#lib/arcade/orders-guests.js";
   import { GLYPHS, GLYPH_ROWS, ICONS, TEA_WORDS, wordWidth } from "#lib/arcade/orders-labels.js";
-  import { CARD_STEPS, STATION_LESSON, followLessons, lessonMemory, type LessonView, type Target } from "#lib/arcade/orders-lessons.js";
+  import {
+    CARD_STEPS,
+    STATION_LESSON,
+    followLessons,
+    ladleCentreIn,
+    lessonMemory,
+    needleCentreIn,
+    ticketBeckon,
+    type LessonView,
+    type Target,
+  } from "#lib/arcade/orders-lessons.js";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
   import { hexToRgb, mixHex, mixRgb, type RGB } from "#lib/arcade/core/color.ts";
   import { bayer } from "#lib/arcade/core/dither.ts";
@@ -385,6 +395,16 @@
     const inset = row === 0 ? 0 : row === CUP_H - 1 ? 2 : wallInset(row);
     return ".".repeat(inset) + "O".repeat(CUP_W - 2 * inset) + ".".repeat(inset);
   });
+  /** Just the edge of that shape, one cell thick: the shake's ghost. */
+  const CUP_OUTLINE = CUP_SILHOUETTE.map((line, row) =>
+    [...line]
+      .map((cellChar, col) => {
+        if (cellChar !== "O") return ".";
+        const inside = (r: number, c: number) => CUP_SILHOUETTE[r]?.[c] === "O";
+        return inside(row - 1, col) && inside(row + 1, col) && inside(row, col - 1) && inside(row, col + 1) ? "." : "O";
+      })
+      .join(""),
+  );
   /**
    * Ice: where each cube rests on the bottom, in the order they drop, and
    * where they bob along the top once the tea is in. The cup marks the slots
@@ -602,6 +622,7 @@
   /** Each tap's Brew chip, while its tank wants brewing. */
   let brewEls: Array<HTMLButtonElement | null> = [];
   let iceEl: HTMLButtonElement;
+  let handEl: HTMLButtonElement;
   let sampleEl: HTMLButtonElement;
   let receiptEl: HTMLElement | null = null;
   let cardEl: HTMLElement;
@@ -681,24 +702,38 @@
   // --- Lessons ----------------------------------------------------------------
   // The shift teaches itself (orders-lessons.js says what and when; the
   // coach shows one line at a time and remembers it on the device). While a
-  // station is taught the guests' patience and arrivals slow to WALK_SLOW;
-  // the bench never slows, so every station is learned at its real speed.
+  // lesson is up and unanswered the whole shift stops: the guests' patience,
+  // the arrivals, the clock and the bench. The player's own press brings it
+  // back and is made at once (a move's press makes the move; any other
+  // counts as Continue), so nothing is lost to reading and no press is lost
+  // to the stop.
 
   const coach = createCoach("orders");
-  /** The lesson on screen and what it points at, and any station's lesson standing down for this drink. */
+  /** The lesson on screen and what it points at, and the quiet before the next. */
   const lessons = lessonMemory();
   /** The coach's lesson and whether it's fading (done, and up long enough to read), copied out so the page follows them. */
   let coachLesson: Lesson | null = null;
   let coachLeaving = false;
-  /** The explanation is still up (not done, not acted on): a line that holds shows Continue only then. */
+  /** The lesson is still up and unanswered (not done, its move not made): it offers Continue only then. */
   let coachOpen = false;
+  /** The lesson is over (done, or its move made): the slip holds where it is. */
+  let coachEnded = false;
+  /** The slip is placed on screen beside its thing: only then does the lesson stop the shift. */
+  let lessonShown = false;
+  /** While the walk-through waits for the shift's first ticket, the guest whose ticket is marked on the rail, or -1. */
+  let beckonGuest = -1;
+  /** A ticket has been taken this shift. */
+  let ticketTaken = false;
+  /** The tap is held open (the hand key shows pressed down). */
+  let handHeld = false;
   let coachX: number | null = null;
   let coachY: number | null = null;
   let coachRing = 0;
   /** Half the width of a wide target (a ticket, a machine, the shake marks), so the loop stretches round it rather than growing tall. */
   let coachWidth = 0;
-  /** The callout's measured width (0 until it has been on screen). */
+  /** The callout's measured size (0 until it has been on screen). */
   let coachSlipW = 0;
+  let coachSlipH = 0;
   /** Half the height of a tall thing the callout rings (a tap), else 0. */
   let coachHeight = 0;
   let coachSide: "above" | "below" | "left" | "right" = "below";
@@ -726,10 +761,14 @@
   /** The counter as the lessons read it, updated in place each frame. */
   const lessonView: LessonView = {
     coarse: false,
+    expert,
+    started: false,
     tapIndex: 0,
     jarIndex: 0,
     holding: false,
     loaded: false,
+    ladle: 0,
+    needle: 0,
     cup: null,
     guests: [],
     tanks: [],
@@ -743,9 +782,13 @@
   let anchorBox: DOMRect | null = null;
   /** The bench canvas on screen, for targets drawn on it. */
   let benchBox: DOMRect | null = null;
-  /** The rail of tickets on screen: a lesson's slip never sits over it. */
+  /** The rail of tickets on screen: a ticket's slip never sits over it. */
   let railBox: DOMRect | null = null;
-  /** How far down the slip must sit: under the HUD, or under the whole rail for a ticket's lesson. */
+  /** The hand button on screen: a slip never covers it while it is the move being taught. */
+  let handBox: DOMRect | null = null;
+  /** A card line's station on the back bar (the bottle, the bin, the ordered tap), or a brew's whole machine. */
+  let machineBox: DOMRect | null = null;
+  /** How far down the slip may sit: under the HUD, or under the whole rail for a ticket's lesson. */
   let coachTop = 72;
   const refreshTick = every(0.1);
 
@@ -1132,6 +1175,8 @@
       }
       binCup();
     }
+    wake();
+    ticketTaken = true;
     startCup(guest);
   }
 
@@ -1220,6 +1265,7 @@
   function dump() {
     if (!playing() || !making || making.stampAt !== null) return;
     const guest = guests.find((item) => item.id === making?.guestId);
+    wake();
     binCup();
     sfxDump();
     if (guest) startCup(guest);
@@ -1256,6 +1302,7 @@
       note("the cup holds no more ice");
       return false;
     }
+    wake();
     cup.ice += 1;
     if (!reduceMotion) iceArcs.push({ age: 0 });
     sfxIce(cup.ice);
@@ -1284,6 +1331,7 @@
     const cup = making;
     if (!cup || !playing() || cup.ice === 0) return;
     if (!(cup.station === "ice" && cup.busy && unsettle(cup)) && !iceAdjustable(cup)) return;
+    wake();
     cup.ice -= 1;
     // A cube still in the air is the one that comes back.
     if (iceArcs.length) iceArcs.pop();
@@ -1297,6 +1345,7 @@
     const cup = making;
     if (!cup || !playing() || !sugarAdjustable(cup)) return false;
     if (cup.sugar >= SUGAR_MAX) return false;
+    wake();
     cup.sugar += 1;
     pumpAge = 0;
     sfxPump(cup.sugar);
@@ -1321,6 +1370,7 @@
     const cup = making;
     if (!cup || !playing() || cup.station !== "sugar" || cup.sugar === 0) return;
     if (cup.busy && !unsettle(cup)) return;
+    wake();
     cup.sugar -= 1;
     pumpAge = 10;
     sfxPump(0);
@@ -1363,6 +1413,7 @@
       return false;
     }
     if (index !== tapIndex) {
+      wake();
       tapIndex = index;
       liveMessage = `The cup is under the ${TEA_NAMES[TEAS[index]]} tap.`;
       // Moved under the ordered tea's tap: the move is known.
@@ -1384,6 +1435,7 @@
       note(`${tea} is brewing`);
       return;
     }
+    wake();
     if (!holds.size) {
       cup.heldSeconds = 0;
       if (tankState(tanks[tapIndex]) === "empty") note(`the ${tea} tank is empty`);
@@ -1486,8 +1538,7 @@
    * it beside the station, and it shouldn't be heard twice.
    */
   function stationMessage(cup: Cup) {
-    const id = STATION_LESSON[cup.station];
-    if (!coach.learned(id) && !lessons.held.has(id)) return "";
+    if (!coach.learned(STATION_LESSON[cup.station])) return "";
     switch (cup.station) {
       case "sugar":
         return `Syrup: pump ${pumps(sugarPumps(cup.order.sugar))} for ${sugarName(cup.order.sugar)}.`;
@@ -1532,6 +1583,7 @@
     if (!cup || cup.station !== "scoop" || cup.busy || !playing()) return false;
     const next = clamp(index, 0, TOPPINGS.length - 1);
     if (next === jarIndex) return true;
+    wake();
     jarIndex = next;
     dipJar(cup);
     liveMessage = `The ladle is in the ${TOPPING_NAMES[TOPPINGS[next]]} jar.`;
@@ -1550,6 +1602,7 @@
     const index = cup.drops.length;
     const wanted = cup.queue[index];
     if (!wanted) return;
+    wake();
     const kind = cup.chosen;
     const ladle = ladleNow(cup);
     // A wrong jar still falls where the ladle was; it just counts for nothing.
@@ -1598,6 +1651,7 @@
   function shake() {
     const cup = making;
     if (!cup || cup.station !== "shake" || cup.busy || !playing()) return;
+    wake();
     cup.shakes += 1;
     if (cup.shakes === 1) cup.shakeStart = clock;
     joltDir = cup.shakes % 2 ? 1 : -1;
@@ -1624,6 +1678,7 @@
   function stamp() {
     const cup = making;
     if (!cup || cup.station !== "seal" || cup.busy || cup.stampAt !== null || !playing()) return;
+    wake();
     const value = sealNeedle(clock - cup.sealStart, expert);
     cup.sealValue = value;
     cup.stampAt = clock;
@@ -1676,6 +1731,7 @@
       note(`let go of the ${tea} tap first`);
       return;
     }
+    wake();
     brewEnds[index] = clock + BREW_SECONDS;
     sfxBrew();
     coach.done("brew");
@@ -1704,6 +1760,7 @@
       note("nobody needs one yet");
       return;
     }
+    wake();
     guest.left = sampleBoost(guest.left, guest.patience);
     samplesLeft -= 1;
     sfxPlop(sampleCap - samplesLeft);
@@ -3672,9 +3729,12 @@
 
   /**
    * One step of the game by `realDt` seconds (capped by the frame loop); the
-   * countdown reads the uncapped `rawDt`, as it always has. While a station
-   * is taught the line (patience and arrivals) runs at the coach's slower
-   * pace; the bench, the shift's clock and the room keep real time.
+   * countdown reads the uncapped `rawDt`, as it always has. While a lesson is
+   * up and unanswered the whole shift stands still: the bench, the clock,
+   * the guests' patience and the arrivals. Once it is answered the bench is
+   * back at full speed at once, and the line (patience, arrivals, the shift's
+   * clock) eases back with the coach. A step waiting for its moment (the
+   * ladle over the cup, the needle in the band) stops the step right on it.
    */
   function advance(realDt: number, rawDt: number) {
     if (!running) {
@@ -3688,15 +3748,25 @@
       return;
     }
 
-    const dt = realDt;
-    // Lessons age on real time (uncapped), and the line's slower step never exceeds the frame's cap.
-    const lineDt = coach.step(rawDt, realDt);
+    // Lessons age on real time (uncapped), and the line's eased step never exceeds the frame's cap.
+    let lineDt = coach.step(rawDt, realDt);
+    let dt = realDt;
+    if (lessonHolds()) {
+      dt = 0;
+      lineDt = 0;
+    } else {
+      const until = momentIn();
+      if (until < dt) {
+        lineDt *= until / dt;
+        dt = until;
+      }
+    }
     lessonClock += realDt;
     // The spotlight comes up with a lesson and goes as it is done or the move is made.
     const dimTarget = coach.current && !coach.leaving && !coach.acting ? 1 : 0;
     lessonDim = reduceMotion ? dimTarget : lessonDim + (dimTarget - lessonDim) * (1 - Math.exp(-realDt / SPOT_EASE));
     clock += dt;
-    elapsed += dt;
+    elapsed += lineDt;
     timeLeft = timeRemaining(elapsed);
     if (elapsed >= SHIFT_SECONDS) {
       void endGame("time");
@@ -3740,7 +3810,8 @@
       if (lessons.cue) measureAnchor();
     }
 
-    stepCup(dt);
+    // Stood still, a running tap would read as one run dry.
+    if (dt > 0) stepCup(dt);
     stepBeats();
     if (gameOver) return;
     warmTurn();
@@ -3785,22 +3856,29 @@
 
   // --- Lessons, in play -------------------------------------------------------------
 
-  /** How wide a lesson's slip can be (Coach's 20rem), for choosing a side it fits on (px). */
-  const SLIP_ROOM = 320;
+  /** The slip's size before it has been measured: Coach's widest, and two lines (px). */
+  const SLIP_W = 304;
+  const SLIP_H = 64;
   /** The lessons a touch player answers on the hand, which lights up with them. */
   const HAND_LESSONS = new Set(["ticket", "ice", "syrup", "pour", "drop", "shake", "seal"]);
   /** Ghosts on the bench are dithered ink: the wall and the cup's inside are light, so cream would vanish. */
   const GHOST_INK = SCENE_INK;
+  /** Real seconds a lesson may go unplaced (its thing not on screen) before it is taken down, so play never stays stopped for a line nobody can see. */
+  const UNPLACED_SECONDS = 1.5;
 
   /** Copies what the lessons read about the counter into their view, in place. */
   function syncLessonView() {
     const view = lessonView;
+    const cup = making;
     view.coarse = touchUI;
+    view.started = ticketTaken;
     view.tapIndex = tapIndex;
     view.jarIndex = jarIndex;
     view.holding = holds.size > 0;
-    view.loaded = !!making && clock >= making.loadedAt;
-    view.cup = making;
+    view.loaded = !!cup && clock >= cup.loadedAt;
+    view.ladle = cup?.station === "scoop" ? ladleAt(clock - cup.scoopStart, cup.swing, Math.PI / 2) : 0;
+    view.needle = cup?.station === "seal" && cup.stampAt === null ? sealNeedle(clock - cup.sealStart, expert) : 0;
+    view.cup = cup;
     view.guests = guests;
     view.tanks = tanks;
     view.brewEnds = brewEnds;
@@ -3813,18 +3891,26 @@
   /**
    * Asks the lessons what this moment should teach and keeps the coach in
    * step with the bench (followLessons in orders-lessons.js): a station's
-   * lesson whose moment has gone comes down uncounted, one left unanswered
-   * stands down for the drink, and the line on screen follows its target.
+   * lesson whose moment has gone comes down uncounted, the next waits for
+   * a short quiet, and the line on screen follows its target. While the
+   * walk-through waits for the shift's first ticket, that ticket is marked.
    */
   function checkLessons() {
     // Nothing new while "go" is still on screen.
     if (clock - begunAt < GO_SECONDS) return;
     syncLessonView();
+    // A line that could not be put on screen never holds play for long.
+    if (coach.current && !coach.leaving && !coach.acting && !lessonShown && coach.age > UNPLACED_SECONDS) {
+      coach.dismiss();
+      lessons.cue = null;
+    }
     if (followLessons(coach, lessonView, lessons, clock)) {
       measureAnchor(true);
-      // Once more after the page has caught up (a ticket just placed, a chip just shown).
+      // Once more after the page has caught up (a ticket just placed, a chip just shown, the slip measured).
       void tick().then(() => measureAnchor());
     }
+    const beckon = ticketBeckon(lessonView, coach.learned);
+    if (beckon !== beckonGuest) beckonGuest = beckon;
   }
 
   /**
@@ -3839,6 +3925,43 @@
       coach.dismiss();
       lessons.cue = null;
     }
+  }
+
+  /** A lesson is up, on screen, and unanswered, so the shift stands still for it. */
+  function lessonHolds() {
+    const lesson = coach.current;
+    return !!lesson && lesson.slow === 0 && !coach.leaving && !coach.acting && lessonShown && running && !gameOver;
+  }
+
+  /**
+   * A press in the shift while a lesson holds it: play comes back, and the
+   * press goes on to do what it always does, so none is lost to the stop. A
+   * step's press is its move begun (the line stays up until the station has
+   * worked or its moment passes); any press during a thing reads as Continue
+   * (the slip stays until it has been up long enough to read).
+   */
+  function wake() {
+    const lesson = coach.current;
+    if (!lesson || coach.leaving || coach.acting || lesson.slow !== 0) return;
+    if (lesson.move) coach.acted(lesson.id);
+    else coach.done(lesson.id);
+  }
+
+  /**
+   * Game seconds until the moment a step waits on (the ladle right over the
+   * cup, the needle in the middle of the band), so the frame stops right on
+   * it; Infinity when nothing waits.
+   */
+  function momentIn() {
+    const cup = making;
+    if (!cup || cup.busy) return Infinity;
+    if (lessons.waiting === "ladle" && cup.station === "scoop" && clock >= cup.loadedAt) {
+      return ladleCentreIn(clock - cup.scoopStart, cup.swing);
+    }
+    if (lessons.waiting === "needle" && cup.station === "seal" && cup.stampAt === null) {
+      return needleCentreIn(clock - cup.sealStart, expert);
+    }
+    return Infinity;
   }
 
   /** The DOM thing a lesson points at, if it is one. */
@@ -3865,6 +3988,21 @@
   }
 
   /**
+   * The machine on the back bar a lesson can point at instead: a card
+   * line's station (the bottle, the bin, the ordered tea's tap), seen from
+   * above when there is no room beside the card; a brew's whole machine.
+   */
+  function machineElement(at: Target): HTMLElement | null {
+    if (at.kind === "tap" || at.kind === "brew") return tapEls[at.index] ?? null;
+    if (at.kind !== "step") return null;
+    const station = CARD_STEPS[at.index];
+    if (station === "sugar") return syrupEl ?? null;
+    if (station === "ice") return iceEl ?? null;
+    if (station === "pour" && making) return tapEls[tapFor(making.order)] ?? null;
+    return null;
+  }
+
+  /**
    * Reads where the lesson's target is on screen. A target that has just
    * gone (a receipt cleared, a ticket served) keeps its last place, so the
    * line fades where it was; a new target with nothing to show yet has none.
@@ -3873,6 +4011,16 @@
     if (canvas) benchBox = canvas.getBoundingClientRect();
     const at = lessons.cue?.at;
     if (lineEl) railBox = lineEl.getBoundingClientRect();
+    if (handEl) handBox = handEl.getBoundingClientRect();
+    machineBox = at ? machineElement(at)?.getBoundingClientRect() ?? null : null;
+    if (machineBox && at?.kind === "brew") {
+      // A brew's brackets take in the whole machine and the chip at its foot.
+      const chip = brewEls[at.index]?.getBoundingClientRect();
+      if (chip && chip.height > 0) {
+        const bottom = Math.max(machineBox.bottom, chip.bottom);
+        machineBox = new DOMRect(machineBox.left, machineBox.top, machineBox.width, bottom - machineBox.top);
+      }
+    }
     if (at && (at.kind === "ticket" || at.kind === "patience")) {
       // A ticket by its slot on the rail: its settled place, not where its
       // unfold has got to; the patience lesson by its track along the foot.
@@ -3932,17 +4080,334 @@
     }
   }
 
+  type Side = "above" | "below" | "left" | "right";
+  /** A box on screen, in viewport px. */
+  interface Rect {
+    l: number;
+    t: number;
+    r: number;
+    b: number;
+  }
   /**
-   * Puts the lesson's line beside its target, with a loop round it, and
-   * lights the pad it is about on touch. Lines about the back bar, the rail
-   * and the receipt sit under them, between them and the cup; lines about
-   * the counter sit above, clear of the guests' faces.
+   * One place the slip could go: a side of its anchor; the anchor and the
+   * brackets Coach draws round it (`ring` for a small thing, `half` and
+   * `tall` for a wide or a tall one); and how high on screen it may sit.
+   */
+  interface Spot {
+    side: Side;
+    x: number;
+    y: number;
+    ring: number;
+    half: number;
+    tall: number;
+    floor: number;
+  }
+
+  /** Keeps the slip this far inside the screen's edge, as Coach does (px). */
+  const EDGE = 16;
+  /** The places tried for the current lesson, best first, and the boxes it must keep clear of; pooled, so a frame allocates nothing. */
+  const spotPool: Spot[] = [];
+  let spotCount = 0;
+  const keepPool: Rect[] = [];
+  let keepCount = 0;
+  const slipBox: Rect = { l: 0, t: 0, r: 0, b: 0 };
+  const loopBox: Rect = { l: 0, t: 0, r: 0, b: 0 };
+  const thingBox: Rect = { l: 0, t: 0, r: 0, b: 0 };
+
+  function addSpot(side: Side, x: number, y: number, ring: number, half: number, tall: number, floor: number) {
+    const spot = spotPool[spotCount] ?? (spotPool[spotCount] = { side, x, y, ring, half, tall, floor });
+    spot.side = side;
+    spot.x = x;
+    spot.y = y;
+    spot.ring = ring;
+    spot.half = half;
+    spot.tall = tall;
+    spot.floor = floor;
+    spotCount++;
+  }
+
+  /** A box the slip must keep clear of, in viewport px. */
+  function addKeep(l: number, t: number, w: number, h: number) {
+    if (w <= 0 || h <= 0) return;
+    const box = keepPool[keepCount] ?? (keepPool[keepCount] = { l: 0, t: 0, r: 0, b: 0 });
+    box.l = l;
+    box.t = t;
+    box.r = l + w;
+    box.b = t + h;
+    keepCount++;
+  }
+
+  /** The same, from bench px. */
+  function addKeepBench(x: number, y: number, w: number, h: number) {
+    if (benchBox) addKeep(benchBox.left + x, benchBox.top + y, w, h);
+  }
+
+  /** The brackets Coach draws round a spot's anchor (its own arithmetic), into `into`. */
+  function loopRect(s: Pick<Spot, "x" | "y" | "ring" | "half" | "tall">, into: Rect) {
+    const w = Math.max(s.ring * 2.3, s.half > 0 ? (s.half + 6) * 2 : 0);
+    const h = Math.max(s.ring * 1.75, s.tall > 0 ? (s.tall + 4) * 2 : 0);
+    into.l = s.x - w / 2;
+    into.r = s.x + w / 2;
+    into.t = s.y - h / 2;
+    into.b = s.y + h / 2;
+    return into;
+  }
+
+  /**
+   * Where Coach will put a slip `w` × `h` for this spot, by its own
+   * arithmetic, into `slipBox`; and whether it fits on that side without the
+   * screen's edge pushing it back over its thing (where it fits, Coach keeps
+   * the side it was given).
+   */
+  function slipFor(s: Spot, w: number, h: number, vw: number, vh: number) {
+    const loopW = Math.max(s.ring * 2.3, s.half > 0 ? (s.half + 6) * 2 : 0);
+    const loopH = Math.max(s.ring * 1.75, s.tall > 0 ? (s.tall + 4) * 2 : 0);
+    const marked = s.ring > 0 || s.half > 0;
+    const gapX = (marked ? Math.max(s.ring * 0.8, loopW / 2, s.half) : 6) + 14;
+    const gapY = (marked ? Math.max(s.ring * 0.8, loopH / 2) : 6) + 14;
+    let left = s.x - w / 2;
+    let top = s.y - h / 2;
+    let fits: boolean;
+    if (s.side === "left") {
+      left = s.x - gapX - w;
+      fits = left >= EDGE;
+    } else if (s.side === "right") {
+      left = s.x + gapX;
+      fits = left + w <= vw - EDGE;
+    } else if (s.side === "above") {
+      top = s.y - gapY - h;
+      fits = top >= s.floor;
+    } else {
+      top = s.y + gapY;
+      fits = top + h <= vh - EDGE;
+    }
+    left = Math.max(EDGE, Math.min(vw - EDGE - w, left));
+    top = Math.max(s.floor, Math.min(vh - EDGE - h, top));
+    slipBox.l = left;
+    slipBox.t = top;
+    slipBox.r = left + w;
+    slipBox.b = top + h;
+    return fits;
+  }
+
+  /** How much of `b` (grown by a few px) the slip box `a` covers, in px². */
+  function overlap(a: Rect, b: Rect) {
+    const margin = 4;
+    const w = Math.min(a.r, b.r + margin) - Math.max(a.l, b.l - margin);
+    const h = Math.min(a.b, b.b + margin) - Math.max(a.t, b.t - margin);
+    return w > 0 && h > 0 ? w * h : 0;
+  }
+
+  /**
+   * What a slip must never cover while this lesson is up: the cup and the
+   * station in use (its machine, the ladle, the shaker, the press and the
+   * gauge), the hand button when it is the move being taught, and for a
+   * ticket's line the rail itself. The thing the lesson is about is kept
+   * clear as well, by each spot.
+   */
+  function keepClear(lesson: Lesson, at: Target) {
+    keepCount = 0;
+    const c = cell;
+    const cup = making;
+    if (cup && benchBox) {
+      addKeepBench(cupLeftAt(cupX) - c, cupTop - c, (CUP_W + 2) * c, counterY - cupTop + c);
+      switch (cup.station) {
+        case "sugar": {
+          const top = shelfTop() - (PUMP_ROWS + 1) * c;
+          addKeepBench(pumpX - (PUMP_W / 2 + 3) * c, top, (PUMP_W + 4) * c, nozzleBottom() - top + c);
+          break;
+        }
+        case "ice":
+          addKeepBench(binLeft() - c, shelfTop() - (ICE_BIN.length + 1) * c, (ICE_BIN[0].length + 2) * c, (ICE_BIN.length + SHELF_ROWS + 2) * c);
+          break;
+        case "pour": {
+          const x = spoutX[tapIndex];
+          const top = shelfTop() - (MACHINE_ROWS + 1) * c;
+          if (x !== undefined) addKeepBench(x - (tankW / 2 + 1) * c, top, (tankW + 2) * c, cupTop - top);
+          break;
+        }
+        case "scoop": {
+          const ladle = ladleNow(cup);
+          addKeepBench(ladle.bx - 5 * c, ladle.by - 3 * c, 10 * c, 5 * c);
+          break;
+        }
+        case "shake":
+          addKeepBench(cupX - 8 * c, cupTop - (SHAKER.length + 4) * c, 16 * c, (SHAKER.length + 4) * c);
+          break;
+        case "seal":
+          // The press over the cup, from its mount under the shelf; the gauge is the seal's own thing.
+          addKeepBench(cupX - (CUP_W / 2 + 2) * c, shelfBottom(), (CUP_W + 4) * c, counterY - shelfBottom());
+          break;
+        default:
+          break;
+      }
+    }
+    if (lesson.move && HAND_LESSONS.has(lesson.id) && handBox) addKeep(handBox.left, handBox.top, handBox.width, handBox.height);
+    if ((at.kind === "ticket" || at.kind === "patience") && railBox) addKeep(railBox.left, railBox.top, railBox.width, railBox.height);
+  }
+
+  /**
+   * Where the lesson's slip goes: the first of its places, best first, that
+   * fits on screen and covers nothing in `keepClear` (nor its own thing);
+   * failing that, the one that covers least. The pour's line, once the tap is
+   * held, moves beside the fill line only where that is clear (null: it
+   * stays where it was).
+   */
+  function placeSpot(lesson: Lesson, at: Target, point: typeof benchSpot | null): Spot | null {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const w = coachSlipW || SLIP_W;
+    const h = coachSlipH || SLIP_H;
+    const floor = Math.round(hudHeight + 8);
+    // The thing itself, as Coach will ring it.
+    let x: number;
+    let y: number;
+    let ring: number;
+    let half = 0;
+    let tall = 0;
+    if (point && benchBox) {
+      x = benchBox.left + point.x;
+      y = benchBox.top + point.y;
+      ring = Math.max(14, point.r);
+      half = point.w;
+    } else if (anchorBox) {
+      const box = anchorBox;
+      x = box.left + box.width / 2;
+      y = box.top + box.height / 2;
+      if (at.kind === "patience") {
+        // The patience track along the ticket's foot: low brackets as wide as the track.
+        ring = 14;
+        half = box.width / 2;
+      } else if (lesson.id === "ticket") {
+        // The ticket carries its own stepping brackets: the slip keeps clear of it and draws none.
+        ring = 0;
+        half = box.width / 2;
+        tall = box.height / 2;
+      } else {
+        // As tall as the thing, stretched to its width when that is wider.
+        ring = Math.max(14, (box.height / 1.75) * 1.1);
+        half = box.width / 2 > ring * 1.15 ? box.width / 2 : 0;
+      }
+    } else {
+      return null;
+    }
+    // A machine on the back bar, bracketed tall and narrow, its slip above it.
+    const m = machineBox && machineBox.width > 0 && machineBox.height > 0 ? machineBox : null;
+    const mx = m ? m.left + m.width / 2 : 0;
+    const my = m ? m.top + m.height / 2 : 0;
+    const mw = m ? m.width / 2 : 0;
+    const mh = m ? m.height / 2 : 0;
+    spotCount = 0;
+    switch (at.kind) {
+      case "ticket":
+      case "patience":
+        // Beside the rail at its ends; otherwise in the strip under it.
+        addSpot("left", x, y, ring, half, tall, floor);
+        addSpot("right", x, y, ring, half, tall, floor);
+        addSpot("below", x, y, ring, half, tall, railBox ? Math.round(railBox.bottom + 8) : floor);
+        break;
+      case "step":
+        // Beside the card on its left, over the finished lines; where there
+        // is no room (a phone), above the station on the back bar, over the
+        // rail, well clear of the cup and the hand.
+        addSpot("left", x, y, ring, half, 0, floor);
+        if (m) addSpot("above", mx, my, 14, mw, mh, floor);
+        else if (lesson.id === "shake" && benchBox && making) {
+          const size = cell;
+          const gap = Math.max(2, Math.round(cell / 2));
+          const marks = SHAKES_NEEDED * size + (SHAKES_NEEDED - 1) * gap;
+          addSpot("above", benchBox.left + cupX, benchBox.top + cupTop - (SHAKER.length + 2) * cell, 14, marks / 2, 0, floor);
+        }
+        addSpot("right", x, y, ring, half, 0, floor);
+        break;
+      case "tap":
+      case "brew":
+        if (m) {
+          addSpot("above", mx, my, 14, mw, mh, floor);
+          addSpot("left", mx, my, 14, mw, mh, floor);
+          addSpot("right", mx, my, 14, mw, mh, floor);
+        } else {
+          addSpot("above", x, y, ring, half, 0, floor);
+          addSpot("left", x, y, ring, half, 0, floor);
+          addSpot("right", x, y, ring, half, 0, floor);
+        }
+        break;
+      case "sample":
+        addSpot("right", x, y, ring, half, 0, floor);
+        addSpot("above", x, y, ring, half, 0, floor);
+        addSpot("left", x, y, ring, half, 0, floor);
+        break;
+      case "receipt":
+      case "streak":
+        addSpot("below", x, y, ring, half, 0, floor);
+        addSpot("right", x, y, ring, half, 0, floor);
+        addSpot("left", x, y, ring, half, 0, floor);
+        addSpot("above", x, y, ring, half, 0, floor);
+        break;
+      case "jar": {
+        // Away from the cup first, so it never lies over the ladle's swing.
+        const far: Side = at.index < 2 ? "left" : "right";
+        addSpot(far, x, y, ring, half, 0, floor);
+        addSpot("above", x, y, ring, half, 0, floor);
+        addSpot(far === "left" ? "right" : "left", x, y, ring, half, 0, floor);
+        addSpot("below", x, y, ring, half, 0, floor);
+        break;
+      }
+      case "ladle":
+        addSpot("above", x, y, ring, half, 0, floor);
+        addSpot("left", x, y, ring, half, 0, floor);
+        addSpot("right", x, y, ring, half, 0, floor);
+        break;
+      case "line":
+        addSpot("right", x, y, ring, half, 0, floor);
+        break;
+      case "gauge":
+        addSpot("right", x, y, ring, half, 0, floor);
+        if (benchBox) {
+          // No room beside the gauge (a phone): the whole seal bracketed, the
+          // press, the cup and the gauge, with the slip above the press.
+          const c = cell;
+          const left = cupX - (CUP_W / 2 + 2) * c;
+          const right = cupX + (CUP_W / 2 + 4 + GAUGE_COLS + 2.5) * c;
+          const top = shelfBottom();
+          addSpot("above", benchBox.left + (left + right) / 2, benchBox.top + (top + counterY) / 2, 14, (right - left) / 2, (counterY - top) / 2, floor);
+        }
+        addSpot("above", x, y, ring, half, 0, floor);
+        break;
+      default:
+        addSpot("above", x, y, ring, half, 0, floor);
+        addSpot("right", x, y, ring, half, 0, floor);
+        break;
+    }
+    keepClear(lesson, at);
+    loopRect({ x, y, ring, half, tall }, thingBox);
+    let best: Spot | null = null;
+    let bestScore = Infinity;
+    for (let index = 0; index < spotCount; index++) {
+      const spot = spotPool[index];
+      const fits = slipFor(spot, w, h, vw, vh);
+      let score = (fits ? 0 : 1e9) + overlap(slipBox, loopRect(spot, loopBox)) + overlap(slipBox, thingBox);
+      for (let k = 0; k < keepCount; k++) score += overlap(slipBox, keepPool[k]);
+      if (score === 0) return spot;
+      if (score < bestScore) {
+        best = spot;
+        bestScore = score;
+      }
+    }
+    return at.kind === "line" ? null : best;
+  }
+
+  /**
+   * Puts the lesson's line in the first place beside its thing that keeps
+   * clear of the cup, the station in use, the hand being taught and (for a
+   * ticket) the rail, with pixel brackets round the thing, and lights the
+   * pad it is about on touch. Once the lesson is over (done, or its move
+   * made) the slip holds where it is.
    */
   function placeCoach() {
     const lesson = coach.current;
     const cue = lessons.cue;
     const at = lesson && cue && cue.lesson.id === lesson.id && running && !gameOver ? cue.at : null;
-    const point = at ? benchPoint(at) : null;
     // The page's pieces follow the spotlight.
     const dim = !!lesson && !!cue && running && !gameOver && !coach.leaving && !coach.acting;
     if (dim !== dimOthers) dimOthers = dim;
@@ -3963,8 +4428,11 @@
       const less = lesson.id === "ice";
       if (less !== litLess) litLess = less;
     }
+    const held = holds.size > 0;
+    if (held !== handHeld) handHeld = held;
     // A ticket on the rail is followed frame by frame (it moves as others leave).
     if (at && (at.kind === "ticket" || at.kind === "patience")) measureAnchor();
+    const point = at ? benchPoint(at) : null;
     if (!lesson || !cue || !at || (point ? !benchBox : !anchorBox)) {
       // The last line stays mounted, faded, so the live region keeps its
       // words until the next lesson replaces them.
@@ -3972,93 +4440,15 @@
       if (coachOpen) coachOpen = false;
       if (handLit) handLit = false;
       if (sampleLit) sampleLit = false;
+      if (lessonShown) lessonShown = false;
       return;
-    }
-    let x: number;
-    let y: number;
-    let ring: number;
-    let half = 0;
-    if (point && benchBox) {
-      x = benchBox.left + point.x;
-      y = benchBox.top + point.y;
-      ring = point.r;
-      half = point.w;
-    } else if (anchorBox) {
-      const box = anchorBox;
-      x = box.left + box.width / 2;
-      if (at.kind === "patience") {
-        // The patience track along the ticket's foot: a low loop as wide as the track.
-        y = box.top + box.height / 2;
-        ring = 10;
-        half = box.width / 2;
-      } else {
-        // A loop as tall as the thing, stretched to its width when that is wider.
-        y = box.top + box.height / 2;
-        ring = (box.height / 1.75) * 1.1;
-        half = box.width / 2 > ring * 1.15 ? box.width / 2 : 0;
-      }
-    } else {
-      return;
-    }
-    // A card step's line goes beside the card on its left. Where the slip, at
-    // its measured width, has no room there (a phone), above the step would
-    // cover the cup being poured: the pour's line points at its lit tap from
-    // above instead.
-    const room = (coachSlipW || SLIP_ROOM) + 20;
-    let overTap = false;
-    let tall = 0;
-    if (at.kind === "step" && lesson.id === "pour" && making && x - half - room < 16) {
-      const tap = tapEls[tapFor(making.order)]?.getBoundingClientRect();
-      if (tap && tap.width > 0 && tap.height > 0) {
-        x = tap.left + tap.width / 2;
-        y = tap.top + tap.height / 2;
-        // Brackets snug round the tap itself, tall and narrow.
-        ring = 0;
-        half = tap.width / 2;
-        tall = Math.round(tap.height / 2);
-        overTap = true;
-      }
     }
     if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
     // The line fades only once it has been up long enough to read; its Continue goes as soon as it is done.
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
     const open = !coach.leaving && !coach.acting;
     if (open !== coachOpen) coachOpen = open;
-    x = Math.round(x);
-    y = Math.round(y);
-    ring = Math.round(Math.max(14, ring));
-    if (x !== coachX) coachX = x;
-    if (y !== coachY) coachY = y;
-    if (ring !== coachRing) coachRing = ring;
-    half = Math.round(half);
-    if (half !== coachWidth) coachWidth = half;
-    if (tall !== coachHeight) coachHeight = tall;
-    // A line of the making card: beside it on the left, over the card's
-    // finished lines, where there is room (a phone puts it above). A
-    // ticket's: beside the rail if it is at the rail's end and the slip
-    // fits there, otherwise in the strip under the whole rail.
-    let side: typeof coachSide = "below";
-    let floor = hudHeight + 8;
-    if (at.kind === "ticket" || at.kind === "patience") {
-      const rail = railBox;
-      const slot = anchorBox;
-      const room = SLIP_ROOM + 40;
-      if (rail && slot && slot.left - rail.left < 12 && rail.left - room >= 16) side = "left";
-      else if (rail && slot && rail.right - slot.right < 12 && window.innerWidth - rail.right - room >= 16) side = "right";
-      else if (rail) floor = Math.round(rail.bottom + 8);
-    } else if (at.kind === "step") {
-      side = !overTap && x - half - room >= 16 ? "left" : "above";
-    } else if (at.kind === "line") {
-      side = "right";
-    } else if (at.kind === "jar" || at.kind === "ladle" || at.kind === "gauge" || at.kind === "tipjar" || at.kind === "sample") {
-      side = "above";
-    }
-    if (side !== coachSide) coachSide = side;
-    if (floor !== coachTop) coachTop = floor;
-    // The hand row sits on the counter's dark wood; everything else on the light wall.
-    const scene = at.kind === "sample" ? "dark" : "light";
-    if (scene !== coachScene) coachScene = scene;
-    const live = touchUI && !coach.leaving && !coach.acting;
+    const live = touchUI && open;
     const hand =
       live &&
       HAND_LESSONS.has(lesson.id) &&
@@ -4067,6 +4457,36 @@
     if (hand !== handLit) handLit = hand;
     const sample = live && lesson.id === "sample";
     if (sample !== sampleLit) sampleLit = sample;
+    // Over: the slip holds where it is. Only the pour's line moves on, to the
+    // fill line while the tap is held, and only where there is room for it.
+    const following = coach.acting && !coach.leaving && at.kind === "line";
+    if ((coach.leaving || coach.acting) && !following) {
+      if (!coachEnded) coachEnded = true;
+      return;
+    }
+    const spot = placeSpot(lesson, at, point);
+    if (!spot) {
+      if (!coachEnded) coachEnded = true;
+      return;
+    }
+    if (coachEnded) coachEnded = false;
+    const x = Math.round(spot.x);
+    const y = Math.round(spot.y);
+    const ring = Math.round(spot.ring);
+    const half = Math.round(spot.half);
+    const tall = Math.round(spot.tall);
+    if (x !== coachX) coachX = x;
+    if (y !== coachY) coachY = y;
+    if (ring !== coachRing) coachRing = ring;
+    if (half !== coachWidth) coachWidth = half;
+    if (tall !== coachHeight) coachHeight = tall;
+    if (spot.side !== coachSide) coachSide = spot.side;
+    if (spot.floor !== coachTop) coachTop = spot.floor;
+    // The card, the hand row and the Sample button sit on the counter's dark
+    // wood: the tail prints cream there; on the light wall, in ink.
+    const scene = room.counterPx && y > room.counterPx ? "dark" : "light";
+    if (scene !== coachScene) coachScene = scene;
+    if (!lessonShown) lessonShown = true;
   }
 
   // --- The spotlight ---------------------------------------------------------------
@@ -4170,34 +4590,48 @@
   }
 
   /**
-   * The player has read it: Continue (Enter, or the slip's button) ends a
-   * line that holds, and counts it. A station's lesson ends on its action.
+   * Continue (Enter, or the slip's button): ends the lesson up and counts it
+   * as known, a step's included (its move is then the player's to make), and
+   * brings play back.
    */
   function continueLesson() {
     const lesson = coach.current;
-    if (!lesson || lesson.move || coach.leaving || !running || paused) return;
+    if (!lesson || coach.leaving || coach.acting || !running || paused) return;
     coach.done(lesson.id);
   }
 
+  /** A lesson is up and unanswered: Enter continues it rather than working the hand. */
+  function lessonOpen() {
+    return !!coach.current && !coach.leaving && !coach.acting && running && !paused;
+  }
+
   /**
-   * The lesson's ghost, where the motion is the lesson: the tea rising to
-   * the line before the tap is held, the ladle right over the cup (when to
-   * drop), and the needle in the middle of the band (when to stamp). Each is
-   * dithered ink, breathing slowly, still while paused.
+   * The lesson's ghost, the move it asks for, played in real time while
+   * play stands still: a pump of syrup squirting into the cup, a cube
+   * arcing from the bin into it, the tea rising to the line before the tap
+   * is held, the scoop falling from the ladle (stopped right over the cup)
+   * into it, the cup jolting side to side, and the press coming down on the
+   * rim (with the needle stopped in the band). Each is dithered ink (syrup
+   * and tea in their own colours), breathing slowly, shown done and still
+   * under Reduce Motion (the shake, which is nothing but motion, not at
+   * all), and gone once paused.
    */
   function drawLessonGhost(g: CanvasRenderingContext2D) {
     const lesson = coach.current;
     const cup = making;
     if (!lesson || !cup || paused || coach.leaving || coach.acting || lessons.cue?.lesson.id !== lesson.id) return;
     const density = 0.4 + 0.25 * beckon(lessonClock, reduceMotion);
-    if (lesson.id === "pour" && cup.station === "pour" && !holds.size) drawPourGhost(g, cup, density);
-    else if (lesson.id === "drop" && cup.station === "scoop" && !cup.busy) drawLadleGhost(g, cup, density);
-    else if (lesson.id === "seal" && cup.station === "seal" && cup.stampAt === null) drawNeedleGhost(g, density);
+    if (lesson.id === "syrup" && cup.station === "sugar" && !cup.busy) drawSyrupGhost(g, cup, density);
+    else if (lesson.id === "ice" && cup.station === "ice" && !cup.busy) drawIceGhost(g, density);
+    else if (lesson.id === "pour" && cup.station === "pour" && !holds.size) drawPourGhost(g, cup, density);
+    else if (lesson.id === "drop" && cup.station === "scoop" && !cup.busy) drawDropGhost(g, cup, density);
+    else if (lesson.id === "shake" && cup.station === "shake" && !cup.busy && !reduceMotion) drawShakeGhost(g, density);
+    else if (lesson.id === "seal" && cup.station === "seal" && cup.stampAt === null) drawPressGhost(g, density);
   }
 
   // Each ghost is painted by one function made once, reading where to paint
   // from `ghostAt`, so a frame allocates nothing for it.
-  const ghostAt = { left: 0, surface: 0, x: 0, y: 0, width: 0, arm: 0, art: TOPPING_ART.pearls };
+  const ghostAt = { left: 0, surface: 0, x: 0, y: 0, width: 0, height: 0, art: TOPPING_ART.pearls };
   const ghostStyle = { color: GHOST_INK, density: 0.5, cell: 4 };
 
   /** The ghost's colour and screen door for this frame, on the bench's grid. */
@@ -4220,27 +4654,63 @@
     }
   };
 
-  /** The ladle hanging straight down at `ghostAt.x`, its bowl's top at `ghostAt.y`, loaded with `ghostAt.art`. */
-  const paintLadleGhost = (ghost: CanvasRenderingContext2D) => {
+  /** A scoop of `ghostAt.art`, its centre at `ghostAt.x` and its top at `ghostAt.y`. */
+  const paintDropGhost = (ghost: CanvasRenderingContext2D) => {
     const c = cell;
-    const { x, y, arm, art } = ghostAt;
-    ghost.fillRect(Math.round(x - arm / 2), y - 9 * c, arm, 9 * c);
-    drawSprite(ghost, LADLE_BOWL, x - (LADLE_BOWL[0].length / 2) * c, y, c, { O: GHOST_INK });
+    const { x, y, art } = ghostAt;
     drawSprite(ghost, art.grid, x - (SCOOP_COLS / 2) * c, y, c, art.palette);
   };
 
-  /** The needle at `ghostAt.y` on a gauge `ghostAt.width` wide from `ghostAt.left`. */
-  const paintNeedleGhost = (ghost: CanvasRenderingContext2D) => {
-    const c = cell;
-    const { left, y, width } = ghostAt;
-    ghost.fillRect(left, y - 1, width, 2);
-    ghost.beginPath();
-    ghost.moveTo(left + width - 1, y);
-    ghost.lineTo(left + width + 2.5 * c, y - 1.4 * c);
-    ghost.lineTo(left + width + 2.5 * c, y + 1.4 * c);
-    ghost.closePath();
-    ghost.fill();
+  /** A plain block, `ghostAt.width` × `ghostAt.height` from `ghostAt.left`, its top at `ghostAt.y`: the sealer's plate, or a squirt of syrup. */
+  const paintPressGhost = (ghost: CanvasRenderingContext2D) => {
+    ghost.fillRect(ghostAt.left, ghostAt.y, ghostAt.width, ghostAt.height);
   };
+
+  /** A cube of ice, its centre at `ghostAt.x` and its top at `ghostAt.y`. */
+  const paintIceGhost = (ghost: CanvasRenderingContext2D) => {
+    drawSprite(ghost, ICE_CUBE, ghostAt.x - 1.5 * cell, ghostAt.y, cell, ICE_PALETTE);
+  };
+
+  /** The cup's outline, its left edge at `ghostAt.left`. */
+  const paintShakeGhost = (ghost: CanvasRenderingContext2D) => {
+    drawSprite(ghost, CUP_OUTLINE, ghostAt.left, cupTop, cell, { O: GHOST_INK });
+  };
+
+  /** A pump: syrup running from the bottle's tube down into the cup, a beat, and again (all the way down under Reduce Motion). */
+  function drawSyrupGhost(g: CanvasRenderingContext2D, cup: Cup, density: number) {
+    const c = cell;
+    const top = nozzleBottom();
+    const bottom = cupTop + 15 * c;
+    const t = reduceMotion ? 1 : clamp((lessonClock % 1.2) / 0.35, 0, 1);
+    ghostAt.width = Math.max(2, Math.round(c / 2) * 2 - 2);
+    ghostAt.left = Math.round(pumpTipX() - c / 2);
+    ghostAt.y = top;
+    ghostAt.height = Math.max(0, Math.round((bottom - top) * t));
+    if (ghostAt.height > 0 && cup.station === "sugar") {
+      drawGhost(g, ghostAt.left - c, top, ghostAt.width + 2 * c, bottom - top, paintPressGhost, styleGhost(SYRUP, density));
+    }
+  }
+
+  /** A cube arcing from the bin into the cup, a beat, and again (in the cup under Reduce Motion). */
+  function drawIceGhost(g: CanvasRenderingContext2D, density: number) {
+    const c = cell;
+    const u = reduceMotion ? 1 : clamp((lessonClock % 1.2) / 0.5, 0, 1);
+    const from = iceArcAt(0);
+    const to = iceArcAt(1);
+    const at = iceArcAt(u);
+    ghostAt.x = at.x;
+    ghostAt.y = at.y;
+    const left = Math.min(from.x, to.x) - 3 * c;
+    drawGhost(g, left, from.y - c, Math.abs(to.x - from.x) + 6 * c, to.y - from.y + 5 * c, paintIceGhost, styleGhost(GHOST_INK, density));
+  }
+
+  /** The cup jolting one way and the other, as each press shakes it. */
+  function drawShakeGhost(g: CanvasRenderingContext2D, density: number) {
+    const c = cell;
+    const side = Math.floor(lessonClock / 0.16) % 2 ? 1 : -1;
+    ghostAt.left = cupLeftAt(cupX) + Math.round(side * 1.5) * c;
+    drawGhost(g, cupLeftAt(cupX) - 3 * c, cupTop - c, (CUP_W + 6) * c, (CUP_H + 2) * c, paintShakeGhost, styleGhost(GHOST_INK, density));
+  }
 
   /** The tea rising from where it is to the fill line, a beat there, and again (at the line under Reduce Motion). */
   function drawPourGhost(g: CanvasRenderingContext2D, cup: Cup, density: number) {
@@ -4253,25 +4723,31 @@
     drawGhost(g, ghostAt.left, cupTop, CUP_W * c, CUP_H * c, paintPourGhost, styleGhost(TEA_COLORS[cup.order.tea], density));
   }
 
-  /** The ladle as it should be at the drop: hanging straight down over the middle of the cup, loaded. */
-  function drawLadleGhost(g: CanvasRenderingContext2D, cup: Cup, density: number) {
+  /** The drop: the scoop falling from the ladle's bowl into the cup, a beat there, and again (in the cup under Reduce Motion). */
+  function drawDropGhost(g: CanvasRenderingContext2D, cup: Cup, density: number) {
     const c = cell;
-    ghostAt.x = workX();
-    ghostAt.y = cupTop - 5 * c;
-    ghostAt.arm = Math.max(3, Math.round(c * 0.6));
+    const ladle = ladleNow(cup);
+    const from = ladle.by - 2 * c;
+    const to = Math.max(from, Math.round(surfaceY(cup)) - SCOOP_ROWS * c);
+    const t = reduceMotion ? 1 : clamp((lessonClock % 1.4) / 0.7, 0, 1);
+    ghostAt.x = ladle.bx;
+    ghostAt.y = Math.round(lerp(from, to, t * t));
     ghostAt.art = TOPPING_ART[cup.queue[cup.drops.length] ?? cup.chosen];
-    const half = (LADLE_BOWL[0].length / 2 + 1) * c;
-    drawGhost(g, ghostAt.x - half, ghostAt.y - 10 * c, 2 * half, 14 * c, paintLadleGhost, styleGhost(GHOST_INK, density));
+    const half = (SCOOP_COLS / 2 + 1) * c;
+    drawGhost(g, ladle.bx - half, from - c, 2 * half, to - from + (SCOOP_ROWS + 2) * c, paintDropGhost, styleGhost(GHOST_INK, density));
   }
 
-  /** The needle where a stamp seals cleanly: the middle of the band. */
-  function drawNeedleGhost(g: CanvasRenderingContext2D, density: number) {
+  /** The stamp: the press plate coming down from where it hovers onto the rim, a beat there, and again (down under Reduce Motion). */
+  function drawPressGhost(g: CanvasRenderingContext2D, density: number) {
     const c = cell;
-    const band = rulesFor(expert).sealBand;
-    ghostAt.width = GAUGE_COLS * c;
-    ghostAt.left = Math.round(cupX + (CUP_W / 2 + 4) * c);
-    ghostAt.y = Math.round(Math.round(cupTop + c) + (1 - (band[0] + band[1]) / 2) * GAUGE_ROWS * c);
-    drawGhost(g, ghostAt.left - c, ghostAt.y - 2 * c, ghostAt.width + 5 * c, 4 * c, paintNeedleGhost, styleGhost(GHOST_INK, density));
+    const hover = cupTop - 4 * c;
+    const landed = cupTop - c;
+    const t = reduceMotion ? 1 : clamp((lessonClock % 1.4) / 0.5, 0, 1);
+    ghostAt.width = (CUP_W + 4) * c;
+    ghostAt.height = Math.round(1.5 * c);
+    ghostAt.left = Math.round(cupX - (CUP_W / 2 + 2) * c);
+    ghostAt.y = Math.round(lerp(hover, landed, cubicOut(t)) - ghostAt.height);
+    drawGhost(g, ghostAt.left, hover - ghostAt.height - c, ghostAt.width, landed - hover + ghostAt.height + 2 * c, paintPressGhost, styleGhost(GHOST_INK, density));
   }
 
   // --- The test bot (development only) ------------------------------------------------
@@ -4300,6 +4776,11 @@
     if (!autoplay || !running || paused) return;
     const lesson = coach.current;
     if (lesson && !coach.leaving && coach.age < 1 && !holds.size) return;
+    // A line it has nothing to do for (a thing, or a step it can't make yet) is continued, so play never stays stopped.
+    if (lesson && lessonHolds() && coach.age >= (lesson.move ? 3 : 1.5)) {
+      continueLesson();
+      return;
+    }
     const cup = making;
     botView.now = clock;
     botView.holding = holds.size > 0;
@@ -4357,8 +4838,8 @@
     const key = event.key;
     if (!running) return;
 
-    // Enter (not on a focused control) continues past a line that holds.
-    if (key === "Enter" && !isOnControl(event) && coach.current && !coach.current.move && !coach.leaving) {
+    // Enter (not on a focused control) continues past a line that holds play.
+    if (key === "Enter" && !isOnControl(event) && lessonOpen()) {
       event.preventDefault();
       if (!event.repeat) continueLesson();
       return;
@@ -4546,6 +5027,8 @@
     loop.stop();
     coach.dismiss();
     lessons.cue = null;
+    lessons.waiting = null;
+    beckonGuest = -1;
     // The shop comes back to full light behind the results.
     lessonDim = 0;
     dimOthers = false;
@@ -4619,10 +5102,15 @@
     autoplay = devBot();
     lessons.cue = null;
     coachLesson = null;
-    lessons.held.clear();
+    coachEnded = false;
+    lessonShown = false;
     lessons.announced.clear();
     settle = null;
     lessons.quiet = 0;
+    lessons.calm = 0;
+    lessons.waiting = null;
+    ticketTaken = false;
+    beckonGuest = -1;
     lessonDim = 0;
     begunAt = 0;
     sfxCountdown(COUNTDOWN_SECONDS);
@@ -4925,6 +5413,10 @@
                   </span>
                   <span class="ou-patience" class:is-low={share <= CROSS_AT} style={`--left: ${share}`}></span>
                 </button>
+                {#if beckonGuest === guest.id && running && !paused}
+                  <!-- The ticket to take: pixel brackets stepping in and out round it. -->
+                  <span class="ou-beckon" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                {/if}
               </li>
           {/each}
         </ol>
@@ -4956,7 +5448,7 @@
               {#if iceOpen && iceCount > 0}
                 <button
                   type="button"
-                  class="boba-btn secondary ou-chip"
+                  class="boba-key ou-chip"
                   class:is-dim={dimOthers && !litLess}
                   aria-label="Take a cube of ice out"
                   aria-keyshortcuts="ArrowDown"
@@ -5001,7 +5493,7 @@
                   <button
                     bind:this={brewEls[index]}
                     type="button"
-                    class="boba-btn secondary ou-chip"
+                    class="boba-key ou-chip"
                     class:is-dim={dimOthers && litTap !== index}
                     aria-label={`Brew ${TEA_NAMES[tea]}`}
                     disabled={!running}
@@ -5158,13 +5650,15 @@
         </div>
       </div>
 
-      <!-- The hand: one big button for whatever the station needs, then the
-           dump and the free samples. -->
+      <!-- The hand: one big key for whatever the station needs, then the
+           dump and the free samples, set on the counter as pixel keys. -->
       <div class="ou-hand">
         <button
+          bind:this={handEl}
           type="button"
-          class="boba-btn ou-hand-btn"
+          class="boba-key is-primary ou-hand-btn"
           class:is-lit={handLit}
+          class:is-down={handHeld}
           class:is-dim={dimOthers && !litHand}
           disabled={!handLive}
           on:mousedown={keepFocus}
@@ -5197,7 +5691,7 @@
         </button>
         <button
           type="button"
-          class="boba-btn secondary"
+          class="boba-key"
           class:is-dim={dimOthers}
           aria-keyshortcuts="Backspace"
           disabled={!handLive}
@@ -5209,7 +5703,7 @@
         <button
           bind:this={sampleEl}
           type="button"
-          class="boba-btn secondary ou-sample"
+          class="boba-key ou-sample"
           class:is-lit={sampleLit}
           class:is-dim={dimOthers && !litSample}
           aria-keyshortcuts="S"
@@ -5238,12 +5732,14 @@
     width={coachWidth}
     height={coachHeight}
     bind:slipW={coachSlipW}
+    bind:slipH={coachSlipH}
     scene={coachScene}
     leaving={coachLeaving}
+    ended={coachEnded}
     hidden={paused || gameOver}
     top={coachTop}
     touch={touchUI}
-    continuable={!!coachLesson && !coachLesson.move && coachOpen}
+    continuable={!!coachLesson && coachOpen}
     on:continue={continueLesson}
     returnFocus={focusPlayfield}
   />
@@ -5328,12 +5824,6 @@
     filter: saturate(0.8);
   }
 
-  /* On touch, the pad a lesson is about: an accent ring, like a finger on it. */
-  .ou-hand-btn.is-lit,
-  .ou-sample.is-lit {
-    box-shadow: 0 0 0 3px var(--b-accent);
-  }
-
   /* No paper wash behind the tickets: they sit on the ceiling. The shared
      sheet carries the same rule; this keeps it if that changes. */
   .boba-hud.is-bare::before {
@@ -5395,7 +5885,56 @@
   }
 
   .ou-slot {
+    position: relative;
     min-width: 0;
+  }
+
+  /* The ticket to take, while the walk-through waits for it: four pixel
+     corner brackets in the accent round the slip, stepping out a cell and
+     back in (still under Reduce Motion). */
+  .ou-beckon {
+    position: absolute;
+    inset: -0.5rem;
+    z-index: 3;
+    pointer-events: none;
+    animation: ou-beckon 0.9s steps(1, end) infinite;
+  }
+
+  .ou-beckon i {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border: 0 solid #e85d4c;
+  }
+
+  .ou-beckon i:nth-child(1) {
+    top: 0;
+    left: 0;
+    border-width: 3px 0 0 3px;
+  }
+
+  .ou-beckon i:nth-child(2) {
+    top: 0;
+    right: 0;
+    border-width: 3px 3px 0 0;
+  }
+
+  .ou-beckon i:nth-child(3) {
+    bottom: 0;
+    left: 0;
+    border-width: 0 0 3px 3px;
+  }
+
+  .ou-beckon i:nth-child(4) {
+    right: 0;
+    bottom: 0;
+    border-width: 0 3px 3px 0;
+  }
+
+  @keyframes ou-beckon {
+    50% {
+      inset: -0.75rem;
+    }
   }
 
   .ou-guest {
@@ -5680,15 +6219,15 @@
     transform: translate(-50%, -110%);
   }
 
-  /* Brew and Less: a compact chip straddling the button's bottom edge. */
+  /* Brew and Less: a small pixel key straddling the machine's bottom edge. */
   .ou-chip {
     position: absolute;
     z-index: 1;
     inset: auto 0 -0.625rem;
     width: fit-content;
-    min-height: 1.25rem;
+    min-height: 1.375rem;
     margin-inline: auto;
-    padding: 0 var(--space-2);
+    padding: 0 var(--space-2) 4px;
     font-size: 0.6875rem;
   }
 
@@ -6120,22 +6659,66 @@
     transition: filter 180ms var(--ease-standard);
   }
 
-  /* Buttons keep their own lift as well. */
-  .ou-hand > :global(.boba-btn),
+  /* Keys press at once (pixel things step); only the dim eases. */
+  .ou-hand > .boba-key,
   .ou-chip {
-    transition:
-      transform var(--motion-base) var(--ease-emphasized),
-      filter 180ms var(--ease-standard);
+    transition: filter 180ms var(--ease-standard);
   }
 
   /* --- The hand --- */
 
+  /* The keys throw a hard shadow on the wood below them. It is cast by the
+     row, since a key's own filter would be cut away by its stepped outline. */
   .ou-hand {
     display: flex;
     flex: none;
     align-items: center;
     justify-content: center;
     gap: var(--space-4);
+    filter: drop-shadow(0 3px 0 rgb(20 10 6 / 0.45));
+  }
+
+  /* The hand's keys are set on the counter's wood: the shared pixel key
+     (dark face, a foot it presses into, the hand's face in the accent), in
+     a row like the labels they replace, at the same sizes. */
+  .ou-hand .boba-key {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-1-5);
+    min-height: 2.5rem;
+    padding: 0 var(--space-4) 4px;
+    white-space: nowrap;
+  }
+
+  .ou-hand .boba-key:not(:disabled):is(:active, .is-down) {
+    padding-bottom: 2px;
+  }
+
+  /* The shared ring is the accent, which vanishes on the hand's accent face: there it is cream. */
+  .ou-hand .boba-key.is-primary:focus-visible {
+    box-shadow:
+      inset 0 0 0 2px #fdf8f3,
+      inset 0 -4px 0 var(--key-foot);
+  }
+
+  /* On touch, the pad a lesson is about: a cream ring inside its face, like a finger on it. */
+  .ou-hand .boba-key.is-lit {
+    box-shadow:
+      inset 0 0 0 3px #fdf8f3,
+      inset 0 -4px 0 var(--key-foot);
+  }
+
+  .ou-hand .boba-key.is-lit:not(:disabled):is(:active, .is-down) {
+    box-shadow:
+      inset 0 0 0 3px #fdf8f3,
+      inset 0 -2px 0 var(--key-foot);
+  }
+
+  /* On the hand's accent face, a mark past what the ticket asked for prints dark. */
+  .ou-cubes.is-hand :is(.ou-cube, .ou-drop).is-over {
+    background: #2a2422;
   }
 
   .ou-pips {
@@ -6155,11 +6738,7 @@
     background: transparent;
   }
 
-  .ou-hand .boba-btn {
-    flex: none;
-  }
-
-  .ou-hand-btn {
+  .ou-hand .ou-hand-btn {
     min-width: min(15rem, 50%);
     min-height: 3.5rem;
     padding-inline: var(--space-6);
@@ -6346,7 +6925,7 @@
       gap: var(--space-2);
     }
 
-    .ou-hand .boba-btn {
+    .ou-hand .boba-key {
       flex: none;
       padding-inline: var(--space-2-5);
     }
@@ -6368,7 +6947,8 @@
 
   @media (prefers-reduced-motion: reduce) {
     .ou-receipt,
-    .ou-stamp {
+    .ou-stamp,
+    .ou-beckon {
       animation: none;
     }
 
@@ -6378,11 +6958,17 @@
     .ou-card-patience,
     .ou-brew-bar,
     .ou-card,
-    .ou-hand > :global(.boba-btn),
+    .ou-hand > .boba-key,
     .ou-slot,
     .ou-chip,
     .ou-tap-star {
       transition: none;
+    }
+
+    /* A pressed key still sinks into its foot, without travelling. */
+    .ou-hand .boba-key:not(:disabled):is(:active, .is-down),
+    .ou-chip:not(:disabled):active {
+      transform: none;
     }
   }
 </style>

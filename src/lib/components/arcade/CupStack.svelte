@@ -40,8 +40,9 @@
     bestCallout,
     createStackLessons,
     ghostSpan,
-    lessonsFor,
     roomUnderSlice,
+    sliceReadSeconds,
+    slideOnto,
     towerCallout,
   } from "#lib/arcade/stack-lessons.js";
   import {
@@ -259,8 +260,9 @@
 
   // Lessons, once per device (stack-lessons.js says what and when, and keeps
   // them in order; the coach shows one at a time and remembers them). In
-  // normal each is an explanation that slows the game until Continue or a
-  // drop; in expert nothing ever slows, so its board's timing is untouched.
+  // normal each one stops play until Continue (the first cup's, with the cup
+  // on its ghost, until the drop); in expert nothing ever slows or stops, so
+  // its board's timing is untouched.
   const coach = createCoach("stack");
   const lessons = createStackLessons(coach);
   /** The coach's lesson, whether it is fading, and where its callout points, copied out so the page follows them. */
@@ -277,6 +279,8 @@
   /** Held out of sight while it has nowhere clear to go and the camera is still moving the row. */
   let coachHeld = false;
   let coachContinuable = false;
+  /** The lesson is over (done, or on its way out): the callout holds where it is. */
+  let coachEnded = false;
   /**
    * The callout's slip as measured, and which lesson it was measured for:
    * it wraps on a narrow screen, and its Continue button can wrap under the
@@ -1656,14 +1660,15 @@
     if (ghostSprite) g.drawImage(ghostSprite, -SPRITE_PAD, -SPRITE_PAD);
   };
 
-  /** The first cup's lesson is up, so its ghost shows. */
+  /** The first cup's ghost is waiting for it, or its lesson is up: the ghost shows. */
   const firstCupTaught = () => playing && tower.length === 1 && lessons.firstCup;
 
   /**
    * The first cup's target: a dithered cream ghost of the sliding cup, in the
    * row it slides in, exactly where a perfect drop lands, so covering it is
    * the drop. It is placed by the same rule as every cup (`drawCup`), with its
-   * dither on the cup's own cells, and drawn under the sliding cup.
+   * dither on the cup's own cells, and drawn under the sliding cup, which in
+   * normal stops on it as its line comes up. It beckons in real time.
    */
   function drawFirstGhost(c: CanvasRenderingContext2D) {
     if (!ghost || !firstCupTaught()) return;
@@ -1750,10 +1755,10 @@
     if (lesson.id === "trim" && taughtPiece) {
       if (trimFor !== taughtPiece) {
         // Chosen once: room under the slice for as long as the line needs
-        // reading, allowing for a row of the tower's climb.
+        // reading (it hangs still while its line stops play), allowing for a
+        // row of the tower's climb.
         trimFor = taughtPiece;
-        const minLife = lessonsFor(rules).trim.minLife ?? 0;
-        trimBelow = roomUnderSlice(zoomY(taughtPiece.y + cupH / 2) + cupH, viewH, slipH, minLife);
+        trimBelow = roomUnderSlice(zoomY(taughtPiece.y + cupH / 2) + cupH, viewH, slipH, sliceReadSeconds(rules));
       }
       if (trimBelow) {
         at = { side: "below", x: zoomX(taughtPiece.x), y: zoomY(taughtPiece.y + cupH / 2 + 4), width: 0, top: playTop, squeezed: false };
@@ -1777,15 +1782,28 @@
     if (coachWidth !== width) coachWidth = width;
     if (coachTop !== at.top) coachTop = at.top;
     if (coachHeld !== held) coachHeld = held;
+    const ended = coach.leaving || coach.acting;
+    if (coachEnded !== ended) coachEnded = ended;
     // Ink marks over pale sky, cream over dark, as the popups do.
     const scene = skyLumAt(y) > 0.5 ? "light" : "dark";
     if (coachScene !== scene) coachScene = scene;
   }
 
-  /** Continue: the explanation up is learned and play eases back to speed. Returns whether there was one. */
+  /** Continue: the line up is learned and play eases back to speed. Returns whether there was one. */
   function continueLesson() {
     if (!playing || paused || gameOver) return false;
     return lessons.proceed();
+  }
+
+  /**
+   * Space, a tap or a click: the drop. While a line has play stopped, the
+   * cup is stopped wherever the line found it, so the press continues the
+   * line instead (once it has been up a moment); the first cup's line is
+   * the exception, as its drop is the move (`lessons.press`).
+   */
+  function press() {
+    if (!playing || paused || gameOver) return;
+    if (lessons.press() === "drop") drop();
   }
 
   /** How far the spotlight is up, 0..1, eased in real time (at once under Reduce Motion). */
@@ -2002,8 +2020,8 @@
   /** One step of play, in real seconds: the slide, the camera, the falling slices, the sky. */
   function update(dt: number, rawDt = dt) {
     // The lessons age in real (uncapped) time and offer the best line as it
-    // comes down toward the tower. In normal an explanation slows the game
-    // while it is up (`gameDt`, never more than `dt`); in expert the game
+    // comes down toward the tower. In normal a line stops the game while it
+    // is up (`gameDt` eases to 0, and back after); in expert the game
     // always runs at its own speed.
     const gameDt = lessons.step(rawDt, dt, playing && previousBest > 0 ? { remaining: previousBest - stacked, ready: bestReady() } : undefined);
     lessonClock += dt;
@@ -2013,17 +2031,29 @@
     if (playing) {
       const top = tower[tower.length - 1];
       track = trackFor(top, halfScreen, slider.width);
-      const moved = stepSlide(slider.left, slider.direction, slider.speed * gameDt, track);
-      slider.left = moved.position;
-      slider.direction = moved.direction;
+      // The first cup's line holds the cup exactly on its ghost while the
+      // rest of the game comes to a stop round it.
+      const distance = lessons.holdsCup ? 0 : slider.speed * gameDt;
+      if (ghost && lessons.ghostDue) {
+        // Normal's first cup slides at full speed until it covers its ghost,
+        // and stops there, never a frame past it, as its line comes up.
+        const moved = slideOnto(slider.left, slider.direction, distance, track, ghost.left);
+        slider.left = moved.position;
+        slider.direction = moved.direction;
+        if (moved.reached) lessons.reachGhost();
+      } else {
+        const moved = stepSlide(slider.left, slider.direction, distance, track);
+        slider.left = moved.position;
+        slider.direction = moved.direction;
+      }
     }
 
     // Keep the sliding cup about a third of the way down the play area.
     const was = camera;
     const desired = playTop + (viewH - playTop) * 0.34;
     const target = playing ? Math.max(0, desired - (groundY - tower.length * cupH)) : 0;
-    // The camera frames in real time, so after a drop in slow motion the row
-    // is back in its place as quickly as ever.
+    // The camera frames in real time, so after a drop just before a line
+    // stops play the row is still brought to its place.
     camera = approach(camera, target, playing ? 6 : 3, dt);
     if (!playing) {
       const towerHeight = tower.length * cupH + 40;
@@ -2039,17 +2069,17 @@
       flashes[index].age += gameDt;
       if (flashes[index].age > 0.35) flashes.splice(index, 1);
     }
-    // The slice the trim lesson names falls slowly (in real time, so the same
-    // in both modes) while it is named, and rides with the tower, so it stays
-    // under the row the next cup slides in. Every other piece falls in the
-    // game's own time.
+    // The slice the trim lesson names falls slowly (in real time) while it
+    // is named, and not at all while its line has play stopped (normal),
+    // and rides with the tower, so it stays under the row the next cup
+    // slides in. Every other piece falls in the game's own time.
     const sliceNamed = taughtPiece !== null && (lessons.pending?.id === "trim" || (coach.current?.id === "trim" && !coach.leaving));
     pieceScale = damp(pieceScale, sliceNamed ? SLICE_SLOW : 1, SLICE_EASE, dt);
     for (let index = pieces.length - 1; index >= 0; index--) {
       const piece = pieces[index];
       let step = gameDt;
       if (piece === taughtPiece) {
-        step = dt * pieceScale;
+        step = Math.min(dt * pieceScale, gameDt);
         piece.y += camera - was;
       }
       piece.vy += SLICE_FALL.gravity * step;
@@ -2147,7 +2177,8 @@
     pieceScale = 1;
     lessonClock = 0;
     nextSlider();
-    // A device's very first cup is taught as it slides, over its ghost.
+    // A device's very first cup is taught as it slides, over its ghost: in
+    // normal play stops as the cup covers it.
     trimFor = null;
     ghost = lessons.begin(rules) ? ghostSpan(tower[0], slider.width) : null;
     setMusicPhase("opening");
@@ -2215,7 +2246,7 @@
   function onPointer(event: PointerEvent) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
-    drop();
+    press();
   }
 
   onMount(() => {
@@ -2250,9 +2281,9 @@
         // Enter is the game's only on the playfield (a focused button keeps its own).
         if (event.key === "Enter" && event.target !== playfield && event.target !== document.body) return;
         event.preventDefault();
-        // While an explanation holds the game slowed, Enter is Continue.
+        // While a line holds the game stopped, Enter is Continue.
         if (event.key === "Enter" && continueLesson()) return;
-        drop();
+        press();
       },
       onResize: sizeCanvas,
       observe: hudRow,
@@ -2346,6 +2377,7 @@
     scene={coachScene}
     width={coachWidth}
     leaving={coachLeaving}
+    ended={coachEnded}
     continuable={coachContinuable}
     on:continue={continueLesson}
     returnFocus={focusPlayfield}

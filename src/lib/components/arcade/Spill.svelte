@@ -72,6 +72,7 @@
     INK as INK_HEX,
     LID as LID_HEX,
     MENU_ICONS,
+    NOTE_BACK,
     PEARL as PEARL_HEX,
     STRAW_PINK,
     arcadeFont,
@@ -85,26 +86,31 @@
   import { clamp } from "#lib/arcade/core/math.ts";
   import { hash2 } from "#lib/arcade/core/rng.ts";
   import { readSpillProgress, writeSpillProgress } from "#lib/arcade/scores.ts";
+  import { DIGITS, GAUGE_CUT, GLYPHS, LABEL_ROWS, WORDS, gaugeFit, gaugeLayout, topLine, tubeColumns } from "#lib/arcade/spill-gauge.js";
   import {
     LESSONS,
     LOW_SHARE,
     ROUTE_ROOM,
     aim,
+    chooseSide,
     continuable as offersContinue,
     createHolds,
     createSpot,
     fillLineY,
     ghostRoute,
+    holds,
+    inItsPart,
+    keepClear,
     knownFrom,
     mayOffer,
     planningLesson,
     resultLesson,
     roomFrame,
     routeVerdict,
-    sideFor,
+    sidesFor,
     wordedFor,
   } from "#lib/arcade/spill-lessons.js";
-  import type { Cue, Lesson } from "#lib/arcade/spill-lessons.js";
+  import type { Cue, Keep, Lesson } from "#lib/arcade/spill-lessons.js";
   import { arcadeExpert } from "#lib/boba.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
@@ -155,6 +161,12 @@
   const SC = 4;
   /** Room for the caption chip (up to two balanced lines) between the tickets and the room. */
   const CAPTION_SPACE = 64;
+  /**
+   * A short, wide screen (a phone on its side): the controls stand in a
+   * cabinet beside the room, with the caption over them, so the room has the
+   * screen's whole height. The same query is in the styles below.
+   */
+  const SIDE_QUERY = "(max-height: 540px) and (min-aspect-ratio: 5/4)";
   /** How far a kettle tips while it pours. */
   const TILT = 0.5;
   const PIPE_TRANSIT = 0.3;
@@ -168,6 +180,8 @@
   const STAR_STAGGER = 0.12;
   /** The reach ring shows below this share, and is at full strength by LOW_SHARE. */
   const RING_SHARE = 0.6;
+  /** Seconds the gauge shakes when straw is refused for want of straw. */
+  const GAUGE_SHAKE = 0.36;
   /** Rooms to a page: the level select keeps a page's rooms side by side. */
   const ROOM_COLUMNS = 3;
 
@@ -194,6 +208,8 @@
   const STEEL_LIGHT = c32("#c9d0d4");
   const STEEL_DARK = c32("#6f777c");
   const STEEL_DEEP = c32("#3a3f44");
+  /** The hole a control is set into, in the counter or the cabinet. */
+  const SOCKET = c32(mixHex("#3a3f44", INK_HEX, 0.45));
   const PINK = c32(STRAW_PINK);
   const PINK_DEEP = c32("#c93a5e");
   const STRIPE_WHITE = c32(CREAM_HEX);
@@ -433,6 +449,7 @@
   let strawUsed = 0;
   let draftUsed = 0;
   let strawSpent: number[] = [];
+  /** Real seconds the gauge has left to shake (a straw refused for want of straw). */
   let gaugeShake = 0;
   let lowAnnounced = false;
   let outAnnounced = false;
@@ -469,6 +486,7 @@
   let hudRow: HTMLElement;
   let barEl: HTMLElement;
   let pourButton: HTMLButtonElement | null = null;
+  let clearButton: HTMLButtonElement | null = null;
   let gaugeEl: HTMLElement | null = null;
   let captionEl: HTMLElement | null = null;
   let verdictEl: HTMLElement | null = null;
@@ -495,6 +513,22 @@
   let hudBottomPx = 72;
   let verdictTop = 200;
   let roomCenterX = 0;
+  /** The controls stand beside the room (a short, wide screen), not under it. */
+  let sideLayout = false;
+  /** Where the caption chip goes: over the room, or over the controls beside it. */
+  let captionStyle = "";
+
+  // The straw gauge, painted into the counter on the kitchen's grid where
+  // its box in the bar sits, measured only on a resize so it never moves
+  // while a room is played: its corner and size in CSS px, its cell size,
+  // and what sits where inside it, in cells.
+  const gaugeBox = { x: 0, y: 0, w: 0, h: 0 };
+  let gaugeUnit = 0;
+  let gauge = gaugeLayout(0);
+  /** The straw's columns this frame, reused. */
+  const tube = { rest: 0, draftTo: 0, marks: [] as number[] };
+  /** The controls' boxes as last measured (CSS px), for the counter's sockets and the callout's keep-clear. */
+  const controlBoxes = { pour: { x: 0, y: 0, w: 0, h: 0 }, clear: { x: 0, y: 0, w: 0, h: 0 } };
 
   let active = true;
   const timers = createTimers();
@@ -705,13 +739,24 @@
     const leftSpace = left - 2;
     const rightStart = right + 2;
     const rightSpace = cols - rightStart - 2;
+    // Beside the room, the cabinet of controls takes the wall's lower part.
+    const cabinet = sideLayout ? cabinetCells() : null;
+    const shelvesEnd = cabinet ? Math.min(wainscotRow, cabinet.y0 - 3) : wainscotRow;
     if (leftSpace >= 12) paintShelves(2, leftSpace, below, wainscotRow, 0);
     if (rightSpace >= 12) {
       const slitW = Math.min(30, rightSpace - 2);
       paintWindow(rightStart + Math.round((rightSpace - slitW) / 2), below + 1, slitW, 5);
       paintLadles(rightStart, rightSpace, below + 10);
-      if (wainscotRow - (below + 28) > 10) paintShelves(rightStart, rightSpace, below + 28, wainscotRow, 1);
+      if (shelvesEnd - (below + 28) > 10) paintShelves(rightStart, rightSpace, below + 28, shelvesEnd, 1);
     }
+
+    // The controls: set into the counter the room stands on, or into the
+    // cabinet beside it, each in a socket of its own.
+    if (cabinet) paintCabinet(cabinet);
+    else paintCounter(floorRow, cols, rows);
+    paintSocket(controlBoxes.pour);
+    paintSocket(controlBoxes.clear);
+    paintSocket(gaugeBox);
 
     kitchenCols = cols;
     kitchenRows = rows;
@@ -815,6 +860,85 @@
         rect(x - 1, y + 4 + length, 3, 1, dark);
       }
     }
+  }
+
+  /**
+   * The counter the room stands on, the width of the kitchen: a steel
+   * worktop with a lit lip, and its front in brushed panels down to a kick
+   * strip, over the last of the floor. The controls are set into its front.
+   */
+  function paintCounter(top: number, cols: number, rows: number) {
+    const kick = Math.max(top + 4, rows - 3);
+    rect(0, top, cols, 1, STEEL_LIGHT);
+    rect(0, top + 1, cols, 1, STEEL);
+    rect(0, top + 2, cols, 1, INK);
+    rect(0, top + 3, cols, kick - top - 3, STEEL_DARK);
+    // The lip's shadow on the front, and a seam between panels now and then.
+    dither(0, top + 3, cols, 1, STEEL_DEEP, 0.5);
+    const seamLight = c32(mixHex("#6f777c", "#9aa3a8", 0.5));
+    for (let x = 7; x < cols; x += 37) {
+      rect(x, top + 4, 1, kick - top - 4, STEEL_DEEP);
+      rect(x + 1, top + 4, 1, kick - top - 4, seamLight);
+    }
+    rect(0, kick, cols, 1, STEEL_DEEP);
+  }
+
+  /** The cabinet beside the room, in cells: round the controls with a margin, on the wall. */
+  function cabinetCells() {
+    const bar = barEl?.getBoundingClientRect();
+    if (!bar) return null;
+    return {
+      x0: Math.floor(bar.left / SC) - 3,
+      y0: Math.floor(bar.top / SC) - 3,
+      x1: Math.ceil(bar.right / SC) + 3,
+      y1: Math.ceil(bar.bottom / SC) + 3,
+    };
+  }
+
+  /**
+   * A steel cabinet hung on the wall beside the room, the controls set into
+   * its front: an ink outline, a lit top lip, a rivet in each corner, and
+   * its shadow on the wall, down and to the right like the room's.
+   */
+  function paintCabinet(box: { x0: number; y0: number; x1: number; y1: number }) {
+    const { x0, y0, x1, y1 } = box;
+    const shade = c32(mixHex(WALL_HEX, SOFFIT_HEX, 0.55));
+    for (let y = y0 + 2; y <= y1; y++) {
+      for (let x = x0 + 2; x <= x1; x++) {
+        if (x < x1 && y < y1) continue;
+        if (bayer(x, y) < 0.5) put(x, y, shade);
+      }
+    }
+    rect(x0, y0, x1 - x0, y1 - y0, INK);
+    rect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, STEEL_DARK);
+    rect(x0 + 1, y0 + 1, x1 - x0 - 2, 1, STEEL_LIGHT);
+    rect(x0 + 1, y0 + 2, x1 - x0 - 2, 1, STEEL);
+    dither(x0 + 1, y0 + 3, x1 - x0 - 2, 1, STEEL_DEEP, 0.5);
+    for (const [x, y] of [
+      [x0 + 2, y0 + 4],
+      [x1 - 3, y0 + 4],
+      [x0 + 2, y1 - 3],
+      [x1 - 3, y1 - 3],
+    ]) {
+      put(x, y, STEEL_LIGHT);
+      put(x + 1, y + 1, STEEL_DEEP);
+    }
+  }
+
+  /**
+   * The socket a control sits in, a cell round its box (CSS px): a dark
+   * hole with stepped corners and the light on its lower lip, so a key
+   * pressed down sinks into it.
+   */
+  function paintSocket(box: { x: number; y: number; w: number; h: number }) {
+    if (box.w <= 0 || box.h <= 0) return;
+    const x0 = Math.floor(box.x / SC) - 1;
+    const y0 = Math.floor(box.y / SC) - 1;
+    const x1 = Math.ceil((box.x + box.w) / SC) + 1;
+    const y1 = Math.ceil((box.y + box.h) / SC) + 1;
+    rect(x0 + 1, y0, x1 - x0 - 2, y1 - y0, SOCKET);
+    rect(x0, y0 + 1, x1 - x0, y1 - y0 - 2, SOCKET);
+    rect(x0 + 1, y1 - 1, x1 - x0 - 2, 1, STEEL);
   }
 
   // --- The room's static layer -------------------------------------------------------
@@ -2199,9 +2323,15 @@
   let coachY: number | null = null;
   let coachRing = 0;
   let coachWidth = 0;
+  let coachHeight = 0;
   let coachSide: Side = "above";
   let coachScene: "dark" | "light" = "light";
   let coachContinuable = false;
+  /** The lesson is over (done, or its move made): the callout holds where it is as it goes. */
+  let coachEnded = false;
+  /** The slip's size as Coach measures it (0 until the slip for the lesson up has been laid out). */
+  let coachSlipW = 0;
+  let coachSlipH = 0;
   /** The room's name chip steps aside while a lesson is up, unless the lesson is about it. */
   let captionHidden = false;
   /** The lesson up holds the room this frame. */
@@ -2210,10 +2340,8 @@
   let lessonExplains = false;
   /** Each lesson's hold allowance for the visit. */
   const lessonHold = createHolds(expert);
-  /** Moves set aside with Continue this visit: not learned, and not shown again until the game opens again. */
-  const skipped = new Set<string>();
-  /** What planning may still teach: learned, or set aside for the visit. */
-  const settledLesson = (id: string) => coach.learned(id) || skipped.has(id);
+  /** What planning has settled: what the device has learned (a move continued past counts as learned). */
+  const settledLesson = (id: string) => coach.learned(id);
   /** Pour was pressed: planning is over, and nothing holds the room until the next one. */
   let pourLatched = false;
   /** Real seconds since the last lesson came down, so two never run together. */
@@ -2246,12 +2374,21 @@
   const litPool: FocusBox[] = [];
   const litBoxes: FocusBox[] = [];
   /** A control's box, measured as its lesson starts and after a resize, not every frame. */
-  let placeRect: DOMRect | null = null;
+  let placeRect: { x: number; y: number; w: number; h: number } | null = null;
   /** The cue the callout has been placed for, so one never shows before it has a place. */
   let placedCue: Cue | null = null;
+  /** The slip size the side was last chosen for (0 before it has been measured). */
+  let sizedW = 0;
+  let sizedH = 0;
+  /**
+   * Real seconds after a lesson goes up in which its side may still be
+   * chosen again as its slip is measured (the slip steps in over this long,
+   * and its Continue key may arrive a frame after its words); then it is kept.
+   */
+  const SIDE_SETTLES = 0.4;
   /** The chalk's ink. */
   const CHALK = INK_HEX;
-  /** Roughly the slip's size, for choosing a side it fits on (Coach keeps it on screen either way). */
+  /** Roughly the slip's size, for choosing a side before it has been measured. */
   const SLIP_W = 260;
   const SLIP_H = 72;
 
@@ -2259,6 +2396,8 @@
     cue = next;
     placeRect = null;
     placedCue = null;
+    // Its slip is measured afresh.
+    coachSlipW = coachSlipH = 0;
     // A lesson takes the room name's place: one message at a time.
     if (caption && captionLife === INTRO_SECONDS) caption = null;
     if (next.target.kind === "route") buildGhost();
@@ -2340,17 +2479,36 @@
     lessonHolds = false;
   }
 
+  /** Whether the lesson up belongs to the part of the room being played, so it may hold it. */
+  function holdableNow() {
+    const lesson = coach.current;
+    return !!cue && cue.lesson === lesson && inItsPart(lesson, { phase, status: world.status, poured: pourLatched });
+  }
+
   /**
-   * Whether the lesson up holds the room this frame: the dial while the
-   * room is still planning and Pour hasn't been pressed, or the next room
-   * while a result is explained, out of the lesson's allowance for the visit.
+   * Whether the lesson up holds the room this frame, out of its allowance
+   * for the visit: the dial and all while the room is still planning and
+   * Pour hasn't been pressed, the tea where it is while the pour is
+   * explained, or the next room while a result is explained.
    * @param dt Real seconds this frame.
    */
   function updateHold(dt: number) {
+    lessonHolds = lessonHold.take(coach.current, { leaving: coach.leaving, acting: coach.acting, holdable: holdableNow() }, dt);
+  }
+
+  /**
+   * A lesson that holds the room has just gone up (on a step mid-frame): the
+   * room stops on that step, not a few steps on.
+   */
+  function stopsHere() {
     const lesson = coach.current;
-    const ours = !!cue && cue.lesson === lesson;
-    const holdable = ours && (phase === "result" ? lesson?.during === "result" : world.status === "waiting" && !pourLatched);
-    lessonHolds = lessonHold.take(lesson, { leaving: coach.leaving, acting: coach.acting, holdable }, dt);
+    return (
+      phase === "play" &&
+      holdableNow() &&
+      holds(lesson, { leaving: coach.leaving, acting: coach.acting, expert }) &&
+      !!lesson &&
+      lessonHold.left(lesson.id) > 0
+    );
   }
 
   /**
@@ -2367,20 +2525,16 @@
 
   /**
    * The player has read it: Continue (Enter on the playfield, the slip's
-   * button, or a result's own keys) ends it. A line about a thing counts as
-   * learned; a move skipped is only set aside for the visit, since nothing
-   * has been made to work (room 1's route is learned if the room then clears).
+   * button, or a result's own keys) ends it and lets the room run on. It
+   * counts as learned, a move continued past (room 1's route) as much as a
+   * line about a thing: the player has said they know it.
    */
   function continueLesson() {
     if (!coachContinuable || paused || levelsOpen) return;
     const lesson = coach.current;
     if (!lesson) return;
-    if (lesson.move) {
-      skipped.add(lesson.id);
-      coach.dismiss();
-      cue = null;
-      lessonHolds = false;
-    } else coach.done(lesson.id);
+    coach.done(lesson.id);
+    lessonHolds = false;
     coachContinuable = false;
   }
 
@@ -2405,24 +2559,47 @@
     }
   }
 
+  /** A DOM element's box, in CSS px. */
+  function boxOf(element: Element | null | undefined) {
+    if (!element?.isConnected) return null;
+    const r = element.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
+  }
+
+  /** The slip's size, once Coach has laid out the slip for the lesson up. */
+  function measuredSlip() {
+    return coachSlipW > 0 && coachSlipH > 0 ? { w: coachSlipW, h: coachSlipH } : null;
+  }
+
   /**
-   * The side of a room point whose slip fits on screen, clear of the loop:
-   * the side asked for, then the other above or below, then right, then left.
+   * What the callout keeps clear of, in CSS px, each with what covering it
+   * costs: the lesson's own things, the cups, the kettles and the tea (or
+   * where it will fall) from the room, the controls (most of all the one
+   * the lesson is about), and the verdict while it is up.
    */
-  function pickSide(prefer: "above" | "below", x: number, y: number, ring: number, width: number): Side {
-    const vertical = ring * 0.875 + 14;
-    const loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
-    const across = Math.max(ring * 0.8, loopW / 2, width) + 14;
-    const barTop = barEl ? barEl.getBoundingClientRect().top : viewH;
-    const fits: Record<Side, boolean> = {
-      above: y - vertical - SLIP_H >= hudBottomPx + 8,
-      below: y + vertical + SLIP_H <= barTop - 8,
-      right: x + across + SLIP_W <= viewW - 16,
-      left: x - across - SLIP_W >= 16,
-    };
-    const order: Side[] = prefer === "above" ? ["above", "below", "right", "left"] : ["below", "above", "right", "left"];
-    for (const side of order) if (fits[side]) return side;
-    return prefer;
+  function keepClearOnScreen(target: Cue["target"], about: string): Keep[] {
+    const out: Keep[] = keepClear(world, spot, target).map((box) => ({ x: rx + box.x * S, y: ry + box.y * S, w: box.w * S, h: box.h * S, weight: box.weight }));
+    // A control is out of the room: better covered for a moment than a cup or the tea.
+    out.push({ ...controlBoxes.pour, weight: about === "pour" ? 4 : 0.25 });
+    out.push({ ...controlBoxes.clear, weight: 0.25 });
+    out.push({ ...gaugeBox, weight: about === "gauge" ? 4 : 0.25 });
+    const shownVerdict = verdict ? boxOf(verdictEl) : null;
+    if (shownVerdict && about !== "verdict") out.push({ ...shownVerdict, weight: 1.5 });
+    return out;
+  }
+
+  /**
+   * The side the slip goes on: the one, of those this lesson would take,
+   * whose slip covers least of what it should keep clear of (Coach then
+   * only keeps it on screen). `slip` is its size, measured once it is up.
+   */
+  function pickSide(target: Cue["target"], anchor: { x: number; y: number; ring: number; width: number; height: number }, slip: { w: number; h: number }): Side {
+    let prefer: Side[];
+    if (spot.place === "room") prefer = sidesFor(target, spot, room);
+    else if (spot.place === "pour" || spot.place === "gauge") prefer = sideLayout ? ["left", "above", "below", "right"] : ["above", "right", "left", "below"];
+    else if (spot.place === "caption" && sideLayout) prefer = ["left", "above", "below", "right"];
+    else prefer = ["below", "above", "right", "left"];
+    return chooseSide(anchor, slip, { w: viewW, h: viewH, top: hudBottomPx + 8 }, keepClearOnScreen(target, spot.place), prefer);
   }
 
   /** Where the callout goes this frame, and what the spotlight keeps lit. */
@@ -2442,25 +2619,26 @@
     let y: number | null = null;
     let ring = 0;
     let width = 0;
-    let side: Side = "above";
+    let height = 0;
     let scene: "dark" | "light" = "light";
     if (found && spot.place === "room") {
       x = rx + spot.x * S;
       y = ry + spot.y * S;
       ring = spot.ring * S;
       width = spot.wide * S;
-      // A side that fits, chosen as the lesson goes up and kept, so the slip doesn't hop.
-      side = placedCue === cue ? coachSide : pickSide(sideFor(target, spot, room), x, y, ring, width);
+      height = spot.tall * S;
     } else if (found) {
-      const element = spot.place === "pour" ? pourButton : spot.place === "gauge" ? gaugeEl : spot.place === "verdict" ? verdictEl : captionEl;
-      if (!placeRect && element?.isConnected) placeRect = element.getBoundingClientRect();
+      // A control (the straw gauge is painted, so its box is the painted one) or a chip.
+      if (!placeRect) {
+        if (spot.place === "gauge") placeRect = gaugeBox.w > 0 ? { ...gaugeBox } : null;
+        else placeRect = boxOf(spot.place === "pour" ? pourButton : spot.place === "verdict" ? verdictEl : captionEl);
+      }
       if (placeRect) {
-        x = placeRect.left + placeRect.width / 2;
-        y = placeRect.top + placeRect.height / 2;
-        ring = (placeRect.height / 2 + 4) / 0.875;
-        width = placeRect.width / 2 + 2 > ring * 1.15 ? placeRect.width / 2 - 4 : 0;
-        // The bar is under the room: its slip goes above, over the floor's dark tiles.
-        side = spot.place === "pour" || spot.place === "gauge" ? "above" : "below";
+        x = placeRect.x + placeRect.w / 2;
+        y = placeRect.y + placeRect.h / 2;
+        ring = (placeRect.h / 2 + 4) / 0.875;
+        width = placeRect.w / 2 + 2 > ring * 1.15 ? placeRect.w / 2 - 4 : 0;
+        // The controls sit on the counter's dark steel: the tail prints cream there.
         scene = spot.place === "pour" || spot.place === "gauge" ? "dark" : "light";
       }
     }
@@ -2473,17 +2651,35 @@
         return;
       }
     } else {
+      // The side is chosen as the lesson goes up, chosen again as the slip
+      // is measured while it steps in, then kept, so it doesn't hop as it follows.
+      let side = coachSide;
+      const anchor = { x, y, ring, width, height };
+      if (placedCue !== cue) {
+        side = pickSide(target, anchor, { w: Math.min(SLIP_W, viewW - 32), h: SLIP_H });
+        sizedW = sizedH = 0;
+      } else if (coach.age < SIDE_SETTLES) {
+        const slip = measuredSlip();
+        if (slip && (slip.w !== sizedW || slip.h !== sizedH)) {
+          side = pickSide(target, anchor, slip);
+          sizedW = slip.w;
+          sizedH = slip.h;
+        }
+      }
       placedCue = cue;
       if (x !== coachX) coachX = x;
       if (y !== coachY) coachY = y;
       if (ring !== coachRing) coachRing = ring;
       if (width !== coachWidth) coachWidth = width;
+      if (height !== coachHeight) coachHeight = height;
       if (side !== coachSide) coachSide = side;
       if (scene !== coachScene) coachScene = scene;
     }
     const shown = wordedFor(lesson, inputMode);
     if (coachLesson !== shown) coachLesson = shown;
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
+    const ended = coach.leaving || coach.acting;
+    if (ended !== coachEnded) coachEnded = ended;
     const canContinue = offersContinue(lesson, lessonHolds);
     if (coachContinuable !== canContinue) coachContinuable = canContinue;
     const hideCaption = target.kind !== "caption";
@@ -2565,7 +2761,129 @@
       box.h = from.h * S;
       litBoxes.push(box);
     }
+    // The gauge is painted on the counter, so it stays lit with what its lesson is about.
+    if (barLit === "gauge" && gaugeBox.w > 0) {
+      gaugeLit.x = gaugeBox.x - SC;
+      gaugeLit.y = gaugeBox.y - SC;
+      gaugeLit.w = gaugeBox.w + SC * 2;
+      gaugeLit.h = gaugeBox.h + SC * 2;
+      litBoxes.push(gaugeLit);
+    }
     drawSpotlight(ctx, viewW, viewH, litBoxes, lessonDim, { color: INK_HEX, cell: SC });
+  }
+
+  const gaugeLit: FocusBox = { x: 0, y: 0, w: 0, h: 0 };
+
+  // --- The straw gauge ------------------------------------------------------------------
+
+  const GAUGE_RULE = "rgba(253, 248, 243, 0.32)";
+  const GAUGE_QUIET = "rgba(253, 248, 243, 0.62)";
+  /** The accent, a step lighter, so "low" and "out" read on the dark chip. */
+  const GAUGE_WARN = "#f18272";
+  const GAUGE_SPENT = "rgba(253, 248, 243, 0.2)";
+  const GAUGE_MARK = "rgba(253, 248, 243, 0.42)";
+  /** The straw's stripes: as the straws in the room, coral once low, and pale while a stroke is being drawn. */
+  const STRAW_STRIPES = [STRAW_PINK, CREAM_HEX] as const;
+  const LOW_STRIPES = ["#e85d4c", "#b8402f"] as const;
+  const DRAFT_STRIPES = ["#ffb0c0", CREAM_HEX] as const;
+  /** The top line as last laid out, kept until the figure or the state changes. */
+  let gaugeLine: ReturnType<typeof topLine> = [];
+  let gaugeLineKey = "";
+
+  /** Prints a word in the pixel alphabet, or a figure in the gauge's digits, a cell of `u` px at a time. */
+  function printCells(text: string, digits: boolean, x: number, y: number, u: number, color: string) {
+    if (!ctx) return;
+    ctx.fillStyle = color;
+    let at = 0;
+    for (const letter of text) {
+      const glyph: readonly string[] | undefined = digits ? DIGITS[letter as keyof typeof DIGITS] : GLYPHS[letter];
+      if (glyph) {
+        for (let row = 0; row < LABEL_ROWS; row++) {
+          for (let col = 0; col < glyph[row].length; col++) {
+            if (glyph[row][col] === "#") ctx.fillRect(x + (at + col) * u, y + row * u, u, u);
+          }
+        }
+      }
+      at += (glyph?.[0].length ?? 3) + 1;
+    }
+  }
+
+  /**
+   * The straw gauge, painted on the counter (or the cabinet) in the kitchen's
+   * pixels: a dark chip like the callout's, "straw" and the figure left over
+   * a pixel straw that shortens from the right as straw is spent. Low, the
+   * straw goes coral, the chip's rule blinks in the accent and it says "low";
+   * out, it says "out". Read straight from the room each frame, so the
+   * stroke being drawn eats into it live. Under Reduce Motion nothing blinks
+   * or shakes.
+   */
+  function drawGauge() {
+    if (!ctx || !gaugeUnit) return;
+    const u = gaugeUnit;
+    const shaking = gaugeShake > 0 && !reduceMotion;
+    const x = gaugeBox.x + (shaking ? (Math.floor(gaugeShake * 28) % 2 ? u : -u) : 0);
+    const y = gaugeBox.y;
+    const w = gaugeBox.w;
+    const h = gaugeBox.h;
+    const cut = GAUGE_CUT * u;
+    const left = Math.max(0, strawBudget - strawUsed - draftUsed);
+    const state = left < 0.5 ? "out" : strawBudget > 0 && left / strawBudget < LOW_SHARE ? "low" : "ok";
+
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = NOTE_BACK;
+    ctx.fillRect(x + cut, y, w - cut * 2, h);
+    ctx.fillRect(x, y + cut, w, h - cut * 2);
+    ctx.fillStyle = state !== "ok" && (reduceMotion || Math.floor(clock * 4) % 2 === 0) ? GAUGE_WARN : GAUGE_RULE;
+    ctx.fillRect(x + cut, y, w - cut * 2, 2);
+    ctx.fillRect(x + cut, y + h - 2, w - cut * 2, 2);
+    ctx.fillRect(x, y + cut, 2, h - cut * 2);
+    ctx.fillRect(x + w - 2, y + cut, 2, h - cut * 2);
+
+    // The top line: "straw" at the left, the figure (and "low") at the right.
+    const figure = Math.round(left);
+    const key = `${state}:${figure}:${gauge.right}`;
+    if (key !== gaugeLineKey) {
+      gaugeLineKey = key;
+      gaugeLine = topLine({ figure, state }, gauge.right);
+    }
+    const lineY = y + gauge.label.y * u;
+    printCells(WORDS.label, false, x + gauge.label.x * u, lineY, u, GAUGE_QUIET);
+    for (const entry of gaugeLine) printCells(entry.text, entry.digits, x + entry.x * u, lineY, u, entry.digits ? CREAM_HEX : GAUGE_WARN);
+
+    // The straw: what is left, the stroke being drawn (dithered: it isn't
+    // down yet), then each straw down at its cost, an outline with its ends marked.
+    const length = gauge.tube.w;
+    tubeColumns(length, strawBudget, left, draftUsed, strawSpent, tube);
+    const tx = x + gauge.tube.x * u;
+    const ty = y + gauge.tube.y * u;
+    const rows = gauge.tube.h;
+    const stripes = state === "low" ? LOW_STRIPES : STRAW_STRIPES;
+    for (let stripe = 0; stripe < 2; stripe++) {
+      ctx.fillStyle = stripes[stripe];
+      for (let col = 0; col < tube.rest; col++) {
+        for (let row = 0; row < rows; row++) if ((((col + row) & 3) < 2 ? 0 : 1) === stripe) ctx.fillRect(tx + col * u, ty + row * u, u, u);
+      }
+      ctx.fillStyle = DRAFT_STRIPES[stripe];
+      for (let col = tube.rest; col < tube.draftTo; col++) {
+        for (let row = 0; row < rows; row++) {
+          if (((col + row) & 1) === 0 && (((col + row) & 3) < 2 ? 0 : 1) === stripe) ctx.fillRect(tx + col * u, ty + row * u, u, u);
+        }
+      }
+    }
+    if (tube.draftTo < length) {
+      ctx.fillStyle = GAUGE_SPENT;
+      ctx.fillRect(tx + tube.draftTo * u, ty, (length - tube.draftTo) * u, u);
+      ctx.fillRect(tx + tube.draftTo * u, ty + (rows - 1) * u, (length - tube.draftTo) * u, u);
+      ctx.fillStyle = GAUGE_MARK;
+      let from = tube.draftTo;
+      for (const mark of tube.marks) {
+        if (mark > from) ctx.fillRect(tx + from * u, ty, u, rows * u);
+        from = mark;
+      }
+      ctx.fillRect(tx + (length - 1) * u, ty, u, rows * u);
+    }
+    ctx.restore();
   }
 
   // --- The room, start to finish -------------------------------------------------------
@@ -2741,19 +3059,26 @@
    * is caught the step it lands.
    */
   function simulate(dt: number, hold = false) {
-    // A lesson holding planning freezes the room: no step at all, so the
-    // room later plays out exactly as it would have from this planning time.
+    // A lesson holding the room freezes it: no step at all, so the room
+    // later plays out exactly as it would have from where it stopped.
     const clock = roomFrame(world, accumulator, dt, hold);
     accumulator = clock.accumulator;
     for (let k = 0; k < clock.steps; k++) {
       step(world, STEP);
       if (world.events.count) handleEvents();
       if (phase === "play" && settled()) settleRoom(world.result ?? judgeRoom(world));
+      // A lesson that stops the room went up on this step (the tea reaching
+      // the cup): the room stops here, the rest of the frame's time let go.
+      if (!hold && stopsHere()) {
+        hold = true;
+        break;
+      }
     }
     alpha = clock.alpha;
     let flowing = 0;
     for (const kettle of world.kettles) if (kettle.started && kettle.left > 0) flowing++;
-    setPour(Math.min(1, flowing * 0.6));
+    // Held, the pour falls silent with the tea.
+    setPour(hold ? 0 : Math.min(1, flowing * 0.6));
   }
 
   function syncHud() {
@@ -2781,7 +3106,7 @@
     if (left < 0.5) {
       if (!outAnnounced) {
         outAnnounced = true;
-        gaugeShake += 1;
+        gaugeShake = GAUGE_SHAKE;
         liveMessage = "Out of straw.";
       }
     } else if (left < strawBudget * LOW_SHARE && !lowAnnounced) {
@@ -2834,6 +3159,8 @@
       ctx.drawImage(dynCanvas, x, y, RW * S, RH * S);
     }
     drawGlow(x + MX * S, y + MT * S);
+    // The gauge on the counter, outside the shake and under the lesson's dim.
+    drawGauge();
     // The lesson: where it points, the spotlight over the kitchen, and the
     // ghost route above it, under the pen and its reach ring.
     placeCoach();
@@ -3038,7 +3365,7 @@
 
   /** A straw refused for want of straw: the gauge says so, with a shake, and taking one back is taught there. */
   function outOfStraw() {
-    if (paced("empty", 0.8)) gaugeShake += 1;
+    if (paced("empty", 0.8)) gaugeShake = GAUGE_SHAKE;
     if (!outAnnounced) syncGauge();
     if (world.strokes.length) teach({ lesson: LESSONS.takeBack, target: { kind: "gauge", index: 0 } });
   }
@@ -3631,7 +3958,6 @@
     progress = cleanProgress(readSpillProgress(mode));
     coach.reset();
     lessonHold.clear();
-    skipped.clear();
     quietFor = Infinity;
     if (firstVisitWithLessons()) {
       // A save from before the lessons: what its cleared rooms taught (in either mode) is known.
@@ -3695,7 +4021,11 @@
       const lit = explains && cue ? (cue.target.kind === "pour" ? "pour" : cue.target.kind === "gauge" ? "gauge" : null) : null;
       if (lit !== barLit) barLit = lit;
     }
-    if (phase !== "idle") stepVisuals(dt);
+    // Held while the tea is coming, the whole room stops: splashes, steam,
+    // a kettle tipping. Held in planning, only the room's clock does.
+    const frozen = phase === "play" && lessonHolds && world.status !== "waiting";
+    if (phase !== "idle") stepVisuals(frozen ? 0 : dt);
+    gaugeShake = Math.max(0, gaugeShake - rawDt);
     if (caption) {
       captionAge += dt;
       if (captionAge >= captionLife) caption = null;
@@ -3714,25 +4044,78 @@
 
   // --- Sizing and lifecycle -------------------------------------------------------------
 
+  /** Copies a DOM rect into a box (CSS px); an empty one when there is no element. */
+  function measureInto(box: { x: number; y: number; w: number; h: number }, element: Element | null) {
+    const r = element?.getBoundingClientRect();
+    box.x = r?.left ?? 0;
+    box.y = r?.top ?? 0;
+    box.w = r?.width ?? 0;
+    box.h = r?.height ?? 0;
+  }
+
+  /**
+   * Measures the controls where the bar's styles put them, and fits the
+   * painted gauge into its box: the biggest cells the box allows, centred,
+   * its corner on the kitchen's grid.
+   */
+  function measureControls() {
+    measureInto(controlBoxes.pour, pourButton);
+    measureInto(controlBoxes.clear, clearButton);
+    const r = gaugeEl?.getBoundingClientRect();
+    const fit = r ? gaugeFit(r.width, r.height) : null;
+    if (!r || !fit) {
+      gaugeUnit = 0;
+      gaugeBox.x = gaugeBox.y = gaugeBox.w = gaugeBox.h = 0;
+      return;
+    }
+    gaugeUnit = fit.unit;
+    gauge = gaugeLayout(fit.columns);
+    gaugeBox.w = gauge.width * fit.unit;
+    gaugeBox.h = gauge.height * fit.unit;
+    gaugeBox.x = Math.round((r.left + (r.width - gaugeBox.w) / 2) / SC) * SC;
+    gaugeBox.y = Math.round((r.top + (r.height - gaugeBox.h) / 2) / SC) * SC;
+  }
+
   function layout() {
     viewW = window.innerWidth;
     viewH = window.innerHeight;
     ctx = fitCanvas(canvas, viewW, viewH);
     dpr = Math.min(window.devicePixelRatio || 1, 2);
+    sideLayout = window.matchMedia(SIDE_QUERY).matches;
     const hudBottom = hudRow ? hudRow.getBoundingClientRect().bottom : 72;
     hudBottomPx = hudBottom;
-    const barTop = barEl ? barEl.getBoundingClientRect().top : viewH;
-    const top = hudBottom + CAPTION_SPACE;
-    const availH = Math.max(160, barTop - 8 - top);
-    const availW = viewW - (viewW < 560 ? 0 : 48);
-    S = Math.max(0.5, Math.floor(Math.min(availW / RW, availH / RH) * 16) / 16);
-    ox = Math.round(((viewW - RW * S) / 2) * dpr) / dpr;
-    oy = Math.round((top + (availH - RH * S) / 2) * dpr) / dpr;
+    const bar = barEl?.getBoundingClientRect();
+    if (sideLayout && bar) {
+      // The controls stand in a cabinet beside the room (its styles put them
+      // low on the right): the room takes the height under the tickets and
+      // the width left of the cabinet, centred there.
+      const top = hudBottom + 12;
+      const availH = Math.max(120, viewH - 16 - top);
+      const availW = Math.max(120, bar.left - 12 - 24 - 16);
+      S = Math.max(0.5, Math.floor(Math.min(availW / RW, availH / RH) * 16) / 16);
+      ox = Math.round((16 + (availW - RW * S) / 2) * dpr) / dpr;
+      oy = Math.round((top + (availH - RH * S) / 2) * dpr) / dpr;
+    } else {
+      const barTop = bar ? bar.top : viewH;
+      const top = hudBottom + CAPTION_SPACE;
+      const availH = Math.max(160, barTop - 8 - top);
+      const availW = viewW - (viewW < 560 ? 0 : 48);
+      S = Math.max(0.5, Math.floor(Math.min(availW / RW, availH / RH) * 16) / 16);
+      ox = Math.round(((viewW - RW * S) / 2) * dpr) / dpr;
+      oy = Math.round((top + (availH - RH * S) / 2) * dpr) / dpr;
+    }
     rx = ox + MX * S;
     ry = oy + MT * S;
-    captionTop = Math.max(hudBottom + 6, oy - CAPTION_SPACE + 6);
+    if (sideLayout && bar) {
+      // Over the cabinet, as wide as it is.
+      captionStyle = `left: ${Math.round(bar.left + bar.width / 2)}px; bottom: ${Math.round(viewH - bar.top + 20)}px; max-width: ${Math.round(bar.width + 24)}px`;
+    } else {
+      captionTop = Math.max(hudBottom + 6, oy - CAPTION_SPACE + 6);
+      captionStyle = `left: 50%; top: ${captionTop}px`;
+    }
     verdictTop = ry + HEIGHT * S * 0.3;
     roomCenterX = rx + (WIDTH * S) / 2;
+    measureControls();
     dynCanvas ??= makeCanvas(RW, RH);
     dynCtx ??= dynCanvas.getContext("2d");
     dynImage ??= new ImageData(RW, RH);
@@ -3792,11 +4175,9 @@
     };
   });
 
-  // The gauge, in shares of the room's straw.
+  // What the gauge says to a screen reader (the canvas paints the same reading).
   $: strawLeftNow = Math.max(0, strawBudget - strawUsed - draftUsed);
   $: leftShare = strawBudget > 0 ? clamp(strawLeftNow / strawBudget, 0, 1) : 0;
-  $: draftShare = strawBudget > 0 ? clamp(draftUsed / strawBudget, 0, 1) : 0;
-  $: spentShares = strawSpent.map((length) => (strawBudget > 0 ? clamp(length / strawBudget, 0, 1) : 0));
   $: strawFigure = Math.round(strawLeftNow);
   $: strawOut = strawLeftNow < 0.5;
   $: strawLow = !strawOut && leftShare < LOW_SHARE;
@@ -3875,18 +4256,22 @@
   <!-- The same line goes to the live region, so this copy is hidden. It steps aside while a lesson is up. -->
   {#if caption}
     {#key caption.id}
-      <p bind:this={captionEl} class="sp-caption boba-ui" class:is-hidden={captionHidden} style="top: {captionTop}px" aria-hidden="true">{caption.line}</p>
+      <p
+        bind:this={captionEl}
+        class="sp-caption boba-ui boba-chip"
+        class:is-hidden={captionHidden}
+        class:is-side={sideLayout}
+        style={captionStyle}
+        aria-hidden="true"
+      >
+        {caption.line}
+      </p>
     {/key}
   {/if}
 
   {#if verdict}
     {#key verdict.id}
-      <div
-        bind:this={verdictEl}
-        class="sp-verdict boba-ui boba-riso is-small"
-        style="top: {verdictTop}px; left: {roomCenterX}px"
-        aria-hidden="true"
-      >
+      <div bind:this={verdictEl} class="sp-verdict boba-ui boba-chip" style="top: {verdictTop}px; left: {roomCenterX}px" aria-hidden="true">
         <span class="sp-verdict-stars">
           {#each [0, 1, 2] as index}
             <span class="sp-verdict-star" class:is-on={index < verdict.stars} style="--delay: {index * STAR_STAGGER}s">
@@ -3894,75 +4279,44 @@
             </span>
           {/each}
         </span>
-        <span class="boba-phase sp-verdict-points">{verdict.points} points</span>
+        <span class="sp-verdict-points">{verdict.points} points</span>
       </div>
     {/key}
   {/if}
 
-  <!-- While a lesson explains, the bar steps back except the control it is about. -->
+  <!-- The controls, set into the counter under the room (into a cabinet beside it on a short, wide
+       screen): Pour (Next once a room is cleared) and Clear are pixel keys, and the straw gauge is
+       painted into the counter between them, in this box. While a lesson explains, the keys step
+       back with the kitchen except the one it is about. -->
   <div bind:this={barEl} class="sp-bar boba-ui" class:is-spot={lessonExplains}>
-    {#if canNext}
-      <button
-        type="button"
-        class="boba-btn sp-bar-btn sp-bar-main"
-        style="--lean: -0.6deg"
-        aria-keyshortcuts="Enter"
-        on:click={(event) => barAction(event, next)}
-      >
-        Next
-        <kbd aria-hidden="true">Enter</kbd>
-      </button>
-    {:else}
-      <button
-        bind:this={pourButton}
-        type="button"
-        class="boba-btn sp-bar-btn sp-bar-main"
-        class:is-lit={barLit === "pour"}
-        style="--lean: -0.6deg"
-        disabled={!canPour}
-        aria-keyshortcuts="Enter"
-        on:click={(event) => barAction(event, pour)}
-      >
-        Pour
-        <kbd aria-hidden="true">Enter</kbd>
-      </button>
-    {/if}
+    <button
+      bind:this={pourButton}
+      type="button"
+      class="boba-key is-primary sp-key"
+      class:is-lit={barLit === "pour"}
+      disabled={!canNext && !canPour}
+      aria-keyshortcuts="Enter"
+      on:click={(event) => barAction(event, canNext ? next : pour)}
+    >
+      <!-- Both words hold the key's width, so it never changes size as Pour turns to Next. -->
+      <span class="sp-key-words">
+        <span class:is-off={canNext}>Pour</span>
+        <span class:is-off={!canNext}>Next</span>
+      </span>
+      <kbd aria-hidden="true">Enter</kbd>
+    </button>
 
-    <!-- The straw gauge: what is left, the straw being drawn, and what each straw down cost. -->
-    {#key gaugeShake}
-      <div
-        bind:this={gaugeEl}
-        class="sp-gauge boba-riso is-small"
-        class:is-lit={barLit === "gauge"}
-        class:is-low={strawLow}
-        class:is-out={strawOut}
-        class:is-hit={gaugeShake > 0}
-        role="img"
-        aria-label={strawOut ? "Out of straw" : `${strawFigure} units of straw left${strawLow ? ", low" : ""}`}
-      >
-        <span class="sp-gauge-straw" aria-hidden="true">
-          {#if leftShare > 0}
-            <span class="sp-gauge-left" style="width: {leftShare * 100}%"></span>
-          {/if}
-          {#if draftShare > 0}
-            <span class="sp-gauge-draft" style="width: {draftShare * 100}%"></span>
-          {/if}
-          {#each spentShares as share}
-            <span class="sp-gauge-spent" style="width: {share * 100}%"></span>
-          {/each}
-        </span>
-        <span class="sp-gauge-readout" aria-hidden="true">
-          <span class="boba-meta sp-gauge-label">straw</span>
-          <span class="sp-gauge-figure">{strawOut ? "out" : strawFigure}</span>
-          {#if strawLow}<span class="sp-gauge-word">low</span>{/if}
-        </span>
-      </div>
-    {/key}
+    <div
+      bind:this={gaugeEl}
+      class="sp-gauge"
+      role="img"
+      aria-label={strawOut ? "Out of straw" : `${strawFigure} units of straw left${strawLow ? ", low" : ""}`}
+    ></div>
 
     <button
+      bind:this={clearButton}
       type="button"
-      class="boba-btn secondary sp-bar-btn"
-      style="--lean: 0.5deg"
+      class="boba-key sp-key"
       disabled={!canClear}
       aria-keyshortcuts="C"
       on:click={(event) => barAction(event, clearAll)}
@@ -3981,8 +4335,12 @@
     side={coachSide}
     ring={coachRing}
     width={coachWidth}
+    height={coachHeight}
+    bind:slipW={coachSlipW}
+    bind:slipH={coachSlipH}
     scene={coachScene}
     leaving={coachLeaving}
+    ended={coachEnded}
     touch={inputMode === "touch"}
     continuable={coachContinuable}
     on:continue={continueLesson}
@@ -4174,21 +4532,19 @@
     line-height: 1;
   }
 
-  /* --- Caption chip: one line, in the strip above the room --- */
+  /* --- Caption chip: the room's name, or a spill's hint, in the strip above the room --- */
 
+  /* A pixel chip like the callout's (`.boba-chip`: the dark riso paper, stepped
+     corners, a faint cream rule), cream italic in the one family. It steps in,
+     as pixel things do. Beside the room (a short, wide screen), it sits over
+     the cabinet of controls instead; its place comes from the layout. */
   .sp-caption {
     position: fixed;
-    left: 50%;
     z-index: calc(var(--layer-overlay) + 3);
     width: max-content;
     max-width: min(34rem, calc(100vw - var(--space-8)));
     margin: 0;
-    padding: var(--space-1-5) var(--space-3);
-    color: var(--b-strong);
-    background: var(--b-raised);
-    border: 1px solid var(--b-rule);
-    border-radius: var(--radius-inline);
-    box-shadow: var(--shadow-popover);
+    padding: 0.5rem 0.875rem 0.5625rem;
     font-family: var(--font-ui);
     font-size: 0.9375rem;
     font-style: italic;
@@ -4198,11 +4554,7 @@
     text-wrap: balance;
     pointer-events: none;
     transform: translateX(-50%);
-    animation: sp-caption-in var(--motion-slow) var(--ease-emphasized) both;
-  }
-
-  :global(.dark) .sp-caption {
-    box-shadow: var(--shadow-popover-dark);
+    animation: sp-chip-in var(--motion-slow) steps(3, end) both;
   }
 
   /* One message at a time: a lesson up elsewhere hides the chip, not forgets it. */
@@ -4210,10 +4562,10 @@
     visibility: hidden;
   }
 
-  @keyframes sp-caption-in {
+  @keyframes sp-chip-in {
     from {
       opacity: 0;
-      transform: translate(-50%, 6px);
+      transform: translate(-50%, 4px);
     }
   }
 
@@ -4233,12 +4585,13 @@
   .sp-verdict-stars {
     display: inline-flex;
     gap: var(--space-2);
-    color: var(--b-line);
+    color: #fdf8f3;
   }
 
+  /* Each star drops in a cell at a time. */
   .sp-verdict-star {
     display: inline-grid;
-    animation: sp-land 360ms var(--ease-emphasized) var(--delay) both;
+    animation: sp-land 320ms steps(4, end) var(--delay) both;
   }
 
   .sp-verdict-star:not(.is-on) {
@@ -4247,135 +4600,142 @@
   }
 
   .sp-verdict-points {
+    color: #e8d5c4;
     font-family: var(--font-ui);
+    font-size: 0.875rem;
+    font-style: italic;
+    line-height: 1.25;
   }
 
   @keyframes sp-land {
     from {
       opacity: 0;
-      transform: translateY(-18px) rotate(-12deg) scale(1.3);
+      transform: translateY(-16px);
     }
-    70% {
+    75% {
       opacity: 1;
-      transform: translateY(2px) scale(1.08, 0.9);
+      transform: translateY(4px);
     }
   }
 
-  /* --- The bottom bar: thumb-sized, clear of the home indicator --- */
+  /* --- The controls: pixel keys set into the counter under the room --- */
 
+  /* The bar only places the keys and the gauge's box: the counter, the sockets
+     and the gauge itself are painted into the kitchen behind them, measured
+     where these styles put them on each resize, so nothing moves in play. */
   .sp-bar {
     position: fixed;
     inset: auto 0 0;
-    z-index: calc(var(--layer-overlay) + 3);
+    /* Under the lesson's callout (which comes after it), so a slip that has
+       to cover a key for a moment is never cut by it. */
+    z-index: calc(var(--layer-overlay) + 2);
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
     gap: var(--space-3);
-    padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+    padding: var(--space-4) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
     pointer-events: none;
   }
 
-  .sp-bar-btn {
+  /* `.boba-key` prints a dark pixel key (Pour the accent one); its key chip sits beside the word. */
+  .sp-key {
+    grid-auto-flow: column;
     min-width: 6rem;
+    min-height: 3rem;
     pointer-events: auto;
-    transition:
-      transform var(--motion-base) var(--ease-emphasized),
-      filter 180ms var(--ease-standard);
-  }
-
-  /* A lesson explaining: the bar steps back with the kitchen, except the
-     control the lesson is about (Pour, or the straw gauge). */
-  .sp-bar.is-spot > .sp-bar-btn:not(.is-lit),
-  .sp-bar.is-spot > .sp-gauge:not(.is-lit) {
-    filter: brightness(0.62) saturate(0.85);
-  }
-
-  /* --- The straw gauge: a long straw that shortens from the right as it is spent --- */
-
-  .sp-gauge {
-    display: flex;
-    flex: 1 1 auto;
-    align-items: center;
-    gap: var(--space-3);
-    min-width: 0;
-    max-width: 28rem;
-    min-height: 2.5rem;
-    padding: var(--space-1-5) var(--space-3);
-    pointer-events: auto;
-    cursor: default;
     transition: filter 180ms var(--ease-standard);
   }
 
-  .sp-gauge.is-hit {
-    animation: boba-shake var(--motion-slow) var(--ease-standard);
+  .sp-key-words {
+    display: inline-grid;
   }
 
-  .sp-gauge-straw {
-    display: flex;
-    flex: 1 1 auto;
-    gap: 2px;
-    min-width: 10rem;
-    height: 0.875rem;
+  .sp-key-words > span {
+    grid-area: 1 / 1;
   }
 
-  .sp-gauge-straw > span {
-    flex: 0 1 auto;
-    min-width: 0;
-    height: 100%;
-    border-radius: 999px;
+  .sp-key-words > .is-off {
+    visibility: hidden;
   }
 
-  /* What is left: pink and white stripes in an ink outline. */
-  .sp-gauge-left {
-    background: repeating-linear-gradient(-55deg, #ff5277 0 4px, #fdf8f3 4px 8px);
-    border: 1.5px solid var(--b-line);
+  /* A lesson explaining: the keys step back with the kitchen, except the one it is about. */
+  .sp-bar.is-spot > .sp-key:not(.is-lit) {
+    filter: brightness(0.62) saturate(0.85);
   }
 
-  /* Low: the stripes lose their white and go coral, and the figure says so. */
-  .sp-gauge.is-low .sp-gauge-left {
-    background: repeating-linear-gradient(-55deg, #e85d4c 0 4px, #b8402f 4px 8px);
+  /* The gauge's box: four-pixel cells, at least as wide as its top line
+     (gaugeFit in spill-gauge.js), never so long the bar outgrows the room. */
+  .sp-gauge {
+    flex: 1 1 208px;
+    min-width: 208px;
+    max-width: 320px;
+    height: 56px;
+    pointer-events: auto;
+    cursor: default;
   }
 
-  /* The straw being drawn, eating into the gauge in a lighter tint. */
-  .sp-gauge-draft {
-    background: repeating-linear-gradient(-55deg, #ffb0c0 0 4px, #fdf8f3 4px 8px);
-    border: 1.5px dashed var(--b-line);
-    opacity: 0.8;
+  @media (hover: none) and (pointer: coarse) {
+    .sp-key {
+      font-size: 0.9375rem;
+    }
   }
 
-  /* Each straw down, faint, at what it cost. */
-  .sp-gauge-spent {
-    background: var(--b-wash);
-    border: 1px dashed var(--b-muted);
-    opacity: 0.6;
+  /* A phone: three-pixel cells, so the keys and the gauge share one row. */
+  @media (max-width: 480px) {
+    .sp-bar {
+      gap: var(--space-2);
+      padding-inline: var(--space-3);
+    }
+
+    .sp-key {
+      min-width: 4.75rem;
+      padding-inline: var(--space-2-5);
+    }
+
+    .sp-gauge {
+      flex-basis: 156px;
+      min-width: 156px;
+      height: 42px;
+    }
   }
 
-  .sp-gauge-readout {
-    display: inline-flex;
-    flex: none;
-    align-items: baseline;
-    gap: var(--space-1);
-    white-space: nowrap;
+  /* Narrower still: the gauge takes a row of its own above the keys. */
+  @media (max-width: 359px) {
+    .sp-gauge {
+      flex-basis: 100%;
+      order: -1;
+      max-width: none;
+    }
+
+    .sp-key {
+      flex: 1;
+    }
   }
 
-  .sp-gauge-figure {
-    min-width: 2.5ch;
-    color: var(--b-strong);
-    font-size: 0.9375rem;
-    font-weight: 500;
-    font-variant-numeric: lining-nums tabular-nums;
-    line-height: 1.2;
-    text-align: right;
-  }
+  /* A short, wide screen: the keys and the gauge stand in a cabinet low on
+     the right, beside the room, the gauge over the keys. (SIDE_QUERY, above.) */
+  @media (max-height: 540px) and (min-aspect-ratio: 5/4) {
+    .sp-bar {
+      inset: auto max(var(--space-5), env(safe-area-inset-right)) max(var(--space-5), env(safe-area-inset-bottom)) auto;
+      width: 208px;
+      gap: var(--space-2);
+      padding: 0;
+    }
 
-  .sp-gauge-word,
-  .sp-gauge.is-out .sp-gauge-figure {
-    color: var(--b-accent);
-    font-weight: 500;
-  }
+    .sp-gauge {
+      flex: 0 0 100%;
+      order: -1;
+      min-width: 0;
+      max-width: none;
+      height: 56px;
+    }
 
-  .sp-gauge-word {
-    font-size: 0.75rem;
-    line-height: 1.25;
+    .sp-key {
+      flex: 1 1 0;
+      min-width: 0;
+      padding-inline: var(--space-2);
+    }
   }
 
   /* --- The level select: a page of rooms to a row --- */
@@ -4542,24 +4902,19 @@
     margin-top: var(--space-5);
   }
 
-  @media (hover: none) and (pointer: coarse) {
-    .sp-bar-btn {
-      min-width: 6.5rem;
-      min-height: 3rem;
-      font-size: 0.9375rem;
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .sp-caption,
-    .sp-verdict-star,
-    .sp-gauge.is-hit {
+    .sp-verdict-star {
       animation: none;
     }
 
-    .sp-bar-btn,
-    .sp-gauge {
+    .sp-key {
       transition: none;
+    }
+
+    /* No press travel: the key's foot still shows it pressed. */
+    .sp-key:not(:disabled):active {
+      transform: none;
     }
   }
 
@@ -4570,24 +4925,6 @@
 
     .sp-caption {
       font-size: 0.875rem;
-    }
-
-    .sp-bar {
-      flex-wrap: wrap;
-      gap: var(--space-2);
-      padding-inline: var(--space-3);
-    }
-
-    /* The gauge takes a row of its own above the buttons, as wide as the bar. */
-    .sp-gauge {
-      flex: 1 1 100%;
-      order: -1;
-      max-width: none;
-    }
-
-    .sp-bar-btn {
-      flex: 1;
-      min-width: 0;
     }
 
     .sp-tile {

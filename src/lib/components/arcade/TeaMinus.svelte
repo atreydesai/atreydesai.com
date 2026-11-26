@@ -37,7 +37,17 @@
     zoomForClearance,
   } from "#lib/arcade/lander-engine.js";
   import type { CrashReason, Pad, Pilot, Ship, Site, Terrain, Touchdown } from "#lib/arcade/lander-engine.js";
-  import { createFlightLessons, teaRows } from "#lib/arcade/lander-lessons.js";
+  import {
+    FIRST_SITE_SEED,
+    calloutFor,
+    createFlightLessons,
+    guidedDevice,
+    guidedStartLimit,
+    leadOn,
+    pointAt,
+    teaRows,
+  } from "#lib/arcade/lander-lessons.js";
+  import type { Side } from "#lib/arcade/lander-lessons.js";
   import {
     ACCENT,
     CREAM,
@@ -88,9 +98,11 @@
   // is the score. All rules and physics live in lander-engine.js; this file
   // only steps it, draws it, and wires it to the arcade. It opens straight on
   // the countdown and teaches in flight: lander-lessons.js says what each
-  // moment needs, the shared coach slows play for a move and sets one line
-  // beside the cup or the coaster, and a dithered ghost of the cup flies the
-  // move (for the tilt, the path the engine's own autopilot would take).
+  // moment needs, the shared coach pauses play and sets one line beside the
+  // cup or the coaster, and a dithered ghost of the cup flies the move (for
+  // the tilt, the path the engine's own autopilot would take). Until the
+  // device has landed once, that path is drawn the whole way down, from the
+  // countdown to the touchdown, with a ghost a beat ahead of the cup.
 
   const { exit, toMenu } = arcadeExits(createEventDispatcher<{ close: null; menu: null }>());
 
@@ -111,6 +123,8 @@
   const DANGER_ALTITUDE = 150;
   const LOW_FUEL = 110;
   const PATH_SAMPLE = 0.08;
+  /** Seconds the guide takes to go once the cup is down. */
+  const GUIDE_FADE = 0.6;
   /** Landing notes: px between lines, and seconds between arrivals. */
   const POPUP_GAP = 24;
   const POPUP_STAGGER = 0.12;
@@ -315,6 +329,34 @@
   }
   const LANDER_GRIDS = [0, 1, 2, 3, 4].map(landerGrid);
 
+  // The touch keys' icons, on the same pixel grid as the scene: a turn each
+  // way, and a flame.
+  const TILT_LEFT = [
+    "...XXXX...",
+    "..X....X..",
+    ".X......X.",
+    "XXX.....X.",
+    ".X......X.",
+    "........X.",
+    ".......X..",
+    ".....XX...",
+  ];
+  const TILT_RIGHT = TILT_LEFT.map((row) => [...row].reverse().join(""));
+  const BURN_ICON = [
+    "....X.....",
+    "....XX....",
+    "...XXX....",
+    "...XXXX...",
+    "..XXXXX.X.",
+    "..XXXXXXX.",
+    ".XXXX.XXXX",
+    ".XXX...XXX",
+    ".XXX...XXX",
+    "..XX..XXX.",
+    "...XXXXX..",
+  ];
+  const KEY_ICON = { X: "currentColor" };
+
   // --- Types ---------------------------------------------------------------
 
   interface FlightPath {
@@ -402,7 +444,7 @@
 
   // Lessons, once per device: lander-lessons.js says what each moment needs
   // and keeps track of what the player has shown this flight; the coach
-  // slows play for a move and shows one lesson at a time.
+  // pauses play and shows one lesson at a time.
   const coach = createCoach("lander");
   const lessons = createFlightLessons(coach);
   /** The coach's lesson, whether it's fading, and where it points, copied out so the page follows them. */
@@ -413,9 +455,19 @@
   let coachX: number | null = null;
   let coachY: number | null = null;
   let coachRing = 0;
-  /** Half the cup's width in px, when the line sits beside it with no loop: the slip keeps clear of it. */
+  /** Half the width and height of the thing in px (the cup, a coaster): the slip keeps clear of it. */
   let coachWidth = 0;
-  let coachSide: "above" | "below" | "left" | "right" = "above";
+  let coachHeight = 0;
+  let coachSide: Side = "above";
+  /** The lesson the side was chosen for, so a slip keeps its side while it still fits. */
+  let coachSideFor: Lesson | null = null;
+  /** The slip's measured size, for the lesson it shows; a generous guess until it has been laid out. */
+  const SLIP_GUESS = { w: 300, h: 80 };
+  const slipSize = { w: SLIP_GUESS.w, h: SLIP_GUESS.h };
+  let slipEl: HTMLElement | null = null;
+  let slipFor: Lesson | null = null;
+  /** The guide's light: 1 while it is followed, stepping down to 0 once the cup is down. */
+  let guideLight = 0;
   /** What in the tickets a lesson is about, so it is underlined there too. */
   let hudLit: "tea" | "descent" | "drift" | null = null;
   /** On touch, the hold button a move lesson is about. */
@@ -469,6 +521,8 @@
   let S = 1;
 
   let seedBase = 0;
+  /** This run's site 1 is the fixed first site: the device has never landed. */
+  let firstSite = false;
   let site: Site = makeSite(1, 7919, undefined, { expert });
   let look: Look = LOOKS[site.terrain];
   let plan: SkyPlan = planSky(site);
@@ -2265,6 +2319,7 @@
     drawLessonLight();
     ctx.save();
     ctx.translate(joltX, joltY);
+    drawGuide();
     drawLessonGhost();
     drawLander();
     drawLandingLoop();
@@ -2379,13 +2434,27 @@
   }
 
   function enterSite(n: number) {
-    useSite(makeSite(n, seedBase, undefined, { expert }));
+    // Until the device has landed once, site 1 is always the same: a flat
+    // plateau with a wide coaster just ahead of the cup (FIRST_SITE_SEED).
+    const first = n === 1 && firstSite;
+    useSite(makeSite(n, first ? FIRST_SITE_SEED : seedBase, first ? "mare" : undefined, { expert }));
     siteIntro = introFor(n);
+  }
+
+  /**
+   * A fresh cup at the top of the sky. Until the device has landed once it
+   * starts low enough under the tickets for a lesson's line to fit above it
+   * (on a phone, where the line is too wide to sit beside the cup).
+   */
+  function launchShip() {
+    const next = newShip(site, viewHUnits);
+    if (guidedDevice(coach)) next.y = Math.min(next.y, guidedStartLimit(viewHUnits, base));
+    return next;
   }
 
   /** A fresh ship at the top of the sky, and a clean sheet around it. */
   function resetAttempt() {
-    ship = newShip(site, viewHUnits);
+    ship = launchShip();
     flightTime = 0;
     accumulator = 0;
     pathClock = 0;
@@ -2412,9 +2481,16 @@
     modeTime = 0;
     // A key tapped before the flight doesn't carry into it as a press.
     input.clearPresses();
-    lessons.start({ revived: landerBlink > 0 });
-    if (autoplay) autopilot = createPilot(richestPad(), ship);
+    lessons.start({ revived: landerBlink > 0, flight: { ship, site, time: 0 }, ceiling });
+    guideLight = lessons.guide ? 1 : 0;
+    if (autoplay) autopilot = createPilot(lessons.guide?.pad ?? richestPad(), ship);
     showIntro();
+  }
+
+  /** During the countdown a guided flight's path is drawn already, from the cup as it waits. */
+  function previewGuide() {
+    lessons.start({ flight: { ship, site, time: 0 }, ceiling });
+    guideLight = lessons.guide ? 1 : 0;
   }
 
   function nextAttempt() {
@@ -2751,14 +2827,23 @@
    * doesn't call this.
    */
   function advance(realDt: number, rawDt: number) {
-    // A lesson eases play into slow motion while it explains, and back out
-    // once it ends: the move made, Continue, or the thing gone from view.
+    // A move lesson holds play still until the move is made: the move itself,
+    // read before any step has seen it, brings play back, and its press,
+    // latched until a step sees it, then makes it.
+    if (mode === "flying") lessons.input(autoplay ? autoplayInput() : input.read());
+    // The development autopilot reads what pauses it, then continues.
+    if (autoplay && coach.paused && coach.age >= 2) continueLesson();
+    // A lesson pauses play while it is up, and play comes back once it ends:
+    // the move made, or Continue.
     const dt = mode === "countdown" ? realDt : coach.step(rawDt, realDt);
     lessonClock += realDt;
     // The spotlight comes up with an explanation and goes as it ends or the move is made.
     const explaining = mode !== "countdown" && coach.current && !coach.leaving && !coach.acting && (coach.current.slow ?? 1) < 1;
     const dimTarget = explaining ? 1 : 0;
     lessonDim = reduceMotion ? dimTarget : lessonDim + (dimTarget - lessonDim) * (1 - Math.exp(-realDt / 0.18));
+    // The guide stays lit until the cup is down, then goes.
+    const guideTarget = lessons.guide && (mode === "countdown" || ship.state === "flying") ? 1 : 0;
+    guideLight = reduceMotion || guideTarget > guideLight ? guideTarget : Math.max(0, guideLight - realDt / GUIDE_FADE);
     clock += dt;
     stepMeteor(dt);
 
@@ -2952,7 +3037,9 @@
 
   /** A new mission: fresh seeds, a full set of landers, site 1, and the countdown. */
   function newMission() {
-    seedBase = devSeed() ?? Math.floor(Math.random() * 1_000_000);
+    const seed = devSeed();
+    seedBase = seed ?? Math.floor(Math.random() * 1_000_000);
+    firstSite = seed === null && guidedDevice(coach);
     autoplay = devAutoplay();
     landingTurn = Math.floor(Math.random() * LANDINGS.length);
     crashTurns = {
@@ -2979,6 +3066,7 @@
     coach.reset();
     enterSite(1);
     resetAttempt();
+    previewGuide();
     mode = "countdown";
     modeTime = 0;
     countdown = COUNTDOWN_SECONDS;
@@ -3014,8 +3102,11 @@
 
   // --- Lessons -------------------------------------------------------------------
 
-  /** Just past the cup's widest point (its feet), in world units from its centre. */
-  const CUP_EDGE = (LANDER_COLUMNS / 2) * CELL + 2;
+  /** A move's ghost flies this many seconds of its path, then rests this long before it goes again. */
+  const MOVE_DEMO = 3.5;
+  const DEMO_REST = 0.7;
+  /** The touch pads on screen, which a callout keeps clear of. */
+  let padRects: Array<{ x: number; y: number; w: number; h: number }> = [];
 
   /** How dim the scene is around a lesson, 0..1, eased in real time. */
   let lessonDim = 0;
@@ -3094,9 +3185,25 @@
   }
 
   /**
+   * Keeps the slip's measured size, for the lesson it shows. The coach makes
+   * a new slip for each lesson; until it has been laid out, a generous guess.
+   */
+  function measureSlip(lesson: Lesson) {
+    if (slipFor !== lesson || !slipEl?.isConnected) {
+      slipEl = playScope?.querySelector<HTMLElement>(".coach .slip") ?? null;
+      slipFor = slipEl ? lesson : null;
+    }
+    slipSize.w = slipEl?.offsetWidth || SLIP_GUESS.w;
+    slipSize.h = slipEl?.offsetHeight || SLIP_GUESS.h;
+  }
+
+  /**
    * Puts the callout beside what its lesson is about (the cup, a coaster, a
-   * pennant), and underlines or lights what it names in the tickets and on
-   * the hold buttons. Captions give way: one message at a time.
+   * pennant), on the side where it covers neither the cup, the path it is
+   * about to fly, nor the coaster it is aiming at (lander-lessons.js
+   * decides, from what is drawn this frame and the slip's measured size),
+   * and underlines or lights what it names in the tickets and on the hold
+   * buttons. Captions give way: one message at a time.
    */
   function placeCoach() {
     const cue = lessons.cue;
@@ -3105,6 +3212,7 @@
       if (coachX !== null) coachX = coachY = null;
       if (hudLit) hudLit = null;
       if (padLit) padLit = null;
+      coachSideFor = null;
       return;
     }
     if (coachLesson !== cue.lesson) {
@@ -3118,34 +3226,35 @@
     const ended = coach.leaving || coach.acting;
     if (ended !== coachEnded) coachEnded = ended;
     const id = cue.lesson.id;
-    const ring = cue.size > 0 ? Math.round(Math.max(14, cue.size * S)) : 0;
-    let x = Math.round(sx(cue.ship ? shown.x + cue.x : cue.x));
-    let y = Math.round(sy(cue.ship ? shown.y + cue.y : cue.y));
-    // Coasters and pennants are on the ground, so their line sits above
-    // them. On the cup, the line takes the roomier side, away from a ghost's
-    // path, clear of the cup itself when no loop holds it off; the
-    // touchdown's line sits over the straw, clear of its ghost below; a
-    // feather's beside the landing loop, under the notes.
-    let side: typeof coachSide = "above";
-    if (id === "feather") {
-      const box = loopBox();
-      side = box.x + box.width < viewW - 280 ? "right" : "left";
-      x = Math.round(side === "right" ? box.x + box.width : box.x);
-      y = Math.round(box.y + box.height / 2);
-    } else if (cue.ship && id === "touchdown") {
-      y = Math.round(sy(shown.y + LANDER_TOP + 2));
-    } else if (cue.ship) {
-      const toward = cue.path?.land ? Math.sign(cue.path.land.x - shown.x) : 0;
-      side = x < viewW / 2 ? "right" : "left";
-      if (toward > 0 && x > 300) side = "left";
-      if (toward < 0 && viewW - x > 300) side = "right";
+    // Once the lesson is over the slip holds where it is, so its side holds too.
+    if (!ended || coachSideFor !== cue.lesson) {
+      measureSlip(cue.lesson);
+      const box = id === "feather" ? loopBox() : null;
+      const at = calloutFor(cue, {
+        cup: shown,
+        guide: lessons.guide,
+        along: lessons.along,
+        toX: sx,
+        toY: sy,
+        scale: S,
+        screen: { w: viewW, h: viewH, top: playTop + 8, bottom: playBottom },
+        slip: slipSize,
+        avoid: padRects,
+        loop: box ? { x: box.x, y: box.y, w: box.width, h: box.height } : null,
+        prefer: coachSideFor === cue.lesson ? coachSide : null,
+      });
+      coachSideFor = cue.lesson;
+      const x = Math.round(at.x);
+      const y = Math.round(at.y);
+      const width = Math.round(at.width);
+      const height = Math.round(at.height);
+      if (x !== coachX) coachX = x;
+      if (y !== coachY) coachY = y;
+      if (at.ring !== coachRing) coachRing = at.ring;
+      if (width !== coachWidth) coachWidth = width;
+      if (height !== coachHeight) coachHeight = height;
+      if (at.side !== coachSide) coachSide = at.side;
     }
-    const width = cue.ship && !ring && (side === "left" || side === "right") ? Math.round(CUP_EDGE * S) : 0;
-    if (x !== coachX) coachX = x;
-    if (y !== coachY) coachY = y;
-    if (ring !== coachRing) coachRing = ring;
-    if (width !== coachWidth) coachWidth = width;
-    if (side !== coachSide) coachSide = side;
     const on = !coach.leaving;
     const lit = !on ? null : id === "fuel" ? "tea" : id === "touchdown" && cue.fault !== "tilt" ? (cue.fault === "fast" ? "descent" : "drift") : null;
     if (lit !== hudLit) hudLit = lit;
@@ -3160,10 +3269,53 @@
   }
 
   /**
+   * Until the device has landed once, the way down: chalk dashes from the
+   * cup to the coaster the flight aims at, the path the engine's own
+   * autopilot would fly, and a ghost of the cup a beat ahead of it along
+   * them, so the player can follow it all the way. The way already flown
+   * is the cup's own trail. The path goes once the cup is down.
+   */
+  function drawGuide() {
+    const guide = lessons.guide;
+    if (!ctx || !guide || guideLight <= 0 || guide.points.length < 2) return;
+    const cue = lessons.cue;
+    // A move's own ghost is up (the burn's, the touchdown's), or the tilt's,
+    // which flies this very path: the lead ghost gives way to it.
+    const teaching = !!cue && !coach.leaving && !coach.acting && (!!cue.path || cue.lesson.id === "touchdown");
+    if (teaching && cue?.path === guide) return;
+    const cell = Math.max(2, Math.round(CELL * S));
+    const march = reduceMotion ? 0 : -lessonClock * 24;
+    // From the cup on (from the start during the countdown); once the cup is
+    // down, from where it last was on the path, while the path goes.
+    const along = lessons.along;
+    const points = guide.points;
+    const from = Math.floor(along);
+    ctx.save();
+    // It goes in three steps, as pixel things do.
+    ctx.globalAlpha = Math.ceil(guideLight * 3) / 3;
+    ghostPoints.length = points.length - from;
+    const start = pointAt(points, along);
+    for (let i = 0; i < ghostPoints.length; i++) {
+      const p = i === 0 ? start : points[from + i];
+      const point = (ghostPoints[i] ??= { x: 0, y: 0 });
+      point.x = sx(p.x);
+      point.y = sy(p.y - FOOT_DROP);
+    }
+    chalkPath(ctx, ghostPoints, { color: CREAM, cell, dash: 1, gap: 2, offset: march });
+    if (!teaching) {
+      const lead = pointAt(points, leadOn(guide, along));
+      // Once the cup is nearly where the ghost waits, the ghost has done its job.
+      if (Math.hypot(lead.x - shown.x, lead.y - shown.y) > 18) drawGhostCup(lead.x, lead.y, lead.a, 0.5, cell, !!lead.b);
+    }
+    ctx.restore();
+  }
+
+  /**
    * A move's ghost, the arcade's hologram: the cup dithered in cream, flying
-   * the move along chalk dashes. The burn rides with the cup and shows its
-   * fall slowing; the tilt flies the autopilot's path to a coaster and rests
-   * there; the touchdown stands upright on the coaster below.
+   * the move along chalk dashes while play is frozen for it. The burn rides
+   * with the cup and shows its fall slowing; the tilt flies the start of the
+   * autopilot's path to a coaster; the touchdown stands upright on the
+   * coaster below.
    */
   function drawLessonGhost() {
     const cue = lessons.cue;
@@ -3200,16 +3352,14 @@
       point.y = sy(points[i].y + oy - FOOT_DROP);
     }
     chalkPath(ctx, ghostPoints, { color: CREAM, cell, dash: 1, gap: 2, offset: march });
-    // The ghost flies the path, rests at its end for a beat, and goes again.
-    // Under Reduce Motion it waits at the end.
-    const period = path.relative ? 1.8 : 3.4;
-    const t = reduceMotion ? 1 : clamp(((lessonClock % period) / period) / 0.8, 0, 1);
-    const along = t * (points.length - 1);
-    const index = Math.min(points.length - 2, Math.floor(along));
-    const a = points[index];
-    const b = points[index + 1];
-    const f = along - index;
-    drawGhostCup(ox + lerp(a.x, b.x, f), oy + lerp(a.y, b.y, f), lerp(a.a, b.a, f), density, cell, cue.lesson.id === "burn");
+    // The ghost flies the move from the cup in real time (the burn until the
+    // fall stops, the tilt's first few seconds), rests a beat, and goes
+    // again. Under Reduce Motion it waits at the end.
+    const span = Math.min(points.length - 1, MOVE_DEMO / path.sample);
+    const period = span * path.sample + DEMO_REST;
+    const at = reduceMotion ? span : Math.min(span, (coach.age % period) / path.sample);
+    const p = pointAt(points, at);
+    drawGhostCup(ox + p.x, oy + p.y, p.a, density, cell, cue.lesson.id === "burn" || !!p.b);
   }
 
   /** The cup as a ghost at world x, y and a tilt, with a short flame when it is burning. */
@@ -3254,7 +3404,8 @@
   /**
    * In development, `?autoplay` hands the keys to the engine's autopilot,
    * which waits as a player following each lesson would, so every lesson can
-   * be seen: a second to read each one, and no tilting until it is taught.
+   * be seen: a second to read each one (two, then Continue, for one it
+   * can't answer with a move), and no tilting until it is taught.
    */
   function devAutoplay() {
     return import.meta.env.DEV && new URLSearchParams(window.location.search).has("autoplay");
@@ -3296,6 +3447,13 @@
     // On touch, the play area ends above the thumb buttons, so no coaster
     // ever sits under a thumb.
     const padsTop = touchUI && padsEl ? padsEl.getBoundingClientRect().top : viewH;
+    padRects =
+      touchUI && padsEl
+        ? [...padsEl.children].map((element) => {
+            const rect = element.getBoundingClientRect();
+            return { x: rect.left, y: rect.top, w: rect.width, h: rect.height };
+          })
+        : [];
     playBottom = Math.max(playTop + 160, Math.min(viewH, padsTop - 8));
     pmid = (playTop + playBottom) / 2;
     const units = viewW >= viewH * 1.05 ? 800 : 440;
@@ -3310,9 +3468,10 @@
     // A ghost's flight was planned under the old ceiling and view: plan it again.
     if (mode === "flying" && ceiling !== lastCeiling) lessons.replan();
     if (mode === "countdown") {
-      ship = newShip(site, viewHUnits);
+      ship = launchShip();
       path = { points: [ship.x, ship.y], ticks: [], crashed: false };
       snapCamera();
+      previewGuide();
     }
     S = base * cam.z;
     earthR = Math.max(6, Math.round((Math.min(viewW, viewH) * 0.09) / SC));
@@ -3456,7 +3615,7 @@
        the live region, so this copy is hidden. -->
   {#if caption && !coachLesson}
     {#key caption.id}
-      <p class="tm-caption boba-ui" aria-hidden="true" style="--tm-caption-bottom: {Math.round(viewH - playBottom + 12)}px">
+      <p class="tm-caption boba-ui boba-chip" aria-hidden="true" style="--tm-caption-bottom: {Math.round(viewH - playBottom + 12)}px">
         {#if caption.kicker}<span class="tm-caption-kicker">{caption.kicker}</span>{/if}
         <span class="tm-caption-line">{caption.line}</span>
       </p>
@@ -3464,72 +3623,65 @@
   {/if}
 
   {#if touchUI}
+    <!-- Pixel keys on the scene: the tilt pair bottom left, burn (the primary
+         key) bottom right. The key a lesson is about earns the accent step. -->
     <div bind:this={padsEl} class="tm-pads boba-ui">
       <div class="tm-pad-group">
-        <button
-          type="button"
-          class="tm-pad boba-riso is-small"
-          class:is-down={touchHeld.left}
-          class:has-slab={padLit === "left" || padLit === "tilt"}
-          style="--tilt: -1.4deg"
-          aria-label="Tilt left"
-          on:pointerdown={(event) => padDown(event, "left")}
-          on:pointerup={(event) => input.padUp(event, "left")}
-          on:pointercancel={(event) => input.padCancel(event, "left")}
-          on:lostpointercapture={(event) => input.padUp(event, "left")}
-          on:keydown={(event) => padKey(event, "left", true)}
-          on:keyup={(event) => padKey(event, "left", false)}
-          on:blur={() => input.padBlur("left")}
-          on:contextmenu={(event) => event.preventDefault()}
-        >
-          <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-            <path d="M25 22 A10 10 0 1 0 9 10" />
-            <path d="M5 6 L8.5 11 L14 8.5" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="tm-pad boba-riso is-small"
-          class:is-down={touchHeld.right}
-          class:has-slab={padLit === "right" || padLit === "tilt"}
-          style="--tilt: 1.2deg"
-          aria-label="Tilt right"
-          on:pointerdown={(event) => padDown(event, "right")}
-          on:pointerup={(event) => input.padUp(event, "right")}
-          on:pointercancel={(event) => input.padCancel(event, "right")}
-          on:lostpointercapture={(event) => input.padUp(event, "right")}
-          on:keydown={(event) => padKey(event, "right", true)}
-          on:keyup={(event) => padKey(event, "right", false)}
-          on:blur={() => input.padBlur("right")}
-          on:contextmenu={(event) => event.preventDefault()}
-        >
-          <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-            <path d="M7 22 A10 10 0 1 1 23 10" />
-            <path d="M27 6 L23.5 11 L18 8.5" />
-          </svg>
-        </button>
+        <span class="tm-key" class:is-lit={padLit === "left" || padLit === "tilt"}>
+          <button
+            type="button"
+            class="tm-pad boba-key"
+            class:is-down={touchHeld.left}
+            aria-label="Tilt left"
+            on:pointerdown={(event) => padDown(event, "left")}
+            on:pointerup={(event) => input.padUp(event, "left")}
+            on:pointercancel={(event) => input.padCancel(event, "left")}
+            on:lostpointercapture={(event) => input.padUp(event, "left")}
+            on:keydown={(event) => padKey(event, "left", true)}
+            on:keyup={(event) => padKey(event, "left", false)}
+            on:blur={() => input.padBlur("left")}
+            on:contextmenu={(event) => event.preventDefault()}
+          >
+            <PixelIcon grid={TILT_LEFT} palette={KEY_ICON} px={3} />
+          </button>
+        </span>
+        <span class="tm-key" class:is-lit={padLit === "right" || padLit === "tilt"}>
+          <button
+            type="button"
+            class="tm-pad boba-key"
+            class:is-down={touchHeld.right}
+            aria-label="Tilt right"
+            on:pointerdown={(event) => padDown(event, "right")}
+            on:pointerup={(event) => input.padUp(event, "right")}
+            on:pointercancel={(event) => input.padCancel(event, "right")}
+            on:lostpointercapture={(event) => input.padUp(event, "right")}
+            on:keydown={(event) => padKey(event, "right", true)}
+            on:keyup={(event) => padKey(event, "right", false)}
+            on:blur={() => input.padBlur("right")}
+            on:contextmenu={(event) => event.preventDefault()}
+          >
+            <PixelIcon grid={TILT_RIGHT} palette={KEY_ICON} px={3} />
+          </button>
+        </span>
       </div>
-      <button
-        type="button"
-        class="tm-pad tm-burn boba-riso is-small"
-        class:is-down={touchHeld.thrust}
-        class:has-slab={padLit === "thrust"}
-        style="--tilt: -0.9deg"
-        aria-label="Burn"
-        on:pointerdown={(event) => padDown(event, "thrust")}
-        on:pointerup={(event) => input.padUp(event, "thrust")}
-        on:pointercancel={(event) => input.padCancel(event, "thrust")}
-        on:lostpointercapture={(event) => input.padUp(event, "thrust")}
-        on:keydown={(event) => padKey(event, "thrust", true)}
-        on:keyup={(event) => padKey(event, "thrust", false)}
-        on:blur={() => input.padBlur("thrust")}
-        on:contextmenu={(event) => event.preventDefault()}
-      >
-        <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-          <path d="M16 3 C19 9 25 12 25 19 A9 9 0 0 1 7 19 C7 14 10 12 11 8 C13 11 14 12 15 13 C15.5 9 15 6 16 3 Z" />
-          <path d="M16 18 C17.5 20 19 21 19 23.5 A3 3 0 0 1 13 23.5 C13 21.5 14.5 20 16 18 Z" />
-        </svg>
-      </button>
+      <span class="tm-key is-burn" class:is-lit={padLit === "thrust"}>
+        <button
+          type="button"
+          class="tm-pad tm-burn boba-key is-primary"
+          class:is-down={touchHeld.thrust}
+          aria-label="Burn"
+          on:pointerdown={(event) => padDown(event, "thrust")}
+          on:pointerup={(event) => input.padUp(event, "thrust")}
+          on:pointercancel={(event) => input.padCancel(event, "thrust")}
+          on:lostpointercapture={(event) => input.padUp(event, "thrust")}
+          on:keydown={(event) => padKey(event, "thrust", true)}
+          on:keyup={(event) => padKey(event, "thrust", false)}
+          on:blur={() => input.padBlur("thrust")}
+          on:contextmenu={(event) => event.preventDefault()}
+        >
+          <PixelIcon grid={BURN_ICON} palette={KEY_ICON} px={4} />
+        </button>
+      </span>
     </div>
   {/if}
 
@@ -3541,8 +3693,10 @@
     side={coachSide}
     ring={coachRing}
     width={coachWidth}
+    height={coachHeight}
     scene="dark"
     leaving={coachLeaving}
+    ended={coachEnded}
     continuable={!!coachLesson && (coachLesson.slow ?? 1) < 1 && !coachEnded}
     on:continue={continueLesson}
     returnFocus={focusPlayfield}
@@ -3668,7 +3822,6 @@
     inset: auto -4px -6px;
     height: 3px;
     background: var(--b-slab);
-    border-radius: 2px;
     animation: boba-rise var(--motion-slow) var(--ease-emphasized) both;
   }
 
@@ -3679,9 +3832,10 @@
 
   /* --- Mission-control caption --- */
 
-  /* A paper chip, so the line reads on the night in either theme. It sits
-     low, just above the bottom of the play area (above the hold buttons on
-     touch), over the regolith rather than up where the cup starts. */
+  /* A pixel chip of the scene (the dark riso paper, stepped corners, cream
+     type), the same in both themes, as the scene is. It sits low, just above
+     the bottom of the play area (above the hold buttons on touch), over the
+     regolith rather than up where the cup starts. */
   .tm-caption {
     position: fixed;
     inset: auto 0 var(--tm-caption-bottom, var(--space-6));
@@ -3695,26 +3849,18 @@
     font-family: var(--font-ui);
     padding: var(--space-2) var(--space-3);
     text-align: center;
-    background: var(--b-raised);
-    border: 1px solid var(--b-rule);
-    border-radius: var(--radius-inline);
-    box-shadow: var(--shadow-popover);
     pointer-events: none;
     animation: boba-rise var(--motion-slow) var(--ease-emphasized) both;
   }
 
-  :global(.dark) .tm-caption {
-    box-shadow: var(--shadow-popover-dark);
-  }
-
   .tm-caption-kicker {
-    color: var(--b-muted);
+    color: #e8d5c4;
     font-size: 0.75rem;
     line-height: 1.25;
   }
 
   .tm-caption-line {
-    color: var(--b-strong);
+    color: #fdf8f3;
     font-family: var(--font-ui);
     font-size: 0.9375rem;
     font-style: italic;
@@ -3741,22 +3887,29 @@
     gap: var(--space-3);
   }
 
+  /* Each key sits in a holder that prints the accent step a cell down and
+     right of it when a lesson is about that key (the key's own notch would
+     clip a shadow cast by the key itself). The burn key's face is already
+     the accent, so its step is cream. */
+  .tm-key {
+    display: inline-grid;
+  }
+
+  .tm-key.is-lit {
+    filter: drop-shadow(4px 4px 0 #e85d4c);
+  }
+
+  .tm-key.is-burn.is-lit {
+    filter: drop-shadow(4px 4px 0 #fdf8f3);
+  }
+
   .tm-pad {
-    display: grid;
-    place-items: center;
     width: 4.5rem;
     height: 4rem;
-    padding: 0;
-    color: var(--b-strong);
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    font: inherit;
+    padding: 0 0 4px;
     pointer-events: auto;
     touch-action: none;
-    -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
-    transition: transform var(--motion-instant) var(--ease-standard);
   }
 
   .tm-burn {
@@ -3764,62 +3917,14 @@
     height: 5rem;
   }
 
-  .tm-pad svg {
-    width: 2rem;
-    height: 2rem;
-    overflow: visible;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .tm-burn svg {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
-
-  /* No slab at rest: the pads sit straight on the sky or the regolith. The
-     one a lesson is about earns its slab until the move is made. */
-  .tm-pad::before {
-    display: none;
-  }
-
-  .tm-pad.has-slab::before {
+  .tm-pad :global(.pixel-icon) {
     display: block;
-  }
-
-  /* Held: the sheet takes the accent plate's ink and sinks a pixel, with a
-     heavier outline so the press reads on the night or on the ground. */
-  .tm-pad.is-down {
-    color: #1a1a1a;
-    transform: translateY(1px);
-  }
-
-  .tm-pad.is-down::after {
-    background: #e85d4c;
-    border-color: #1a1a1a;
-    border-width: 2.25px;
-  }
-
-  :global(.dark) .tm-pad.is-down {
-    color: #1a1a1a;
-  }
-
-  :global(.dark) .tm-pad.is-down::after {
-    background: #f07563;
-    border-color: #fdf8f3;
   }
 
   @media (prefers-reduced-motion: reduce) {
     .tm-caption,
     .tm-tea.is-lit::after {
       animation: none;
-    }
-
-    .tm-pad {
-      transition: none;
     }
   }
 

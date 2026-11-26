@@ -11,8 +11,13 @@ import {
   TANK_LOW,
   TEAS,
   TOPPINGS,
+  ladleAt,
   makeOrder,
+  rulesFor,
   scoopQueue,
+  scoopResult,
+  sealNeedle,
+  sealResult,
   stationsFor,
   sugarPumps,
 } from "../src/lib/arcade/orders-engine.js";
@@ -21,13 +26,15 @@ import {
   STATION_LESSON,
   CARD_STEPS,
   THING_GAP,
-  THING_LIFE,
-  WALK_SLOW,
-  WALK_WAIT,
+  WALK_GAP,
   allLessons,
+  atMoment,
   followLessons,
+  ladleCentreIn,
   lessonMemory,
   lessonNow,
+  needleCentreIn,
+  ticketBeckon,
   walkPending,
 } from "../src/lib/arcade/orders-lessons.js";
 
@@ -58,6 +65,7 @@ function cupFor(g) {
     tea: null,
     ice: 0,
     sugar: 0,
+    shakes: 0,
     queue: scoopQueue(g.order),
     drops: [],
     stampAt: null,
@@ -67,10 +75,14 @@ function cupFor(g) {
 function view(extra = {}) {
   return {
     coarse: false,
+    expert: false,
+    started: false,
     tapIndex: 0,
     jarIndex: 0,
     holding: false,
     loaded: true,
+    ladle: 0,
+    needle: 0.77,
     cup: null,
     guests: [],
     tanks: TEAS.map(() => TANK_CAPACITY),
@@ -86,6 +98,8 @@ function view(extra = {}) {
 const none = () => false;
 const all = () => true;
 const order = { tea: "matcha", sugar: 50, ice: "regular", toppings: [{ kind: "jelly", scoops: 1 }] };
+/** Every step of the walk-through, for a device that has finished it. */
+const WALK = ["ticket", "ice", "syrup", "pour", "jar", "drop", "shake", "seal"];
 
 test("every line fits the arcade's one-line voice", () => {
   for (const lesson of allLessons()) {
@@ -93,10 +107,13 @@ test("every line fits the arcade's one-line voice", () => {
     assert.ok(words.length <= 8, `${lesson.id}: "${lesson.text}" runs to ${words.length} words`);
     assert.ok(!/[!·]/.test(lesson.text), `${lesson.id} uses a mark the voice avoids`);
     assert.match(lesson.text, /^[A-Z][^.]*[^.\s]\.$/, `${lesson.id} isn't one full sentence`);
-    // A move waits for the player (it is done, or stands down); a thing
-    // holds at full speed until it is continued, or ends by itself.
-    if (lesson.move) assert.equal(lesson.life, Infinity, lesson.id);
-    else assert.ok(lesson.life === THING_LIFE && (lesson.slow ?? 1) === 1, lesson.id);
+  }
+});
+
+test("every lesson stops the shift until it is answered, however long it is read", () => {
+  for (const lesson of allLessons()) {
+    assert.equal(lesson.slow, 0, `${lesson.id} pauses play rather than slowing it`);
+    assert.equal(lesson.life, Infinity, `${lesson.id} never ends by itself`);
   }
 });
 
@@ -117,8 +134,9 @@ test("the first drink is walked through station by station, each pointing at wha
 
   assert.equal(teach().at.guest, g.id, "the ticket the hand takes next");
   v.cup = cupFor(g);
+  v.started = true;
   assert.equal(v.cup.station, "sugar", "syrup first");
-  assert.equal(teach().lesson.slow, WALK_SLOW);
+  assert.equal(teach().lesson.slow, 0);
   v.cup.station = "ice";
   teach();
   v.cup.station = "pour";
@@ -226,15 +244,17 @@ test("the ticket waits until it is on the rail", () => {
   const g = guest(order, { placed: false });
   const v = view({ guests: [g] });
   assert.equal(lessonNow(v, none), null);
+  assert.equal(ticketBeckon(v, none), -1);
   g.placed = true;
   assert.equal(lessonNow(v, none).lesson.id, "ticket");
+  assert.equal(ticketBeckon(v, none), g.id);
 });
 
-test("nothing else is taught while a drink still has a station to teach", () => {
+test("only its stations are taught while a drink is on the bench", () => {
   const critic = guest(makeOrder(50, CRITIC, seeded(3)), { regular: CRITIC });
   const g = guest(order);
   const cup = cupFor(g);
-  const v = view({ guests: [g, critic], cup, jar: 4, tanks: [0, 0, 0, 0] });
+  const v = view({ guests: [g, critic], cup, jar: 4, tanks: [0, 0, 0, 0], started: true });
   // Only the ticket is known: through the syrup's settle its own line stays
   // up, and the critic, the jar and the dry tanks all wait for the drink.
   cup.busy = true;
@@ -243,36 +263,66 @@ test("nothing else is taught while a drink still has a station to teach", () => 
   assert.equal(lessonNow(v, knowsTicket).lesson.id, "syrup");
   cup.station = "pour";
   assert.equal(lessonNow(v, knowsTicket), null, "between stations, nothing");
-  // The last station still to teach is the seal: the shake is no time for the critic either.
+  // Every station learned: still nothing while the drink is on the bench, at any station.
   cup.busy = false;
-  cup.station = "shake";
-  assert.equal(lessonNow(v, (id) => id !== "critic" && id !== "seal"), null);
-  // Every station learned: the critic is named.
-  cup.busy = false;
-  cup.station = "shake";
+  for (const station of ["sugar", "ice", "pour", "scoop", "shake", "seal"]) {
+    cup.station = station;
+    assert.equal(lessonNow(v, (id) => !["critic", "patience", "tipjar"].includes(id)), null, station);
+  }
+  // Served, with the bench empty: the critic is named.
+  v.cup = null;
+  v.guests = [critic];
   const next = lessonNow(v, (id) => id !== "critic");
   assert.equal(next.lesson.id, "critic");
   assert.equal(next.lesson.name, "the critic");
   assert.deepEqual(next.at, { kind: "ticket", index: -1, guest: critic.id });
 });
 
-test("things wait while the hands are on the pour, the ladle or the sealer", () => {
+test("until the shift's first ticket is taken, nothing else is said and the ticket stays marked", () => {
+  const coach = createCoach("orders", { persist: false });
+  const memory = lessonMemory();
+  const g = guest(order);
+  const critic = guest(makeOrder(50, CRITIC, seeded(5)), { regular: CRITIC, left: 30 * CROSS_AT });
+  const v = view({ guests: [g, critic], jar: 4, special: "matcha", tanks: [0, TANK_CAPACITY, TANK_CAPACITY, TANK_CAPACITY] });
+  // The most restless guest's ticket: its line, and the mark on it.
+  run(coach, v, memory, 0.5);
+  assert.equal(coach.current?.id, "ticket");
+  assert.equal(memory.cue.at.guest, critic.id);
+  assert.equal(ticketBeckon(v, coach.learned), critic.id);
+  // Continued without taking it: counted, and play comes back; but a
+  // critic, a cross guest, a tip, a dry tank and a special all wait, and
+  // the ticket stays marked.
+  coach.done("ticket");
+  run(coach, v, memory, THING_GAP * 4);
+  assert.equal(coach.current, null);
+  assert.equal(ticketBeckon(v, coach.learned), critic.id);
+  // Taken: the mark goes and the walk-through goes on.
+  v.started = true;
+  v.cup = cupFor(critic);
+  assert.equal(ticketBeckon(v, coach.learned), -1);
+  run(coach, v, memory, WALK_GAP + 0.5);
+  assert.equal(coach.current?.id, STATION_LESSON[v.cup.station]);
+  // A device that has learned every step marks nothing.
+  assert.equal(ticketBeckon(view({ guests: [g] }), all), -1);
+});
+
+test("things wait for an empty bench", () => {
   const g = guest(order);
   const other = guest(order, { left: 5 });
-  for (const station of ["pour", "scoop", "seal"]) {
+  const knows = (id) => !["patience", "tipjar"].includes(id);
+  for (const station of ["sugar", "ice", "pour", "scoop", "shake", "seal"]) {
     const cup = { ...cupFor(g), station };
-    const v = view({ guests: [g, other], cup, jar: 5 });
-    assert.equal(lessonNow(v, (id) => !["patience", "tipjar"].includes(id)), null, station);
+    const v = view({ guests: [g, other], cup, jar: 5, started: true });
+    assert.equal(lessonNow(v, knows), null, station);
   }
-  const cup = { ...cupFor(g), station: "shake" };
-  const v = view({ guests: [g, other], cup, jar: 5 });
-  assert.equal(lessonNow(v, (id) => !["patience", "tipjar"].includes(id)).lesson.id, "patience");
+  const v = view({ guests: [g, other], jar: 5, started: true });
+  assert.equal(lessonNow(v, knows).lesson.id, "patience");
 });
 
 test("each later thing is named when it first matters", () => {
   const knowsAllBut = (...ids) => (id) => !ids.includes(id);
 
-  // Patience, from the moment a waiting guest starts watching the clock (not the one being made).
+  // Patience, from the moment a waiting guest starts watching the clock.
   const g = guest(order, { left: 30 * GLANCE_AT + 0.5 });
   const v = view({ guests: [g] });
   assert.equal(lessonNow(v, knowsAllBut("patience")), null);
@@ -320,18 +370,20 @@ test("with the shared coach, a first shift teaches each station once and a secon
     const shown = [];
     for (let drink = 0; drink < drinks; drink++) {
       const g = guest(makeOrder(40, null, random));
-      const v = view({ guests: [g], tapIndex: TEAS.indexOf(g.order.tea) });
+      const v = view({ guests: [g], tapIndex: TEAS.indexOf(g.order.tea), started: drink > 0 });
       const show = () => {
         const next = lessonNow(v, coach.learned);
         if (next && next.lesson.move && coach.offer(next.lesson)) {
           shown.push(next.lesson.id);
           coach.step(0.7);
+          coach.acted(next.lesson.id);
           coach.done(next.lesson.id);
           coach.step(1);
         }
       };
       show();
       v.cup = cupFor(g);
+      v.started = true;
       for (const station of v.cup.stations) {
         v.cup.station = station;
         if (station === "scoop") v.jarIndex = TOPPINGS.indexOf(v.cup.queue[0]);
@@ -350,21 +402,22 @@ test("with the shared coach, a first shift teaches each station once and a secon
   assert.deepEqual(shift(6), []);
 });
 
-/** The game's clock across a test's runs. */
+/** The game's clock across a test's runs: it stops while a lesson stops play, as the counter's does. */
 let clock = 0;
 
-/** Steps the coach and the lessons together for `seconds`, as the game's frames do; returns the line's pace each frame. */
+/** Steps the coach and the lessons together for `seconds` of real time, as the game's frames do; returns play's pace each frame. */
 function run(coach, v, memory, seconds, dt = 1 / 60) {
   const paces = [];
   for (let t = 0; t < seconds; t += dt) {
-    clock += dt;
-    paces.push(coach.step(dt) / dt);
+    const played = coach.step(dt);
+    clock += played;
+    paces.push(played / dt);
     followLessons(coach, v, memory, clock);
   }
   return paces;
 }
 
-test("the line slows while a station is taught and is back to speed once it is done", () => {
+test("play stops while a step is taught, as long as it takes, and comes back with its move", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
   const g = guest(order);
@@ -372,18 +425,164 @@ test("the line slows while a station is taught and is back to speed once it is d
   run(coach, v, memory, 1);
   assert.equal(coach.current?.id, "ticket");
   assert.equal(memory.cue.at.kind, "ticket");
-  assert.ok(Math.abs(coach.scale - WALK_SLOW) < 0.02, "the guests wait at half speed");
-  // Taken: done, and the next station's line takes over at once.
+  assert.ok(coach.paused, "the shift stops for it");
+  // However long it is read, it waits, and no time passes in the shift.
+  const before = clock;
+  run(coach, v, memory, 90);
+  assert.equal(coach.current?.id, "ticket");
+  assert.ok(clock - before < 0.01, `${(clock - before).toFixed(3)} s of play passed`);
+  // Taken (the press is the move): play comes back at once.
+  coach.acted("ticket");
   coach.done("ticket");
   v.cup = cupFor(g);
-  run(coach, v, memory, 0.1);
+  v.started = true;
+  let paces = run(coach, v, memory, 0.8);
+  assert.ok(paces.at(-1) > 0.95, `back to speed, ${paces.at(-1)}`);
+  // The first pump: the line stays up while play runs, until the marks are full.
+  run(coach, v, memory, WALK_GAP + 0.2);
   assert.equal(coach.current?.id, "syrup");
-  // The last pump: done, and the line comes back to speed while the cup moves on.
+  assert.ok(coach.paused);
+  coach.acted("syrup");
+  v.cup.sugar = 1;
+  paces = run(coach, v, memory, 1);
+  assert.equal(coach.current?.id, "syrup");
+  assert.ok(paces.at(-1) > 0.95);
   coach.done("syrup");
   v.cup.busy = true;
-  const paces = run(coach, v, memory, 1);
-  assert.ok(paces.at(-1) > 0.95, `back to speed, ${paces.at(-1)}`);
+  run(coach, v, memory, 1);
   assert.equal(coach.current, null);
+});
+
+test("steps come one at a time, a short quiet of play apart", () => {
+  const coach = createCoach("orders", { persist: false });
+  const memory = lessonMemory();
+  const g = guest(order);
+  const v = view({ guests: [g], tapIndex: TEAS.indexOf("matcha") });
+  /** Plays on until a lesson is up; returns the play seconds with none on screen. */
+  const quietUntilNext = () => {
+    let quiet = 0;
+    for (let frame = 0; frame < 600 && (!coach.current || coach.leaving); frame++) {
+      const was = clock;
+      coach.step(1 / 60);
+      clock += 1 / 60;
+      followLessons(coach, v, memory, clock);
+      if (!coach.current) quiet += clock - was;
+    }
+    return quiet;
+  };
+  quietUntilNext();
+  assert.equal(coach.current?.id, "ticket");
+  coach.done("ticket");
+  v.cup = cupFor(g);
+  v.started = true;
+  assert.ok(quietUntilNext() >= WALK_GAP - 0.05);
+  assert.equal(coach.current?.id, "syrup");
+  coach.done("syrup");
+  v.cup.station = "ice";
+  assert.ok(quietUntilNext() >= WALK_GAP - 0.05);
+  assert.equal(coach.current?.id, "ice");
+});
+
+test("a station the player has begun before its line shows isn't taught on that drink", () => {
+  const coach = createCoach("orders", { persist: false });
+  const memory = lessonMemory();
+  coach.skip("ticket");
+  const g = guest(order);
+  const v = view({ guests: [g], cup: cupFor(g), started: true });
+  // A pump in during the quiet after the ticket.
+  memory.calm = clock + WALK_GAP;
+  v.cup.sugar = 1;
+  run(coach, v, memory, WALK_GAP * 3);
+  assert.equal(coach.current, null);
+  // The syrup worked: known. The ice is new: taught.
+  coach.done("syrup");
+  assert.ok(coach.learned("syrup"));
+  v.cup.station = "ice";
+  run(coach, v, memory, 0.2);
+  assert.equal(coach.current?.id, "ice");
+  // A shake made before its line: not taught either.
+  coach.done("ice");
+  run(coach, v, memory, 1);
+  for (const id of ["pour", "jar", "drop"]) coach.skip(id);
+  v.cup.station = "shake";
+  v.cup.shakes = 2;
+  run(coach, v, memory, WALK_GAP * 3);
+  assert.equal(coach.current, null);
+});
+
+test("no new line while tea is running, except the one for a dry tap", () => {
+  const coach = createCoach("orders", { persist: false });
+  const memory = lessonMemory();
+  for (const id of ["ticket", "syrup", "ice"]) coach.skip(id);
+  const g = guest(order);
+  const matcha = TEAS.indexOf("matcha");
+  const v = view({ guests: [g], cup: { ...cupFor(g), station: "pour" }, started: true, tapIndex: matcha, holding: true });
+  run(coach, v, memory, 1);
+  assert.equal(coach.current, null, "pouring already: the pour isn't stopped to teach it");
+  v.tanks[matcha] = 0;
+  run(coach, v, memory, 0.2);
+  assert.equal(coach.current?.id, "dry");
+  assert.match(coach.current.text, /^Let go/);
+});
+
+test("the drop and the stamp stop play at the very moment to make them", () => {
+  const coach = createCoach("orders", { persist: false });
+  const memory = lessonMemory();
+  for (const id of ["ticket", "syrup", "ice", "pour", "jar", "shake"]) coach.skip(id);
+  const g = guest(order);
+  const v = view({ guests: [g], cup: { ...cupFor(g), station: "scoop" }, started: true, jarIndex: TOPPINGS.indexOf("jelly"), ladle: 0.8 });
+  // Out at the side: nothing yet, and the counter is told what the line waits on.
+  run(coach, v, memory, 0.5);
+  assert.equal(coach.current, null);
+  assert.equal(memory.waiting, "ladle");
+  // Right over the cup: the line, with play stopped there, where a drop lands clean.
+  v.ladle = 0;
+  run(coach, v, memory, 0.5);
+  assert.equal(coach.current?.id, "drop");
+  assert.ok(coach.paused);
+  assert.equal(scoopResult(v.ladle), "clean");
+  assert.equal(memory.waiting, null);
+  coach.acted("drop");
+  coach.done("drop");
+  run(coach, v, memory, 1);
+
+  // The seal: the needle cold, then in the band.
+  v.cup.station = "seal";
+  v.needle = 0.2;
+  run(coach, v, memory, WALK_GAP + 0.5);
+  assert.equal(coach.current, null);
+  assert.equal(memory.waiting, "needle");
+  v.needle = 0.77;
+  run(coach, v, memory, 0.2);
+  assert.equal(coach.current?.id, "seal");
+  assert.equal(sealResult(v.needle), "sealed");
+  assert.ok(atMoment(v, "seal") && !atMoment({ ...v, needle: 0.5 }, "seal"));
+});
+
+test("the counter can stop its clock right on the ladle's and the needle's moments", () => {
+  for (const swing of [2.4, 3, 3.6, 4.7]) {
+    for (let time = 0; time < 6; time += 0.137) {
+      const until = ladleCentreIn(time, swing);
+      assert.ok(until > 0 && until <= Math.PI / swing + 1e-9, `${until}`);
+      assert.ok(Math.abs(ladleAt(time + until, swing, Math.PI / 2)) < 1e-9);
+      // Nowhere before it is the ladle over the cup's middle.
+      for (let k = 1; k < 10; k++) assert.ok(Math.abs(ladleAt(time + (until * k) / 10, swing, Math.PI / 2)) > 1e-6);
+    }
+    // Stopped right on a crossing, the next one is the one after.
+    const first = ladleCentreIn(0, swing);
+    assert.ok(Math.abs(ladleCentreIn(first, swing) - Math.PI / swing) < 1e-9);
+  }
+  for (const expert of [false, true]) {
+    const { sealBand: band, sealPeriod: period } = rulesFor(expert);
+    const middle = (band[0] + band[1]) / 2;
+    for (let time = 0; time < 5; time += 0.093) {
+      const until = needleCentreIn(time, expert);
+      assert.ok(until > 0 && until <= period, `${until}`);
+      assert.ok(Math.abs(sealNeedle(time + until, expert) - middle) < 1e-9);
+      assert.equal(sealResult(sealNeedle(time + until, expert), expert), "sealed");
+      assert.ok(needleCentreIn(time + until, expert) > 1e-6);
+    }
+  }
 });
 
 test("a station's lesson whose moment passes comes down uncounted, and the next drink teaches it", () => {
@@ -391,15 +590,17 @@ test("a station's lesson whose moment passes comes down uncounted, and the next 
   const memory = lessonMemory();
   coach.skip("ticket");
   const g = guest(order);
-  const v = view({ guests: [g], cup: cupFor(g), tapIndex: TEAS.indexOf("matcha") });
+  const v = view({ guests: [g], cup: cupFor(g), started: true, tapIndex: TEAS.indexOf("matcha") });
   run(coach, v, memory, 0.5);
   assert.equal(coach.current?.id, "syrup");
   // A tap pressed early: the cup jumps to the pour, short on syrup and ice.
   v.cup.station = "pour";
   run(coach, v, memory, 0.1);
-  assert.equal(coach.current?.id, "pour");
+  assert.equal(coach.current, null);
   assert.equal(coach.learned("syrup"), false);
-  // Dumped: nothing left to teach on this drink, and nothing stays slowed.
+  run(coach, v, memory, WALK_GAP + 0.5);
+  assert.equal(coach.current?.id, "pour");
+  // Dumped: nothing left to teach on this drink, and play comes back.
   v.cup = null;
   const paces = run(coach, v, memory, 0.8);
   assert.equal(coach.current, null);
@@ -409,42 +610,25 @@ test("a station's lesson whose moment passes comes down uncounted, and the next 
   const next = guest(order);
   v.guests = [next];
   v.cup = cupFor(next);
-  run(coach, v, memory, 0.1);
+  run(coach, v, memory, WALK_GAP + 0.5);
   assert.equal(coach.current?.id, "syrup");
 });
 
-test("a station left unanswered stands down for the shift, so the line never stays slowed", () => {
+test("Continue on a step counts it as known, and play comes back", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
   coach.skip("ticket");
   const g = guest(order);
-  const v = view({ guests: [g], cup: cupFor(g) });
-  const paces = run(coach, v, memory, WALK_WAIT + 1);
-  assert.ok(WALK_WAIT <= 7, "about seven seconds at most");
-  assert.equal(coach.current, null);
+  const v = view({ guests: [g], cup: cupFor(g), started: true });
+  run(coach, v, memory, 30);
+  assert.equal(coach.current?.id, "syrup", "it never stands down by itself");
+  assert.equal(coach.scale, 0);
+  coach.done("syrup");
+  assert.ok(coach.learned("syrup"));
+  const paces = run(coach, v, memory, 1);
   assert.ok(paces.at(-1) > 0.95);
-  assert.equal(coach.learned("syrup"), false, "uncounted");
-  // Not offered again this shift, on this drink or the next.
-  run(coach, v, memory, 2);
-  assert.equal(coach.current, null);
-  const next = guest(order);
-  v.guests = [next];
-  v.cup = cupFor(next);
-  run(coach, v, memory, 0.5);
-  assert.equal(coach.current, null);
-  // Nor does it hold the later things back: with the rest known, the tip
-  // jar is named while the syrup is still to go in.
-  for (const id of ["ice", "pour", "jar", "drop", "shake", "seal"]) coach.skip(id);
-  v.jar = 2;
-  run(coach, v, memory, 0.5);
-  assert.equal(coach.current?.id, "tipjar");
-  v.jar = 0;
-  coach.dismiss();
-  // A new shift tries again.
-  memory.held.clear();
-  coach.reset();
-  run(coach, v, memory, 0.1);
-  assert.equal(coach.current?.id, "syrup");
+  run(coach, v, memory, WALK_GAP + 1);
+  assert.equal(coach.current, null, "not taught again");
 });
 
 test("the pour's line follows the tea once the tap is held, and stays up through the hold", () => {
@@ -452,34 +636,38 @@ test("the pour's line follows the tea once the tap is held, and stays up through
   const memory = lessonMemory();
   for (const id of ["ticket", "ice", "syrup"]) coach.skip(id);
   const g = guest(order);
-  const v = view({ guests: [g], cup: { ...cupFor(g), station: "pour" }, tapIndex: TEAS.indexOf("matcha") });
+  const v = view({ guests: [g], cup: { ...cupFor(g), station: "pour" }, started: true, tapIndex: TEAS.indexOf("matcha") });
   run(coach, v, memory, 0.5);
   assert.deepEqual(memory.cue.at, { kind: "step", index: CARD_STEPS.indexOf("pour"), guest: -1 });
+  assert.ok(coach.paused);
   v.holding = true;
   coach.acted("pour");
   const moved = followLessons(coach, v, memory, clock);
   assert.equal(moved, true, "measured again at its new target");
   assert.equal(memory.cue.at.kind, "line");
-  const paces = run(coach, v, memory, WALK_WAIT + 1);
+  const paces = run(coach, v, memory, 10);
   assert.equal(coach.current?.id, "pour", "a long hold never stands it down");
   assert.ok(paces.at(-1) > 0.95, "and the line is at speed while the tap runs");
 });
 
-test("a thing never takes over from a station, but a station takes over from a thing", () => {
+test("a thing gives way to a drink being started", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
   for (const id of ["ticket", "syrup", "pour", "jar", "drop", "shake", "seal"]) coach.skip(id);
-  // The receipt is named, at full speed.
-  const v = view({ receipt: { sentBack: false, combo: 0 } });
-  run(coach, v, memory, 0.2);
+  // The receipt is named, and the shift stops for it.
+  const v = view({ receipt: { sentBack: false, combo: 0 }, started: true });
+  run(coach, v, memory, 0.5);
   assert.equal(coach.current?.id, "serve");
-  assert.equal(coach.current.slow ?? 1, 1, "named at full speed");
-  // The next ticket is taken while the line is still up (the receipt stays):
-  // the ice, a station still to teach, takes over at once.
+  assert.ok(coach.paused);
+  // The next ticket is taken before it could be read: down, uncounted, and
+  // the ice, a station still to teach, follows after a short quiet.
   const g = guest(order);
   v.guests = [g];
   v.cup = { ...cupFor(g), station: "ice" };
   run(coach, v, memory, 0.1);
+  assert.equal(coach.current, null);
+  assert.equal(coach.learned("serve"), false);
+  run(coach, v, memory, WALK_GAP + 0.5);
   assert.equal(coach.current?.id, "ice");
   // And a thing never interrupts it: the tip jar fills, the line stays on the ice.
   v.jar = 4;
@@ -491,15 +679,15 @@ test("a thing never takes over from a station, but a station takes over from a t
 test("a thing comes down when what it points at goes", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
-  for (const id of ["ticket", "ice", "syrup", "pour", "jar", "drop", "shake", "seal"]) coach.skip(id);
-  // The receipt cleared at once (the next ticket taken straight away): down, uncounted.
+  for (const id of WALK) coach.skip(id);
+  // The receipt cleared at once: down, uncounted.
   const v = view({ receipt: { sentBack: false, combo: 0 } });
   run(coach, v, memory, 0.3);
   assert.equal(coach.current?.id, "serve");
   v.receipt = null;
   run(coach, v, memory, 0.1);
   assert.equal(coach.current, null);
-  assert.equal(coach.learned("serve"), false, "the next hand-off says it again");
+  assert.equal(coach.learned("serve"), false, "the next shift says it again");
   // The critic's line follows their own ticket as the rail shifts, and fades once read if they are served.
   const other = guest(order);
   const critic = guest(order, { regular: CRITIC });
@@ -517,26 +705,27 @@ test("a thing comes down when what it points at goes", () => {
   assert.ok(coach.leaving);
 });
 
-
-test("things come one at a time, with a little quiet between them", () => {
+test("things come one at a time, with a little quiet of play between them", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
-  for (const id of ["ticket", "ice", "syrup", "pour", "jar", "drop", "shake", "seal"]) coach.skip(id);
+  for (const id of WALK) coach.skip(id);
   // The first hand-off: the receipt, coins in the jar, and a special on the rail, all at once.
   const v = view({ receipt: { sentBack: false, combo: 0 }, jar: 3, guests: [guest({ ...order, tea: "taro" })], special: "taro" });
   const shown = [];
   let quietFor = 0;
   let last = null;
-  for (let t = 0; t < 3 * (THING_LIFE + THING_GAP) + 2; t += 1 / 60) {
-    clock += 1 / 60;
-    coach.step(1 / 60);
+  for (let t = 0; t < 30; t += 1 / 60) {
+    const played = coach.step(1 / 60);
+    clock += played;
     followLessons(coach, v, memory, clock);
     const id = coach.current?.id ?? null;
     if (id && id !== last) {
       shown.push({ id, quiet: quietFor });
       quietFor = 0;
     }
-    if (!id) quietFor += 1 / 60;
+    if (!id) quietFor += played;
+    // Read for a couple of seconds, then continued.
+    if (id && !coach.leaving && coach.age > 2) coach.done(id);
     last = id;
   }
   assert.deepEqual(
@@ -546,14 +735,15 @@ test("things come one at a time, with a little quiet between them", () => {
   for (const item of shown.slice(1)) assert.ok(item.quiet >= THING_GAP - 0.05, `${item.id} after ${item.quiet.toFixed(2)} s of quiet`);
 });
 
-test("the receipt's line follows the last station at once", () => {
+test("the receipt's line follows the last station after a short quiet", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
   for (const id of ["ticket", "ice", "syrup", "pour", "jar", "drop", "shake"]) coach.skip(id);
   const g = guest(order);
-  const v = view({ guests: [g], cup: { ...cupFor(g), station: "seal" } });
+  const v = view({ guests: [g], cup: { ...cupFor(g), station: "seal" }, started: true });
   run(coach, v, memory, 0.5);
   assert.equal(coach.current?.id, "seal");
+  coach.acted("seal");
   coach.done("seal");
   v.cup.stampAt = clock;
   run(coach, v, memory, 0.7);
@@ -561,51 +751,52 @@ test("the receipt's line follows the last station at once", () => {
   v.cup = null;
   v.guests = [];
   v.receipt = { sentBack: false, combo: 0 };
-  run(coach, v, memory, 0.6);
+  run(coach, v, memory, 0.2);
+  assert.equal(coach.current, null, "not on the heels of the seal");
+  run(coach, v, memory, WALK_GAP);
   assert.equal(coach.current?.id, "serve");
 });
 
 test("a thing holds until it is continued, and continuing counts it", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
-  for (const id of ["ticket", "ice", "syrup", "pour", "jar", "drop", "shake", "seal"]) coach.skip(id);
+  for (const id of WALK) coach.skip(id);
   const v = view({ jar: 3 });
-  run(coach, v, memory, THING_LIFE - 1);
-  assert.equal(coach.current?.id, "tipjar", "still up, at full speed");
-  assert.equal(coach.scale, 1);
-  // Continue (Enter, or the slip's button) is coach.done.
+  run(coach, v, memory, 30);
+  assert.equal(coach.current?.id, "tipjar", "still up, with play stopped");
+  assert.equal(coach.scale, 0);
+  // Continue (Enter, the slip's button, or any press in play) is coach.done.
   coach.done("tipjar");
   assert.ok(coach.learned("tipjar"));
   run(coach, v, memory, 1);
   assert.equal(coach.current, null);
 });
 
-test("a thing comes down as the hands reach the pour, the ladle or the sealer", () => {
-  for (const station of ["pour", "scoop", "seal"]) {
-    const coach = createCoach("orders", { persist: false });
-    const memory = lessonMemory();
-    for (const id of ["ticket", "ice", "syrup", "pour", "jar", "drop", "shake", "seal"]) coach.skip(id);
-    const g = guest(order);
-    const v = view({ guests: [g], cup: { ...cupFor(g), station: "shake" }, jar: 3, jarIndex: TOPPINGS.indexOf("jelly") });
-    run(coach, v, memory, 0.5);
-    assert.equal(coach.current?.id, "tipjar", "named at the shake");
-    // Too soon to have been read: down, uncounted, so it comes again.
-    v.cup.station = station;
-    run(coach, v, memory, 0.1);
-    assert.equal(coach.current, null, station);
-    assert.equal(coach.learned("tipjar"), false);
-    // Named once a shift: not again in this one.
-    v.cup.station = "shake";
-    run(coach, v, memory, THING_GAP + 1);
-    assert.equal(coach.current, null);
-    // Next shift, read first, then the pour: it counts, and fades.
-    const shift = lessonMemory();
-    run(coach, v, shift, LESSONS.tipjar.minLife + 0.5);
-    assert.equal(coach.current?.id, "tipjar");
-    v.cup.station = station;
-    run(coach, v, shift, 0.1);
-    assert.ok(coach.learned("tipjar"), station);
-  }
+test("a thing comes down when a drink is started", () => {
+  const coach = createCoach("orders", { persist: false });
+  for (const id of WALK) coach.skip(id);
+  const g = guest(order);
+  const memory = lessonMemory();
+  const v = view({ jar: 3, started: true });
+  run(coach, v, memory, 0.5);
+  assert.equal(coach.current?.id, "tipjar");
+  // Too soon to have been read: down, uncounted, so it comes again.
+  v.guests = [g];
+  v.cup = cupFor(g);
+  run(coach, v, memory, 0.1);
+  assert.equal(coach.current, null);
+  assert.equal(coach.learned("tipjar"), false);
+  // Named once a shift: not again in this one.
+  v.cup = null;
+  run(coach, v, memory, THING_GAP + 1);
+  assert.equal(coach.current, null);
+  // Next shift, read first, then a drink: it counts, and fades.
+  const shift = lessonMemory();
+  run(coach, v, shift, LESSONS.tipjar.minLife + 0.5);
+  assert.equal(coach.current?.id, "tipjar");
+  v.cup = cupFor(g);
+  run(coach, v, shift, 0.1);
+  assert.ok(coach.learned("tipjar"));
 });
 
 test("a tap run dry mid-pour says how to go on: let go, brew, then pour the rest", () => {
@@ -637,7 +828,7 @@ test("a tap run dry mid-pour says how to go on: let go, brew, then pour the rest
 test("a thing is named once a shift, read to the end or not", () => {
   const coach = createCoach("orders", { persist: false });
   let memory = lessonMemory();
-  for (const id of ["ticket", "ice", "syrup", "pour", "jar", "drop", "shake", "seal"]) coach.skip(id);
+  for (const id of WALK) coach.skip(id);
   const v = view({ receipt: { sentBack: false, combo: 0 } });
   run(coach, v, memory, 0.3);
   assert.equal(coach.current?.id, "serve");

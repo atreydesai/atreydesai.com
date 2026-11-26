@@ -59,20 +59,34 @@
     type Popup,
   } from "#lib/arcade/art.ts";
   import {
+    FREEZE_MIN,
     HOLD,
     LESSONS,
     MOVE_LATEST,
-    SETTLE,
+    basketPlaces,
+    catchMoved,
+    catchPlaces,
+    choosePlace,
+    cupPlaces,
     flightPath,
+    ghostAt,
+    keepOff,
     lessonNow,
+    linkPlaces,
     mayOffer,
+    mayPause,
     nextDown,
     onSpot,
     stillNext,
+    type Box,
+    type CupMarks,
     type FlightPoint,
+    type KeepOff,
+    type Place,
   } from "#lib/arcade/catch-lessons.js";
+  import { createPointerGuard } from "#lib/arcade/catch-pointer.js";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
-  import { beckon, chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { beckon, chalkPath, drawBrackets, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import { createFrameLoop } from "#lib/arcade/core/loop.ts";
   import { clamp, snap } from "#lib/arcade/core/math.ts";
   import { COUNTDOWN_SECONDS, stepCountdown } from "#lib/arcade/countdown.js";
@@ -239,21 +253,26 @@
   // --- Lessons -------------------------------------------------------------
 
   // Taught once per device, inside the live shift: catch-lessons.js says
-  // what and when, and the coach slows play and shows one at a time.
+  // what, when and where, and the coach stops play and shows one at a time.
   const coach = createCoach("catch");
   /** Seconds on shift that "go" stays up; nothing is taught before it's gone. */
   const GO_SECONDS = 0.62;
-  /** The Coach's slip: its text size and padding, its widest, its height on one line, and its margin from the page's edge. */
-  const SLIP_FONT_PX = 13;
-  const SLIP_PADDING = 24 + 4;
-  const SLIP_MAX = 320;
-  const SLIP_HEIGHT = 34;
-  const SLIP_GUTTER = 16;
+  /**
+   * The Coach's slip, for guessing its size before it has been measured:
+   * its text size, its padding and the gap before Continue, Continue's own
+   * width and height, its widest, and the height of a line.
+   */
+  const SLIP_FONT_PX = 15;
+  const SLIP_PADDING = 28;
+  const SLIP_GAP = 12;
+  const SLIP_CONTINUE = 114;
+  const SLIP_KEY_H = 32;
+  const SLIP_MAX = 304;
+  const SLIP_LINE = 21;
   /** The pen loop around a cup in flight (half its size, in px). */
   const CUP_RING = 30;
   /** The chalk's square, on the arcade's 4px grid. */
   const CHALK_CELL = 4;
-  type Side = "left" | "right" | "above" | "below";
   interface Cue {
     lesson: Lesson;
     /** The cup it is about, until that cup is caught or falls. */
@@ -262,43 +281,55 @@
     spawn: PendingSpawn | null;
     /** The link itself, so the loop can find it again if the page reflows. */
     element: HTMLElement | null;
-    /** What the callout points at: it follows a cup or the basket, and stays put on a link or a landing. */
+    /** The link's centre and size on screen, when it is about a link. */
+    link: { x: number; y: number; width: number; height: number } | null;
+    /** What the callout points at: a link, a landing, a cup, or the basket. */
     anchor: "link" | "landing" | "cup" | "basket";
     /** For the catch: the centre of the cup where it lands, where the basket has to get to. */
     spot: number;
-    /** Where the tail points, in viewport px. */
-    x: number;
-    y: number;
-    ring: number;
-    /** Half the width of what it points at, when that is wider than the loop (a long link). */
-    width: number;
-    side: Side;
+    /** Where the slip goes: the Coach's anchor, its side, and the marks round the thing. */
+    place: Place;
   }
   let cue: Cue | null = null;
   /** The coach's lesson and whether it's fading, copied out so the page follows them. */
   let coachLesson: Lesson | null = null;
   let coachLeaving = false;
+  /** The lesson is over (done, or its move made): the slip holds where it is. */
+  let coachEnded = false;
   let coachX: number | null = null;
   let coachY: number | null = null;
   let coachRing = 0;
   let coachWidth = 0;
-  let coachSide: Side = "right";
+  let coachHeight = 0;
+  let coachSide: Place["side"] = "right";
   /** The slip offers Continue while it is explaining (not once the move is made or it is on its way out). */
   let coachContinuable = false;
   /** How dim the page is around an explanation, 0..1, eased in real time. */
   let lessonDim = 0;
-  /** The basket, and the thing the lesson is about: what stays lit (reused every frame). */
+  /**
+   * What stays lit (reused every frame): the basket, the thing the lesson
+   * is about, and, while the catch is frozen, the basket's way to the cup.
+   */
   const focusBoxes: FocusBox[] = [
+    { x: 0, y: 0, w: 0, h: 0 },
     { x: 0, y: 0, w: 0, h: 0 },
     { x: 0, y: 0, w: 0, h: 0 },
   ];
   const basketOnly: FocusBox[] = [focusBoxes[0]];
+  const basketAndThing: FocusBox[] = [focusBoxes[0], focusBoxes[1]];
   /** Light kept round each thing (px), and the wash's cell, on the arcade's 4px grid. */
   const LIGHT_PAD = 12;
   const LIGHT_CELL = 4;
   /** Each lesson's slip as the Coach drew it (Continue and all), measured once it is on the page. */
   const slipSizes = new Map<string, { w: number; h: number }>();
-  /** Lessons whose slow motion timed out this run: they wait for a later run. */
+  /** What the slip keeps off, and the boxes and arcs that go into it (reused). */
+  const keepOffBoxes: KeepOff[] = [];
+  const cupMarks: CupMarks[] = [];
+  const markArcs: FlightPoint[][] = [];
+  const basketBox: Box = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  const linkBox: Box = { x0: 0, y0: 0, x1: 0, y1: 0 };
+  const linkThings: Box[] = [linkBox];
+  /** Lessons whose hold timed out this run: they wait for a later run. */
   const timedOut = new Set<string>();
   /** What the lessons treat as known: learned on this device, or timed out this run. */
   const known = (id: string) => coach.learned(id) || timedOut.has(id);
@@ -317,6 +348,10 @@
   let quietFor = Infinity;
   /** Real seconds the basket has stayed under the taught cup; a sweep through doesn't count. */
   let settledFor = 0;
+  /** Where the basket stood as the catch's freeze took hold: moving it from there brings play back. */
+  let freezeFrom = 0;
+  /** `lessonClock` when the catch came up: the ghost's run counts from here. */
+  let ghostFrom = 0;
   /** The first throw's way down, built once when its lesson starts, and the part still ahead of the cup. */
   const arc: FlightPoint[] = [];
   const arcAhead: Array<{ x: number; y: number }> = [];
@@ -334,7 +369,20 @@
     waiting: [] as PendingSpawn[],
     pearlDown: false,
     pearlsComeBack: rules.goldensToRestore > 0,
+    /** The page's width, which the basket may have to cross (set with the page's size). */
+    width: 1280,
   };
+
+  // --- The pointer -----------------------------------------------------------
+
+  // The basket follows the pointer's x; its height is never used, and the
+  // pointer is hidden over the stage, so it drifts unseen. During play a
+  // press on the tickets counts only once the pointer has come to rest on
+  // them, and a pointer off the page holds play a beat before it pauses.
+  const pointer = createPointerGuard();
+  /** The press now going on was on the tickets during play, and wasn't meant: its click is dropped. */
+  let pressRefused = false;
+  let hudEl: HTMLElement;
 
   // --- Canvas and lifecycle state -----------------------------------------
 
@@ -466,11 +514,16 @@
 
   const paintGhostBasket = (g: CanvasRenderingContext2D) => drawSprite(g, basketGrid, ghostX, ghostY, BASKET_PX, BPAL);
 
+  /** Whether play is frozen for the catch: it is up, and the move isn't made yet. */
+  const catchFrozen = () => !!cue && cue.anchor === "landing" && coach.current === cue.lesson && !coach.leaving && !coach.acting;
+
   /**
    * The first throw's lesson, drawn under the cups: the cup's way down in
-   * chalk, from the cup to the catch line, and a ghost of the basket where it
-   * lands, dithered in the page's ink. Both step aside while the basket is
-   * there, and come back if it wanders off.
+   * chalk, from the cup to the catch line, and a ghost of the basket,
+   * dithered in the page's ink. While play is frozen the ghost runs the move
+   * in real time, from the basket to where the cup lands, again and again;
+   * once the move is made it waits there. Both step aside while the basket
+   * is there, and come back if it wanders off.
    */
   function drawLessonGhost() {
     if (!ctx || !cue || cue.anchor !== "landing" || arc.length < 2) return;
@@ -501,7 +554,9 @@
     });
 
     const end = arc[arc.length - 1];
-    ghostX = snap(clamp(end.x - basketW / 2, 0, viewW - basketW), BASKET_PX);
+    const landing = clamp(end.x, basketW / 2, viewW - basketW / 2);
+    const center = catchFrozen() ? ghostAt(basketCenter(), landing, lessonClock - ghostFrom, reduceMotion) : landing;
+    ghostX = snap(clamp(center - basketW / 2, 0, viewW - basketW), BASKET_PX);
     ghostY = snap(basketY, BASKET_PX);
     const density = 0.45 + 0.25 * beckon(lessonClock, reduceMotion, 1.1);
     drawGhost(ctx, ghostX, ghostY, basketW, BASKET_H, paintGhostBasket, { color: markColor, density, cell: BASKET_PX });
@@ -518,8 +573,8 @@
   /**
    * The explanation's spotlight: the page dims under a wash of ink, and the
    * basket and what the lesson is about stay in full light: the link, the
-   * cup, or (for the catch) the cup, the chalk still ahead of it and the
-   * ghost basket where it lands.
+   * cup, or (for the catch) the cup, the chalk still ahead of it, the ghost
+   * basket where it lands, and the row between, where the ghost runs.
    */
   function drawLessonLight() {
     if (!ctx || lessonDim <= 0.01) return;
@@ -529,13 +584,15 @@
     let boxes = basketOnly;
     if (cue && cue.anchor !== "basket") {
       const thing = focusBoxes[1];
+      boxes = basketAndThing;
       if (cue.anchor === "link") {
         // The link, and the corner marks of its throw.
-        const half = Math.max(cue.width, 26);
-        lightBox(thing, cue.x - half, cue.y - 26, cue.x + half, cue.y + 26);
+        const link = cue.link ?? { x: cue.place.x, y: cue.place.y, width: 0, height: 0 };
+        const half = Math.max(link.width / 2, 26);
+        lightBox(thing, link.x - half, link.y - 26, link.x + half, link.y + 26);
       } else if (cue.anchor === "cup") {
-        const x = cue.cup ? cue.cup.x : cue.x - BOBA_W / 2;
-        const y = cue.cup ? cue.cup.y : cue.y - BOBA_H / 2;
+        const x = cue.cup ? cue.cup.x : cue.place.x - BOBA_W / 2;
+        const y = cue.cup ? cue.cup.y : cue.place.y - BOBA_H / 2;
         lightBox(thing, x, y, x + BOBA_W, y + BOBA_H);
       } else {
         const end = arc[arc.length - 1];
@@ -558,13 +615,35 @@
           y1 = Math.max(y1, point.y);
         }
         lightBox(thing, x0, y0, x1, y1);
+        // The basket's way along its row to the landing, which the ghost runs.
+        const spot = clamp(end.x - basketW / 2, 0, viewW - basketW);
+        lightBox(focusBoxes[2], Math.min(left, spot), basketY, Math.max(left, spot) + basketW, basketY + BASKET_H);
+        boxes = focusBoxes;
       }
       // (Boxes that touch are lit as one by drawSpotlight itself.)
-      boxes = focusBoxes;
     }
     // A dark wash reads on the page in either theme.
     // Over a page of text the dither stays faint, so the words under it still read as words.
     drawSpotlight(ctx, viewW, viewH, boxes, lessonDim, { color: INK, cell: LIGHT_CELL, pattern: "flat", wash: 0.28 });
+  }
+
+  /** The Coach's corners, in the accent, as it draws them round a cup (half its loop's size). */
+  const CORNER_COLOR = "#e85d4c";
+  const CUP_LOOP_W = CUP_RING * 2.3;
+  const CUP_LOOP_H = CUP_RING * 1.75;
+
+  /**
+   * A line about a cup whose slip had to go further out than the Coach's
+   * corners reach (near the page's edge, out of the cup's way): the corners
+   * round the cup are drawn here instead, the same marks, until the line is
+   * over.
+   */
+  function drawCupMarks() {
+    if (!ctx || !cue || cue.anchor !== "cup" || !cue.cup || (cue.place.ring ?? 0) > 0) return;
+    if (coach.current !== cue.lesson || coach.leaving || coach.acting) return;
+    const x = cue.cup.x + BOBA_W / 2 - CUP_LOOP_W / 2;
+    const y = cue.cup.y + BOBA_H / 2 - CUP_LOOP_H / 2;
+    drawBrackets(ctx, x, y, CUP_LOOP_W, CUP_LOOP_H, { color: CORNER_COLOR });
   }
 
   function drawScene() {
@@ -575,6 +654,7 @@
     for (const boba of bobas) drawBoba(boba);
     drawParticles(ctx, particles);
     drawLessonLight();
+    drawCupMarks();
     drawPopups(ctx, popups, popupFont);
     drawBasket(basketLeft());
     placeCoach();
@@ -803,19 +883,24 @@
 
   /**
    * How big a lesson's slip is: as the Coach drew it, once it has been on
-   * the page; until then, its line in the slip's type, padded, on one line.
+   * the page; until then, a guess from its line in the slip's type, with
+   * Continue beside it, or under it when the two won't share a line.
    */
   function slipSize(lesson: Lesson) {
     const measured = slipSizes.get(lesson.id);
     if (measured) return measured;
-    let w = SLIP_MAX;
+    let text = SLIP_MAX;
     if (ctx) {
       ctx.save();
       ctx.font = arcadeFont(SLIP_FONT_PX, 400);
-      w = ctx.measureText(lesson.name ? `${lesson.name} ${lesson.text}` : lesson.text).width + SLIP_PADDING;
+      text = ctx.measureText(lesson.name ? `${lesson.name} ${lesson.text}` : lesson.text).width;
       ctx.restore();
     }
-    return { w: Math.ceil(Math.min(SLIP_MAX, w, viewW - SLIP_GUTTER * 2)), h: SLIP_HEIGHT };
+    const widest = Math.min(SLIP_MAX, viewW - 32);
+    const oneLine = SLIP_PADDING + text + SLIP_GAP + SLIP_CONTINUE;
+    if (oneLine <= widest) return { w: Math.ceil(oneLine), h: 20 + SLIP_KEY_H };
+    const lines = Math.max(1, Math.ceil(text / Math.max(1, widest - SLIP_PADDING)));
+    return { w: widest, h: 20 + lines * SLIP_LINE + 8 + SLIP_KEY_H };
   }
 
   /** Measures the slip on the page the first time it is there with its Continue button, and places it again by that. */
@@ -824,77 +909,111 @@
     const slip = document.querySelector<HTMLElement>(".coach .slip");
     if (!slip || slip.offsetWidth <= 0) return;
     slipSizes.set(lesson.id, { w: slip.offsetWidth, h: slip.offsetHeight });
-    if (cue.anchor === "link") cue.side = pickSide(lesson, cue.x, cue.y, cue.side === "left" || cue.side === "right" ? cue.side : inward(cue.x), cue.ring, cue.width, true);
-    else if (cue.anchor === "landing" && cue.cup) aimAtLanding(cue, cue.cup);
-    else if (cue.anchor === "basket") pinToBasket(cue);
+    placeCue(cue);
+  }
+
+  /** The page as the Coach sees it: its size, and the line the slip stays under, clear of the tickets. */
+  const coachView = () => ({ width: viewW, height: viewH, top: PLAYFIELD_TOP + 8 });
+
+  /** Sets `box` to the basket's box with its left edge at `left`. */
+  function basketAt(box: Box, left: number) {
+    box.x0 = left;
+    box.x1 = left + basketW;
+    box.y0 = basketY;
+    box.y1 = basketY + BASKET_H;
+    return box;
+  }
+
+  /** What a slip keeps off for `cup`, into the `index`th marks: the cup, its way down from here, and the basket where it lands. */
+  function markCup(index: number, cup: Boba) {
+    const path = (markArcs[index] ??= []);
+    flightPath(cup, cup.gravity, playfield(), path);
+    const marks = (cupMarks[index] ??= {
+      box: { x0: 0, y0: 0, x1: 0, y1: 0 },
+      arc: path,
+      landing: { x0: 0, y0: 0, x1: 0, y1: 0 },
+    });
+    const box = (marks.box ??= { x0: 0, y0: 0, x1: 0, y1: 0 });
+    box.x0 = cup.x;
+    box.y0 = cup.y;
+    box.x1 = cup.x + BOBA_W;
+    box.y1 = cup.y + BOBA_H;
+    marks.arc = path;
+    basketAt(marks.landing, clamp(path[path.length - 1].x - basketW / 2, 0, viewW - basketW));
+    return marks;
+  }
+
+  /** Marks every cup still in the air; returns the marks of the next one down. */
+  function markAll() {
+    const next = nextDown(bobas);
+    let count = 0;
+    let nextMarks: CupMarks | null = null;
+    for (const boba of bobas) {
+      if (boba.passed) continue;
+      const marks = markCup(count++, boba);
+      if (boba === next) nextMarks = marks;
+    }
+    cupMarks.length = count;
+    return nextMarks;
   }
 
   /**
-   * How far the Coach sets its slip from the anchor, beside it or above it:
-   * clear of the pen loop, or of the thing itself when it is wider (it
-   * follows Coach.svelte's own spacing).
+   * Where the slip goes for `target`, measured, on the page as it is now:
+   * never over the basket, its way along its row to where it has to be, a
+   * cup, a cup's way down, or where it lands. The catch's slip goes beside
+   * the ghost basket on its far side from the real one (or beside the real
+   * basket, away from the move, or above the row, out of the cup's way); a
+   * line about a cup goes beside it on the side it flies away from; a link's
+   * beside the link toward the page's middle; the basket's beside the
+   * basket, away from where it has to go next.
    */
-  function reach(ring: number, width: number, across: boolean) {
-    if (ring <= 0 && width <= 0) return 6 + 14;
-    if (!across) return Math.max(ring * 0.8, (ring * 1.75) / 2) + 14;
-    const loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
-    return Math.max(ring * 0.8, loopW / 2, width) + 14;
+  function placeCue(target: Cue) {
+    const size = slipSize(target.lesson);
+    const view = coachView();
+    basketAt(basketBox, basketLeft());
+    if (target.anchor === "landing" || target.anchor === "cup") {
+      // Its cup gone (caught, or past), the lesson is over and the slip holds.
+      if (!target.cup) return;
+      const marks = markCup(0, target.cup);
+      cupMarks.length = 1;
+      keepOff({ basket: basketBox, toward: marks.landing, cups: cupMarks, sprite: BOBA_SPRITE }, keepOffBoxes);
+      const places =
+        target.anchor === "landing"
+          ? catchPlaces(basketBox, marks.landing, size, view)
+          : cupPlaces({ x: target.cup.x + BOBA_W / 2, y: target.cup.y + BOBA_H / 2 }, target.cup.vx, CUP_RING, view);
+      target.place = choosePlace(places, keepOffBoxes, size, view);
+    } else if (target.anchor === "link" && target.link) {
+      const link = target.link;
+      markAll();
+      linkBox.x0 = link.x - link.width / 2;
+      linkBox.x1 = link.x + link.width / 2;
+      linkBox.y0 = link.y - link.height / 2;
+      linkBox.y1 = link.y + link.height / 2;
+      keepOff({ basket: basketBox, cups: cupMarks, things: linkThings, sprite: BOBA_SPRITE }, keepOffBoxes);
+      const ring = Math.round(clamp(Math.max(link.width / 2, link.height), 18, 56));
+      target.place = choosePlace(linkPlaces(link, ring, Math.round(link.width / 2), view), keepOffBoxes, size, view);
+    } else {
+      const next = markAll();
+      keepOff({ basket: basketBox, toward: next?.landing ?? null, cups: cupMarks, sprite: BOBA_SPRITE }, keepOffBoxes);
+      const toward = next ? (next.landing.x0 + next.landing.x1) / 2 : null;
+      target.place = choosePlace(basketPlaces(basketBox, toward, view), keepOffBoxes, size, view);
+    }
   }
-
-  /**
-   * Which side of a thing at `x, y` the slip goes on: `prefer`'s side, or
-   * the other if the page runs out first. For something that stays put (a
-   * link), when neither side has room the slip goes above it, or below if
-   * the tickets are in the way; a moving thing keeps to a side.
-   */
-  function pickSide(lesson: Lesson, x: number, y: number, prefer: Side, ring = 0, width = 0, upright = false): Side {
-    const { w, h } = slipSize(lesson);
-    const away = reach(ring, width, true);
-    const fitsRight = x + away + w + SLIP_GUTTER <= viewW;
-    const fitsLeft = x - away - w - SLIP_GUTTER >= 0;
-    if (prefer === "right" && fitsRight) return "right";
-    if (prefer === "left" && fitsLeft) return "left";
-    if (fitsRight) return "right";
-    if (fitsLeft) return "left";
-    if (!upright) return prefer;
-    return y - reach(ring, width, false) - h >= PLAYFIELD_TOP + 8 ? "above" : "below";
-  }
-
-  /** Toward the middle of the page, where there's room. */
-  const inward = (x: number): Side => (x < viewW / 2 ? "right" : "left");
-
-  /** The edge of a basket centred at `center` on `side`, so the slip sits beside it, not over it. */
-  const basketEdge = (center: number, side: Side) => center + (side === "right" ? 1 : -1) * (basketW / 2 + 2);
 
   /**
    * Points the catch at where `cup` will land, from where it is now on the
-   * page as it is now: the chalk's path down, and the slip beside the ghost
-   * basket on the side away from the real one, so the hand has a clear way.
+   * page as it is now: the chalk's path down, and the spot the basket has to
+   * get to.
    */
   function aimAtLanding(target: Cue, cup: Boba) {
     flightPath(cup, cup.gravity, playfield(), arc);
     arcFrom = simTime;
-    const spot = arc[arc.length - 1].x;
-    const y = basketY + BASKET_H / 2;
-    const side = pickSide(target.lesson, spot, y, basketCenter() < spot ? "right" : "left", 0, basketW / 2 + 2);
-    target.spot = spot;
-    target.x = basketEdge(clamp(spot, basketW / 2, viewW - basketW / 2), side);
-    target.y = y;
-    target.side = side;
+    target.spot = arc[arc.length - 1].x;
   }
 
-  /** Where a link is on the page now, its loop, and the side its slip goes on. */
-  function aimAtLink(target: Cue, link: { x: number; y: number; width: number; height: number }) {
-    target.ring = Math.round(clamp(Math.max(link.width / 2, link.height), 18, 56));
-    target.width = Math.round(link.width / 2);
-    target.spot = target.x = link.x;
-    target.y = link.y;
-    target.side = pickSide(target.lesson, link.x, link.y, inward(link.x), target.ring, target.width, true);
-  }
-
-  /** Where a lesson points: the landing, the link, the cup, or the basket. */
+  /** Where a lesson points: the landing, the link, the cup, or the basket (where it is as the line comes up). */
   function makeCue(lesson: Lesson, cup: Boba | null, spawn: PendingSpawn | null): Cue {
-    const made: Cue = { lesson, cup, spawn, element: null, anchor: "basket", spot: 0, x: 0, y: 0, ring: 0, width: 0, side: "right" };
+    const made: Cue = { lesson, cup, spawn, element: null, link: null, anchor: "basket", spot: 0, place: { x: 0, y: 0, side: "right" } };
     if (lesson.id === LESSONS.catch.id && cup) {
       made.spawn = null;
       made.anchor = "landing";
@@ -903,29 +1022,16 @@
       made.cup = null;
       made.anchor = "link";
       made.element = spawn.source;
-      aimAtLink(made, spawn.link);
+      made.link = { ...spawn.link };
     } else if (cup) {
       made.spawn = null;
       made.anchor = "cup";
-      made.ring = CUP_RING;
-      made.spot = made.x = cup.x + BOBA_W / 2;
-      made.y = cup.y + BOBA_H / 2;
-      made.side = pickSide(lesson, made.x, made.y, inward(made.x), CUP_RING);
-    } else pinToBasket(made);
+    } else {
+      made.cup = null;
+      made.spawn = null;
+    }
+    placeCue(made);
     return made;
-  }
-
-  /**
-   * A line about the basket stays where the basket was when it came up: a
-   * slip that followed the basket would run from the pointer on its way to
-   * Continue.
-   */
-  function pinToBasket(target: Cue) {
-    const center = basketCenter();
-    target.spot = center;
-    target.side = pickSide(target.lesson, center, basketY, inward(center), 0, basketW / 2 + 2);
-    target.x = basketEdge(center, target.side);
-    target.y = basketY + BASKET_H / 2;
   }
 
   /**
@@ -947,7 +1053,11 @@
     cue.cup = null;
   }
 
-  /** The window changed size: a lesson's landing, or its link, is found again on the page as it is now. */
+  /**
+   * The window changed size: a lesson's landing, or its link, is found
+   * again on the page as it is now, and its slip placed again (unless the
+   * lesson is over, when the slip holds where it is).
+   */
   function refitCue() {
     if (!cue || coach.current !== cue.lesson) return;
     if (cue.anchor === "landing" && cue.cup) {
@@ -956,11 +1066,14 @@
         // Already past the new catch line: it can't be caught now.
         cup.passed = true;
         cupPassed(cup);
-      } else aimAtLanding(cue, cup);
+        return;
+      }
+      aimAtLanding(cue, cup);
     } else if (cue.anchor === "link" && cue.element?.isConnected) {
       const rect = cue.element.getBoundingClientRect();
-      aimAtLink(cue, { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height });
-    } else if (cue.anchor === "basket") pinToBasket(cue);
+      cue.link = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height };
+    }
+    if (!coach.leaving && !coach.acting) placeCue(cue);
   }
 
   /**
@@ -1014,20 +1127,40 @@
     cue = null;
     if (!move) return;
     const next = nextDown(bobas);
-    if (next && next.landAt - simTime >= MOVE_LATEST && coach.offer(LESSONS.catch)) cue = makeCue(LESSONS.catch, next, null);
+    if (next && next.landAt - simTime >= MOVE_LATEST && coach.offer(LESSONS.catch)) {
+      cue = makeCue(LESSONS.catch, next, null);
+      ghostFrom = lessonClock;
+    }
+  }
+
+  /** The moment as the lessons read it. */
+  function readMoment() {
+    moment.now = simTime;
+    moment.cups = bobas;
+    moment.waiting = pendingSpawns;
+    moment.pearlDown = lives.left < lives.max;
+    return moment;
   }
 
   /** Asks the lessons what this moment should teach, once "go" is gone. */
   function checkLessons(realDt: number) {
     const current = coach.current;
     if (current?.move && !coach.leaving && cue?.lesson === current) {
-      // The catch: play comes back to speed once the basket has settled
-      // under the cup, not as a hand sweeps through the spot.
-      settledFor = cue.cup && onSpot(basketCenter(), cue.spot, basketW) ? settledFor + realDt : 0;
-      if (!coach.acting && settledFor >= SETTLE) coach.acted(current.id);
+      // The catch: play is frozen until the player makes the move, the
+      // basket moved, or already waiting under the cup (a sweep through the
+      // spot doesn't count). Until the freeze has held a moment, where the
+      // basket stands is where the move counts from, so a hand already on
+      // its way still sees the freeze; its move is never lost, since the
+      // basket follows the pointer all the while.
+      const at = basketCenter();
+      settledFor = cue.cup && onSpot(at, cue.spot, basketW) ? settledFor + realDt : 0;
+      if (!coach.acting) {
+        if (coach.age < FREEZE_MIN) freezeFrom = at;
+        if (catchMoved(coach.age, freezeFrom, at, settledFor)) coach.acted(current.id);
+      }
       // A move being taught holds the stage until its cup is caught or goes
-      // past, but never holds play slow for more than `HOLD`: then it comes
-      // down uncounted, and waits for a later run.
+      // past, but never holds play for more than `HOLD`: then it comes down
+      // uncounted, and waits for a later run.
       catchFor += realDt;
       if (catchFor >= HOLD) {
         coach.dismiss();
@@ -1038,26 +1171,29 @@
     }
     settledFor = 0;
     if (elapsed < GO_SECONDS) return;
-    moment.now = simTime;
-    moment.cups = bobas;
-    moment.waiting = pendingSpawns;
-    moment.pearlDown = lives.left < lives.max;
-    const next = lessonNow(moment, known);
+    const next = lessonNow(readMoment(), known);
     if (next && next.lesson.id !== current?.id && mayOffer(next.lesson, current, coach.age, quietFor, coach.leaving) && coach.offer(next.lesson)) {
       cue = makeCue(next.lesson, next.cup, next.spawn);
-      if (next.lesson.move) catchFor = 0;
+      if (next.lesson.move) {
+        catchFor = 0;
+        ghostFrom = lessonClock;
+        freezeFrom = basketCenter();
+      }
     }
     if (!coach.current) cue = null;
   }
 
   /**
    * Teaches something that just happened, beside the basket: now, while
-   * nothing else is up, or at a later time it happens. A lost pearl is said
-   * at once; the bonus point can wait for a rest after another line.
+   * nothing else is up and play may stop (the next cup down could still be
+   * reached from anywhere once it goes on), or at a later time it happens.
+   * A lost pearl is said at once; the bonus point can wait for a rest after
+   * another line.
    */
   function teachNow(id: "miss" | "perfect", quiet = Infinity) {
     const lesson = LESSONS[id];
-    if (gameOver || !mayOffer(lesson, coach.current, coach.age, quiet, coach.leaving) || !coach.offer(lesson)) return;
+    if (gameOver || known(id) || !mayPause(readMoment())) return;
+    if (!mayOffer(lesson, coach.current, coach.age, quiet, coach.leaving) || !coach.offer(lesson)) return;
     cue = makeCue(lesson, null, null);
   }
 
@@ -1075,37 +1211,44 @@
   function linkThrew(thrown: boolean) {
     if (!cue) return;
     cue.spawn = null;
-    // With the catch still to teach, it takes over from this line once the
-    // line has been read, and play stays slow for it; otherwise the line goes.
+    // With the catch still to teach, it takes over from this line (play has
+    // gone on since the line was continued, and stops again for the catch);
+    // otherwise the line goes.
     if (coach.current === cue.lesson && (!thrown || coach.learned("catch"))) coach.done(cue.lesson.id);
   }
 
-  /** Puts the callout beside its thing, following a cup in the air; anything else stays put. */
+  /**
+   * Puts the callout beside its thing. Until the lesson is over, a line
+   * about a cup or a landing is placed afresh each frame (play takes a beat
+   * to stop, and the basket can move while the catch is frozen); a link's or
+   * the basket's stays where it was placed. Once over, the slip holds.
+   */
   function placeCoach() {
     const lesson = coach.current;
     if (!lesson || !cue || cue.lesson !== lesson || gameOver) {
       if (coachLesson) coachLesson = null;
       if (coachX !== null) coachX = coachY = null;
       if (coachContinuable) coachContinuable = false;
+      if (coachEnded) coachEnded = false;
       return;
     }
-    if (cue.anchor === "cup" && cue.cup) {
-      cue.x = cue.cup.x + BOBA_W / 2;
-      cue.y = cue.cup.y + BOBA_H / 2;
-      cue.side = pickSide(lesson, cue.x, cue.y, cue.side, CUP_RING);
-    }
+    const ended = coach.leaving || coach.acting;
+    if (!ended && (cue.anchor === "cup" || cue.anchor === "landing")) placeCue(cue);
     if (coachLesson !== lesson) coachLesson = lesson;
     // The slip stays readable through its minimum life, then fades.
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
-    const continuable = !coach.leaving && !coach.acting && (lesson.slow ?? 1) < 1;
+    if (coachEnded !== ended) coachEnded = ended;
+    const continuable = !ended && (lesson.slow ?? 1) < 1;
     if (continuable !== coachContinuable) coachContinuable = continuable;
-    const x = Math.round(cue.x);
-    const y = Math.round(cue.y);
+    const place = cue.place;
+    const x = Math.round(place.x);
+    const y = Math.round(place.y);
     if (x !== coachX) coachX = x;
     if (y !== coachY) coachY = y;
-    if (cue.ring !== coachRing) coachRing = cue.ring;
-    if (cue.width !== coachWidth) coachWidth = cue.width;
-    if (cue.side !== coachSide) coachSide = cue.side;
+    if ((place.ring ?? 0) !== coachRing) coachRing = place.ring ?? 0;
+    if ((place.width ?? 0) !== coachWidth) coachWidth = place.width ?? 0;
+    if ((place.height ?? 0) !== coachHeight) coachHeight = place.height ?? 0;
+    if (place.side !== coachSide) coachSide = place.side;
     measureSlip(lesson);
   }
 
@@ -1220,6 +1363,14 @@
 
   /** One frame of real time: the countdown, or the shift at the lesson's pace. */
   function advance(realDt: number, rawDt: number) {
+    // Off the page the basket can't be steered: play holds still for a
+    // beat, and pauses if the pointer stays away.
+    const away = pointer.status(performance.now() / 1000);
+    if (away === "gone") {
+      void pauseGame();
+      return;
+    }
+    if (away === "held") return;
     if (countdown > 0) {
       const next = stepCountdown(countdownElapsed, countdown, Math.min(rawDt, 0.25));
       countdownElapsed = next.elapsed;
@@ -1230,9 +1381,9 @@
       if (next.done) beginRound();
       return;
     }
-    // A lesson eases the whole shift (throws, flights, the ramp) into slow
-    // motion and back out, so every planned landing keeps its fairness; the
-    // basket stays on the mouse, at full speed.
+    // A lesson stops the whole shift (throws, flights, the ramp) in a beat
+    // and eases it back, so every planned landing keeps its fairness; the
+    // basket stays on the mouse all the while.
     // Lessons hold on real time (uncapped, so as long on a slow device),
     // while the shift's own step stays capped.
     // Real time, capped only against a leap (a tab coming back), as the coach's own clock is.
@@ -1240,7 +1391,7 @@
     const dt = coach.step(rawDt, realDt);
     lessonClock += real;
     // The basket's blink after a pearl drops or comes back runs on real
-    // time, so slow motion doesn't stretch it.
+    // time, so a lesson doesn't hold it.
     basketBlink = Math.max(0, basketBlink - real);
     step(dt);
     quietFor = coach.current ? 0 : quietFor + real;
@@ -1301,7 +1452,11 @@
     settledFor = 0;
     lessonDim = 0;
     catchFor = 0;
+    freezeFrom = 0;
+    ghostFrom = 0;
     timedOut.clear();
+    pointer.enter();
+    pressRefused = false;
     readTheme();
     run += 1;
   }
@@ -1335,6 +1490,8 @@
   function resumeGame() {
     if (gameOver || !active || !paused) return;
     paused = false;
+    // Resuming is meant: whatever the pointer did off the page is forgotten.
+    pointer.enter();
     loop.resync();
     setMusicPaused(false);
     sfxBlip();
@@ -1378,6 +1535,7 @@
     viewH = window.innerHeight;
     ctx = fitCanvas(canvas, viewW, viewH);
     basketY = viewH - BASKET_H - 16;
+    moment.width = viewW;
     pointerX = clamp(pointerX, basketW / 2, viewW - basketW / 2);
     refitPlay();
     loop.redraw();
@@ -1390,12 +1548,45 @@
     readTheme();
     sizeCanvas();
 
+    const seconds = () => performance.now() / 1000;
+    /** The pointer is steering the basket: the shift (or its countdown) is on, not paused or over. */
+    const steering = () => active && !paused && !gameOver;
     const onMove = (event: MouseEvent) => {
       mouseX = event.clientX;
+      const target = event.target instanceof Element ? event.target : null;
+      pointer.move(seconds(), event.clientX, event.clientY, !!target?.closest(".boba-hud"));
       // On the slip's Continue button, the basket keeps its aim: reaching
       // for the button mustn't steer the basket off the cup.
-      const onContinue = event.target instanceof Element && event.target.closest(".coach button");
+      const onContinue = target?.closest(".coach button");
       if (!onContinue) pointerX = mouseX;
+    };
+    // Off the page (not just onto another part of it), the pointer holds
+    // play a beat before the shift pauses; back on, play goes on.
+    const root = document.documentElement;
+    const onLeave = () => {
+      if (steering()) pointer.leave(seconds());
+    };
+    const onEnter = () => pointer.enter();
+    // A press on the tickets' buttons during play counts only once the
+    // pointer has come to rest on them, so a sweep that drifted up there
+    // can't end in a click on pause; its click is dropped. A key's click
+    // (Enter on a focused button) is always its own.
+    const refuse = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    const onPress = (event: PointerEvent) => {
+      const onButton = event.target instanceof Element && !!event.target.closest("button");
+      pressRefused = onButton && steering() && !pointer.pressCounts(seconds());
+      if (pressRefused) refuse(event);
+    };
+    const onMouseDown = (event: MouseEvent) => {
+      if (pressRefused) refuse(event);
+    };
+    const onClick = (event: MouseEvent) => {
+      if (event.detail === 0) return;
+      if (pressRefused) refuse(event);
+      pressRefused = false;
     };
     const unmountShell = mountShell({
       isOver: () => gameOver,
@@ -1422,9 +1613,16 @@
         reduceMotion = reduce;
         loop.redraw();
       },
-      pauseOnPointerLeave: true,
+      // The pointer leaving the page is handled here, with a beat's grace.
+      pauseOnPointerLeave: false,
     });
     window.addEventListener("mousemove", onMove, { passive: true });
+    root.addEventListener("mouseleave", onLeave);
+    root.addEventListener("mouseenter", onEnter);
+    const hud = hudEl;
+    hud.addEventListener("pointerdown", onPress, true);
+    hud.addEventListener("mousedown", onMouseDown, true);
+    hud.addEventListener("click", onClick, true);
 
     startRun();
 
@@ -1436,6 +1634,11 @@
       timers.clear();
       unmountShell();
       window.removeEventListener("mousemove", onMove);
+      root.removeEventListener("mouseleave", onLeave);
+      root.removeEventListener("mouseenter", onEnter);
+      hud.removeEventListener("pointerdown", onPress, true);
+      hud.removeEventListener("mousedown", onMouseDown, true);
+      hud.removeEventListener("click", onClick, true);
     };
   });
 </script>
@@ -1453,7 +1656,7 @@
 <!-- Where focus rests during the shift: not a button, so Enter continues a
      lesson and Space pauses. -->
 <div bind:this={playfieldEl} class="sr-only" tabindex="-1" role="group" aria-label="Boba catch playfield"></div>
-<header class="boba-hud boba-ui" aria-label="Boba catch status">
+<header bind:this={hudEl} class="boba-hud boba-ui" aria-label="Boba catch status">
   <div class="boba-hud-row">
     <div class="boba-ticket boba-ticket-start boba-riso" style="--tilt: -1.4deg">
       <span class="boba-ticket-icon" aria-hidden="true">
@@ -1506,8 +1709,10 @@
     side={coachSide}
     ring={coachRing}
     width={coachWidth}
+    height={coachHeight}
     scene={darkPage ? "dark" : "light"}
     leaving={coachLeaving}
+    ended={coachEnded}
     continuable={coachContinuable}
     returnFocus={focusPlayfield}
     on:continue={continueLesson}

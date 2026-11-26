@@ -37,6 +37,9 @@ test("every word the meter prints is in the pixel alphabet", () => {
   }
 });
 
+/** Whether two boxes in cells share any cell. */
+const meets = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
 for (const twoRows of [false, true]) {
   test(`the meter's layout holds together (${twoRows ? "two rows" : "one row"})`, () => {
     const layout = meterLayout(twoRows);
@@ -46,6 +49,13 @@ for (const twoRows of [false, true]) {
       x >= METER_PAD && y >= METER_PAD && x + w <= layout.width - METER_PAD && y + h <= layout.height - METER_PAD;
     assert.ok(inside(layout.cup.x, layout.cup.y, layout.cup.w, layout.cup.h));
     for (const cube of layout.cubes) assert.ok(inside(cube.x, cube.y, CUBE, CUBE));
+    // The word fits in the chip beside or over the cubes, clear of the cup; so do the cubes.
+    assert.ok(inside(layout.labelBox.x, layout.labelBox.y, layout.labelBox.w, layout.labelBox.h), "the word runs out of the chip");
+    assert.ok(!meets(layout.labelBox, layout.cup), "the word sits on the cup");
+    for (const cube of layout.cubes) assert.ok(!meets({ ...cube, w: CUBE, h: CUBE }, layout.cup), "a cube sits on the cup");
+    // The sugar's box (lit and ringed in its lesson) holds every cube and none of the cup.
+    for (const cube of layout.cubes) assert.ok(cube.x >= layout.sugar.x && cube.y >= layout.sugar.y && cube.x + CUBE <= layout.sugar.x + layout.sugar.w && cube.y + CUBE <= layout.sugar.y + layout.sugar.h);
+    assert.ok(!meets(layout.sugar, layout.cup), "the sugar's box takes in the cup");
     // The longest label, with the keycap after it on a wide screen, fits over the cubes.
     const longest = Math.max(wordWidth(meterWord(false)), wordWidth(meterWord(true)) + (twoRows ? 0 : 2 + KEYCAP_X[0].length));
     assert.ok(longest <= layout.sugar.w, `label ${longest} wider than ${layout.sugar.w}`);
@@ -67,8 +77,20 @@ test("between the pads the cubes take two rows, so the chip is narrower", () => 
   const wide = meterLayout(false);
   const touch = meterLayout(true);
   assert.ok(touch.width < wide.width);
-  // Fits between a 375 px phone's pads at the scene's 4 px cell, with room either side.
+  // Fits between a 375 px phone's pads at the scene's 4 px cell, with room either side,
+  // and stands no taller than the jump and rush pads stacked beside it.
   assert.ok(touch.width * 4 <= 375 - 20 - 80 - 20 - 104 - 16);
+  assert.ok(touch.height * 4 <= 88 + 12 + 56);
+});
+
+test("the meter reads at a glance: big cubes and a big cup", () => {
+  // At the scene's 4 px cell a cube is 20 px a side and the cup 36 px across.
+  assert.ok(CUBE >= 5);
+  assert.ok(METER_CUP[0].length >= 9 && METER_CUP.length >= 11);
+  // On a wide screen the chip is at least 300 px across, every cube in one row.
+  const wide = meterLayout(false);
+  assert.ok(wide.width * 4 >= 300);
+  assert.equal(new Set(wide.cubes.map((cube) => cube.y)).size, 1);
 });
 
 test("the tea shows in half rows, and only an empty cup shows none", () => {

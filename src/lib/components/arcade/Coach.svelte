@@ -72,9 +72,9 @@
 
   const GUTTER = 16;
   let slip: HTMLElement;
-  /** The slip's measured width, bindable, so a game can tell whether it fits beside a thing. */
+  /** The slip's measured size, bindable, so a game can tell whether it fits beside a thing. */
   export let slipW = 0;
-  let slipH = 0;
+  export let slipH = 0;
   let viewW = 0;
   let viewH = 0;
   /** A touch device: lessons name the gesture, not the key. */
@@ -114,22 +114,27 @@
 
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.max(lo, v)));
 
-  // Once the lesson is over (or fading), the anchor is held where it last was.
-  let held: { x: number | null; y: number | null } | null = null;
-  $: held = ended || leaving ? (held ?? { x, y }) : null;
+  // Once the lesson is over (or fading), everything that places it is held
+  // as it last was: the anchor, the side and the marks' size.
+  let held: { x: number | null; y: number | null; side: typeof side; ring: number; width: number; height: number } | null = null;
+  $: held = ended || leaving ? (held ?? { x, y, side, ring, width, height }) : null;
   $: ax = held ? held.x : x;
   $: ay = held ? held.y : y;
+  $: aSide = held ? held.side : side;
+  $: aRing = held ? held.ring : ring;
+  $: aWidth = held ? held.width : width;
+  $: aHeight = held ? held.height : height;
 
   $: anchored = ax !== null && ay !== null && Number.isFinite(ax) && Number.isFinite(ay);
-  $: loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
-  $: loopH = Math.max(ring * 1.75, height > 0 ? (height + 4) * 2 : 0);
+  $: loopW = Math.max(aRing * 2.3, aWidth > 0 ? (aWidth + 6) * 2 : 0);
+  $: loopH = Math.max(aRing * 1.75, aHeight > 0 ? (aHeight + 4) * 2 : 0);
   // How far the slip sits from the anchor on each axis: clear of the loop (or the thing).
-  $: reachX = Math.max(ring * 0.8, loopW / 2, width);
-  $: reachY = Math.max(ring * 0.8, loopH / 2);
-  $: marked = ring > 0 || width > 0;
+  $: reachX = Math.max(aRing * 0.8, loopW / 2, aWidth);
+  $: reachY = Math.max(aRing * 0.8, loopH / 2);
+  $: marked = aRing > 0 || aWidth > 0;
   $: gapX = (marked ? reachX : 6) + 14;
   $: gapY = (marked ? reachY : 6) + 14;
-  $: place = position(anchored, ax ?? viewW / 2, ay ?? viewH / 2, side, gapX, gapY, slipW, slipH, viewW, viewH, top);
+  $: place = position(anchored, ax ?? viewW / 2, ay ?? viewH / 2, aSide, gapX, gapY, slipW, slipH, viewW, viewH, top);
   $: reach = place.where === "left" || place.where === "right" ? reachX : reachY;
 
   /**
@@ -230,7 +235,7 @@
     >
       {#if anchored && ax !== null && ay !== null}
         <svg class="marks" width={viewW} height={viewH} aria-hidden="true">
-          {#if ring > 0}
+          {#if aRing > 0}
             <g class="corners">
               {#each corners as corner}
                 <rect x={corner.h.x} y={corner.h.y} width={corner.h.w} height={corner.h.h} />

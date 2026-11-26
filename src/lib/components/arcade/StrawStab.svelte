@@ -55,7 +55,12 @@
     type StabMode,
   } from "#lib/arcade/stab-engine.js";
   import {
+    HOLD_AFTER,
     LESSONS,
+    PRESS_AFTER,
+    STOPS,
+    STOP_WITHIN,
+    bracketBox,
     lessonForMiss,
     lessonForSong,
     lessonForStab,
@@ -63,6 +68,8 @@
     lessonNow,
     mayOffer,
     nextWaiting,
+    practiceBracket,
+    roomToStop,
     type NextCup,
   } from "#lib/arcade/stab-lessons.js";
   import {
@@ -121,6 +128,8 @@
   let TEMPOS = songTempos(PLAYLIST);
   const PLUNGE_SECONDS = 0.05;
   const RELOAD_SECONDS = 0.1;
+  /** How far above its rest the next straw starts as it comes back into the hand, past its own length, px. */
+  const RELOAD_RISE = 30;
   const TUMBLE_SECONDS = 0.45;
   const TIER_LABELS = [
     "easy does it",
@@ -1632,7 +1641,7 @@
   function drawHand() {
     if (plunge || gameOver || !blinkShows(strawBlink)) return;
     let bottom = restBottom();
-    if (reload > 0) bottom -= (reload / RELOAD_SECONDS) * (strawH + 30);
+    if (reload > 0) bottom -= (reload / RELOAD_SECONDS) * (strawH + RELOAD_RISE);
     else if (running && !reduceMotion) bottom -= Math.max(0, 1 - beatPhase * 3) * 3;
     drawStraw(strawX, bottom);
   }
@@ -1671,11 +1680,13 @@
     }
     drawPlunge(now);
     drawHand();
+    drawParticles(ctx, particles);
+    // A lesson's spotlight, under its own marks (the brackets and the ghost
+    // straw, which open wider than the lit lane) and the notes, which all
+    // stay at full strength over it.
+    drawLessonLight();
     drawPractice(now);
     drawCupLesson(now);
-    drawParticles(ctx, particles);
-    // A lesson's spotlight, under the notes, which stay legible over it.
-    drawLessonLight();
     drawNotes();
     placeCoach();
   }
@@ -1683,9 +1694,12 @@
   // --- Lessons -------------------------------------------------------------------
   //
   // Taught once per device, inside the live run: stab-lessons.js says what
-  // and when, and the coach shows one line at a time. Nothing here touches
-  // the beat: lines, brackets, the ghost straw and the spotlight are all drawn
-  // for the song time on screen, and play never slows.
+  // and when, and the coach shows one line at a time. Nothing here bends the
+  // beat: lines, brackets, the ghost straw and the spotlight are all drawn
+  // for the song time on screen, and play never slows. The two pearl lines
+  // stop it outright where there is room (`lookForStop`), the way the pause
+  // card does: the audio clock is suspended, so the music and the belt hold
+  // together, and Continue picks both up exactly where they stopped.
 
   /** Song seconds after the first downbeat that "go" is gone by; nothing is taught before. */
   const GO_SECONDS = 0.62;
@@ -1696,11 +1710,6 @@
   const SLIP_GUESS = Object.freeze({ id: "", w: 320, h: 76 });
   /** How far above the lane's top the judgement notes reach (two rows, the upper one rising). */
   const NOTES_CLEAR = 52;
-  /** The practice brackets: beats they take to close onto the notch, and how much bigger they start. */
-  const APPROACH_BEATS = 2;
-  const LOOP_GROW = 2.4;
-  /** Song seconds the brackets stay snug on the notch after the beat, while the cup is still in reach. */
-  const LOOP_AFTER = 0.12;
   /** Real seconds a lesson's brackets round its cup take to grow on: quick, as the cup may be close. */
   const LOOP_DRAW = 0.1;
   /** The ghost straw shows the stab for this many of the practice's cups. */
@@ -1736,6 +1745,21 @@
   let slipSize: { id: string; w: number; h: number } = SLIP_GUESS;
   /** The slip offers Continue while it is explaining (not once it is done or on its way out). */
   let coachContinuable = false;
+  /** The lesson is over (done, or on its way out): the callout holds where it is. */
+  let coachEnded = false;
+  /**
+   * A pearl line has stopped the belt: the audio clock is suspended (as the
+   * pause card suspends it) and the run waits for Continue.
+   */
+  let lessonHeld = false;
+  /** The heard song time until which a pearl line just up looks for room to stop the belt, or null. */
+  let stopUntil: number | null = null;
+  /** The heard song time the belt stops at, once room was found (HOLD_AFTER on), or null. */
+  let holdAt: number | null = null;
+  /** Real seconds since room was found, so a press already on its way then is not taken for Continue. */
+  let stopAge = 0;
+  /** A pearl line is stopping the belt, or about to: the straw waits, and a press continues it. */
+  const stopping = () => lessonHeld || holdAt !== null;
   /** How dim the stall is around an explanation, 0..1, eased in real time. */
   let lessonDim = 0;
   /** Real seconds since the last lesson came down (none yet this run: forever), so two never run together. */
@@ -1745,7 +1769,7 @@
   /** The practice's tick on each of its cups' beats, on the audio clock. */
   const ticks = createTicks();
   /** What the lessons read each frame, kept in one object rather than built every frame. */
-  const moment: { now: number; next: Cup | null; practicing: boolean } = { now: 0, next: null, practicing: false };
+  const moment: { now: number; next: Cup | null; practicing: boolean; seen: number } = { now: 0, next: null, practicing: false, seen: Infinity };
 
   /** The earliest cup still waiting for the straw: the only one a lesson may be about. */
   const nextCup = () => nextWaiting(cups);
@@ -1772,12 +1796,9 @@
     if (!ctx || !practiceOn(practice) || !running) return;
     const next = nextCup();
     if (next && practiceAt(practice, next.time)) {
-      const beat = 60 / barPosition(TEMPOS, next.bar).bpm;
-      const ahead = next.time - now;
-      if (ahead <= APPROACH_BEATS * beat && ahead >= -LOOP_AFTER) {
-        // Under Reduce Motion they sit closed on the notch, still timed to the beat.
-        bracketCup(strawX, CREAM, reduceMotion ? 1 : 1 + (LOOP_GROW - 1) * clamp(ahead / (APPROACH_BEATS * beat), 0, 1));
-      }
+      // Under Reduce Motion they sit closed on the notch, still timed to the beat.
+      const grow = practiceBracket(next.time - now, 60 / barPosition(TEMPOS, next.bar).bpm, reduceMotion);
+      if (grow !== null) bracketCup(strawX, CREAM, grow);
     }
     // The ghost's tip meets the lid on the beat (see ghostPlunge).
     ghostStraw.rest = restBottom();
@@ -1806,16 +1827,22 @@
     }
   }
 
+  /** The layout `bracketBox` rings a cup in, kept in one object rather than built every frame. */
+  const bracketLayout = { beltY: 0, cupW: 0, cupH: 0, px: 0 };
+
   /**
    * Pixel brackets snug round a cup whose centre is at `x`, as the lesson
-   * callout rings a thing: `grow` times as big (the practice's close-in),
-   * `progress` of their arms grown on.
+   * callout rings a thing: `grow` times as big (the practice's close-in, in
+   * whole art pixels), `progress` of their arms grown on.
    */
   function bracketCup(x: number, color: string, grow = 1, progress = 1) {
     if (!ctx) return;
-    const w = (cupW + px * 4) * grow;
-    const h = (cupH + px * 4) * grow;
-    drawBrackets(ctx, x - w / 2, beltY - cupH / 2 - h / 2, w, h, { color, arm: px * 3, bar: px, progress });
+    bracketLayout.beltY = beltY;
+    bracketLayout.cupW = cupW;
+    bracketLayout.cupH = cupH;
+    bracketLayout.px = px;
+    const box = bracketBox(x, bracketLayout, grow);
+    drawBrackets(ctx, box.x, box.y, box.w, box.h, { color, arm: px * 3, bar: px, progress });
   }
 
   /**
@@ -1856,11 +1883,12 @@
   }
 
   /**
-   * Where the slip goes, given its size, clear of the straw, the notes and
-   * the cups still to come: under the belt by the notch; else beside the
-   * notch, on the belt behind it, where every cup has already gone by; else
-   * above the lane, over the notes. Where none of them has room for all of
-   * it, under the belt or beside the notch, whichever spills least.
+   * Where the slip goes, given its size, clear of the notch, the straw, the
+   * notes and the cups still to come: under the belt by the notch; else
+   * beside the notch, on the belt behind it, where every cup has already
+   * gone by; else above the lane, over the notes and the path the next straw
+   * comes down after a stab. Where none of them has room for all of it,
+   * under the belt or beside the notch, whichever spills least.
    */
   function slipPlace(w: number, h: number) {
     const top = stageTop + 8;
@@ -1872,7 +1900,9 @@
     const leftY = Math.max(beltY - cupH / 2, restBottom() - strawH + 12 + h / 2);
     const leftSpill = SLIP_GUTTER - (leftX - SLIP_GAP - w);
     if (leftSpill <= 0) return { side: "left" as const, x: leftX, y: leftY };
-    const aboveY = laneTop - NOTES_CLEAR;
+    // The next straw comes down from its own length and RELOAD_RISE over its rest.
+    const reloadTop = restBottom() - 2 * strawH - RELOAD_RISE;
+    const aboveY = Math.min(laneTop - NOTES_CLEAR, reloadTop + SLIP_GAP - SC);
     if (aboveY - SLIP_GAP - h >= top) return { side: "above" as const, x: strawX, y: aboveY };
     return belowSpill <= leftSpill
       ? { side: "below" as const, x: strawX, y: belowY }
@@ -1898,6 +1928,7 @@
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
     const continuable = !coach.leaving && !coach.acting;
     if (continuable !== coachContinuable) coachContinuable = continuable;
+    if (continuable === coachEnded) coachEnded = !continuable;
     if (x !== coachX) coachX = x;
     if (y !== coachY) coachY = y;
     if (side !== coachSide) coachSide = side;
@@ -1906,11 +1937,87 @@
   /**
    * Teaches something that has just happened at the notch, if the device
    * still needs it and the stage is free: otherwise a later time it happens.
+   * A pearl line then looks for room to stop the belt (`lookForStop`).
    */
   function teach(lesson: Lesson | null) {
     if (!lesson || gameOver || lastShown < GO_SECONDS) return;
     if (!mayOffer(lesson, coach.current, coach.age, quietFor) || !coach.offer(lesson)) return;
     cue = { lesson, cup: null };
+    if (STOPS.includes(lesson.id) && !practiceOn(practice)) stopUntil = songNow() + STOP_WITHIN;
+  }
+
+  /**
+   * While a pearl line just up looks for room: the first moment the next cup
+   * will still be a beat off once the sound just made has played out, the
+   * belt is set to stop (HOLD_AFTER on). Past STOP_WITHIN, or once the line
+   * has gone, it stays over the running belt.
+   */
+  function lookForStop(now: number) {
+    if (stopUntil === null) return;
+    const lesson = coach.current;
+    if (!lesson || coach.leaving || !STOPS.includes(lesson.id) || now > stopUntil) {
+      stopUntil = null;
+      return;
+    }
+    if (!roomToStop({ now, next: nextCup(), beat: 60 / currentBpm })) return;
+    stopUntil = null;
+    holdAt = now + HOLD_AFTER;
+    stopAge = 0;
+  }
+
+  /** Holds the song where it is: the audio clock suspended, so the music and the belt stop together. */
+  function holdClock() {
+    heldSong = songNow();
+    if (useAudio) suspendAudio();
+  }
+
+  /**
+   * Picks the song up where it was held: the audio clock resumed (the belt
+   * waits for it, then reads the clock afresh), or, playing silently, the
+   * page clock moved on by the time it was held.
+   */
+  function releaseClock() {
+    last = 0;
+    if (useAudio) {
+      resumeAudio();
+      waitingForAudio = true;
+      waitStarted = perfSeconds();
+    } else {
+      origin = perfSeconds() - heldSong;
+    }
+  }
+
+  /** The pearl line up stops the belt until Continue (the frame calls it at `holdAt`). */
+  function holdForLesson() {
+    holdAt = null;
+    const lesson = coach.current;
+    if (lessonHeld || !running || paused || waitingForAudio || gameOver || !lesson || !STOPS.includes(lesson.id) || coach.leaving) return;
+    lessonHeld = true;
+    holdClock();
+  }
+
+  /** The line that stopped the belt is over (or never got to): the run picks up exactly where it stopped. */
+  function releaseLesson() {
+    holdAt = null;
+    stopUntil = null;
+    if (!lessonHeld) return;
+    lessonHeld = false;
+    if (running && !paused && !gameOver) releaseClock();
+  }
+
+  /**
+   * A frame while a pearl line holds the belt: nothing on it moves (it is
+   * drawn where it stopped), and the line doesn't age, so it waits for
+   * Continue; its spotlight eases in on real time, and the straw's flicker
+   * for the pearl just lost plays out, as the pearl's own does in the tickets.
+   */
+  function holdFrame(realDt: number) {
+    stopAge += realDt;
+    strawBlink = Math.max(0, strawBlink - Math.min(realDt, 0.05));
+    easeSpotlight(realDt);
+    // The development autoplay reads for a moment, then carries on.
+    if (autoplay && coach.current && !coach.leaving && stopAge >= 2) continueLesson();
+    if (!coach.current || coach.leaving) releaseLesson();
   }
 
   /** Asks the lessons what is coming that should be taught, once "go" is gone. */
@@ -1925,6 +2032,8 @@
       moment.now = shown;
       moment.next = nextCup();
       moment.practicing = practiceOn(practice);
+      // Wholly on screen: a cup's centre half a cup in from the right edge.
+      moment.seen = (viewW - strawX - cupW / 2) / speed;
       const found = lessonNow(moment, coach.learned);
       if (
         found &&
@@ -1947,6 +2056,11 @@
     coach.step(realDt);
     quietFor = coach.current ? 0 : quietFor + realDt;
     if (!gameOver) checkLessons(shown);
+    easeSpotlight(realDt);
+  }
+
+  /** The spotlight eases in with an explanation and out as it ends, on real time (at once under Reduce Motion). */
+  function easeSpotlight(realDt: number) {
     const lesson = coach.current;
     const target = lesson && cue?.lesson === lesson && !coach.leaving && !coach.acting ? 1 : 0;
     lessonDim = reduceMotion ? target : lessonDim + (target - lessonDim) * (1 - Math.exp(-Math.min(realDt, 0.25) / 0.18));
@@ -1991,7 +2105,8 @@
   /**
    * The player has read it: Continue (Enter on the playfield, or the slip's
    * button) ends the line and its spotlight. On the practice it ends the
-   * practice too, counted as known, and the belt counts from then on.
+   * practice too, counted as known, and the belt counts from then on. A line
+   * that stopped the belt starts it again, exactly where it stopped.
    */
   function continueLesson() {
     const lesson = coach.current;
@@ -2001,6 +2116,7 @@
       ticks.stop();
     }
     coach.done(lesson.id);
+    releaseLesson();
   }
 
   // --- Rules in motion ---------------------------------------------------------
@@ -2108,8 +2224,22 @@
     return pan(x);
   }
 
-  /** Stab input can act: a live run, not waiting on audio. */
-  const canStab = () => running && !paused && !gameOver && !waitingForAudio;
+  /** Stab input can act: a live run, not stopped for a line or waiting on audio. */
+  const canStab = () => running && !paused && !stopping() && !gameOver && !waitingForAudio;
+
+  /**
+   * A stab key or tap. While a pearl line has the belt stopped (or is about
+   * to) there is nothing at the notch to stab (the line only stops it with
+   * the next cup a beat off), so the press continues the line instead, once
+   * it has been up a moment (PRESS_AFTER); a press sooner does nothing.
+   */
+  function press(event: Event) {
+    if (stopping() && !paused) {
+      if (stopAge >= PRESS_AFTER) continueLesson();
+      return;
+    }
+    stabFromEvent(event);
+  }
 
   /** A key or tap, judged at the moment it happened, not when it was handled. */
   function stabFromEvent(event: Event) {
@@ -2228,7 +2358,11 @@
   }
 
   function runAutoplay(shown: number) {
-    while (autoplayStabs.length && autoplayStabs[0] <= shown) stab(autoplayStabs.shift() as number);
+    while (autoplayStabs.length && autoplayStabs[0] <= shown) {
+      const at = autoplayStabs.shift() as number;
+      // Not into a belt a line is stopping.
+      if (!stopping()) stab(at);
+    }
   }
 
   function stepStraws(dt: number) {
@@ -2283,7 +2417,8 @@
     if (rawDt > 0.002 && rawDt < 0.1) frameInterval += (rawDt - frameInterval) * 0.1;
     const dt = Math.min(rawDt, 0.05);
 
-    if (paused) {
+    if (paused || lessonHeld) {
+      if (!paused) holdFrame(rawDt);
       draw(running ? lastShown : 0);
       raf = requestAnimationFrame(frame);
       return;
@@ -2324,6 +2459,18 @@
     syncClock();
     // Heard now: misses are called against this.
     const now = songNow();
+    // A pearl line stops the belt where there is room, once the sound just
+    // made has played out: drawn where it was, and held from here until Continue.
+    lookForStop(now);
+    if (holdAt !== null) stopAge += rawDt;
+    if (holdAt !== null && now >= holdAt) {
+      holdForLesson();
+      if (lessonHeld) {
+        draw(lastShown);
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+    }
     // On screen at the next refresh: everything is drawn for this.
     const shown = songAt(presentSeconds(timestamp, performance.now(), frameInterval));
     lastShown = shown;
@@ -2365,10 +2512,8 @@
   async function pauseGame() {
     if (gameOver || paused) return;
     paused = true;
-    if (running && !waitingForAudio) {
-      heldSong = songNow();
-      if (useAudio) suspendAudio();
-    }
+    // A line holding the belt has already held the clock.
+    if (running && !waitingForAudio && !lessonHeld) holdClock();
     liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
@@ -2378,15 +2523,8 @@
     if (gameOver || !paused) return;
     paused = false;
     last = 0;
-    if (running) {
-      if (useAudio) {
-        resumeAudio();
-        waitingForAudio = true;
-        waitStarted = perfSeconds();
-      } else {
-        origin = perfSeconds() - heldSong;
-      }
-    }
+    // Back to a line holding the belt, it stays held until Continue.
+    if (running && !lessonHeld) releaseClock();
     sfxBlip();
     liveMessage = "The game resumed.";
     void tick().then(focusPlayfield);
@@ -2427,6 +2565,9 @@
     if (lesson && !lesson.move && !coach.leaving && coach.age >= (lesson.minLife ?? 0.9)) coach.done(lesson.id);
     coach.dismiss();
     cue = null;
+    lessonHeld = false;
+    holdAt = null;
+    stopUntil = null;
     ticks.stop();
     lessonDim = 0;
     const result = concludeRun("stab", score);
@@ -2442,6 +2583,11 @@
   /** A fresh belt: new songs, nothing on it, the clock stopped. */
   function resetRun() {
     cancelAnimationFrame(raf);
+    // A run left while a line held the belt mustn't leave the audio clock frozen.
+    if (lessonHeld) resumeAudio();
+    lessonHeld = false;
+    holdAt = null;
+    stopUntil = null;
     stopMusic();
     timers.clear();
     PLAYLIST = stabPlaylist();
@@ -2545,7 +2691,7 @@
   function onPointer(event: PointerEvent) {
     if (event.pointerType === "mouse" && event.button !== 0) return;
     event.preventDefault();
-    stabFromEvent(event);
+    press(event);
   }
 
   function onKey(event: KeyboardEvent) {
@@ -2570,7 +2716,7 @@
       else if (isOnControl(event)) return;
     }
     event.preventDefault();
-    stabFromEvent(event);
+    press(event);
   }
 
   onMount(() => {
@@ -2644,7 +2790,7 @@
       >
         <span class="beats" aria-hidden="true">
           {#each [0, 1, 2, 3] as beat}
-            <span class="beat" class:on={running && !paused && beat === beatInBar}></span>
+            <span class="beat" class:on={running && !paused && !lessonHeld && beat === beatInBar}></span>
           {/each}
         </span>
         <span class="boba-stack">
@@ -2670,6 +2816,7 @@
     y={coachY}
     side={coachSide}
     leaving={coachLeaving}
+    ended={coachEnded}
     continuable={coachContinuable}
     on:continue={continueLesson}
     returnFocus={focusPlayfield}
@@ -2737,36 +2884,24 @@
     gap: var(--space-1);
   }
 
-  /* Four beat lights, one per beat of the bar. */
+  /* Four beat lights, one per beat of the bar: square pixel cells on the
+     ticket's chip, an outline lit solid in the accent on its beat, switched
+     at once as the scene's pixels are, never eased or scaled. */
   .beats {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: 4px;
   }
 
   .beat {
-    width: 0.625rem;
-    height: 0.625rem;
-    border: 1.5px solid var(--b-line);
-    border-radius: 50%;
-    transition:
-      background-color 60ms linear,
-      transform 60ms linear;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--b-line);
+    border-radius: 0;
   }
 
   .beat.on {
     background: var(--b-slab);
     border-color: var(--b-slab);
-    transform: scale(1.25);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .beat {
-      transition: none;
-    }
-
-    .beat.on {
-      transform: none;
-    }
   }
 </style>

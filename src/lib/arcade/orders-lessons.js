@@ -4,19 +4,25 @@
 // under the cup (the syrup, the ice, the tea, the shake), and where the
 // motion is the lesson, the thing itself (the ladle over the cup, the
 // sealer's needle, the tea's fill line once the tap is held). One short line
-// sits beside it with a pen loop round it, and it moves on the moment it is
-// done. While a station is being taught the guests wait at half speed, so
-// learning never costs a pearl; the bench itself is never slowed, so the
-// pour, the ladle and the sealer are learned at the speed they are played,
-// with a ghost showing the tea's line, the ladle over the cup and the
-// needle in the band instead.
+// sits beside it with pixel brackets round it. Each step stops the shift
+// (the guests' patience, the arrivals, the clock and the bench) until the
+// player makes its move, which brings play back and is made at once, so
+// reading never costs a pearl. The drop and the stamp stop at the very
+// moment to make them, the ladle right over the cup and the needle in the
+// middle of the band, while a ghost shows the move. Continue counts a step
+// as known without making it. One step at a time: the next waits for a
+// short quiet (WALK_GAP) after the last has gone, and a station the player
+// has already begun by then isn't taught.
+//
+// Until the shift's first ticket is taken, while the device is still being
+// walked through, nothing else is said: the ticket itself is marked on the
+// rail instead (ticketBeckon), even once its line has been continued.
 //
 // Later things (a guest losing patience, a sample, a tank running low, the
 // critic, the special, the tip jar, the combo, what the receipt means) get
-// one line each the first time they matter, at full speed, and only while
-// the hands are free: never mid-pour, at the ladle or at the sealer, and
-// never while a station is still to be taught. They hold until the player
-// continues (or until their thing goes, or a while passes).
+// one line each the first time they matter, only while the bench is empty,
+// and a few seconds apart (THING_GAP). They stop the shift too, until the
+// player continues, or acts (which counts as continuing), or their thing goes.
 //
 // Every line is worded so that doing exactly what it says works: the cup
 // starts under the ordered tea's tap, and if it has been moved away the
@@ -24,11 +30,11 @@
 // jar; and the Brew key shows only when it brews the tank in the loop.
 //
 // DOM-free: the component describes the counter in a `view`, asks
-// `lessonNow` each frame, and hands the answer to the shared coach
+// `followLessons` each frame, and hands the answer to the shared coach
 // (src/lib/arcade/core/coach.ts), which shows one lesson at a time and
 // remembers them on the device.
 
-import { CROSS_AT, GLANCE_AT, TEAS, TOPPINGS, mostImpatient, tankState } from "./orders-engine.js";
+import { CROSS_AT, GLANCE_AT, TEAS, TOPPINGS, mostImpatient, rulesFor, tankState } from "./orders-engine.js";
 import { TEA_WORDS } from "./orders-labels.js";
 
 /**
@@ -68,13 +74,18 @@ import { TEA_WORDS } from "./orders-labels.js";
  * updates it in place each frame.
  * @typedef {{
  *   coarse: boolean,
+ *   expert: boolean,
+ *   started: boolean,
  *   tapIndex: number,
  *   jarIndex: number,
  *   holding: boolean,
  *   loaded: boolean,
+ *   ladle: number,
+ *   needle: number,
  *   cup: null | {
  *     guestId: number, station: Station, stations: Station[], busy: boolean,
- *     order: { tea: Tea }, tea: Tea | null, queue: Topping[], drops: number[], stampAt: number | null
+ *     order: { tea: Tea }, tea: Tea | null, queue: Topping[], drops: number[], stampAt: number | null,
+ *     sugar: number, ice: number, shakes: number
  *   },
  *   guests: Array<{ id: number, placed: boolean, left: number, patience: number, regular: { quirk?: string }, order: { tea: Tea } }>,
  *   tanks: number[],
@@ -84,34 +95,24 @@ import { TEA_WORDS } from "./orders-labels.js";
  *   jar: number,
  *   receipt: null | { sentBack: boolean, combo: number },
  * }} LessonView
- * `holding` is the tap held open; `loaded` the ladle carrying a scoop; `jar`
- * the coins showing in the tip jar.
+ * `started` is a ticket taken this shift; `holding` the tap held open;
+ * `loaded` the ladle carrying a scoop; `ladle` where it is (-1 to 1, 0 over
+ * the middle of the cup) and `needle` the sealer's needle (0 cold to 1),
+ * each where its station is in play; `jar` the coins showing in the tip jar.
  */
 
-/** The guests' patience and arrivals run at this share of speed while a station is taught. */
-export const WALK_SLOW = 0.5;
 /**
- * Real seconds a station's lesson waits to be done before it stands down,
- * uncounted, so the line is never left slowed. One that stands down isn't
- * taught again this shift (the next shift tries again).
+ * Seconds of play after a lesson has gone before the next step is shown,
+ * so two never come in quick succession.
  */
-export const WALK_WAIT = 7;
-/**
- * Seconds of quiet after a thing is named before the next is, so the first
- * minute isn't one line after another. A station's lesson never waits.
- */
+export const WALK_GAP = 1;
+/** Seconds of play after a thing has gone before the next thing is named. */
 export const THING_GAP = 3;
 
-const walk = { slow: WALK_SLOW, life: Infinity, minLife: 0.6, move: true };
-/**
- * A thing is named at full speed and holds until the player continues
- * (Enter, or the slip's button), its thing goes, or THING_LIFE passes.
- */
-export const THING_LIFE = 7;
-const thing = { slow: 1, life: THING_LIFE, minLife: 1.6 };
-
-/** The stations where the eye is on something moving: no thing is named over them. */
-const TIMED = new Set(["pour", "scoop", "seal"]);
+/** A step stops the shift until its move is made, or Continue. */
+const walk = { slow: 0, life: Infinity, minLife: 0.6, move: true };
+/** A thing stops the shift too, until the player continues or acts, or its thing goes. */
+const thing = { slow: 0, life: Infinity, minLife: 1.6 };
 
 /** The making card's lines, in the order a drink is built. */
 export const CARD_STEPS = /** @type {const} */ (["sugar", "ice", "pour", "scoop", "shake", "seal"]);
@@ -198,6 +199,13 @@ export const STATION_LESSON = Object.freeze({
   seal: "seal",
 });
 
+/**
+ * The moves made at a moment, and what that moment waits on: the drop with
+ * the ladle over the cup, the stamp with the needle in the band.
+ * @type {Readonly<Record<string, "ladle" | "needle">>}
+ */
+export const MOMENTS = Object.freeze({ drop: "ladle", seal: "needle" });
+
 /** @returns {LessonCue} */
 const blankCue = () => ({ lesson: LESSONS.ticket, at: { kind: "ticket", index: -1, guest: -1 } });
 
@@ -214,11 +222,26 @@ function aim(into, lesson, kind, index = -1, guest = -1) {
   return into;
 }
 
+/** The guest whose ticket the hand takes next, once it is up on the rail. @param {LessonView} view */
+function nextTicket(view) {
+  const guest = view.guests[mostImpatient(view.guests)];
+  return guest && guest.placed ? guest : null;
+}
+
+/**
+ * Whether the device still has a station of the walk-through to learn.
+ * @param {(id: string) => boolean} learned
+ */
+export function walkUnlearned(learned) {
+  for (const id of Object.values(STATION_LESSON)) if (!learned(id)) return true;
+  return false;
+}
+
 /**
  * The lesson this moment needs, if the device still needs one: the next
- * station's action while a drink is being walked through, else a thing
- * that has just started to matter. The answer is written into `into`
- * (pass one to reuse it each frame).
+ * station's action while a drink is on the bench, else (with the bench
+ * empty) the ticket, or a thing that has just started to matter. The
+ * answer is written into `into` (pass one to reuse it each frame).
  * @param {LessonView} view
  * @param {(id: string) => boolean} learned
  * @param {LessonCue} [into]
@@ -226,21 +249,29 @@ function aim(into, lesson, kind, index = -1, guest = -1) {
  */
 export function lessonNow(view, learned, into = blankCue()) {
   const cup = view.cup;
-  if (!cup) {
-    if (!learned("ticket")) {
-      // The ticket the hand takes next, once it is up on the rail. Nothing
-      // else is taught before the first drink is under way.
-      const next = mostImpatient(view.guests);
-      const guest = view.guests[next];
-      return guest && guest.placed ? aim(into, LESSONS.ticket, "ticket", -1, guest.id) : null;
-    }
-  } else {
-    const move = stationLesson(view, cup, learned, into);
-    if (move) return move;
-    // Between stations, or waiting on the right tap or jar: nothing else yet.
-    if (walkPending(cup, learned)) return null;
+  if (cup) return stationLesson(view, cup, learned, into);
+  if (!learned("ticket")) {
+    const guest = nextTicket(view);
+    return guest ? aim(into, LESSONS.ticket, "ticket", -1, guest.id) : null;
   }
+  // Still being walked through: nothing else until this shift's first
+  // ticket is taken (the ticket is marked instead, see ticketBeckon).
+  if (!view.started && walkUnlearned(learned)) return null;
   return thingLesson(view, learned, into);
+}
+
+/**
+ * The ticket to mark on the rail while the walk-through waits for it: the
+ * one the hand takes next, from when it is up until the shift's first
+ * ticket is taken, for as long as the device is still being walked
+ * through. The guest's id, or -1.
+ * @param {LessonView} view
+ * @param {(id: string) => boolean} learned
+ */
+export function ticketBeckon(view, learned) {
+  if (view.cup || view.started) return -1;
+  if (learned("ticket") && !walkUnlearned(learned)) return -1;
+  return nextTicket(view)?.id ?? -1;
 }
 
 /**
@@ -308,31 +339,27 @@ export function walkPending(cup, learned) {
 }
 
 /**
- * A thing that has just started to matter, while the hands are free.
+ * A thing that has just started to matter, with the bench empty.
  * @param {LessonView} view
  * @param {(id: string) => boolean} learned
  * @param {LessonCue} into
  * @returns {LessonCue | null}
  */
 function thingLesson(view, learned, into) {
-  const cup = view.cup;
-  // Never over the pour, the ladle or the sealer, where the eye is on a moving thing.
-  if (cup && TIMED.has(cup.station)) return null;
-
   // The receipt at the hand-off, and the combo line on it the first time it shows.
   if (view.receipt && !view.receipt.sentBack) {
     if (!learned("serve")) return aim(into, LESSONS.serve, "receipt");
     if (view.receipt.combo > 1 && !learned("combo")) return aim(into, LESSONS.combo, "streak");
   }
 
-  // The guests waiting (not the one being made): the most restless, the critic, a special.
+  // The guests waiting: the most restless, the critic, a special.
   let glancing = -1;
   let restless = -1;
   let critic = -1;
   let special = -1;
   let worst = Infinity;
   for (const guest of view.guests) {
-    if (!guest.placed || (cup && guest.id === cup.guestId)) continue;
+    if (!guest.placed) continue;
     const share = guest.left / guest.patience;
     if (share <= GLANCE_AT && share < worst) {
       worst = share;
@@ -381,70 +408,134 @@ export function targetGone(view, at) {
 }
 
 /**
+ * Whether a station's step has already been begun without its lesson: a
+ * pump in, a cube in, a shake made. The player has found it, so it isn't
+ * taught on this drink (it counts as known once the station works).
+ * @param {LessonView} view @param {string} id
+ */
+function begun(view, id) {
+  const cup = view.cup;
+  if (!cup) return false;
+  if (id === "syrup") return cup.sugar > 0;
+  if (id === "ice") return cup.ice > 0;
+  if (id === "shake") return cup.shakes > 0;
+  return false;
+}
+
+/**
+ * Whether a move made at a moment is due now: the drop with the ladle over
+ * the cup (where it lands clean), the stamp with the needle in the band.
+ * Every other step is due as soon as its station is.
+ * @param {LessonView} view @param {string} id
+ */
+export function atMoment(view, id) {
+  const rules = rulesFor(view.expert);
+  if (id === "drop") return Math.abs(view.ladle) <= rules.cupCenter;
+  if (id === "seal") return view.needle >= rules.sealBand[0] && view.needle <= rules.sealBand[1];
+  return true;
+}
+
+/**
+ * Seconds from `time` until the ladle is next right over the middle of the
+ * cup (where `ladleAt` is 0), always a little after `time`, so a game that
+ * stops its clock there never stops it twice on the same crossing.
+ * @param {number} time seconds since the swing began
+ * @param {number} swing the swing's angular speed
+ * @param {number} [offset] its phase at time 0 (the bench starts it out at one side)
+ */
+export function ladleCentreIn(time, swing, offset = Math.PI / 2) {
+  if (!(swing > 0)) return Infinity;
+  const k = Math.floor((swing * time + offset) / Math.PI) + 1;
+  const until = (k * Math.PI - offset) / swing - time;
+  return until > 1e-6 ? until : until + Math.PI / swing;
+}
+
+/**
+ * Seconds from `time` until the sealer's needle is next at the middle of
+ * the band, on its way up or down, always a little after `time`.
+ * @param {number} time seconds since the seal began
+ * @param {boolean} [expert]
+ */
+export function needleCentreIn(time, expert = false) {
+  const { sealPeriod: period, sealBand: band } = rulesFor(expert);
+  const middle = (band[0] + band[1]) / 2;
+  // The needle climbs through `middle` at middle/2 of each cycle and falls through it at 1 - middle/2.
+  const cycle = Math.floor(time / period);
+  for (const at of [cycle + middle / 2, cycle + 1 - middle / 2, cycle + 1 + middle / 2, cycle + 2 - middle / 2]) {
+    const until = at * period - time;
+    if (until > 1e-6) return until;
+  }
+  return period;
+}
+
+/**
  * What the component keeps between frames: the lesson on screen and what
- * it points at (`cue`, null for none); the station lessons that stood down
- * unanswered this shift (`held`, not taught again until the next); and the
- * time before which no new thing is named. The two cue objects are reused
- * every frame. Clear `held` and `quiet` for a new shift.
+ * it points at (`cue`, null for none); the things named this shift
+ * (`announced`); the game time before which no new step (`calm`) or new
+ * thing (`quiet`) is shown; and the moment a step is waiting on (`waiting`:
+ * the ladle or the needle), so the game can stop its clock right on it. The
+ * two cue objects are reused every frame. Start a new shift with a fresh
+ * memory, or clear `announced` and zero `calm` and `quiet`.
  * @typedef {{
- *   cue: LessonCue | null, held: Set<string>, announced: Set<string>, quiet: number, shown: LessonCue, next: LessonCue,
+ *   cue: LessonCue | null, announced: Set<string>, quiet: number, calm: number,
+ *   waiting: "ladle" | "needle" | null, shown: LessonCue, next: LessonCue,
  *   knows: ((id: string) => boolean) | null
  * }} LessonMemory
- * `announced` holds the things named this shift, read to the end or not:
- * a thing comes once a shift, and is counted on the device only once it
+ * A thing comes once a shift, and is counted on the device only once it
  * has been up long enough to read (or continued). `knows` is made once:
- * learned, stood down this shift, or (for a thing) already named in it.
+ * learned, or (for a thing) already named this shift.
  */
 
 /** @returns {LessonMemory} */
 export function lessonMemory() {
-  return { cue: null, held: new Set(), announced: new Set(), quiet: 0, shown: blankCue(), next: blankCue(), knows: null };
+  return { cue: null, announced: new Set(), quiet: 0, calm: 0, waiting: null, shown: blankCue(), next: blankCue(), knows: null };
 }
 
 /**
  * Keeps the shared coach in step with the counter, once a frame. Asks what
  * this moment should teach; takes a station's lesson down uncounted once
  * its moment has gone (a tap pressed early, the cup dumped, the guest gone),
- * so the next drink teaches it; stands one down for the rest of the shift
- * if it waits more than WALK_WAIT unanswered (a tap held open is an answer
- * in progress; one let go too soon is not), so the line is never left
- * slowed; takes a thing down when what it points at goes (counted once it
- * has been up long enough to read); and offers whatever is due, a new
- * thing only after THING_GAP of quiet. A lesson already up follows its
- * target (a ticket moving along the rail, the pour's line once the tap is
- * held); a new one waits its turn. Returns whether the cue on screen is new
- * or now points somewhere else, so the component can measure it again.
+ * so the next drink teaches it; takes a thing down when what it points at
+ * goes or a drink is started (counted once it has been up long enough to
+ * read); and offers whatever is due, one at a time: a new step only after
+ * WALK_GAP of play since the last lesson went, a new thing only after
+ * THING_GAP since the last thing; never while tea is running (bar the dry
+ * tap's line); never a station already begun; and the drop and the stamp
+ * only at their moment (`memory.waiting` says which one is awaited). A
+ * lesson already up follows its target (a ticket moving along the rail, the
+ * pour's line once the tap is held). Returns whether the cue on screen is
+ * new or now points somewhere else, so the component can measure it again.
  * @param {import("./core/coach.ts").Coach} coach
  * @param {LessonView} view
  * @param {LessonMemory} memory updated in place
- * @param {number} now the game's clock, in seconds
+ * @param {number} now the game's clock, in seconds (it stops while a lesson stops play)
  */
 export function followLessons(coach, view, memory, now) {
-  // A station that stood down counts as known for the rest of the shift, so
-  // it neither comes back nor holds the later things back.
-  const { held, announced } = memory;
-  memory.knows ??= (id) => coach.learned(id) || held.has(id) || announced.has(id);
+  const { announced } = memory;
+  memory.knows ??= (id) => coach.learned(id) || announced.has(id);
   let next = lessonNow(view, memory.knows, memory.next);
-  if (next && !next.lesson.move && coach.current?.id !== next.lesson.id && now < memory.quiet) next = null;
+  const due = next ? next.lesson.id : null;
   const current = coach.current;
+  memory.waiting = null;
+  if (next && current?.id !== next.lesson.id) {
+    const id = next.lesson.id;
+    if (now < (next.lesson.move ? memory.calm : memory.quiet) || (view.holding && id !== "dry") || begun(view, id)) {
+      next = null;
+    } else if (!atMoment(view, id)) {
+      memory.waiting = MOMENTS[id] ?? null;
+      next = null;
+    }
+  }
   if (current && !coach.leaving) {
     if (current.move) {
-      if (next?.lesson.id !== current.id) {
+      // Its moment has gone: down, uncounted, so the next drink teaches it.
+      if (due !== current.id) {
         coach.dismiss();
         memory.cue = null;
-      } else if (coach.age > WALK_WAIT && !view.holding) {
-        memory.held.add(next.lesson.id);
-        coach.dismiss();
-        memory.cue = null;
-        next = null;
       }
-    } else if (
-      (memory.cue && memory.cue.lesson.id === current.id && targetGone(view, memory.cue.at)) ||
-      (view.cup && TIMED.has(view.cup.station))
-    ) {
-      // Its thing has gone, or the hands have reached the pour, the ladle or
-      // the sealer, where nothing else is said.
-      // Read: it fades where it was. Not yet: it comes down, and the next one says it.
+    } else if ((memory.cue && memory.cue.lesson.id === current.id && targetGone(view, memory.cue.at)) || view.cup) {
+      // Its thing has gone, or a drink has been started.
+      // Read: it fades where it was. Not yet: it comes down, and the next shift says it.
       if (coach.age >= (current.minLife ?? 0)) coach.done(current.id);
       else {
         coach.dismiss();
@@ -467,8 +558,12 @@ export function followLessons(coach, view, memory, now) {
       if (fresh && !next.lesson.move) announced.add(next.lesson.id);
     }
   }
-  if (!coach.current) memory.cue = null;
-  // Quiet is kept after a thing; the line that closes a station's lesson (the receipt) follows at once.
-  else if (!coach.current.move) memory.quiet = now + THING_GAP;
+  const up = coach.current;
+  if (!up) memory.cue = null;
+  else {
+    // The quiet runs from when the lesson has gone (faded out, or taken down).
+    memory.calm = Math.max(memory.calm, now + WALK_GAP);
+    memory.quiet = Math.max(memory.quiet, now + (up.move ? WALK_GAP : THING_GAP));
+  }
   return moved;
 }
