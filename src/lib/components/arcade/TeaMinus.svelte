@@ -78,7 +78,7 @@
   import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
   import { beckon, chalkPath, drawBrackets, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import { createFrameLoop, every } from "#lib/arcade/core/loop.ts";
-  import { clamp, lerp, smooth, snap } from "#lib/arcade/core/math.ts";
+  import { clamp, lerp, smooth, smoothstep, snap } from "#lib/arcade/core/math.ts";
   import { createPool } from "#lib/arcade/core/pool.ts";
   import { createRng, ihash, noise2 } from "#lib/arcade/core/rng.ts";
   import { emojiRows } from "#lib/arcade/share.ts";
@@ -2308,9 +2308,10 @@
     drawRanges();
     // This is distant terrain. The native surface, flight path, and every
     // real coaster are drawn later using the zoomed world camera.
+    const landscape = smoothstep(1.9, 2.2, viewW / Math.max(1, viewH));
     drawBackdrop(ctx, {
       width: viewW, height: viewH, time: flightTime, still: reduceMotion,
-      alternate: siteN % 2 === 0 ? 1 : 0, opacity: 0.87, focus: 0.65,
+      alternate: siteN % 2 === 0 ? 1 : 0, opacity: 0.87, focus: lerp(0.65, 0.94, landscape),
     });
     drawWind();
     for (const ghost of ghosts) drawPath(ghost, 0.3);

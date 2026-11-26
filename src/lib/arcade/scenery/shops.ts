@@ -2,6 +2,10 @@ import { skyline } from "./ascent";
 import { HEIGHT, hash, Pixels, raster, WIDTH, wrap } from "./pixel";
 import { paintGroundedProp, paintProp } from "./props";
 
+const kitchenLight = { color: "#737a72", amount: 0.43 };
+const stallLight = { color: "#684c58", amount: 0.46 };
+const barLight = { color: "#977b6d", amount: 0.38 };
+
 function bricks(p: Pixels, mortar: string, face: string, edge: string, bottom: number) {
   p.rect(mortar, 0, 0, WIDTH, bottom);
   for (let y = 1; y < bottom; y += 13) {
@@ -30,7 +34,7 @@ function windowView(p: Pixels, x: number, y: number, w: number, h: number, time:
       p.rect("#7e8b93", x + w - 13, y + 2, 2, h);
     } else {
       p.rect("#585264", x, y + h - 12, w, 3);
-      paintProp(p, "tram", x - 64 + wrap(time * 15 + 74, w + 120), y + h - 24);
+      paintGroundedProp(p, "tram", x - 24 + wrap(time * 15 + 74, w + 48), y + h - 11, { scale: 0.64, light: barLight });
     }
   });
   p.rect("#7d625c", x + Math.floor(w / 2) - 2, y, 3, h);
@@ -56,10 +60,10 @@ function kitchenPlate(p: Pixels) {
   }
   p.rect("#563f44", 43, 52, 53, 4);
   p.rect("#b38470", 40, 50, 60, 2);
-  paintProp(p, "tins", 55, 28);
+  paintGroundedProp(p, "tins", 69, 50, { scale: 0.79, light: kitchenLight });
   p.rect("#4a484a", 251, 37, 56, 6);
   p.rect("#ae8670", 246, 35, 65, 3);
-  paintProp(p, "mold", 271, 18);
+  paintGroundedProp(p, "mold", 283, 36, { scale: 0.78, light: kitchenLight });
   for (let x = 253; x < 301; x += 12) {
     p.rect("#4d5153", x, 49, 2, 25);
     p.oval("#91918a", x + 1, 74, 4, 6);
@@ -78,11 +82,11 @@ function kitchenPlate(p: Pixels) {
   p.rect("#808a86", 84, 121, 155, 8);
   p.rect("#627473", 89, 123, 146, 4);
   p.rect("#b5b7a8", 84, 120, 155, 1);
-  p.rect("#a77966", 37, 103, 55, 8);
-  p.oval("#89625b", 67, 106, 14, 3);
-  paintGroundedProp(p, "kettle", 64, 104);
-  p.rect("#563f44", 38, 111, 53, 3);
-  p.rect("#bc967d", 37, 110, 55);
+  p.rect("#947365", 35, 77, 45, 5);
+  p.oval("#785c53", 57, 80, 11, 2);
+  paintGroundedProp(p, "kettle", 56, 78, { scale: 0.69, light: kitchenLight });
+  p.rect("#59484a", 37, 82, 41, 3);
+  p.rect("#a38979", 35, 81, 45);
 }
 
 export function paintKitchen(p: Pixels, time: number) {
@@ -91,7 +95,10 @@ export function paintKitchen(p: Pixels, time: number) {
   windowView(p, 116, 18, 105, 72, time, true);
   p.rect("#717472", 97, 25, 135, 3);
   p.rect("#b0a496", 99, 24, 132);
-  paintProp(p, "sieve", 183 + Math.sin(time / 3) * 25, 23);
+  const trolley = 171 + Math.sin(time / 3) * 23;
+  p.rect("#8e8d7c", trolley - 5, 24, 3, 3);
+  p.rect("#8e8d7c", trolley + 7, 24, 3, 3);
+  paintProp(p, "sieve", trolley - 10, 25, { scale: 0.75, light: kitchenLight });
 }
 
 let stalls: HTMLCanvasElement;
@@ -112,9 +119,9 @@ function marketPlate(p: Pixels) {
     p.rect("#946e67", x, 116, 37);
     p.oval("#55434e", x + 20, 120, 13, 3);
   }
-  paintProp(p, "seal-roll", 41, 104);
-  paintGroundedProp(p, "straw-caddy", 297, 119);
-  paintProp(p, "awning", 273, 82);
+  paintGroundedProp(p, "seal-roll", 48, 119, { scale: 0.68, light: stallLight });
+  paintGroundedProp(p, "straw-caddy", 300, 118, { scale: 0.71, light: stallLight });
+  paintProp(p, "awning", 279, 81, { scale: 0.81, light: stallLight });
   p.rect("#6d4c54", 0, 44, WIDTH, 3);
   p.rect("#715361", 0, 38, WIDTH, 3);
   p.rect("#4e3746", 0, 0, WIDTH, 17);
@@ -138,10 +145,13 @@ export function paintMarket(p: Pixels, time: number) {
   stalls ??= raster(WIDTH, HEIGHT, marketPlate);
   p.image(stalls, 0, 0);
   for (const [i, x] of [38, 91, 217, 270].entries()) {
-    const y = 44 + (i === 1 || i === 2 ? 7 : 0);
-    const sway = Math.sin(time + i) * 2;
-    paintProp(p, "lantern", x + sway, y);
-    if (Math.floor(time / 2 + i) % 3 === 0) p.rect("#eab178", x + sway + 9, y + 11, 3, 4);
+    const hook = x + 9;
+    const wireY = hook < 220 ? 46 + (hook - 48) * 8 / 172 : 54 - (hook - 220) * 13 / 98;
+    const y = wireY + 4;
+    const sway = Math.sin(time + i) * 1.6;
+    p.line("#5c4653", hook, wireY, hook + sway, y);
+    paintProp(p, "lantern", x + sway, y, { scale: 0.8, light: stallLight });
+    if (Math.floor(time / 2 + i) % 3 === 0) p.rect("#c89877", x + sway + 8, y + 9, 2, 3);
   }
 }
 
@@ -161,10 +171,10 @@ function counterPlate(p: Pixels) {
   p.rect("#4d4042", 67, 0, 3, 28);
   p.oval("#624b49", 68, 28, 17, 7);
   p.rect("#d3a988", 52, 29, 30, 2);
-  paintProp(p, "tins", 24, 59);
-  paintProp(p, "sugar-jar", 61, 56);
-  paintProp(p, "milk-crate", 244, 46);
-  paintProp(p, "sugar-jar", 285, 46);
+  paintGroundedProp(p, "tins", 38, 81, { scale: 0.86, light: barLight });
+  paintGroundedProp(p, "sugar-jar", 68, 82, { scale: 0.86, light: barLight });
+  paintGroundedProp(p, "milk-crate", 261, 73, { scale: 0.77, light: barLight });
+  paintGroundedProp(p, "sugar-jar", 293, 73, { scale: 0.8, light: barLight });
   p.rect("#7e5e52", 0, 114, WIDTH, 52);
   p.rect("#c99569", 0, 114, WIDTH, 16);
   p.rect("#e2b18a", 0, 114, WIDTH, 3);
@@ -187,8 +197,8 @@ export function paintBar(p: Pixels, time: number) {
     p.rect("#ba8a70", x, 104, 44, 2);
     p.oval("#6e5049", x + 24, 109, 16, 3);
   }
-  paintProp(p, "receipt", 36, 89);
-  paintGroundedProp(p, "pump", 275, 108);
+  paintGroundedProp(p, "receipt", 44, 107, { scale: 0.77, light: barLight });
+  paintGroundedProp(p, "pump", 275, 108, { scale: 0.73, light: barLight });
   p.oval("#835e52", 156, 121, 28, 4);
   p.oval("#cba175", 155, 119, 26, 3);
 }

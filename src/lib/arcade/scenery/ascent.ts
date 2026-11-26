@@ -1,7 +1,8 @@
 import { mixHex } from "#lib/arcade/core/color.ts";
 import { bayer } from "#lib/arcade/core/dither.ts";
+import { lerp, smoothstep } from "#lib/arcade/core/math.ts";
 import { clamp, hash, HEIGHT, Pixels, raster, WIDTH, wrap } from "./pixel";
-import { paintProp } from "./props";
+import { paintGroundedProp, paintProp } from "./props";
 
 type Plate = readonly [string, string, string];
 const skies: ReadonlyArray<{ at: number; colors: Plate }> = [
@@ -94,7 +95,7 @@ function clouds(p: Pixels, altitude: number, time: number) {
     const y = 73 + (altitude - 22) * 2 + layer * 27;
     const speed = 1 + layer * 2.2;
     for (let i = 0; i < 4; i++) {
-      const x = wrap(7 + i * 118 + time * speed + layer * 67, 472) - 144;
+      const x = wrap(7 + i * 120 + time * speed + layer * 67, WIDTH + 158) - 158;
       const top = y + hash(i * 21 + layer) * 15;
       const variant = (i + layer) % 4;
       p.ctx.globalAlpha = opacity;
@@ -115,8 +116,8 @@ function stars(p: Pixels, altitude: number, time: number) {
   p.ctx.globalAlpha = sight;
   for (let i = 0; i < 95; i++) {
     const depth = hash(i * 8 + 2);
-    const x = wrap(hash(i * 31 + 105) * WIDTH + time * depth * 0.9, WIDTH);
-    const y = wrap(hash(i * 19 + 6) * HEIGHT + altitude * depth * 0.18, HEIGHT);
+    const x = wrap(hash(i * 31 + 105) * WIDTH + time * depth * 0.9, WIDTH + 4) - 2;
+    const y = hash(i * 19 + 6) * HEIGHT + altitude * depth * 0.18;
     const color = depth < 0.17 ? "#a3a4ad" : depth < 0.5 ? "#5a6886" : "#3d4865";
     p.rect(color, x, y);
     if (depth < 0.045 && Math.floor(time / 3 + i) % 3 !== 0) {
@@ -197,10 +198,19 @@ function crescent(p: Pixels, cx: number, cy: number) {
   p.rect("#6d7583", cx - 9, cy + 4, 2, 2);
 }
 
+const roofLight = { color: "#916f7a", amount: 0.29 };
+const airLight = { color: "#9d8b9d", amount: 0.27 };
+const orbitLight = { color: "#505973", amount: 0.31 };
+
+/** The camera passes each band in either direction. */
+function flybyProgress(altitude: number, enter: number, arrive: number, leave: number, exit: number) {
+  return smoothstep(enter, arrive, altitude) * (1 - smoothstep(leave, exit, altitude));
+}
+
 export function paintAscent(p: Pixels, altitude: number, time: number) {
-  p.image(sky(altitude), 0, 0);
+  p.image(sky(Math.min(100, Math.round(altitude))), 0, 0);
   const horizon = 116 + altitude * 2.45;
-  if (altitude < 16) {
+  if (horizon - 55 < HEIGHT) {
     p.oval("#eaba8f", 223, 79 + altitude * 3, 22, 22);
     skyline(p, horizon + 3, time * 1, 0);
     skyline(p, horizon + 18, time * 2, 1);
@@ -209,56 +219,77 @@ export function paintAscent(p: Pixels, altitude: number, time: number) {
   stars(p, altitude, time);
   clouds(p, altitude, time);
 
-  if (altitude < 9) {
-    const roof = 139 + altitude * 4;
+  const roof = 139 + altitude * 4;
+  if (roof - 38 < HEIGHT) {
     p.rect("#514351", 0, roof, WIDTH, 50);
     p.rect("#735560", 0, roof, WIDTH, 3);
     p.rect("#ad7e73", 0, roof, WIDTH, 1);
     for (let x = 4; x < WIDTH; x += 18) p.rect("#644c55", x, roof + 8, 9);
-    paintProp(p, "tank", 39, roof - 41);
-    paintProp(p, "awning", 253, roof - 22);
+    p.oval("#463849", 53, roof + 2, 12, 2);
+    paintGroundedProp(p, "tank", 51, roof + 1, { scale: 0.72, light: roofLight });
+    p.rect("#614c59", 259, roof - 13, 22, 14);
+    paintGroundedProp(p, "awning", 270, roof + 1, { scale: 0.73, light: roofLight });
   }
 
-  if (altitude > 14 && altitude < 40) {
-    paintProp(p, "balloon", 235 - time % 42, 101 + (altitude - 24) * 3 + Math.sin(time * 1.2) * 3);
+  // Side entries work through the viewport edge even when a tall phone
+  // needs extra sky above and below the painted plate.
+  const balloonX = lerp(WIDTH + 2, 242 + Math.sin(time / 8) * 13, flybyProgress(altitude, 11, 24, 34, 48));
+  if (balloonX < WIDTH) {
+    const y = 78 + (altitude - 22) * 1.6 + Math.sin(time * 1.2) * 2;
+    paintProp(p, "balloon", balloonX, y, { scale: 0.78, light: airLight });
   }
-  if (altitude > 34 && altitude < 63) {
-    const x = wrap(time * 11 + 94, WIDTH + 110) - 60;
-    const y = 107 + (altitude - 46) * 2;
-    p.rect("#8f98ad", x - 58, y + 9, 52);
-    p.rect("#656f91", x - 42, y + 11, 34);
-    paintProp(p, "courier", x, y);
+  const courierX = lerp(-44, WIDTH + 59, smoothstep(31, 68, altitude));
+  if (courierX > -43 && courierX < WIDTH + 58) {
+    const courierY = 78 + (altitude - 41) * 0.85 + Math.sin(time / 7) * 4;
+    const x = courierX;
+    p.rect("#7986a1", x - 58, courierY + 7, 51);
+    p.rect("#626f8e", x - 42, courierY + 9, 35);
+    paintProp(p, "courier", x, courierY, { scale: 0.81, light: airLight });
   }
 
-  if (altitude > 56 && altitude < 99) {
-    p.ctx.save();
-    p.ctx.globalAlpha = Math.min(clamp((altitude - 56) / 8, 0, 1), clamp((99 - altitude) / 8, 0, 1));
+  const earthX = lerp(-269, -88, flybyProgress(altitude, 51, 75, 78, 103));
+  if (earthX > -267) {
     const meridian = Math.round((1 + Math.sin(time * 0.075)) * 8);
-    p.image(earth(meridian), -105 + altitude / 3, 92 + Math.abs(altitude - 71) * 3);
-    crescent(p, 247 - (altitude - 72) * 0.6, 33 + (altitude - 72) * 0.6);
-    const x = 235 + 37 * Math.sin(time / 8);
-    const y = 88 + (altitude - 72) * 2.5;
-    paintProp(p, "station", x, y);
-    if (Math.floor(time * 1.6) % 2 === 0) p.rect("#dfb281", x + 4, y + 22, 2, 2);
-    if (altitude > 64) paintProp(p, "probe", 61 + Math.sin(time / 8) * 18, 48 + Math.sin(time / 2.8) * 5);
+    p.image(earth(meridian), earthX, 85 + ((altitude - 74) / 18) ** 2 * 11);
+  }
+  const moonX = lerp(WIDTH + 15, 247, flybyProgress(altitude, 55, 72, 80, 94));
+  if (moonX < WIDTH + 14) crescent(p, moonX, 32 + (altitude - 72) * 0.76);
+  const stationX = lerp(WIDTH + 2, 238 + 13 * Math.sin(time / 8), flybyProgress(altitude, 55, 74, 81, 99));
+  if (stationX < WIDTH) {
+    const x = stationX;
+    const stationY = 77 + (altitude - 67) * 1.2;
+    paintProp(p, "station", x, stationY, { scale: 0.76, light: orbitLight });
+    if (Math.floor(time * 1.6) % 2 === 0) p.rect("#ada08e", x + 4, stationY + 17, 2, 2);
+  }
+  const probeX = lerp(-29, 55 + Math.sin(time / 8) * 12, flybyProgress(altitude, 62, 76, 82, 98));
+  const probeY = 42 + (altitude - 73) * 1.3 + Math.sin(time / 2.8) * 4;
+  if (probeX > -20) {
+    paintProp(p, "probe", probeX, probeY, { scale: 0.78, light: orbitLight });
+  }
+  if (altitude > 77) {
+    p.ctx.save();
+    p.ctx.globalAlpha = smoothstep(77, 91, altitude);
+    dust(p, time);
     p.ctx.restore();
   }
-  if (altitude >= 83) {
-    p.ctx.save();
-    p.ctx.globalAlpha = clamp((altitude - 83) / 11, 0, 1);
-    dust(p, time);
-    paintProp(p, "ringed", 14 + Math.sin(time / 25) * 12, 19);
-    p.oval("#545469", 112 + Math.sin(time / 8) * 11, 73 + Math.sin(time / 15) * 5, 3, 3);
-    p.rect("#878290", 110 + Math.sin(time / 8) * 11, 72 + Math.sin(time / 15) * 5);
-    paintProp(p, "coaster-moon", 237, 102);
-    paintProp(p, "pearl-satellite", 56 + Math.sin(time / 6) * 17, 109 + Math.sin(time / 4) * 6, 1, 20 * Math.sin(time / 5));
-    const cometX = 183 + wrap(time * 6 + 25, 165);
-    const cometY = 41 + Math.sin(time / 4) * 8;
-    paintProp(p, "ice", cometX, cometY);
-    paintProp(p, "shard", cometX - 14, cometY + 16);
-    p.rect("#5d7585", cometX - 9, cometY + 4, 3);
-    p.rect("#52677e", cometX + 6, cometY + 24);
-    p.rect("#687e8e", cometX + 2, cometY + 29, 2);
-    p.ctx.restore();
+  const pearlX = lerp(-90, 18 + Math.sin(time / 25) * 8, smoothstep(81, 99, altitude));
+  if (pearlX > -87) {
+    paintProp(p, "ringed", pearlX, 30, { scale: 0.84, light: orbitLight });
+  }
+  const coasterX = lerp(WIDTH + 2, 244, smoothstep(87, 103, altitude));
+  if (coasterX < WIDTH) {
+    paintProp(p, "coaster-moon", coasterX, 105, { scale: 0.76, light: orbitLight });
+  }
+  const satelliteX = lerp(-65, 57 + Math.sin(time / 6) * 14, smoothstep(84, 102, altitude));
+  if (satelliteX > -53) {
+    paintProp(p, "pearl-satellite", satelliteX, 108 + Math.sin(time / 4) * 5, {
+      scale: 0.73, turn: 20 * Math.sin(time / 5), light: orbitLight,
+    });
+  }
+  const cometX = lerp(-26, WIDTH + 15, smoothstep(83, 115, altitude));
+  const cometY = 43 + (altitude - 95) * 0.7 + Math.sin(time / 4) * 4;
+  if (cometX > -25 && cometX < WIDTH + 14) {
+    paintProp(p, "ice", cometX, cometY, { scale: 0.8, light: orbitLight });
+    paintProp(p, "shard", cometX - 13, cometY + 14, { scale: 0.74, light: orbitLight });
   }
 }

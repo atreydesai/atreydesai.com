@@ -3,6 +3,9 @@ import { skyline } from "./ascent";
 import { hash, HEIGHT, Pixels, raster, WIDTH, wrap } from "./pixel";
 import { paintGroundedProp, paintProp } from "./props";
 
+const rainLight = { color: "#50516a", amount: 0.42 };
+const lunarLight = { color: "#676e83", amount: 0.24 };
+
 let rainySky: HTMLCanvasElement;
 export function paintRoute(p: Pixels, time: number) {
   rainySky ??= raster(WIDTH, HEIGHT, (q) => q.bands("#252d43", "#424762", "#78606e", 50, 19));
@@ -15,11 +18,15 @@ export function paintRoute(p: Pixels, time: number) {
   p.rect("#363449", 0, 119, WIDTH, 4);
   p.rect("#6d596a", 0, 118, WIDTH);
   for (let x = 7; x < WIDTH; x += 39) p.rect("#3b394f", x, 122, 5, 19);
-  paintProp(p, "tram", wrap(time * 24 + 190, 390) - 61, 103);
+  paintGroundedProp(p, "tram", wrap(time * 24 + 190, WIDTH + 64) - 32, 119, { scale: 0.8, light: rainLight });
   skyline(p, 152, -time * 19, 2, true);
   for (let i = 0; i < 4; i++) {
-    const x = wrap(-time * 21 + 34 + i * 94, 376) - 30;
-    paintProp(p, i % 2 ? "awning" : "tank", x, i % 2 ? 105 : 91);
+    const x = wrap(-time * 19 + 34 + i * 95, 380) - 30;
+    const roof = 123 + (i % 2 ? 3 : -1);
+    p.rect("#34374b", x - 16, roof, 32, 23);
+    p.rect("#636176", x - 17, roof, 34, 2);
+    p.rect("#4a485e", x + 8, roof + 3, 7, 17);
+    paintGroundedProp(p, i % 2 ? "awning" : "tank", x, roof, { scale: 0.69, light: rainLight });
   }
 
   for (let i = 0; i < 47; i++) {
@@ -27,6 +34,14 @@ export function paintRoute(p: Pixels, time: number) {
     const y = wrap(hash(i + 521) * 155 + time * (44 + i % 17), 146);
     p.line(i % 8 ? "#626a82" : "#888599", x, y, x + 2, y + 4);
   }
+  p.rect("#433f51", 31, 125, 251, 9);
+  p.rect("#5d566c", 30, 125, 253, 2);
+  p.rect("#373345", 31, 131, 251, 8);
+  p.oval("#3b3547", 59, 128, 9, 2);
+  p.oval("#3b3547", 219, 128, 11, 3);
+  paintGroundedProp(p, "vent", 56, 127, { scale: 0.73, light: rainLight });
+  paintGroundedProp(p, "signal", 269, 126, { scale: 0.72, light: rainLight });
+  paintGroundedProp(p, "courier-crate", 215, 126, { scale: 0.67, light: rainLight });
   p.rect("#322f40", 0, 137, WIDTH, 31);
   p.rect("#665e77", 0, 137, WIDTH, 2);
   p.rect("#4e445c", 0, 140, WIDTH, 4);
@@ -35,12 +50,6 @@ export function paintRoute(p: Pixels, time: number) {
     const y = 146 + i % 19;
     p.rect(i % 3 ? "#494359" : "#7a606c", x, y, 5 + i % 7);
   }
-  p.oval("#292735", 58, 138, 13, 2);
-  p.oval("#292735", 272, 138, 7, 2);
-  p.oval("#292735", 214, 141, 15, 6);
-  paintProp(p, "vent", 45, 119);
-  paintProp(p, "signal", 265, 113);
-  paintGroundedProp(p, "courier-crate", 211, 140);
 }
 
 const farRidge = [[0, 95], [26, 81], [48, 92], [72, 64], [86, 82], [100, 78], [141, 109], [162, 93], [181, 99], [214, 76], [231, 88], [245, 82], [280, 94], [320, 71]];
@@ -86,22 +95,22 @@ function rillePlate(p: Pixels) {
   p.line("#5d6073", 8, 122, 90, 122);
   p.line("#84838d", 243, 119, 277, 117, 4);
   p.line("#756f7d", 241, 124, 281, 122, 2);
-  p.oval("#56596c", 260, 120, 16, 5);
-  p.oval("#484d63", 270, 122, 13, 2);
-  p.oval("#55586b", 297, 117, 20, 3);
-  paintGroundedProp(p, "lunar-beacon", 258, 119);
-  paintProp(p, "relay", 277, 84);
-  p.rect("#55586c", 96, 118, 11, 2);
-  paintProp(p, "pennant", 95, 92);
+  p.oval("#56596c", 260, 120, 13, 4);
+  p.oval("#484d63", 267, 122, 10, 2);
+  p.oval("#55586b", 297, 117, 17, 2);
+  paintGroundedProp(p, "lunar-beacon", 258, 119, { scale: 0.79, light: lunarLight });
+  paintGroundedProp(p, "relay", 296, 117, { scale: 0.82, light: lunarLight });
+  p.rect("#55586c", 97, 118, 9, 2);
+  paintGroundedProp(p, "pennant", 106, 118, { scale: 0.78, light: lunarLight });
 }
 
 export function paintRille(p: Pixels, time: number) {
   rille ??= raster(WIDTH, HEIGHT, rillePlate);
   p.image(rille, 0, 0);
   const x = 28 + Math.sin(time / 6) * 19;
-  p.oval("#5d6176", x + 19, 119, 18, 2);
-  paintProp(p, "rover", x, 93);
-  if (Math.floor(time * 1.4) % 2 === 0) p.rect("#deb481", 294, 107, 5, 2);
+  p.oval("#5d6176", x + 19, 119, 14, 2);
+  paintGroundedProp(p, "rover", x + 19, 119, { scale: 0.76, light: lunarLight });
+  if (Math.floor(time * 1.4) % 2 === 0) p.rect("#c19e7b", 293, 110, 4, 1);
 }
 
 let print: HTMLCanvasElement;
@@ -131,8 +140,8 @@ export function paintCatch(p: Pixels) {
     q.rect("#dd917e", 236, 38, 42, 31);
     q.rect("#f0b59b", 241, 43, 31, 21);
     q.rect("#9d6156", 235, 44, 45);
-    paintProp(q, "ticket", 243, 81);
+    paintProp(q, "ticket", 246, 81, { scale: 0.83, light: { color: "#c6a78f", amount: 0.28 } });
+    paintProp(q, "takeaway", 252, 112, { scale: 0.76, light: { color: "#c6a78f", amount: 0.36 } });
   });
   p.image(print, 0, 0);
-  paintProp(p, "takeaway", 251, 116);
 }

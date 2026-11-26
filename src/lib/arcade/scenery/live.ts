@@ -26,31 +26,33 @@ interface Frame extends Placement {
 
 /**
  * The scenery rides the game's canvas and clock. One native-pixel plate per
- * variant is cached by camera band and 15 Hz clock tick. It has no frame loop
- * of its own.
+ * variant is cached by camera position and clock tick, without its own loop.
  */
 export function createBackdrop(game: GameId) {
   const plates: Array<{
     canvas: HTMLCanvasElement;
     time: number;
     altitude: number;
+    entry: number;
   } | undefined> = [];
+  const rate = game === "stack" ? 30 : 15;
   let time = 0;
 
-  function plate(altitude: number, alternate: boolean) {
+  function plate(altitude: number, alternate: boolean, entry = 1) {
     const index = Number(alternate);
     let frame = plates[index];
     if (!frame) {
       const canvas = document.createElement("canvas");
       canvas.width = WIDTH;
       canvas.height = HEIGHT;
-      frame = plates[index] = { canvas, time: -1, altitude: -1 };
+      frame = plates[index] = { canvas, time: -1, altitude: -1, entry: -1 };
     }
     const height = alternate ? 0 : altitude;
-    if (frame.time !== time || frame.altitude !== height) {
-      renderBackdrop(frame.canvas, game, height, time, alternate);
+    if (frame.time !== time || frame.altitude !== height || frame.entry !== entry) {
+      renderBackdrop(frame.canvas, game, height, time, alternate, entry);
       frame.time = time;
       frame.altitude = height;
+      frame.entry = entry;
     }
     return frame.canvas;
   }
@@ -61,9 +63,9 @@ export function createBackdrop(game: GameId) {
       rows = HEIGHT, alternate = 0, align,
     } = options;
     if (width < 1 || height < 1 || opacity <= 0) return;
-    const altitude = Math.round(clamp(options.altitude ?? 0, 0, 100));
+    const altitude = Math.round(clamp(options.altitude ?? 0, 0, 124) * 8) / 8;
     // A preference change leaves an already-painted view where it is.
-    if (!options.still || options.time < time) time = Math.floor(Math.max(0, options.time) * 15) / 15;
+    if (!options.still || options.time < time) time = Math.floor(Math.max(0, options.time) * rate) / rate;
 
     const artHeight = Math.max(1, Math.round(width * rows / WIDTH));
     const positioned = align ? align.y - align.row * width / WIDTH : top + (height - artHeight) * focus;
@@ -107,7 +109,8 @@ export function createBackdrop(game: GameId) {
     ctx.globalAlpha = 1;
     ctx.drawImage(plate(altitude, false), 0, 0);
     ctx.globalAlpha = amount;
-    ctx.drawImage(plate(altitude, true), 0, 0);
+    const entry = game === "stack" ? Math.round(amount * 160) / 160 : 1;
+    ctx.drawImage(plate(altitude, true, entry), 0, 0);
     return transition;
   }
 

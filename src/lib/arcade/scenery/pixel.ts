@@ -68,8 +68,12 @@ export class Pixels {
     this.ctx.restore();
   }
 
-  image(canvas: HTMLCanvasElement, x: number, y: number, scale = 1) {
-    this.ctx.drawImage(canvas, Math.round(x), Math.round(y), canvas.width * scale, canvas.height * scale);
+  image(canvas: HTMLCanvasElement, x: number, y: number, scale = 1, anchorX = 0, anchorY = 0) {
+    const width = Math.max(1, Math.round(canvas.width * scale));
+    const height = Math.max(1, Math.round(canvas.height * scale));
+    const left = Math.round(x - anchorX * width / canvas.width);
+    const top = Math.round(y - anchorY * height / canvas.height);
+    this.ctx.drawImage(canvas, left, top, width, height);
   }
 }
 

@@ -1,11 +1,15 @@
 import type { GameId } from "#lib/boba.ts";
 import { bayer } from "#lib/arcade/core/dither.ts";
+import { lerp, smoothstep } from "#lib/arcade/core/math.ts";
 import { skyline } from "./ascent";
 import { hash, HEIGHT, Pixels, raster, WIDTH, wrap } from "./pixel";
 import { paintGroundedProp, paintProp } from "./props";
 
 let icePlate: HTMLCanvasElement;
-function iceBelt(p: Pixels, time: number) {
+let iceRock: HTMLCanvasElement;
+const iceLight = { color: "#53677e", amount: 0.28 };
+
+export function paintIceBelt(p: Pixels, time: number, entry: number) {
   icePlate ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#172134", 0, 0, WIDTH, HEIGHT);
     for (let y = 0; y < HEIGHT; y++) {
@@ -25,31 +29,43 @@ function iceBelt(p: Pixels, time: number) {
       const x = hash(i + 752) * 319, y = hash(i + 198) * 167;
       q.rect(i % 8 === 0 ? "#95a1a4" : "#465873", x, y);
     }
-    q.oval("#2a3250", 244, 37, 25, 24);
-    q.oval("#596877", 241, 35, 21, 22);
-    q.oval("#2a3250", 249, 33, 23, 22);
-    q.oval("#424f65", 239, 36, 17, 21);
-    q.oval("#2a3250", 245, 33, 19, 21);
+  });
+  iceRock ??= raster(48, 18, (q) => {
+    for (let y = 0; y < 18; y++) {
+      const left = Math.max(0, 11 - y * 2, y - 10);
+      const right = 46 - Math.max(0, 20 - y * 2, (y - 9) * 2);
+      q.rect(y < 8 ? "#617b90" : "#414d66", left, y, right - left);
+      if (y < 8) q.rect(y < 4 ? "#879ba3" : "#6b8798", left, y, 27 - left);
+    }
+    q.line("#526d83", 9, 12, 28, 10);
+    q.line("#9aabb1", 12, 1, 25, 1);
+    q.line("#354959", 18, 7, 31, 8, 2);
   });
   p.image(icePlate, 0, 0);
+  const moonX = lerp(WIDTH + 29, 244, smoothstep(0.06, 0.76, entry));
+  p.oval("#2a3250", moonX, 37, 25, 24);
+  p.oval("#596877", moonX - 3, 35, 21, 22);
+  p.oval("#2a3250", moonX + 5, 33, 23, 22);
+  p.oval("#424f65", moonX - 5, 36, 17, 21);
+  p.oval("#2a3250", moonX + 1, 33, 19, 21);
   for (let i = 0; i < 15; i++) {
-    const x = wrap(i * 53 + time * (3 + i % 4), 340) - 11;
+    const x = wrap(i * 53 + time * (3 + i % 4), WIDTH + 11) - 8;
     const y = 52 + 0.44 * x + (hash(i + 21) - 0.5) * 48;
     const tint = i % 6 ? "#536c80" : "#81939c";
     p.line(tint, x, y, x + 3 + (i % 5), y - 1 - (i % 2), 1);
   }
-  paintProp(p, "ice", 27 + Math.sin(time / 6) * 13, 48);
-  paintProp(p, "shard", 64 + Math.sin(time / 6) * 13, 67);
-  paintProp(p, "buoy", 46 + Math.sin(time / 4) * 9, 109 - Math.cos(time / 3.6) * 5);
-  const x = 244 + Math.sin(time / 6) * 13;
-  const y = 95 + Math.sin(time / 3.5) * 8;
-  p.oval("#313d55", x + 15, y + 37, 31, 10);
-  p.oval("#55687d", x + 14, y + 33, 28, 7);
-  p.oval("#81979f", x + 9, y + 31, 19, 4);
-  p.oval("#55687b", x + 18, y + 35, 12, 4);
-  paintGroundedProp(p, "mirror", x + 13, y + 34, Math.sin(time / 6) * 33);
+  const chipsX = lerp(-68, 28 + Math.sin(time / 6) * 12, smoothstep(0, 0.67, entry));
+  paintProp(p, "ice", chipsX, 48, { scale: 0.82, light: iceLight });
+  paintProp(p, "shard", chipsX + 31, 67, { scale: 0.79, light: iceLight });
+  const buoyX = lerp(-21, 51 + Math.sin(time / 4) * 8, smoothstep(0.21, 0.91, entry));
+  paintProp(p, "buoy", buoyX, 110 - Math.cos(time / 3.6) * 4, { scale: 0.76, light: iceLight });
+  const x = lerp(WIDTH + 29, 259 + Math.sin(time / 6) * 11, smoothstep(0.15, 1, entry));
+  const y = 128 + Math.sin(time / 3.5) * 7;
+  p.image(iceRock, x - 22, y - 5);
+  paintGroundedProp(p, "mirror", x, y + 2, { scale: 0.76, turn: Math.sin(time / 6) * 28, light: iceLight });
 }
 
+const glassLight = { color: "#a18b79", amount: 0.36 };
 let gardenSky: HTMLCanvasElement;
 function glassRoofs(p: Pixels, time: number) {
   gardenSky ??= raster(WIDTH, HEIGHT, (q) => {
@@ -64,11 +80,16 @@ function glassRoofs(p: Pixels, time: number) {
   skyline(p, 131, -time * 5, 1);
   for (let i = 0; i < 5; i++) {
     const x = wrap(i * 101 + 22 - time * 14, 505) - 76;
-    const y = 86 + (i % 2) * 9;
-    paintProp(p, "greenhouse", x, y);
-    p.rect("#575b58", x + 2, y + 39, 74, 7);
-    p.rect("#a28870", x + 2, y + 39, 74, 2);
-    p.rect("#786b64", x + 10, y + 43, 22);
+    const y = 86 + (i % 2) * 7;
+    paintProp(p, "greenhouse", x + 5, y, { scale: 0.85, light: glassLight });
+    p.rect("#765f5f", x + 1, y + 32, 73, 5);
+    p.rect("#b3947c", x + 1, y + 32, 73, 2);
+    if (i % 2) {
+      p.oval("#7d6961", x + 65, y + 34, 8, 2);
+      paintGroundedProp(p, "planter", x + 65, y + 33, { scale: 0.58, turn: i * 15, light: glassLight });
+    }
+    p.rect("#62565c", x + 1, y + 37, 73, 4);
+    p.rect("#856b62", x + 2, y + 37, 72);
   }
   p.rect("#515258", 0, 137, WIDTH, HEIGHT - 137);
   p.rect("#90736b", 0, 137, WIDTH, 3);
@@ -78,13 +99,10 @@ function glassRoofs(p: Pixels, time: number) {
     p.rect("#65585d", x, 146, 15, 2);
     p.rect("#6a625d", x + 5, 155, 18);
   }
-  for (const [x, turn] of [[66, 0], [255, 65]]) {
-    p.oval("#42434b", x + 3, 142, 12, 4);
-    paintGroundedProp(p, "planter", x, 140, turn);
-  }
 }
 
 let flats: HTMLCanvasElement;
+const duskLight = { color: "#907580", amount: 0.29 };
 function longShadow(p: Pixels, time: number) {
   flats ??= raster(WIDTH, HEIGHT, (q) => {
     q.bands("#282b40", "#444052", "#776075", 62, 19);
@@ -109,19 +127,20 @@ function longShadow(p: Pixels, time: number) {
       }
       for (let line = 0; line < 9; line++) q.line("#594c64", cx + 15, foot + line, cx + width + 79, foot + 12 + line);
     }
-    q.line("#503d52", 200, 133, 224, 139, 2);
-    q.oval("#574458", 205, 134, 8, 2);
-    paintProp(q, "mast", 184, 100);
-    paintProp(q, "pennant", 97, 92);
-    q.oval("#514056", 57, 143, 15, 4);
-    q.line("#59475a", 60, 142, 87, 147, 2);
-    paintGroundedProp(q, "vault", 54, 141, 45);
+    q.line("#503d52", 199, 133, 224, 139, 2);
+    q.oval("#574458", 203, 134, 7, 2);
+    paintGroundedProp(q, "mast", 202, 133, { scale: 0.81, light: duskLight });
+    paintGroundedProp(q, "pennant", 104, 118, { scale: 0.74, light: duskLight });
+    q.oval("#514056", 56, 140, 13, 3);
+    q.line("#59475a", 59, 140, 82, 145, 2);
+    paintGroundedProp(q, "vault", 54, 139, { scale: 0.79, turn: 45, light: duskLight });
   });
   p.image(flats, 0, 0);
-  if (Math.floor(time) % 3 < 2) p.rect("#dfb07e", 206, 126, 2, 2);
+  if (Math.floor(time) % 3 < 2) p.rect("#c1a088", 206, 127, 2, 1);
 }
 
 let serviceRoom: HTMLCanvasElement;
+const copperInShade = { color: "#746472", amount: 0.42 };
 function belowSink(p: Pixels, time: number) {
   serviceRoom ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#65576a", 0, 0, WIDTH, HEIGHT);
@@ -152,16 +171,20 @@ function belowSink(p: Pixels, time: number) {
     q.rect("#59454f", 88, 94, 13, 10);
     q.rect("#a78675", 89, 95, 10, 7);
     q.rect("#c3a085", 89, 95, 10);
-    paintGroundedProp(q, "valve", 94, 100);
-    paintProp(q, "trap", 136, 35);
-    paintProp(q, "mold", 284, 104);
+    paintGroundedProp(q, "valve", 94, 100, { scale: 0.75, light: copperInShade });
+    q.rect("#997d78", 145, 30, 2, 9);
+    q.rect("#997d78", 171, 30, 2, 9);
+    paintProp(q, "trap", 143, 35, { scale: 0.79, light: copperInShade });
+    q.rect("#77616b", 275, 119, 28, 3);
+    paintGroundedProp(q, "mold", 288, 119, { scale: 0.78, light: copperInShade });
   });
   p.image(serviceRoom, 0, 0);
   const drop = wrap(time * 20, 62);
-  p.rect("#a5bbac", 158, 52 + drop, 2, 3);
+  p.rect("#9eaba2", 158, 50 + drop, 1, 2);
 }
 
 let waterfront: HTMLCanvasElement;
+const harbourLight = { color: "#a78d8e", amount: 0.48 };
 function ferryMarket(p: Pixels, time: number) {
   waterfront ??= raster(WIDTH, HEIGHT, (q) => {
     q.bands("#8f8290", "#be9d98", "#e2b69e", 48, 19);
@@ -186,17 +209,22 @@ function ferryMarket(p: Pixels, time: number) {
     }
   });
   p.image(waterfront, 0, 0);
-  paintProp(p, "ferry", wrap(time * 10 + 121, 412) - 85, 79 + Math.sin(time) * 1.3);
   for (let i = 0; i < 14; i++) p.rect(i % 3 ? "#b19899" : "#d0a99b", wrap(i * 49 + time * 2.6, 320), 104 + (i * 7) % 20, 4 + i % 13);
+  const ferryX = wrap(time * 9 + 121, WIDTH + 84) - 76;
+  const waterline = 110 + Math.sin(time) * 0.8;
+  p.rect("#ac9391", ferryX - 5, waterline + 1, 56);
+  p.rect("#b8a09b", ferryX + 4, waterline + 3, 51);
+  paintProp(p, "ferry", ferryX, waterline - 24, { scale: 0.75, light: harbourLight });
   for (const [x, turn] of [[28, 0], [291, 45]]) {
-    p.rect("#705c63", x - 10, 118, 20, 8);
-    p.rect("#ae8b7d", x - 10, 118, 20);
-    p.oval("#624e57", x + 1, 122, 8, 2);
-    paintGroundedProp(p, "dock-lamp", x, 120, turn);
+    p.rect("#705c63", x - 8, 118, 16, 8);
+    p.rect("#ae8b7d", x - 8, 118, 16);
+    p.oval("#624e57", x + 1, 122, 6, 2);
+    paintGroundedProp(p, "dock-lamp", x, 120, { scale: 0.75, turn, light: harbourLight });
   }
 }
 
 let courtyard: HTMLCanvasElement;
+const courtyardLight = { color: "#bb9984", amount: 0.39 };
 function courtyardStand(p: Pixels, time: number) {
   courtyard ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#e3b495", 0, 0, WIDTH, HEIGHT);
@@ -215,12 +243,9 @@ function courtyardStand(p: Pixels, time: number) {
     q.rect("#a28675", 104, 91, 112, 5);
     q.rect("#c8a684", 104, 91, 112, 2);
     q.rect("#e2b796", 100, 104, 120, 6);
-    for (const x of [24, 260]) {
-      q.rect("#a57176", x, 25, 38, 49);
-      q.rect("#806576", x + 3, 29, 32, 39);
-      q.rect("#848587", x + 4, 31, 29, 36);
-      q.rect("#b58a83", x + 17, 28, 3, 42);
-      q.rect("#b58a83", x, 46, 37, 2);
+    for (const x of [12, 302]) {
+      q.rect("#c79a89", x, 8, 5, 103);
+      q.rect("#d8ab94", x + 1, 8, 2, 103);
     }
     q.rect("#c29382", 0, 112, WIDTH, 56);
     for (let i = 0; i < 28; i++) {
@@ -234,20 +259,29 @@ function courtyardStand(p: Pixels, time: number) {
   });
   p.image(courtyard, 0, 0);
   for (const [x, turn] of [[37, 13], [288, 50]]) {
-    p.rect("#a77470", x - 15, 103, 30, 17);
-    p.rect("#d5a28b", x - 15, 103, 30, 8);
-    p.oval("#b68275", x + 2, 107, 12, 4);
-    paintGroundedProp(p, "planter", x, 105, turn);
+    p.rect("#a77470", x - 12, 104, 24, 13);
+    p.rect("#d5a28b", x - 12, 104, 24, 6);
+    p.oval("#b68275", x + 2, 107, 9, 3);
+    paintGroundedProp(p, "planter", x, 105, { scale: 0.75, turn, light: courtyardLight });
   }
-  p.oval("#a37469", 209, 108, 14, 4);
-  paintGroundedProp(p, "ice-chest", 207, 106);
-  const sway = Math.sin(time / 3) * 2;
-  paintProp(p, "lantern", 71 + sway, 36);
-  paintProp(p, "lantern", 227 - sway, 36);
-  paintProp(p, "tray", 101, 93);
+  p.rect("#a77470", 242, 103, 26, 8);
+  p.rect("#d1a18b", 242, 103, 26, 2);
+  p.oval("#a37469", 256, 105, 10, 2);
+  paintGroundedProp(p, "ice-chest", 254, 103, { scale: 0.57, light: courtyardLight });
+  for (const x of [81, 237]) {
+    const sway = Math.sin(time / 3 + x) * 1.2;
+    p.rect("#9a716d", x - 3, 34, 7, 2);
+    p.line("#8b6666", x, 35, x + sway, 41);
+    paintProp(p, "lantern", x - 9 + sway, 39, { scale: 0.79, light: courtyardLight });
+  }
+  p.rect("#a77470", 64, 106, 30, 6);
+  p.rect("#d1a18b", 64, 105, 30, 2);
+  p.oval("#a37469", 79, 107, 12, 2);
+  paintGroundedProp(p, "tray", 78, 106, { scale: 0.56, light: courtyardLight });
 }
 
 let folded: HTMLCanvasElement;
+const paperLight = { color: "#c3a38a", amount: 0.37 };
 function foldedMenu(p: Pixels) {
   folded ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#e7ccac", 0, 0, WIDTH, HEIGHT);
@@ -279,17 +313,17 @@ function foldedMenu(p: Pixels) {
     q.rect("#f4d8b8", 14, 116, 41, 20);
     q.rect("#b67d6b", 19, 121, 30, 2);
     q.rect("#c6a88f", 19, 127, 19);
-    paintProp(q, "carrier", 253, 43);
-    q.oval("#cea589", 267, 115, 12, 4);
-    q.oval("#cda285", 246, 136, 15, 5);
-    paintGroundedProp(q, "stamp", 265, 113, 15);
-    paintGroundedProp(q, "basket", 244, 134);
+    q.oval("#d3ad92", 270, 65, 10, 2);
+    paintGroundedProp(q, "carrier", 269, 65, { scale: 0.77, light: paperLight });
+    q.oval("#cea589", 267, 115, 9, 3);
+    q.oval("#cda285", 246, 136, 12, 4);
+    paintGroundedProp(q, "stamp", 265, 113, { scale: 0.76, turn: 15, light: paperLight });
+    paintGroundedProp(q, "basket", 244, 134, { scale: 0.78, light: paperLight });
   });
   p.image(folded, 0, 0);
 }
 
-export const alternateScenes: Record<GameId, (p: Pixels, time: number) => void> = {
-  stack: iceBelt,
+export const alternateScenes: Record<Exclude<GameId, "stack">, (p: Pixels, time: number) => void> = {
   runner: glassRoofs,
   lander: longShadow,
   spill: belowSink,

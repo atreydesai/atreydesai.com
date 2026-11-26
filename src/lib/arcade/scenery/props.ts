@@ -11,6 +11,13 @@ interface PropFrame {
   anchorY: number;
 }
 
+interface Appearance {
+  scale?: number;
+  turn?: number;
+  /** Mix the prop's ink toward the light around it, preserving its silhouette. */
+  light?: { color: string; amount: number };
+}
+
 interface Prop {
   name: string;
   art: (turn?: number) => PropFrame;
@@ -383,25 +390,25 @@ export const props: Record<string, Prop> = {
     p.rect("#ad7771", 2, 24, 24);
   }),
 
-  mirror: stacked("parabolic radio mirror", mirrorArray, 22.5),
-  planter: stacked("rooftop tomato planter", roofPlanter, 30),
+  mirror: stacked("parabolic radio mirror", mirrorArray, 22.5, 0.55),
+  planter: stacked("rooftop tomato planter", roofPlanter, 22.5, 0.55),
   vault: stacked("lunar sample vault", sampleVault, 30, 0.5),
   valve: stacked("copper roller valve", rollerValve, 30),
-  "dock-lamp": stacked("brass dock lamp", dockLamp, 30),
-  "ice-chest": stacked("open ice chest", iceChest, 22.5),
+  "dock-lamp": stacked("brass dock lamp", dockLamp, 22.5, 0.52),
+  "ice-chest": stacked("open ice chest", iceChest, 22.5, 0.58),
   stamp: stacked("coral order stamp", inkStamp, 30),
   basket: stacked("wicker carry basket", models.catch, 30),
-  "courier-crate": stacked("courier crate", models.runner, 30),
+  "courier-crate": stacked("courier crate", models.runner, 22.5, 0.48),
   "lunar-beacon": stacked("parked survey lander", models.lander, 15, 0.48),
   "pearl-satellite": stacked("pearl satellite", models.stack, 30),
-  "straw-caddy": stacked("straw caddy", models.stab, 22.5),
-  kettle: stacked("copper kettle", models.spill, 97.5),
-  pump: stacked("amber syrup pump", models.orders, 30),
+  "straw-caddy": stacked("straw caddy", models.stab, 22.5, 0.52),
+  kettle: stacked("copper kettle", models.spill, 97.5, 0.6),
+  pump: stacked("amber syrup pump", models.orders, 30, 0.56),
 };
 
 const artCache = new Map<string, PropFrame>();
 
-function propArt(id: string, turn = 0) {
+function propArt(id: string, turn: number, light: Appearance["light"]) {
   const step = 360 / TURN_STEPS;
   const angle = props[id].slices ? ((Math.round(turn / step) * step % 360) + 360) % 360 : 0;
   const key = id + ":" + angle;
@@ -410,15 +417,36 @@ function propArt(id: string, turn = 0) {
     art = props[id].art(angle);
     artCache.set(key, art);
   }
-  return art;
+  if (!light) return art;
+
+  const litKey = `${key}:${light.color}:${light.amount}`;
+  let lit = artCache.get(litKey);
+  if (!lit) {
+    const source = art.canvas;
+    const canvas = raster(source.width, source.height, (p) => {
+      p.image(source, 0, 0);
+      p.ctx.globalCompositeOperation = "source-atop";
+      p.ctx.globalAlpha = light.amount;
+      p.rect(light.color, 0, 0, source.width, source.height);
+    });
+    lit = { ...art, canvas };
+    artCache.set(litKey, lit);
+  }
+  return lit;
 }
 
-export function paintProp(p: Pixels, id: string, x: number, y: number, scale = 1, turn = 0) {
-  p.image(propArt(id, turn).canvas, x, y, scale);
+export function paintProp(p: Pixels, id: string, x: number, y: number, { scale = 1, turn = 0, light }: Appearance = {}) {
+  p.image(propArt(id, turn, light).canvas, x, y, scale);
 }
 
-/** Place the stack's ground slice on a surface, regardless of its turn. */
-export function paintGroundedProp(p: Pixels, id: string, x: number, y: number, turn = 0) {
-  const { canvas, anchorX, anchorY } = propArt(id, turn);
-  p.image(canvas, x - anchorX, y - anchorY);
+/** Place the prop's ground point on a surface, regardless of its scale and turn. */
+export function paintGroundedProp(
+  p: Pixels,
+  id: string,
+  x: number,
+  y: number,
+  { scale = 1, turn = 0, light }: Appearance = {},
+) {
+  const { canvas, anchorX, anchorY } = propArt(id, turn, light);
+  p.image(canvas, x, y, scale, anchorX, anchorY);
 }

@@ -1606,13 +1606,15 @@
     drawClouds(c, CLOUDS[1]);
     drawBalloon(c);
     drawClouds(c, CLOUDS[2]);
+    // Keep the planet's limb on the bottom edge of tall viewports.
+    const followHorizon = smoothstep(18, 28, view) * (1 - smoothstep(58, 64, view));
     drawBackdrop(c, {
       width: viewW, height: viewH,
       // The five painted bands follow the camera, including the way back
       // down. The ice belt comes in only after the moon-coaster flyby.
       altitude: (view / SKY_AT[SKY_AT.length - 1]) * 100,
       alternate: smoothstep(60, 68, view),
-      time: windClock, still: reduceMotion, opacity: 0.94, focus: 0.72,
+      time: windClock, still: reduceMotion, opacity: 0.94, focus: lerp(0.72, 1, followHorizon),
     });
     drawFlock(c);
   }
