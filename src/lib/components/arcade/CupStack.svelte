@@ -77,7 +77,7 @@
   import { approach, clamp, damp, lerp, smoothstep, snap } from "#lib/arcade/core/math.ts";
   import { createPool } from "#lib/arcade/core/pool.ts";
   import { createRng, hash2, noise2 } from "#lib/arcade/core/rng.ts";
-  import { BESTS_SYNCED, readBest } from "#lib/arcade/scores.ts";
+  import { BESTS_SYNCED, readBest, type ArcadeMode } from "#lib/arcade/scores.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Coach from "./Coach.svelte";
@@ -2265,7 +2265,9 @@
     focusPlayfield();
     // A game opened from a link syncs its best from the board as it opens;
     // when that lands after the climb has begun, the line moves up to it.
-    const onBestsSynced = () => {
+    const onBestsSynced = (event: Event) => {
+      // Only a best in the mode being played.
+      if ((event as CustomEvent<ArcadeMode>).detail !== (expert ? "expert" : "normal")) return;
       const best = readBest("stack");
       if (best > previousBest) previousBest = best;
     };

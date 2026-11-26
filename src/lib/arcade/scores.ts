@@ -159,8 +159,9 @@ export function savePlayerName(name: string) {
 }
 
 /**
- * Dispatched on `window` when a sync has raised a best on this device, so a
- * game already open (cup stack's best line) can show it.
+ * Dispatched on `window` (a CustomEvent whose detail is the mode) when a sync
+ * has raised a best on this device, so a game already open (cup stack's best
+ * line) can show it.
  */
 export const BESTS_SYNCED = "boba:bests-synced";
 
@@ -187,7 +188,7 @@ export async function syncBests(mode: ArcadeMode = currentMode(), game?: GameId)
         if (mergeBest(id as GameId, best as number, mode)) changed = true;
       }
     }
-    if (changed && typeof window !== "undefined") window.dispatchEvent(new Event(BESTS_SYNCED));
+    if (changed && typeof window !== "undefined") window.dispatchEvent(new CustomEvent<ArcadeMode>(BESTS_SYNCED, { detail: mode }));
     return changed;
   } catch {
     return false;

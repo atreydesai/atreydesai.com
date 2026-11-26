@@ -13,6 +13,7 @@ import {
   meterLayout,
   meterWord,
   sugarReading,
+  teaCellLit,
   teaHalfRows,
   wordWidth,
 } from "../src/lib/arcade/runner-meter.js";
@@ -93,4 +94,21 @@ test("the sugar reads as the HUD did: filled by the pearls, emptied by a rush", 
   assert.deepEqual(sugarReading({ sugar: 0, rush: 0.1 }, full, rushTime), { cubes: 1, ready: false, rushing: true });
   assert.equal(meterWord(false), "sugar");
   assert.equal(meterWord(true), "rush");
+});
+
+test("any tea at all lights a cell, and each half row above the bottom adds some", () => {
+  const lit = (halfRows) => {
+    let count = 0;
+    METER_CUP.forEach((line, row) => [...line].forEach((_, col) => (count += teaCellLit(halfRows, row, col) ? 1 : 0)));
+    return count;
+  };
+  assert.equal(lit(0), 0);
+  assert.ok(lit(1) > 0);
+  // The bottom row is a single cell, so its half and its whole are the same;
+  // every half row above it adds tea.
+  for (let halfRows = 3; halfRows <= 12; halfRows++) {
+    assert.ok(lit(halfRows) > lit(halfRows - 1), `half row ${halfRows} adds nothing`);
+  }
+  const all = METER_CUP.join("").replace(/[^1-6]/g, "").length;
+  assert.equal(lit(12), all);
 });

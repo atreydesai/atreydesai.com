@@ -9,9 +9,9 @@
   //
   // The game decides where the eye already is and puts the callout there:
   // beside the runner, under the cup, by the station. `side` says which
-  // side of the anchor the slip sits on; where it won't fit there at its
-  // measured size, it takes the opposite side, then above or below, so it
-  // never covers its thing, and it always stays on screen.
+  // side of the anchor the slip sits on; where a slip beside its thing won't
+  // fit at its measured size, it takes the other side, then above or below,
+  // so it never covers its thing, and it always stays on screen.
   import { createEventDispatcher, onMount } from "svelte";
 
   import type { Lesson } from "#lib/arcade/core/coach.ts";
@@ -21,10 +21,12 @@
   export let x: number | null = null;
   export let y: number | null = null;
   export let side: "above" | "below" | "left" | "right" = "above";
-  /** Half the size of the pen loop drawn around the anchor; 0 draws none. */
+  /** Half the size of the brackets drawn around the anchor; 0 draws none. */
   export let ring = 0;
-  /** Half the width of the thing itself, when it is wider than the loop would be (a long link): the loop stretches round it and the slip keeps clear of it. */
+  /** Half the width of the thing itself, when it is wider than the ring would be (a long link): the brackets stretch round it and the slip keeps clear of it. */
   export let width = 0;
+  /** Half the height of the thing itself, when it is taller than the ring would be (a tap): likewise. */
+  export let height = 0;
   /** The scene behind is dark (most are): the loop and tail print cream, not ink. */
   export let scene: "dark" | "light" = "dark";
   /** The lesson is fading out (it has been readable long enough). */
@@ -63,7 +65,8 @@
 
   const GUTTER = 16;
   let slip: HTMLElement;
-  let slipW = 0;
+  /** The slip's measured width, bindable, so a game can tell whether it fits beside a thing. */
+  export let slipW = 0;
   let slipH = 0;
   let viewW = 0;
   let viewH = 0;
@@ -106,7 +109,7 @@
 
   $: anchored = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y);
   $: loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
-  $: loopH = ring * 1.75;
+  $: loopH = Math.max(ring * 1.75, height > 0 ? (height + 4) * 2 : 0);
   // How far the slip sits from the anchor on each axis: clear of the loop (or the thing).
   $: reachX = Math.max(ring * 0.8, loopW / 2, width);
   $: reachY = Math.max(ring * 0.8, loopH / 2);
@@ -140,12 +143,14 @@
     vh: number,
     minTop: number,
   ) {
-    // The side asked for, unless the slip won't fit there (a narrow phone):
-    // then the opposite side, then above or below, so it never covers its thing.
+    // Beside the thing, unless the slip won't fit there (a narrow phone):
+    // then the other side, then above or below, so it never covers its thing.
+    // Above or below is the game's own choice, made to keep clear of what
+    // moves past (straw stab's cups over its belt), so it is never flipped;
+    // the screen's edge only nudges it.
     let where = asked;
-    if (has && w > 0 && h > 0 && !fits(where, ax, ay, gx, gy, w, h, vw, vh, minTop)) {
-      const opposite = ({ left: "right", right: "left", above: "below", below: "above" } as const)[where];
-      const order: Array<typeof side> = [opposite, "above", "below"];
+    if (has && w > 0 && h > 0 && (where === "left" || where === "right") && !fits(where, ax, ay, gx, gy, w, h, vw, vh, minTop)) {
+      const order: Array<typeof side> = [where === "left" ? "right" : "left", "above", "below"];
       where = order.find((other) => fits(other, ax, ay, gx, gy, w, h, vw, vh, minTop)) ?? asked;
     }
     let left = ax - w / 2;

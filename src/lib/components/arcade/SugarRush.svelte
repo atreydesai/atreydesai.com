@@ -64,7 +64,7 @@
   } from "#lib/arcade/runner-engine.js";
   import { LESSONS, lessonAhead, type LessonCue } from "#lib/arcade/runner-lessons.js";
   import { botInput, createBot } from "#lib/arcade/runner-bot.js";
-  import { CUBE, CUBE_EMPTY, CUBE_FULL, GLYPHS, KEYCAP_X, LABEL_ROWS, METER_CUP, METER_CUT, meterLayout, meterWord, sugarReading, teaHalfRows, wordWidth } from "#lib/arcade/runner-meter.js";
+  import { CUBE_EMPTY, CUBE_FULL, GLYPHS, KEYCAP_X, LABEL_ROWS, METER_CUP, METER_CUT, meterLayout, meterWord, sugarReading, teaCellLit, teaHalfRows, wordWidth } from "#lib/arcade/runner-meter.js";
   import { RIM, WINDOW, stripSkyline } from "#lib/arcade/core/city.ts";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
   import { createControls, keyName, watchTouch } from "#lib/arcade/core/controls.ts";
@@ -3281,11 +3281,22 @@
     if (touchUI && padsRow) {
       meter = meterLayout(true);
       const row = padsRow.getBoundingClientRect();
-      const from = padsRow.firstElementChild?.getBoundingClientRect().right ?? row.left;
-      const to = padsRow.lastElementChild?.getBoundingClientRect().left ?? row.right;
-      meterU = meter.width * SC <= to - from - 16 ? SC : 3;
-      meterX = Math.round((from + to - meter.width * meterU) / 2);
-      meterY = Math.round(row.bottom - meter.height * meterU);
+      const slide = padsRow.firstElementChild?.getBoundingClientRect();
+      const stack = padsRow.lastElementChild;
+      const from = slide?.right ?? row.left;
+      const to = stack?.getBoundingClientRect().left ?? row.right;
+      const fit = [SC, 3].find((u) => meter.width * u <= to - from - 16);
+      if (fit) {
+        meterU = fit;
+        meterX = Math.round((from + to - meter.width * fit) / 2);
+        meterY = Math.round(row.bottom - meter.height * fit);
+      } else {
+        // Larger text leaves no room between the pads: centred just over them.
+        meterU = 3;
+        const jumpTop = stack?.lastElementChild?.getBoundingClientRect().top ?? row.top;
+        meterX = Math.round((viewW - meter.width * 3) / 2);
+        meterY = Math.round(Math.min(slide?.top ?? row.top, jumpTop) - 8 - meter.height * 3);
+      }
       return;
     }
     meter = meterLayout(false);
@@ -3364,7 +3375,6 @@
     // The cup: its tea drains a half row at a time (the top row dithered),
     // and under a quarter its outline turns the accent and blinks.
     const tea = teaHalfRows(displayTea);
-    const rows = tea >> 1;
     const low = displayTea < 0.25;
     const outline = low && (reduceMotion || Math.floor(clock * 4) % 2 === 0) ? ACCENT : CREAM;
     const cupX = meterX + meter.cup.x * u;
@@ -3378,10 +3388,7 @@
         if (ch === "O") color = outline;
         else if (ch === "S") color = STRAW_PINK;
         else if (ch === "b") color = PEARL;
-        else {
-          const level = Number(ch);
-          color = level <= rows || (level === rows + 1 && tea % 2 === 1 && (row + col) % 2 === 0) ? TEA : METER_GLASS;
-        }
+        else color = teaCellLit(tea, row, col) ? TEA : METER_GLASS;
         ctx.fillStyle = color;
         ctx.fillRect(cupX + col * u, cupY + row * u, u, u);
       }

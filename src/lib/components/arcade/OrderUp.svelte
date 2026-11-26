@@ -697,6 +697,10 @@
   let coachRing = 0;
   /** Half the width of a wide target (a ticket, a machine, the shake marks), so the loop stretches round it rather than growing tall. */
   let coachWidth = 0;
+  /** The callout's measured width (0 until it has been on screen). */
+  let coachSlipW = 0;
+  /** Half the height of a tall thing the callout rings (a tap), else 0. */
+  let coachHeight = 0;
   let coachSide: "above" | "below" | "left" | "right" = "below";
   let coachScene: "dark" | "light" = "light";
   /** On touch, the pad the lesson is about lights up: the hand, or the Sample button. */
@@ -1335,11 +1339,10 @@
     const short: string[] = [];
     if (cup.stations.includes("ice") && iceState(cup.ice, cup.order.ice) === "short") short.push("ice");
     if (cup.stations.includes("sugar") && sugarState(cup.sugar, cup.order.sugar) === "short") short.push("sugar");
-    if (short.length) {
-      popBeside(`short on ${short.join(" and ")}`, "miss", 0.9, 12);
-      liveMessage = `The cup is short on ${short.join(" and ")}.`;
-    }
+    if (short.length) popBeside(`short on ${short.join(" and ")}`, "miss", 0.9, 12);
     enterStation("pour");
+    // Said after the pour station's own line, which would otherwise replace it.
+    if (short.length) liveMessage = `The cup is short on ${short.join(" and ")}. ${liveMessage}`;
   }
 
   // --- The pour --------------------------------------------------------------------
@@ -3989,6 +3992,25 @@
     } else {
       return;
     }
+    // A card step's line goes beside the card on its left. Where the slip, at
+    // its measured width, has no room there (a phone), above the step would
+    // cover the cup being poured: the pour's line points at its lit tap from
+    // above instead.
+    const room = (coachSlipW || SLIP_ROOM) + 20;
+    let overTap = false;
+    let tall = 0;
+    if (at.kind === "step" && lesson.id === "pour" && making && x - half - room < 16) {
+      const tap = tapEls[tapFor(making.order)]?.getBoundingClientRect();
+      if (tap && tap.width > 0) {
+        x = tap.left + tap.width / 2;
+        y = tap.top + tap.height / 2;
+        // Brackets snug round the tap itself, tall and narrow.
+        ring = 0;
+        half = tap.width / 2;
+        tall = Math.round(tap.height / 2);
+        overTap = true;
+      }
+    }
     if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
     // The line fades only once it has been up long enough to read; its Continue goes as soon as it is done.
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
@@ -4002,6 +4024,7 @@
     if (ring !== coachRing) coachRing = ring;
     half = Math.round(half);
     if (half !== coachWidth) coachWidth = half;
+    if (tall !== coachHeight) coachHeight = tall;
     // A line of the making card: beside it on the left, over the card's
     // finished lines, where there is room (a phone puts it above). A
     // ticket's: beside the rail if it is at the rail's end and the slip
@@ -4016,7 +4039,7 @@
       else if (rail && slot && rail.right - slot.right < 12 && window.innerWidth - rail.right - room >= 16) side = "right";
       else if (rail) floor = Math.round(rail.bottom + 8);
     } else if (at.kind === "step") {
-      side = x - half - SLIP_ROOM > 16 ? "left" : "above";
+      side = !overTap && x - half - room >= 16 ? "left" : "above";
     } else if (at.kind === "line") {
       side = "right";
     } else if (at.kind === "jar" || at.kind === "ladle" || at.kind === "gauge" || at.kind === "tipjar" || at.kind === "sample") {
@@ -5205,6 +5228,8 @@
     side={coachSide}
     ring={coachRing}
     width={coachWidth}
+    height={coachHeight}
+    bind:slipW={coachSlipW}
     scene={coachScene}
     leaving={coachLeaving}
     hidden={paused || gameOver}

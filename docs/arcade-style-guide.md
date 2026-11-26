@@ -706,7 +706,8 @@ level in the cup on screen and in the HUD's cup drains together.
   last attempt's line, fainter.
 - Landing pads are coasters with a pennant that leans with the wind; the ×5
   coaster is labelled in ochre.
-- A landing is circled in chalk. A crash is a fireball, then spilled pearls
+- A landing is ringed with cream pixel brackets that grow on round the
+  lander. A crash is a fireball, then spilled pearls
   bouncing in the low gravity.
 - Telemetry that has gone unsafe changes colour and gains a word (“too
   fast”, “drifting”).
@@ -785,8 +786,10 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   printed under the word "sugar". Full cubes are solid; empty ones are faint
   outlines. A full meter turns the cubes gold under "rush", with the X key
   beside it on a keyboard and a glint along the cubes (still under Reduce
-  Motion); a rush drains them. It is placed only on a resize, so it never
-  moves mid-run, and sits outside the screen shake.
+  Motion); a rush drains them. On a phone it sits between the slide and
+  jump pads, its cubes in two rows of five, smaller if the room is short,
+  and just over the pads when larger text leaves none. It is placed only on
+  a resize, so it never moves mid-run, and sits outside the screen shake.
 - **The course is authored, then shuffled.** Thirty-one set pieces unlock
   with distance and never repeat back to back. Besides awnings that bounce,
   vents that lift, cables to ride, crates, pigeons and split routes, things

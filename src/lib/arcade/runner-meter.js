@@ -93,6 +93,32 @@ export function teaHalfRows(fraction) {
 }
 
 /**
+ * Each tea cell's place along its own row, counted from the row's first tea
+ * cell (pearls and the outline skipped), so a half row can light every other.
+ * @type {number[][]}
+ */
+const TEA_INDEX = METER_CUP.map((line) => {
+  let seen = 0;
+  return [...line].map((ch) => (/[1-6]/.test(ch) ? seen++ : -1));
+});
+
+/**
+ * Whether the tea cell at `row`, `col` of the cup is tea with `halfRows`
+ * shown: whole rows up to the level, and in a half row every other cell
+ * from its first, so even the one-cell bottom row shows any tea at all.
+ * @param {number} halfRows from teaHalfRows
+ * @param {number} row
+ * @param {number} col
+ */
+export function teaCellLit(halfRows, row, col) {
+  const level = Number(METER_CUP[row]?.[col]);
+  if (!(level >= 1)) return false;
+  const rows = halfRows >> 1;
+  if (level <= rows) return true;
+  return level === rows + 1 && halfRows % 2 === 1 && TEA_INDEX[row][col] % 2 === 0;
+}
+
+/**
  * What the sugar reads: how many cubes are full, and whether a rush is
  * ready or running. A rush empties the cubes as it runs.
  * @param {{ sugar: number, rush: number }} state
