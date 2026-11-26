@@ -1,7 +1,7 @@
 import { bayer } from "#lib/arcade/core/dither.ts";
 import { skyline } from "./ascent";
 import { hash, HEIGHT, Pixels, raster, WIDTH, wrap } from "./pixel";
-import { paintProp } from "./props";
+import { paintGroundedProp, paintProp } from "./props";
 
 let rainySky: HTMLCanvasElement;
 export function paintRoute(p: Pixels, time: number) {
@@ -35,13 +35,16 @@ export function paintRoute(p: Pixels, time: number) {
     const y = 146 + i % 19;
     p.rect(i % 3 ? "#494359" : "#7a606c", x, y, 5 + i % 7);
   }
-  paintProp(p, "vent", 45, 118);
-  paintProp(p, "signal", 265, 112);
-  paintProp(p, "courier-crate", 194, 110);
+  p.oval("#292735", 58, 138, 13, 2);
+  p.oval("#292735", 272, 138, 7, 2);
+  p.oval("#292735", 214, 141, 15, 6);
+  paintProp(p, "vent", 45, 119);
+  paintProp(p, "signal", 265, 113);
+  paintGroundedProp(p, "courier-crate", 211, 140);
 }
 
 const farRidge = [[0, 95], [26, 81], [48, 92], [72, 64], [86, 82], [100, 78], [141, 109], [162, 93], [181, 99], [214, 76], [231, 88], [245, 82], [280, 94], [320, 71]];
-const nearRidge = [[0, 112], [29, 107], [48, 110], [61, 102], [83, 109], [113, 114], [140, 114], [161, 112], [176, 114], [185, 123], [197, 148], [214, 155], [229, 149], [242, 117], [257, 106], [278, 107], [301, 97], [320, 110]];
+const nearRidge = [[0, 112], [29, 107], [48, 110], [61, 102], [83, 109], [113, 114], [140, 114], [161, 112], [176, 114], [185, 123], [197, 148], [214, 155], [229, 149], [236, 126], [244, 111], [278, 110], [301, 97], [320, 110]];
 
 function ridgeline(p: Pixels, points: number[][], face: string, strata: string[]) {
   for (let i = 1; i < points.length; i++) {
@@ -77,21 +80,28 @@ function rillePlate(p: Pixels) {
       if (hash(x + y * WIDTH) > 0.96) p.rect("#8e8f98", x, y, 2 + (x % 4));
     }
   }
-  p.line("#8c7478", 19, 119, 78, 116);
-  p.line("#8c7478", 17, 121, 77, 118);
-  p.line("#81828d", 30, 127, 108, 121);
-  p.line("#5e626d", 58, 135, 109, 128);
-  paintProp(p, "lunar-beacon", 220, 79);
-  paintProp(p, "relay", 257, 75);
-  paintProp(p, "pennant", 91, 85);
+  // A packed track on the left bank and a small service terrace beyond the rille.
+  p.line("#777884", 5, 118, 93, 118, 5);
+  p.line("#93929b", 5, 117, 93, 117);
+  p.line("#5d6073", 8, 122, 90, 122);
+  p.line("#84838d", 243, 119, 277, 117, 4);
+  p.line("#756f7d", 241, 124, 281, 122, 2);
+  p.oval("#56596c", 260, 120, 16, 5);
+  p.oval("#484d63", 270, 122, 13, 2);
+  p.oval("#55586b", 297, 117, 20, 3);
+  paintGroundedProp(p, "lunar-beacon", 258, 119);
+  paintProp(p, "relay", 277, 84);
+  p.rect("#55586c", 96, 118, 11, 2);
+  paintProp(p, "pennant", 95, 92);
 }
 
 export function paintRille(p: Pixels, time: number) {
   rille ??= raster(WIDTH, HEIGHT, rillePlate);
   p.image(rille, 0, 0);
-  const x = 30 + Math.sin(time / 6) * 19;
-  paintProp(p, "rover", x, 86);
-  if (Math.floor(time * 1.4) % 2 === 0) p.rect("#deb481", 274, 98, 5, 2);
+  const x = 28 + Math.sin(time / 6) * 19;
+  p.oval("#5d6176", x + 19, 119, 18, 2);
+  paintProp(p, "rover", x, 93);
+  if (Math.floor(time * 1.4) % 2 === 0) p.rect("#deb481", 294, 107, 5, 2);
 }
 
 let print: HTMLCanvasElement;

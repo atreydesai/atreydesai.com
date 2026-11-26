@@ -5,23 +5,34 @@ import type { SpriteModel } from "./stacks/types";
 import { dockLamp, iceChest, inkStamp, mirrorArray, rollerValve, roofPlanter, sampleVault } from "./new-stacks";
 import { Pixels, raster } from "./pixel";
 
+interface PropFrame {
+  canvas: HTMLCanvasElement;
+  anchorX: number;
+  anchorY: number;
+}
+
 interface Prop {
   name: string;
-  art: (turn?: number) => HTMLCanvasElement;
+  art: (turn?: number) => PropFrame;
   slices?: SpriteModel;
 }
 
 function stamp(name: string, width: number, height: number, draw: (p: Pixels) => void): Prop {
-  return { name, art: () => raster(width, height, draw) };
+  return { name, art: () => ({ canvas: raster(width, height, draw), anchorX: width / 2, anchorY: height - 1 }) };
 }
 
-function stacked(name: string, model: SpriteModel, angle: number): Prop {
+function stacked(name: string, model: SpriteModel, angle: number, squash = 0.75): Prop {
   return {
     name,
     slices: model,
     art: (turn = 0) => {
-      const { grid } = stackGrid(model.slices, { turn: ((angle + turn) % 360) * Math.PI / 180, outline: "O" });
-      return raster(grid[0].length, grid.length, (p) => drawSprite(p.ctx, grid, 0, 0, 1, model.palette));
+      const { grid, anchorX, anchorY } = stackGrid(model.slices, {
+        turn: ((angle + turn) % 360) * Math.PI / 180,
+        squash,
+        outline: "O",
+      });
+      const canvas = raster(grid[0].length, grid.length, (p) => drawSprite(p.ctx, grid, 0, 0, 1, model.palette));
+      return { canvas, anchorX, anchorY };
     },
   };
 }
@@ -374,23 +385,23 @@ export const props: Record<string, Prop> = {
 
   mirror: stacked("parabolic radio mirror", mirrorArray, 22.5),
   planter: stacked("rooftop tomato planter", roofPlanter, 30),
-  vault: stacked("lunar sample vault", sampleVault, 30),
+  vault: stacked("lunar sample vault", sampleVault, 30, 0.5),
   valve: stacked("copper roller valve", rollerValve, 30),
   "dock-lamp": stacked("brass dock lamp", dockLamp, 30),
   "ice-chest": stacked("open ice chest", iceChest, 22.5),
   stamp: stacked("coral order stamp", inkStamp, 30),
   basket: stacked("wicker carry basket", models.catch, 30),
   "courier-crate": stacked("courier crate", models.runner, 30),
-  "lunar-beacon": stacked("lunar beacon", models.lander, 30),
+  "lunar-beacon": stacked("parked survey lander", models.lander, 15, 0.48),
   "pearl-satellite": stacked("pearl satellite", models.stack, 30),
   "straw-caddy": stacked("straw caddy", models.stab, 22.5),
   kettle: stacked("copper kettle", models.spill, 97.5),
   pump: stacked("amber syrup pump", models.orders, 30),
 };
 
-const artCache = new Map<string, HTMLCanvasElement>();
+const artCache = new Map<string, PropFrame>();
 
-export function propArt(id: string, turn = 0) {
+function propArt(id: string, turn = 0) {
   const step = 360 / TURN_STEPS;
   const angle = props[id].slices ? ((Math.round(turn / step) * step % 360) + 360) % 360 : 0;
   const key = id + ":" + angle;
@@ -403,5 +414,11 @@ export function propArt(id: string, turn = 0) {
 }
 
 export function paintProp(p: Pixels, id: string, x: number, y: number, scale = 1, turn = 0) {
-  p.image(propArt(id, turn), x, y, scale);
+  p.image(propArt(id, turn).canvas, x, y, scale);
+}
+
+/** Place the stack's ground slice on a surface, regardless of its turn. */
+export function paintGroundedProp(p: Pixels, id: string, x: number, y: number, turn = 0) {
+  const { canvas, anchorX, anchorY } = propArt(id, turn);
+  p.image(canvas, x - anchorX, y - anchorY);
 }

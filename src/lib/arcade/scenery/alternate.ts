@@ -2,7 +2,7 @@ import type { GameId } from "#lib/boba.ts";
 import { bayer } from "#lib/arcade/core/dither.ts";
 import { skyline } from "./ascent";
 import { hash, HEIGHT, Pixels, raster, WIDTH, wrap } from "./pixel";
-import { paintProp } from "./props";
+import { paintGroundedProp, paintProp } from "./props";
 
 let icePlate: HTMLCanvasElement;
 function iceBelt(p: Pixels, time: number) {
@@ -46,7 +46,8 @@ function iceBelt(p: Pixels, time: number) {
   p.oval("#313d55", x + 15, y + 37, 31, 10);
   p.oval("#55687d", x + 14, y + 33, 28, 7);
   p.oval("#81979f", x + 9, y + 31, 19, 4);
-  paintProp(p, "mirror", x - 6, y, 1, Math.sin(time / 6) * 33);
+  p.oval("#55687b", x + 18, y + 35, 12, 4);
+  paintGroundedProp(p, "mirror", x + 13, y + 34, Math.sin(time / 6) * 33);
 }
 
 let gardenSky: HTMLCanvasElement;
@@ -77,7 +78,10 @@ function glassRoofs(p: Pixels, time: number) {
     p.rect("#65585d", x, 146, 15, 2);
     p.rect("#6a625d", x + 5, 155, 18);
   }
-  for (const [x, turn] of [[49, 0], [238, 65]]) paintProp(p, "planter", x, 105, 1, turn);
+  for (const [x, turn] of [[66, 0], [255, 65]]) {
+    p.oval("#42434b", x + 3, 142, 12, 4);
+    paintGroundedProp(p, "planter", x, 140, turn);
+  }
 }
 
 let flats: HTMLCanvasElement;
@@ -105,14 +109,16 @@ function longShadow(p: Pixels, time: number) {
       }
       for (let line = 0; line < 9; line++) q.line("#594c64", cx + 15, foot + line, cx + width + 79, foot + 12 + line);
     }
-    paintProp(q, "mast", 185, 77);
+    q.line("#503d52", 200, 133, 224, 139, 2);
+    q.oval("#574458", 205, 134, 8, 2);
+    paintProp(q, "mast", 184, 100);
     paintProp(q, "pennant", 97, 92);
+    q.oval("#514056", 57, 143, 15, 4);
+    q.line("#59475a", 60, 142, 87, 147, 2);
+    paintGroundedProp(q, "vault", 54, 141, 45);
   });
   p.image(flats, 0, 0);
-  const x = 38 + Math.sin(time / 12) * 12;
-  p.line("#624c61", x + 7, 139, x + 52, 144, 3);
-  paintProp(p, "vault", x, 113, 1, 45);
-  if (Math.floor(time) % 3 < 2) p.rect("#dfb07e", 207, 104, 2, 2);
+  if (Math.floor(time) % 3 < 2) p.rect("#dfb07e", 206, 126, 2, 2);
 }
 
 let serviceRoom: HTMLCanvasElement;
@@ -143,11 +149,14 @@ function belowSink(p: Pixels, time: number) {
     }
     q.rect("#5f5766", 0, 125, WIDTH, 43); q.rect("#917a7d", 0, 125, WIDTH, 2);
     q.rect("#4e586a", 106, 122, 103, 7); q.rect("#677b83", 111, 124, 93, 4);
+    q.rect("#59454f", 88, 94, 13, 10);
+    q.rect("#a78675", 89, 95, 10, 7);
+    q.rect("#c3a085", 89, 95, 10);
+    paintGroundedProp(q, "valve", 94, 100);
     paintProp(q, "trap", 136, 35);
     paintProp(q, "mold", 284, 104);
   });
   p.image(serviceRoom, 0, 0);
-  paintProp(p, "valve", 69, 76, 1, Math.sin(time / 3) * 31);
   const drop = wrap(time * 20, 62);
   p.rect("#a5bbac", 158, 52 + drop, 2, 3);
 }
@@ -179,8 +188,12 @@ function ferryMarket(p: Pixels, time: number) {
   p.image(waterfront, 0, 0);
   paintProp(p, "ferry", wrap(time * 10 + 121, 412) - 85, 79 + Math.sin(time) * 1.3);
   for (let i = 0; i < 14; i++) p.rect(i % 3 ? "#b19899" : "#d0a99b", wrap(i * 49 + time * 2.6, 320), 104 + (i * 7) % 20, 4 + i % 13);
-  paintProp(p, "dock-lamp", 15, 102);
-  paintProp(p, "dock-lamp", 278, 102, 1, 45);
+  for (const [x, turn] of [[28, 0], [291, 45]]) {
+    p.rect("#705c63", x - 10, 118, 20, 8);
+    p.rect("#ae8b7d", x - 10, 118, 20);
+    p.oval("#624e57", x + 1, 122, 8, 2);
+    paintGroundedProp(p, "dock-lamp", x, 120, turn);
+  }
 }
 
 let courtyard: HTMLCanvasElement;
@@ -220,9 +233,14 @@ function courtyardStand(p: Pixels, time: number) {
     q.rect("#dfac8a", 81, 111, 156, 2);
   });
   p.image(courtyard, 0, 0);
-  paintProp(p, "planter", 20, 97, 1, 13);
-  paintProp(p, "planter", 271, 97, 1, 50);
-  paintProp(p, "ice-chest", 192, 88);
+  for (const [x, turn] of [[37, 13], [288, 50]]) {
+    p.rect("#a77470", x - 15, 103, 30, 17);
+    p.rect("#d5a28b", x - 15, 103, 30, 8);
+    p.oval("#b68275", x + 2, 107, 12, 4);
+    paintGroundedProp(p, "planter", x, 105, turn);
+  }
+  p.oval("#a37469", 209, 108, 14, 4);
+  paintGroundedProp(p, "ice-chest", 207, 106);
   const sway = Math.sin(time / 3) * 2;
   paintProp(p, "lantern", 71 + sway, 36);
   paintProp(p, "lantern", 227 - sway, 36);
@@ -262,8 +280,10 @@ function foldedMenu(p: Pixels) {
     q.rect("#b67d6b", 19, 121, 30, 2);
     q.rect("#c6a88f", 19, 127, 19);
     paintProp(q, "carrier", 253, 43);
-    paintProp(q, "stamp", 250, 87, 1, 15);
-    paintProp(q, "basket", 226, 106);
+    q.oval("#cea589", 267, 115, 12, 4);
+    q.oval("#cda285", 246, 136, 15, 5);
+    paintGroundedProp(q, "stamp", 265, 113, 15);
+    paintGroundedProp(q, "basket", 244, 134);
   });
   p.image(folded, 0, 0);
 }

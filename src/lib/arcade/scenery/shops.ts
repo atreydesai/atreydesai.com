@@ -1,6 +1,6 @@
 import { skyline } from "./ascent";
 import { HEIGHT, hash, Pixels, raster, WIDTH, wrap } from "./pixel";
-import { paintProp } from "./props";
+import { paintGroundedProp, paintProp } from "./props";
 
 function bricks(p: Pixels, mortar: string, face: string, edge: string, bottom: number) {
   p.rect(mortar, 0, 0, WIDTH, bottom);
@@ -78,9 +78,11 @@ function kitchenPlate(p: Pixels) {
   p.rect("#808a86", 84, 121, 155, 8);
   p.rect("#627473", 89, 123, 146, 4);
   p.rect("#b5b7a8", 84, 120, 155, 1);
-  p.rect("#563f44", 38, 109, 53, 4);
-  p.rect("#b38470", 37, 108, 55, 2);
-  paintProp(p, "kettle", 41, 71);
+  p.rect("#a77966", 37, 103, 55, 8);
+  p.oval("#89625b", 67, 106, 14, 3);
+  paintGroundedProp(p, "kettle", 64, 104);
+  p.rect("#563f44", 38, 111, 53, 3);
+  p.rect("#bc967d", 37, 110, 55);
 }
 
 export function paintKitchen(p: Pixels, time: number) {
@@ -105,8 +107,13 @@ function marketPlate(p: Pixels) {
     p.rect("#a67765", x + 3, 69, 33);
   }
   paintProp(p, "shutter", 247, 83);
-  paintProp(p, "seal-roll", 40, 106);
-  paintProp(p, "straw-caddy", 281, 96);
+  for (const x of [33, 279]) {
+    p.rect("#6c5358", x, 116, 37, 8);
+    p.rect("#946e67", x, 116, 37);
+    p.oval("#55434e", x + 20, 120, 13, 3);
+  }
+  paintProp(p, "seal-roll", 41, 104);
+  paintGroundedProp(p, "straw-caddy", 297, 119);
   paintProp(p, "awning", 273, 82);
   p.rect("#6d4c54", 0, 44, WIDTH, 3);
   p.rect("#715361", 0, 38, WIDTH, 3);
@@ -175,8 +182,13 @@ export function paintBar(p: Pixels, time: number) {
   counter ??= raster(WIDTH, HEIGHT, counterPlate);
   p.image(counter, 0, 0);
   windowView(p, 107, 17, 118, 73, time, false);
-  paintProp(p, "receipt", 37, 94);
-  paintProp(p, "pump", 259, 89);
+  for (const x of [24, 253]) {
+    p.rect("#79594e", x, 105, 44, 8);
+    p.rect("#ba8a70", x, 104, 44, 2);
+    p.oval("#6e5049", x + 24, 109, 16, 3);
+  }
+  paintProp(p, "receipt", 36, 89);
+  paintGroundedProp(p, "pump", 275, 108);
   p.oval("#835e52", 156, 121, 28, 4);
   p.oval("#cba175", 155, 119, 26, 3);
 }
