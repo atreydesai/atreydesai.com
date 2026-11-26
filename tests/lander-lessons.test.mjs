@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createCoach } from "../src/lib/arcade/core/coach.ts";
+import { createControls } from "../src/lib/arcade/core/controls.ts";
 import {
   FOOT_DROP,
   MAX_FUEL,
@@ -19,7 +20,9 @@ import {
   BURN_LEARNED,
   CUP,
   FIRST_SITE_SEED,
+  GUIDED,
   GUIDED_SLIP_H,
+  LANDED,
   LESSONS,
   LESSON_START,
   MOVE_PROOF,
@@ -31,7 +34,9 @@ import {
   covered,
   landsFromHere,
   createFlightLessons,
-  guidedStartLimit,
+  guidedDevice,
+  headroomFor,
+  cameraFloor,
   leadOn,
   lessonAhead,
   nearestBelow,
@@ -73,9 +78,8 @@ const freshCoach = () => createCoach("lander", { persist: false });
  * is continued `read` real seconds after it appears (never, for Infinity),
  * and a move frozen for is continued after `skip`.
  */
-function fly(site, player, { viewH = 455, coach = freshCoach(), lessons = createFlightLessons(coach), revived = false, seconds = 80, read = 0.8, skip = Infinity, top = Infinity } = {}) {
+function fly(site, player, { viewH = 455, coach = freshCoach(), lessons = createFlightLessons(coach), revived = false, seconds = 80, read = 0.8, skip = Infinity, viewOf = (ship) => viewAround(ship, site, viewH) } = {}) {
   const ship = newShip(site, viewH);
-  ship.y = Math.min(ship.y, top);
   const ceiling = viewH + 30;
   lessons.start({ revived, flight: { ship, site, time: 0 }, ceiling });
   const cues = [];
@@ -112,7 +116,7 @@ function fly(site, player, { viewH = 455, coach = freshCoach(), lessons = create
       if (result) lessons.touchdown(result);
     }
     if (result) break;
-    lessons.check({ ship, site, time }, viewAround(ship, site, viewH), ceiling);
+    lessons.check({ ship, site, time }, viewOf(ship), ceiling);
     const cue = lessons.cue;
     if (cue && cues[cues.length - 1]?.cue !== cue) {
       cues.push({ cue, time, real, altitude: altitudeOf(ship, site), ship: { ...ship }, guide: lessons.guide, along: lessons.along });
@@ -713,7 +717,7 @@ test("a device that has never landed is guided the whole way down, by the autopi
         assert.deepEqual([guide.points[0].x, guide.points[0].y], [ship.x, ship.y], `${where}: the path doesn't start at the cup`);
         assert.ok(Math.abs(guide.land.y - (guide.pad.y + FOOT_DROP)) < 1e-6 && padBelow(guide.land, site)?.pad === guide.pad, `${where}: the path doesn't end on its coaster`);
         // Once the device has landed, no flight is guided.
-        coach.skip("touchdown");
+        coach.skip(LANDED);
         lessons.start({ flight: { ship, site, time: 0 }, ceiling: viewH + 30 });
         assert.equal(lessons.guide, null, `${where}: guided after a landing`);
       }
@@ -817,7 +821,7 @@ test("off the guided flight, the coaster named and the tilt's ghost go to the co
     const site = makeSite(1, seed);
     const coach = freshCoach();
     // A device that has landed before, but never been shown the coaster.
-    coach.skip("touchdown");
+    coach.skip(LANDED);
     coach.skip("burn");
     const { cues } = fly(site, newcomer(site), { coach, seconds: 30 });
     const named = cues.find((c) => c.cue.lesson.id === "coaster");
@@ -842,10 +846,16 @@ const SCREENS = [
   { name: "tablet", w: 1024, h: 768, top: 84, touch: true },
   { name: "phone", w: 390, h: 844, top: 112, touch: true },
   { name: "small phone", w: 375, h: 667, top: 112, touch: true },
+  // A phone on its side, the view shorter than the highest start.
+  { name: "short phone", w: 844, h: 250, top: 64, touch: true },
 ];
 
-/** The game's camera over the cup, without its lag, and how it draws the world on this screen. */
-function screenFor(ship, site, sc) {
+/**
+ * The game's camera over the cup, without its lag, and how it draws the
+ * world on this screen: zoomed in by the ground, and never so low that the
+ * cup leaves the top (with room for a line above it on a guided phone flight).
+ */
+function screenFor(ship, site, sc, guided = true) {
   const padsTop = sc.touch ? sc.h - 100 : sc.h;
   const bottom = Math.max(sc.top + 160, Math.min(sc.h, padsTop - 8));
   const units = sc.w >= sc.h * 1.05 ? 800 : 440;
@@ -854,7 +864,8 @@ function screenFor(ship, site, sc) {
   const z = 1 + 1.5 * zoomForClearance(clearance(ship, site));
   const f = (z - 1) / 1.5;
   const rest = viewH / 2 - 6;
-  const camY = rest + (Math.max(viewH / (2 * z) - 6, groundAt(site, ship.x) + (0.27 * viewH) / z) - rest) * f;
+  const framed = rest + (Math.max(viewH / (2 * z) - 6, groundAt(site, ship.x) + (0.27 * viewH) / z) - rest) * f;
+  const camY = Math.max(framed, cameraFloor(ship.y, { viewHeight: viewH, base, zoom: z, headroom: headroomFor(sc.w, base, guided) }));
   const scale = base * z;
   const mid = (sc.top + bottom) / 2;
   const pads = sc.touch
@@ -866,6 +877,7 @@ function screenFor(ship, site, sc) {
   return {
     viewH,
     base,
+    view: { left: ship.x - sc.w / 2 / scale, right: ship.x + sc.w / 2 / scale, top: camY + (mid - sc.top) / scale, bottom: camY - (bottom - mid) / scale },
     toX: (x) => sc.w / 2 + (x - ship.x) * scale,
     toY: (y) => mid - (y - camY) * scale,
     scale,
@@ -885,10 +897,11 @@ test("the callout never covers the cup, the path it is about to fly, or the coas
   for (const expert of [false, true]) {
     const site = makeSite(1, FIRST_SITE_SEED, "mare", { expert });
     for (const sc of SCREENS) {
-      const { viewH: units, base } = screenFor(newShip(site, 455), site, sc);
-      // As the game starts a guided flight: low enough for a line above the cup.
-      const { cues } = fly(site, newcomer(site), { viewH: units, top: guidedStartLimit(units, base) });
-      assert.ok(cues.length >= 3, `${sc.name}: only ${cues.map((c) => c.cue.lesson.id)}`);
+      const { viewH: units } = screenFor(newShip(site, 455), site, sc);
+      const { cues, result } = fly(site, newcomer(site), { viewH: units, viewOf: (ship) => screenFor(ship, site, sc).view });
+      // On the short phone the cup lands before most lessons find a calm moment.
+      assert.ok(cues.length >= (sc.h < 300 ? 1 : 3), `${sc.name}: only ${cues.map((c) => c.cue.lesson.id)}`);
+      assert.equal(result?.kind, "land", `${sc.name}: ${result?.kind ?? "still flying"}`);
       for (const { cue, ship, guide, along } of cues) {
         const g = screenFor(ship, site, sc);
         const slip = slipFor(cue.lesson, sc);
@@ -897,13 +910,26 @@ test("the callout never covers the cup, the path it is about to fly, or the coas
         const where = `${expert ? "expert" : "normal"} ${sc.name} ${cue.lesson.id}: ${at.side}`;
         if (process.env.TM_PLACES) console.log(where, at.clear, JSON.stringify(box));
         placed++;
+        // The cup is on screen whenever a lesson stops play: under the tickets, over the pads.
+        const cupTop = g.toY(ship.y + CUP.high);
+        const cupBottom = g.toY(ship.y + CUP.low);
+        assert.ok(cupTop >= sc.top && cupBottom <= g.screen.bottom, `${where}: the cup is at ${cupTop.toFixed(0)} to ${cupBottom.toFixed(0)} px, off the play area`);
         // A phone is too narrow for the slip beside a coaster or its
         // pennant, and too short below them: there, their line sits over the
         // last of the way down, never over the cup or the coaster itself.
         const phone = sc.w < 500;
-        if (phone && !cue.ship) {
-          const cup = { x: g.toX(ship.x - CUP.half), y: g.toY(ship.y + CUP.high), w: CUP.half * 2 * g.scale, h: (CUP.high - CUP.low) * g.scale };
-          assert.equal(covered(box, [cup, ...g.pads], []), 0, `${where} covers the cup or the pads`);
+        const pad = cue.pad ?? guide.pad;
+        const cx = pad.cx + Math.round((ship.x - pad.cx) / 1200) * 1200;
+        const padBox = { x: g.toX(cx - pad.width / 2 - 4), y: g.toY(pad.y + 14), w: (pad.width + 8) * g.scale, h: g.toY(pad.y) + 27 - g.toY(pad.y + 14) };
+        const cupBox = { x: g.toX(ship.x - CUP.half), y: g.toY(ship.y + CUP.high), w: CUP.half * 2 * g.scale, h: (CUP.high - CUP.low) * g.scale };
+        const touches = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+        if (sc.h < 300) {
+          // A play area 160 px tall can't keep the usual margin round
+          // everything: the slip still never overlaps the cup, the coaster
+          // aimed at or the pads.
+          for (const other of [cupBox, padBox, ...g.pads]) assert.ok(!touches(box, other), `${where} overlaps ${JSON.stringify(other)}`);
+        } else if (phone && !cue.ship) {
+          assert.equal(covered(box, [cupBox, ...g.pads], []), 0, `${where} covers the cup or the pads`);
           assert.ok(box.y + box.h < g.toY(guide.pad.y + 14), `${where} covers the coaster`);
         } else {
           assert.ok(at.clear, `${where} covers something`);
@@ -968,5 +994,183 @@ test("play held still for a lesson and brought back lands exactly as it would ha
     assert.equal(straight?.kind, "land", `seed ${seed}`);
     assert.deepEqual(replay(1, 5), straight, `seed ${seed}: a pause changed the landing`);
     assert.deepEqual(replay(3.3, 0.4), straight, `seed ${seed}: a short pause changed the landing`);
+  }
+});
+
+// --- Review fixes: fair starts, the cup in view, guidance until a landing, no carried taps ---
+
+test("a guided flight starts where any other does and scores the same for the same flying", () => {
+  for (const expert of [false, true]) {
+    const site = makeSite(1, FIRST_SITE_SEED, "mare", { expert });
+    for (const viewH of [200, 330, 508, 700]) {
+      // The keys, step by step: a pilot onto the coaster below, as any player might fly it.
+      const recorded = [];
+      {
+        const ship = newShip(site, viewH);
+        const pilot = createPilot(nearestBelow(ship.x, site.pads).pad, ship);
+        for (let k = 0; k < 120 * 40; k++) {
+          const keys = pilotControls(pilot, ship, site, k * H);
+          recorded.push(keys);
+          if (stepShip(ship, keys, site, k * H, H, viewH + 30)) break;
+        }
+      }
+      const player = (ship, coach, lessons, time) => recorded[Math.round(time / H)] ?? IDLE;
+      // Planning the guide never moves the cup.
+      const ship = newShip(site, viewH);
+      const before = { ...ship };
+      createFlightLessons(freshCoach()).start({ flight: { ship, site, time: 0 }, ceiling: viewH + 30 });
+      assert.deepEqual(ship, before, "planning the guide moved the cup");
+      // A fresh device, stopped by every lesson, against a seasoned one taught nothing.
+      const seasoned = freshCoach();
+      seasoned.skip(LANDED);
+      for (const id of Object.keys(LESSONS)) seasoned.skip(id);
+      const guided = fly(site, player, { viewH, skip: 0.3 });
+      const plain = fly(site, player, { viewH, coach: seasoned });
+      const where = `${expert ? "expert" : "normal"} view ${viewH}`;
+      assert.ok(guided.cues.length > 0 && plain.cues.length === 0, where);
+      assert.equal(guided.result?.kind, "land", `${where}: ${guided.result?.kind}`);
+      assert.deepEqual(guided.result, plain.result, `${where}: the guided flight scored differently`);
+      assert.deepEqual(guided.ship, plain.ship, `${where}: the guided flight ended differently`);
+    }
+  }
+});
+
+test("the camera keeps the cup on screen however short the view, with room for a line above it on a guided phone flight", () => {
+  const site = makeSite(1, FIRST_SITE_SEED, "mare");
+  for (const sc of [...SCREENS, { name: "tiny", w: 640, h: 230, top: 64, touch: true }, { name: "tall phone", w: 430, h: 932, top: 160, touch: true }]) {
+    for (const guided of [true, false]) {
+      const { viewH } = screenFor(newShip(site, 455), site, sc, guided);
+      const ship = newShip(site, viewH);
+      const g = screenFor(ship, site, sc, guided);
+      const room = g.toY(ship.y + CUP.high) - sc.top;
+      const want = headroomFor(sc.w, g.base, guided);
+      assert.ok(room >= Math.min(want, 10) - 1e-6, `${sc.name}${guided ? " guided" : ""}: the cup's straw is ${room.toFixed(0)} px under the tickets`);
+      // On a guided phone flight there's room for a two-line slip above the cup; elsewhere it sits beside.
+      if (guided && sc.w < 500) assert.ok(room >= 8 + GUIDED_SLIP_H, `${sc.name}: only ${room.toFixed(0)} px above the cup`);
+      if (sc.w >= 708) assert.equal(want, 10, `${sc.name}: kept room above a cup it could sit beside`);
+    }
+  }
+});
+
+test("guidance lasts until the device's first landing: Continue on the touchdown warning doesn't end it", () => {
+  const site = makeSite(1, FIRST_SITE_SEED, "mare");
+  const coach = freshCoach();
+  const lessons = createFlightLessons(coach);
+  const start = () => lessons.start({ flight: { ship: newShip(site, 455), site, time: 0 }, ceiling: 485 });
+  start();
+  assert.ok(lessons.guide);
+  // The touchdown warning up and continued: it counts as known, but nothing has landed.
+  coach.offer(LESSONS.touchdown);
+  coach.done("touchdown");
+  assert.ok(coach.learned("touchdown"));
+  lessons.touchdown({ kind: "crash", reason: "fast" });
+  start();
+  assert.ok(lessons.guided && lessons.guide, "a crash after Continue ended the guidance");
+  // The first landing ends it, for good.
+  lessons.touchdown({ kind: "land", pad: site.pads[0], points: 100, feather: false });
+  assert.ok(coach.learned(LANDED));
+  start();
+  assert.equal(lessons.guide, null);
+  assert.equal(guidedDevice(coach), false);
+  // A device that knew the touchdown before landings were remembered, and was never guided, has landed.
+  const old = freshCoach();
+  old.skip("touchdown");
+  assert.equal(guidedDevice(old), false);
+  assert.equal(old.learned(GUIDED), false);
+
+  // In flight: a hot approach warned, Continue pressed, then the crash; the next lander is still guided.
+  const flown = freshCoach();
+  for (const id of ["burn", "coaster", "steer", "wind", "fuel", "landers"]) flown.skip(id);
+  const flight = createFlightLessons(flown);
+  let pilot = null;
+  const hot = (ship, c, l, time) => {
+    pilot ??= createPilot(site.pads[0], ship);
+    const keys = pilotControls(pilot, ship, site, time);
+    if (pilot.descending) keys.thrust = false;
+    return keys;
+  };
+  const first = fly(site, hot, { coach: flown, lessons: flight, skip: 0.3 });
+  assert.ok(first.cues.some((c) => c.cue.lesson.id === "touchdown"), "no warning came");
+  assert.equal(first.result?.kind, "crash");
+  assert.ok(flown.learned("touchdown"), "Continue didn't count the warning");
+  pilot = null;
+  const next = fly(site, () => IDLE, { coach: flown, lessons: flight, seconds: 1 });
+  assert.ok(next.lessons.guide, "the next lander lost its guide");
+});
+
+test("a press while a lesson holds play stopped never carries into play, unless it makes the move", () => {
+  const site = makeSite(1, FIRST_SITE_SEED, "mare");
+  const keys = { " ": "thrust", ArrowLeft: "left", ArrowRight: "right" };
+  const setup = (skips) => {
+    const controls = createControls({ names: ["left", "right", "thrust"], keys, enabled: () => true });
+    const coach = freshCoach();
+    for (const id of skips) coach.skip(id);
+    const lessons = createFlightLessons(coach);
+    lessons.start({ flight: { ship: newShip(site, 455), site, time: 0 }, ceiling: 485 });
+    /** One frame as the game runs it: the keys read (and a press dropped while play is held), then its steps' keys. */
+    const frame = () => {
+      if (lessons.input(controls.read())) controls.clearPresses();
+      let acc = coach.step(FRAME);
+      const seen = [];
+      while (acc >= H) {
+        acc -= H;
+        seen.push({ ...controls.read() });
+        controls.clearPresses();
+      }
+      return seen;
+    };
+    /** Continue, as the game does it. */
+    const proceed = () => {
+      if (coach.paused) controls.clearPresses();
+      coach.done(coach.current.id);
+    };
+    const hold = (lesson) => {
+      coach.offer(lesson);
+      for (let t = 0; t < 1 && !coach.paused; t += FRAME) frame();
+      assert.ok(coach.paused, `${lesson.id} didn't stop play`);
+    };
+    return { controls, coach, lessons, frame, proceed, hold };
+  };
+  const tap = (controls, key) => {
+    controls.keyDown(key, true);
+    controls.keyUp(key);
+  };
+
+  // A tap of burn while the coaster is explained, then Continue: play resumes without a burn.
+  {
+    const { controls, frame, proceed, hold } = setup(["burn"]);
+    hold(LESSONS.coaster);
+    tap(controls, " ");
+    assert.equal(controls.read().thrust, true, "the tap wasn't latched to begin with");
+    frame();
+    proceed();
+    const steps = [];
+    for (let f = 0; f < 30; f++) steps.push(...frame());
+    assert.ok(steps.length > 0, "play didn't come back");
+    assert.ok(steps.every((k) => !k.thrust), "the tap made while play was stopped burned");
+  }
+  // The same tap and Continue before the game has drawn a frame between them.
+  {
+    const { controls, frame, proceed, hold } = setup(["burn"]);
+    hold(LESSONS.coaster);
+    tap(controls, " ");
+    proceed();
+    const steps = [];
+    for (let f = 0; f < 30; f++) steps.push(...frame());
+    assert.ok(steps.every((k) => !k.thrust), "the tap carried through Continue");
+  }
+  // Frozen for the burn: a tilt is dropped, the burn itself resumes play and burns at once.
+  {
+    const { controls, coach, frame, hold } = setup([]);
+    hold(LESSONS.burn);
+    tap(controls, "ArrowLeft");
+    frame();
+    assert.ok(coach.paused, "a tilt made the burn");
+    tap(controls, " ");
+    let steps = [];
+    for (let f = 0; f < 30 && !steps.length; f++) steps = frame();
+    assert.ok(coach.acting, "the burn didn't count as made");
+    assert.equal(steps[0]?.thrust, true, "the burn's own press was lost");
+    assert.equal(steps[0]?.left, false, "the tilt tapped while frozen carried into play");
   }
 });

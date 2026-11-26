@@ -2,11 +2,12 @@
 // puzzle, so nothing is slowed: a lesson that explains holds the room
 // instead, which stops it outright (no step at all: the dial, a belt, a
 // kettle on its rail, the tea in the air all wait), so a held room plays out
-// bit for bit as an unheld one would from where it stopped. During planning
-// straws can still be drawn and taken back while it waits. Each lesson holds
-// for a few seconds of real time a visit at most (planning time is points),
-// and Continue (Enter, or the slip's button), pressing Pour, or doing what
-// it asks lets the room run on. Each line sits beside the thing it is about,
+// bit for bit as an unheld one would from where it stopped. It holds only
+// while it is read: a pen down, a straw taken back or Clear ends the hold at
+// once, so drawing always costs planning time (planning time is points) and
+// nothing is drawn while the tea stands still. Each lesson holds for a few
+// seconds of real time a visit at most, and Continue (Enter, or the slip's
+// button), pressing Pour, or doing what it asks lets the room run on. Each line sits beside the thing it is about,
 // in the room, with pixel brackets round it, clear of the ghost, the tea,
 // the cups and the control it is about; the kitchen dims except for that
 // thing while the line is up.
@@ -459,13 +460,15 @@ export function mayOffer(next, current, age, quiet = Infinity, leaving = false) 
 
 /**
  * Whether `lesson` is one that holds the room while it explains: not once
- * it is done or its move is made, and never in expert, whose five seconds
- * are the rule.
+ * it is done or its move is made, never while a straw is being drawn (the
+ * room only stands still while it is read, so drawing always costs planning
+ * time and nothing is drawn with the tea standing still), and never in
+ * expert, whose five seconds are the rule.
  * @param {Lesson | null} lesson
- * @param {{ leaving: boolean, acting?: boolean, expert?: boolean }} state
+ * @param {{ leaving: boolean, acting?: boolean, expert?: boolean, drafting?: boolean }} state
  */
-export function holds(lesson, { leaving, acting = false, expert = false }) {
-  return !!lesson?.hold && !expert && !leaving && !acting;
+export function holds(lesson, { leaving, acting = false, expert = false, drafting = false }) {
+  return !!lesson?.hold && !expert && !leaving && !acting && !drafting;
 }
 
 /**
@@ -496,10 +499,12 @@ export function inItsPart(lesson, { phase, status, poured }) {
  * The visit's holds: each lesson may hold the room for `HOLD` real seconds
  * in a visit, all its holds together, however often it is shown (taken
  * down for a straw to be taken back and shown again, or its room opened
- * again from the level select). `take` says whether the lesson up holds
- * this frame and spends `dt` of its allowance if so; `holdable` is false
- * when there is nothing for it to hold (its part of the room is over: see
- * `inItsPart`), which spends nothing. `clear` starts a new visit.
+ * again from the level select), and only while it is read: `end` spends
+ * the rest the moment the player changes a straw. `take` says whether the
+ * lesson up holds this frame and spends `dt` of its allowance if so;
+ * `holdable` is false when there is nothing for it to hold (its part of the
+ * room is over: see `inItsPart`), which spends nothing. `clear` starts a
+ * new visit.
  * @param {boolean} expert
  */
 export function createHolds(expert) {
@@ -508,15 +513,26 @@ export function createHolds(expert) {
   return {
     /**
      * @param {Lesson | null} lesson
-     * @param {{ leaving: boolean, acting?: boolean, holdable?: boolean }} state
+     * @param {{ leaving: boolean, acting?: boolean, holdable?: boolean, drafting?: boolean }} state
      * @param {number} dt Real seconds this frame.
      */
-    take(lesson, { leaving, acting = false, holdable = true }, dt) {
-      if (!lesson || !holdable || !holds(lesson, { leaving, acting, expert })) return false;
+    take(lesson, { leaving, acting = false, holdable = true, drafting = false }, dt) {
+      if (!lesson || !holdable || !holds(lesson, { leaving, acting, expert, drafting })) return false;
       const spent = used.get(lesson.id) ?? 0;
       if (spent >= HOLD) return false;
       used.set(lesson.id, spent + Math.max(0, dt));
       return true;
+    },
+    /**
+     * The player changed the straws (a pen down, a straw taken back, Clear)
+     * while `id` was up: its hold is over for the visit and the room runs on
+     * at once, so planning done during a lesson costs planning time as
+     * usual, and a pour stopped for a lesson starts again before anything
+     * is drawn into it. The lesson itself may stay up.
+     * @param {string} id
+     */
+    end(id) {
+      used.set(id, HOLD);
     },
     /** Real seconds of hold `id` has left in the visit. @param {string} id */
     left(id) {

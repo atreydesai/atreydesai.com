@@ -99,6 +99,8 @@
   } from "#lib/arcade/art.ts";
   import { createCoach, resetLessons, type Lesson } from "#lib/arcade/core/coach.ts";
   import { TICK_LOOKAHEAD, createTicks } from "#lib/arcade/stab-tick.ts";
+  import { createAudioGate } from "#lib/arcade/stab-clock.js";
+  import { sharedAudioContext } from "#lib/audio-context.ts";
   import { hexToRgb, mixHex, mixRgb, rgbToHex, type RGB } from "#lib/arcade/core/color.ts";
   import { bayer, paintBands } from "#lib/arcade/core/dither.ts";
   import { drawBrackets, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
@@ -404,6 +406,19 @@
   let waitingForAudio = false;
   let waitStarted = 0;
   let heldSong = 0;
+  /** The song time at the audio clock's last good reading, where the belt waits if the clock stops under it. */
+  let heardSong = 0;
+  /**
+   * Whether the belt may move on the audio clock: never while a suspension
+   * asked for is still landing, the context isn't running, or its clock
+   * stands still (stab-clock.js).
+   */
+  const gate = createAudioGate();
+  /** The shared context whose state changes the gate hears about. */
+  let watched: AudioContext | null = null;
+  const onAudioState = () => {
+    if (watched) gate.state(watched.state);
+  };
   /** The song time last drawn, held while paused so the belt doesn't step back. */
   let lastShown = 0;
   /** The measured frame interval, in seconds: how far ahead a frame is drawn. */
@@ -418,14 +433,34 @@
 
   const perfSeconds = () => performance.now() / 1000;
 
-  /** Reads the audio clock and steadies the page-to-audio offset. */
+  /**
+   * The shared context's state, its changes reported to the gate. Only once
+   * the run plays on it, so the context is never made here.
+   */
+  function audioState(): string {
+    const context = useAudio ? sharedAudioContext() : null;
+    if (context && context !== watched) {
+      watched?.removeEventListener("statechange", onAudioState);
+      watched = context;
+      context.addEventListener("statechange", onAudioState);
+    }
+    return context?.state ?? "closed";
+  }
+
+  /**
+   * Reads the audio clock and steadies the page-to-audio offset. False when
+   * the clock can't be followed this frame (stopping, stopped or standing
+   * still), and the belt must wait for it rather than run on by the page clock.
+   */
   function syncClock() {
-    if (!useAudio) return;
+    if (!useAudio) return true;
     const perf = perfSeconds();
     const heard = audioClock();
-    if (heard === null) return;
+    if (heard === null || !gate.mayAdvance(heard, audioState(), perf)) return false;
     clockOffset = steadyOffset(clockSynced ? clockOffset : null, heard - perf);
     clockSynced = true;
+    heardSong = heard - origin;
+    return true;
   }
 
   /** Song time at a moment on the page clock, in seconds. */
@@ -1965,20 +2000,29 @@
     stopAge = 0;
   }
 
-  /** Holds the song where it is: the audio clock suspended, so the music and the belt stop together. */
+  /**
+   * Holds the song where it is: the audio clock suspended, so the music and
+   * the belt stop together. Already waiting for the audio, the belt is held
+   * where it waits.
+   */
   function holdClock() {
-    heldSong = songNow();
-    if (useAudio) suspendAudio();
+    if (!waitingForAudio) heldSong = songNow();
+    if (useAudio) {
+      gate.hold(audioState(), perfSeconds());
+      suspendAudio();
+    }
   }
 
   /**
    * Picks the song up where it was held: the audio clock resumed (the belt
-   * waits for it, then reads the clock afresh), or, playing silently, the
-   * page clock moved on by the time it was held.
+   * waits for it, then reads the clock afresh; a suspension still landing is
+   * waited out and the resume asked again), or, playing silently, the page
+   * clock moved on by the time it was held.
    */
   function releaseClock() {
     last = 0;
     if (useAudio) {
+      gate.release();
       resumeAudio();
       waitingForAudio = true;
       waitStarted = perfSeconds();
@@ -2418,6 +2462,13 @@
     const dt = Math.min(rawDt, 0.05);
 
     if (paused || lessonHeld) {
+      // Held, the audio stays suspended: one landing is noted, as its
+      // statechange would, and a resume that landed after the hold (asked
+      // just before it) is suspended again, so no music runs under the hold.
+      if (useAudio && running && gate.needsSuspend(audioState(), perfSeconds())) {
+        gate.hold("running", perfSeconds());
+        suspendAudio();
+      }
       if (!paused) holdFrame(rawDt);
       draw(running ? lastShown : 0);
       raf = requestAnimationFrame(frame);
@@ -2439,7 +2490,13 @@
     }
 
     if (waitingForAudio) {
-      if (audioClock() !== null) {
+      const state = audioState();
+      // A suspension that landed after the audio was asked back swallowed
+      // that resume: ask again. While one is still landing, the wait for the
+      // audio hasn't begun.
+      if (gate.needsResume(state, perfSeconds())) resumeAudio();
+      if (gate.suspending) waitStarted = perfSeconds();
+      if (gate.mayAdvance(audioClock(), state, perfSeconds())) {
         waitingForAudio = false;
         clockSynced = false;
       } else if (perfSeconds() - waitStarted > 0.8) {
@@ -2456,7 +2513,18 @@
       }
     }
 
-    syncClock();
+    if (!syncClock()) {
+      // The audio clock stopped or stood still under the belt (a suspension
+      // landing late, or the system taking the audio): the belt waits where
+      // it was last heard, as after a pause, and asks for the audio back.
+      heldSong = heardSong;
+      waitingForAudio = true;
+      waitStarted = perfSeconds();
+      if (gate.needsResume(audioState(), perfSeconds())) resumeAudio();
+      draw(lastShown);
+      raf = requestAnimationFrame(frame);
+      return;
+    }
     // Heard now: misses are called against this.
     const now = songNow();
     // A pearl line stops the belt where there is room, once the sound just
@@ -2512,8 +2580,9 @@
   async function pauseGame() {
     if (gameOver || paused) return;
     paused = true;
-    // A line holding the belt has already held the clock.
-    if (running && !waitingForAudio && !lessonHeld) holdClock();
+    // A line holding the belt has already held the clock; waiting for the
+    // audio, the belt stays where it waits and the audio is held again.
+    if (running && !lessonHeld) holdClock();
     liveMessage = "The game is paused.";
     await tick();
     pauseCard?.focus();
@@ -2588,6 +2657,7 @@
     lessonHeld = false;
     holdAt = null;
     stopUntil = null;
+    gate.reset();
     stopMusic();
     timers.clear();
     PLAYLIST = stabPlaylist();
@@ -2749,6 +2819,7 @@
       stopMusic();
       ticks.stop();
       timers.clear();
+      watched?.removeEventListener("statechange", onAudioState);
       unmountShell();
       window.removeEventListener("keydown", onPlayfieldTab, true);
     };

@@ -14,9 +14,10 @@
 // short quiet (WALK_GAP) after the last has gone, and a station the player
 // has already begun by then isn't taught.
 //
-// Until the shift's first ticket is taken, while the device is still being
-// walked through, nothing else is said: the ticket itself is marked on the
-// rail instead (ticketBeckon), even once its line has been continued.
+// On every shift, nothing but the ticket's own line is said until the
+// shift's first ticket is taken. While the device is still being walked
+// through, that ticket is marked on the rail as well (ticketBeckon), even
+// once its line has been continued.
 //
 // Later things (a guest losing patience, a sample, a tank running low, the
 // critic, the special, the tip jar, the combo, what the receipt means) get
@@ -254,9 +255,10 @@ export function lessonNow(view, learned, into = blankCue()) {
     const guest = nextTicket(view);
     return guest ? aim(into, LESSONS.ticket, "ticket", -1, guest.id) : null;
   }
-  // Still being walked through: nothing else until this shift's first
-  // ticket is taken (the ticket is marked instead, see ticketBeckon).
-  if (!view.started && walkUnlearned(learned)) return null;
+  // On every shift, nothing else until its first ticket is taken (while the
+  // device is still being walked through, that ticket is marked instead,
+  // see ticketBeckon). Every thing still has its turn at a later empty bench.
+  if (!view.started) return null;
   return thingLesson(view, learned, into);
 }
 

@@ -10,6 +10,7 @@ import {
   slideFor,
   sliderWidth,
   speedForHeight,
+  SHARE_MARKS,
   trackFor,
   traySpan,
   widthAfterPerfect,
@@ -35,6 +36,7 @@ import {
   sliceReadSeconds,
   slideOnto,
   slipBox,
+  taughtDrop,
   towerCallout,
 } from "../src/lib/arcade/stack-lessons.js";
 import { createCoach } from "../src/lib/arcade/core/coach.ts";
@@ -445,10 +447,42 @@ test("normal: the first cup's ghost waits at full speed, and play stops the mome
   // It never goes on by itself, however long it is left.
   assert.equal(run(lessons, 60), 0);
   assert.ok(lessons.holdsCup);
-  // The drop is the move: a press drops, and the landing teaches it.
+  // The drop is the move: a press drops, and the landing teaches it. Held
+  // on its ghost, the cup lands whole as a plain drop (taughtDrop), so it
+  // says nothing about perfects: that waits for one the player times.
   assert.equal(lessons.press(), "drop");
-  assert.equal(lessons.afterDrop({ kind: "perfect", level: 0, streak: 1, width: 14 }), LESSONS.perfect);
+  assert.equal(lessons.afterDrop({ kind: "clean", level: 0, streak: 0, width: 14 }), null);
   assert.ok(coach.learned("first") && !lessons.firstCup && !lessons.holdsCup);
+  assert.ok(!coach.learned("perfect"));
+  run(lessons, 1.5);
+  assert.equal(lessons.afterDrop({ kind: "perfect", level: 1, streak: 1, width: 14 }), LESSONS.perfect);
+});
+
+test("the taught first drop lands whole on the ghost but is never a perfect, so it gives no streak, regrowth or perfect count", () => {
+  const tray = traySpan(NORMAL);
+  const width = sliderWidth(tray, NORMAL);
+  const ghost = ghostSpan(tray, width);
+  const { speed } = slideFor(0, NORMAL);
+  const window = perfectWindow(0, speed, NORMAL);
+  for (const px of PIXEL_SCALES) {
+    const judged = dropCup(tray, ghost.left, width, { window, px });
+    assert.equal(judged.kind, "perfect", "a drop the player timed there would be a perfect");
+    const taught = taughtDrop(judged);
+    // Whole, exactly on the ghost, and plain: white in the share, like a drop that wasn't centred.
+    assert.equal(taught.kind, "clean");
+    assert.deepEqual(taught.placed, ghost);
+    assert.equal(taught.cut, null);
+    assert.equal(SHARE_MARKS[taught.kind], SHARE_MARKS.clean);
+    // It teaches no perfect: the component counts a streak, the regrowth and
+    // the perfect drops only for a perfect, so it starts none of them.
+    assert.equal(lessonForDrop({ kind: taught.kind, streak: 0, width }, none), null);
+  }
+  // A judged result that isn't a perfect passes through unchanged.
+  for (const kind of ["clean", "cut", "miss"]) {
+    const result = { kind, placed: null, cut: null, offset: 3 };
+    assert.equal(taughtDrop(result), result);
+  }
+  assert.equal(taughtDrop({ kind: "close", placed: ghost, cut: null, offset: 0.6 }).kind, "clean");
 });
 
 test("normal: every other lesson stops play until Continue, and a drop press then continues rather than drops", () => {

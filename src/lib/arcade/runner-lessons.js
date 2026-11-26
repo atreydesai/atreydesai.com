@@ -41,6 +41,7 @@ import {
   isLethal,
   jumpPath,
   jumpReach,
+  letGo,
   speedAt,
   swingReach,
 } from "./runner-engine.js";
@@ -119,6 +120,64 @@ export const LESSONS = Object.freeze({
 export const LESSON_CONTROL = Object.freeze(
   /** @type {Record<string, "jump" | "down" | "rush">} */ ({ jump: "jump", hold: "jump", glide: "jump", slide: "down", slam: "down", rush: "rush" }),
 );
+
+/** @typedef {"jump" | "down" | "rush"} Control */
+
+/**
+ * What the run sees of the controls around a lesson's pause. A press
+ * dropped while a lesson holds play (any control but the one it asks for)
+ * is kept from the run until that control is let go and pressed again, so
+ * a key still held when play resumes never acts as a press then (a jump at
+ * the post must not slam because down was held through the pause). And a
+ * control let go and pressed again while no step ran (play stopped) is
+ * shown to the run as the fresh press it is, though the run last saw it
+ * held (the rush's X held before the meter filled, then pressed in its
+ * lesson). DOM-free: the component tells it what happened and filters each
+ * step's input through it.
+ */
+export function createLessonGate() {
+  /** @type {Set<Control>} */
+  const kept = new Set();
+  /** @type {Set<Control>} */
+  const letGoSinceStep = new Set();
+  return {
+    /** A fresh press of `control` was dropped for a lesson: the run doesn't see it until it is let go. @param {Control} control */
+    drop(control) {
+      kept.add(control);
+    },
+    /** Nothing holds `control` any more. @param {Control} control */
+    release(control) {
+      kept.delete(control);
+      letGoSinceStep.add(control);
+    },
+    /** Whether the run is kept from seeing `control`. @param {Control} control */
+    keeps(control) {
+      return kept.has(control);
+    },
+    /**
+     * The input one step should see, given what is held (and pressed) now;
+     * call once per step, just before it.
+     * @param {{ held: Record<Control, boolean> }} state the run
+     * @param {Readonly<Record<Control, boolean>>} input
+     */
+    filter(state, input) {
+      const out = { jump: !!input.jump, down: !!input.down, rush: !!input.rush };
+      for (const control of kept) {
+        // Not held at all now: it was let go, whatever the events said.
+        if (!out[control]) kept.delete(control);
+        else out[control] = false;
+      }
+      for (const control of letGoSinceStep) if (out[control]) letGo(/** @type {any} */ (state), control);
+      letGoSinceStep.clear();
+      return out;
+    },
+    /** A fresh run, or everything let go. */
+    clear() {
+      kept.clear();
+      letGoSinceStep.clear();
+    },
+  };
+}
 
 /**
  * @typedef {{

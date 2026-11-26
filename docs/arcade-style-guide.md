@@ -304,8 +304,11 @@ its difficulty still climbs, and its opener skips the slow songs that opened
 recently. Effects are
 short and gentle and sit under the music's key where they can. Mute silences everything, and nothing throws when audio is locked.
 Straw stab draws its belt against the audio clock (`audioClock()`), so cups
-land on what is heard; pausing suspends the audio context so the music
-resumes on the same beat. Music has three phases (opening, steady, rush) that
+land on what is heard; pausing (the pause card, or a pearl line's stop)
+suspends the audio context so the music resumes on the same beat, and the
+belt waits for that clock to be running and moving again (a suspension still
+landing is waited out, and the resume asked again), so it never runs on in
+silence. Music has three phases (opening, steady, rush) that
 differ by arrangement, not volume.
 
 ## Voice
@@ -450,9 +453,10 @@ page itself. It needs a mouse.
   line and a dithered ghost basket runs from the basket to where the cup
   will land, again and again (it waits there under Reduce Motion), with
   "Move the basket under the cup." beside it. The player's own move brings
-  play back (the basket moved once the freeze has held a moment, or already
-  waiting under the cup), and the basket follows the mouse all the while,
-  so no move is lost. A cup let go past takes the lesson down for a later
+  play back: the basket brought under the cup and held there (moving it
+  isn't enough, nor a pass through the spot, nor a hand reaching for the
+  slip's Continue), and the basket follows the mouse all the while, so no
+  move is lost. A cup let go past takes the lesson down for a later
   cup; a lesson whose cup is overtaken stands down, and the catch moves to
   that cup if it can still be reached; unmade after seven seconds it waits
   for a later run. The first golden cup, the first golden cup while a pearl
@@ -604,10 +608,10 @@ graded, and handed over.
   needle mid-band, while a ghost plays the move (syrup squirting, a cube
   arcing in, the tea rising to the line, the scoop falling, the cup
   jolting, the press coming down). Each step waits a second of play after
-  the last has gone, and a station already begun isn't taught. Until the
-  shift's first ticket is taken nothing else is said, and that ticket is
-  marked with accent pixel brackets stepping out a cell and back (still
-  under Reduce Motion). Later things are named once each, only with the
+  the last has gone, and a station already begun isn't taught. On every
+  shift nothing else is said until its first ticket is taken; while the
+  device is still being walked through, that ticket is marked with accent
+  pixel brackets stepping out a cell and back (still under Reduce Motion). Later things are named once each, only with the
   bench empty, a few seconds apart, and hold play until Continue or the next
   press. While a line is up the shop dims and the drink in hand stays lit.
   A slip never covers the cup, the station in use, the hand being taught,
@@ -685,7 +689,9 @@ A cup slides over the tower; drop it, and what overhangs is sliced off.
   speed over a dithered cream ghost of itself, sitting exactly where a
   perfect drop lands, and stops the moment it covers it, under "Drop the
   cup when it covers the ghost."; the drop starts play again and lands
-  perfect, and a cup landed before it gets there counts as known. Then come
+  whole, but as a plain drop, not a perfect, since the game timed it: it
+  starts no streak and isn't counted among the perfect drops. A cup landed
+  before it gets there counts as known. Then come
   the first slice (which hangs where it was cut while its line is up,
   riding with the tower), the first perfect, a streak one perfect short of
   growing the cup back (in expert, learned only when it does), and the
@@ -778,8 +784,10 @@ level in the cup on screen and in the HUD's cup drains together.
   cup (as it is for the tilt lesson). It goes in three steps at the
   touchdown. Such a device's site 1 is always the same (`FIRST_SITE_SEED`,
   a site the engine itself makes, with a wide coaster on a flat plateau
-  just ahead), and its cup starts low enough for a lesson's line to fit
-  above it on a phone.
+  just ahead). Its cup starts where every cup does; on a phone the camera
+  keeps room under the tickets for a lesson's line above it, and on any
+  screen the cup is in view whenever a lesson stops play. Only a real
+  landing ends the guidance.
 - **Sharing** gives one emoji per attempt (the coaster's keycap for a
   landing, a burst for a crash) after a moon, and a feather for each feather
   landing.
@@ -1004,8 +1012,11 @@ room, to steer it into the cup.
   and all), so it later plays out step for step from where it stopped: a
   planning lesson holds planning, the fill line stops the pour on the step
   tea first reaches a cup, taking a straw back holds whichever part it
-  comes up in, and a result's lessons hold the next room. Straws can still
-  be drawn and taken back while it waits. Each lesson may hold for seven
+  comes up in, and a result's lessons hold the next room. It holds only
+  while it is read: a pen down, a straw taken back or Clear ends the hold at
+  once and the room runs on, so drawing always costs planning time, and
+  nothing is drawn while the tea stands still. The lesson stays up; room 1's
+  ghost keeps teaching while the dial runs. Each lesson may hold for seven
   seconds of a visit (planning time is points).
   Continue (`Enter`, or the slip's button), pressing Pour, or doing what the
   lesson asks lets the room run on. While any lesson is up the kitchen dims

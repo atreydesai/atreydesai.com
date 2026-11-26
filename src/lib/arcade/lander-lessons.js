@@ -34,7 +34,6 @@ import {
   altitudeOf,
   createPilot,
   pilotControls,
-  startAltitude,
   stepShip,
 } from "./lander-engine.js";
 
@@ -83,11 +82,18 @@ import {
  */
 export const FIRST_SITE_SEED = 21320;
 /**
- * Whether a device's flights are guided: it has never landed (a landing
- * counts the touchdown as known).
+ * What the coach also remembers per device, beside its lessons (never shown):
+ * that it has landed, and that it has flown a guided flight.
+ */
+export const LANDED = "landed";
+export const GUIDED = "guided";
+/**
+ * Whether a device's flights are guided: it has never landed. Only a landing
+ * counts, never Continue on a lesson. A device that knew the touchdown
+ * before landings were remembered, and was never guided, counts as landed.
  * @param {Pick<Coach, "learned">} coach
  */
-export const guidedDevice = (coach) => !coach.learned("touchdown");
+export const guidedDevice = (coach) => !coach.learned(LANDED) && (coach.learned(GUIDED) || !coach.learned("touchdown"));
 /** Flight seconds before any lesson, while "go" is still on screen. */
 export const LESSON_START = 0.62;
 /** Flight seconds of burn that have clearly slowed a fall: burning is known. */
@@ -586,25 +592,41 @@ export function leadOn(path, s, { seconds = 1, reach = 34 } = {}) {
  * lowest and highest points (feet to straw), each with a little room.
  */
 export const CUP = Object.freeze({ half: 15, low: -FOOT_DROP - 2, high: 20 });
+/** Coach's widest slip, px (19rem). */
+export const SLIP_W = 304;
 /** The tallest lesson line expected above the cup (two lines and Continue, on a phone), px. */
 export const GUIDED_SLIP_H = 104;
+/** The least room kept between the cup's straw and the tickets, px. */
+const HEADROOM = 10;
 
 /**
- * The highest a guided flight's cup may start, in world units, so that a
- * lesson's line of `slipH` px fits between the tickets and the cup with the
- * view at rest: on a phone the line is too wide to sit beside the cup, so it
- * goes above it. Never lower than the engine's lowest start. On a wide
- * screen this is above where the cup starts anyway.
- * @param {number} viewHeight the view's height in world units
+ * Room the camera keeps between the cup's straw and the tickets, in px. On
+ * a guided flight on a screen too narrow for a lesson's line beside the cup,
+ * enough for the line to sit above it; otherwise a little, so the cup is
+ * always on screen. Only the camera follows this: the cup starts and flies
+ * the same on every flight, guided or not.
+ * @param {number} viewW the screen's width, px
  * @param {number} scale px per world unit, at rest
- * @param {number} [slipH]
+ * @param {boolean} guided
  */
-export function guidedStartLimit(viewHeight, scale, slipH = GUIDED_SLIP_H) {
-  // The view's top is 6 units short of its height; the callout keeps 8 px
-  // under the tickets; its anchor is 5 units over the cup's centre, and the
-  // slip stays half the cup's height and 6 px over that (4 px to spare).
-  const over = 5 + (CUP.high - CUP.low) / 2;
-  return Math.max(startAltitude(0), viewHeight - 6 - over - (8 + slipH + 6 + 4) / scale);
+export function headroomFor(viewW, scale, guided) {
+  const beside = viewW / 2 - CUP.half * scale - 20 - GUTTER;
+  if (!guided || beside >= SLIP_W) return HEADROOM;
+  // The callout keeps 8 px under the tickets, and the slip stays 6 px over
+  // the cup's marks (4 px to spare).
+  return 8 + GUIDED_SLIP_H + 6 + 4;
+}
+
+/**
+ * The lowest the camera may sit, in world y, for the cup at `cupY` to have
+ * `headroom` px between its straw and the top of the play area, which is
+ * half the view's height over the camera at zoom `zoom`.
+ * @param {number} cupY
+ * @param {{ viewHeight: number, base: number, zoom: number, headroom: number }} frame
+ *   `viewHeight` in world units at rest, `base` px per unit at rest
+ */
+export function cameraFloor(cupY, { viewHeight, base, zoom, headroom }) {
+  return cupY + CUP.high + (headroom / base - viewHeight / 2) / zoom;
 }
 
 /** How far below a coaster's surface its slab and label reach, in px. */
@@ -941,6 +963,7 @@ export function createFlightLessons(coach) {
       revived = again;
       held.clear();
       guided = guidedDevice(coach);
+      if (guided) coach.skip(GUIDED);
       guide = null;
       along = 0;
       plannedAt = -Infinity;
@@ -950,12 +973,16 @@ export function createFlightLessons(coach) {
     /**
      * Once a frame, with the controls as they are (presses not yet seen by
      * a step included): while a move lesson holds play still, making the
-     * move brings play back, and the latched press then makes it.
+     * move brings play back, and the latched press then makes it. Returns
+     * true while a lesson still holds play stopped after that: any press
+     * waiting then (a tap while a thing is explained, a key that isn't the
+     * move) is the game's to drop, so it never carries into play.
      * @param {Controls} keys
      */
     input(keys) {
       const current = coach.current;
       if (current?.move && makes(current.id, keys)) act(current.id);
+      return coach.paused;
     },
 
     /**
@@ -1076,13 +1103,15 @@ export function createFlightLessons(coach) {
 
     /**
      * The flight touched down. A safe landing shows the coaster and the
-     * touchdown are known (and ends the guided flights); a move still
+     * touchdown are known, and is the device's landing that ends its guided
+     * flights; a move still
      * waiting comes down uncounted, so the next flight teaches it again; a
      * first feather landing is named.
      * @param {Touchdown} result
      */
     touchdown(result) {
       if (result.kind === "land") {
+        coach.skip(LANDED);
         coach.done("touchdown");
         coach.done("coaster");
       }

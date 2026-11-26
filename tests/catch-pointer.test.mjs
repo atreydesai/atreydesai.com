@@ -88,3 +88,44 @@ test("off the page, play holds a beat, then the shift pauses; back in time, play
   guard.enter();
   assert.equal(guard.status(31), "in");
 });
+
+test("leaving the page forgets the time over the tickets: back within the grace, a click at once is not taken", () => {
+  // Rested on pause long enough, then off the top of the page and straight back.
+  const guard = createPointerGuard();
+  walk(guard, [
+    [0, PAUSE.x, PAUSE.y],
+    [0.5, PAUSE.x + 1, PAUSE.y],
+  ]);
+  assert.equal(guard.pressCounts(1), true);
+  guard.leave(1);
+  // While it is away, nothing it presses counts.
+  assert.equal(guard.pressCounts(1.1), false);
+  walk(guard, [[1 + LEAVE_GRACE - 0.1, PAUSE.x, PAUSE.y]]);
+  assert.equal(guard.status(1 + LEAVE_GRACE - 0.09), "in", "back in time: play went on");
+  assert.equal(guard.pressCounts(1 + LEAVE_GRACE - 0.09), false, "a click just after coming back counted");
+  // Its dwell starts again from its return.
+  assert.equal(guard.pressCounts(1 + LEAVE_GRACE - 0.1 + HUD_DWELL + 0.01), true);
+
+  // Back on the page with no move yet (only the page's enter): still from the return.
+  const entered = createPointerGuard();
+  walk(entered, [[0, PAUSE.x, PAUSE.y]]);
+  entered.leave(1);
+  entered.enter(1.2);
+  assert.equal(entered.pressCounts(1.21), false);
+  assert.equal(entered.pressCounts(1.2 + HUD_DWELL + 0.01), true);
+
+  // A pointer that left while play wasn't on (paused) forgets its dwell too, but holds nothing.
+  const paused = createPointerGuard();
+  walk(paused, [[0, PAUSE.x, PAUSE.y]]);
+  paused.leave(1, false);
+  assert.equal(paused.status(5), "in");
+  walk(paused, [[5, PAUSE.x, PAUSE.y]]);
+  assert.equal(paused.pressCounts(5.05), false);
+  // Resuming (no time given) doesn't count as coming back.
+  const resumed = createPointerGuard();
+  walk(resumed, [[0, PAUSE.x, PAUSE.y]]);
+  resumed.leave(1);
+  resumed.enter();
+  assert.equal(resumed.status(3), "in");
+  assert.equal(resumed.pressCounts(3), false, "a pointer still off the page pressed");
+});

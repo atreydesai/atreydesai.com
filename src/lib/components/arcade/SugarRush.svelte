@@ -62,7 +62,7 @@
     swingBox,
     swingReach,
   } from "#lib/arcade/runner-engine.js";
-  import { LESSONS, LESSON_CONTROL, lessonAhead, moveAhead, placeCallout, slamPath, type LessonCue } from "#lib/arcade/runner-lessons.js";
+  import { LESSONS, LESSON_CONTROL, createLessonGate, lessonAhead, moveAhead, placeCallout, slamPath, type LessonCue } from "#lib/arcade/runner-lessons.js";
   import { botInput, createBot } from "#lib/arcade/runner-bot.js";
   import { CUBE_EMPTY, CUBE_FULL, GLYPHS, KEYCAP_X, LABEL_ROWS, METER_CUP, METER_CUT, meterLayout, meterWord, sugarReading, teaCellLit, teaHalfRows, wordWidth } from "#lib/arcade/runner-meter.js";
   import { RIM, WINDOW, stripSkyline } from "#lib/arcade/core/city.ts";
@@ -3288,6 +3288,8 @@
     if (calloutFor !== lesson.id) {
       calloutFor = lesson.id;
       calloutSide = null;
+      // What the lesson is about shows at once (the rush pad for the rush).
+      syncHud();
     }
     if (coachLesson !== cue.lesson) coachLesson = cue.lesson;
     if (coachLeaving !== coach.fading) coachLeaving = coach.fading;
@@ -3673,7 +3675,8 @@
       prevY = state.runner.y;
       // A press counts until a step has seen it, so a tap is never lost
       // between steps, which come far apart as play eases into and out of a lesson.
-      const held = autoplay ? autoplayInput(autoplay) : input.read();
+      // What a lesson dropped stays out until it is let go (runner-lessons.js).
+      const held = autoplay ? autoplayInput(autoplay) : gate.filter(state, input.read());
       input.clearPresses();
       const events = stepRun(state, held, STEP);
       if (events.length) onEvents(events);
@@ -3812,7 +3815,8 @@
     }
     stepScene(dt);
     updateCamera(dt);
-    hudClock += dt;
+    // In real time, so the HUD (and the rush pad) catch up while a lesson holds play.
+    hudClock += realDt;
     if (hudClock >= 0.1) {
       hudClock = 0;
       syncHud();
@@ -3840,6 +3844,20 @@
     enabled: () => !paused && !gameOver,
     onPads: (pads) => (touchHeld = pads),
   });
+  const CONTROLS: Array<keyof Held> = ["jump", "down", "rush"];
+  /** Keeps a press dropped for a lesson from the run until it is let go, and shows the run a press it would miss. */
+  const gate = createLessonGate();
+
+  /** A control nothing holds any more: the gate hears of it. */
+  function letGoOf(control: keyof Held) {
+    if (!input.holding(control)) gate.release(control);
+  }
+
+  /** Lets go of everything (pause, blur, the end of a run). */
+  function releaseInput() {
+    input.releaseAll();
+    for (const control of CONTROLS) gate.release(control);
+  }
 
   /**
    * What a press of `control` does while a lesson is up. While a move is
@@ -3871,16 +3889,45 @@
   function padPress(event: PointerEvent, control: keyof Held) {
     const what = lessonPress(control, true);
     if (!input.padDown(event, control)) return;
-    if (what === "drop") input.clearPresses();
-    else if (what === "act") actOnLesson();
+    if (what === "drop") {
+      input.clearPresses();
+      gate.drop(control);
+    } else if (what === "act") {
+      actOnLesson();
+    }
   }
 
   /** Space or Enter on a focused pad, likewise. */
   function padKeyDown(event: KeyboardEvent, control: keyof Held) {
     const what = lessonPress(control, !event.repeat);
     if (!input.padKey(event, control, true)) return;
-    if (what === "drop") input.clearPresses();
-    else if (what === "act") actOnLesson();
+    if (what === "drop") {
+      input.clearPresses();
+      gate.drop(control);
+    } else if (what === "act") {
+      actOnLesson();
+    }
+  }
+
+  /** A pointer off a pad, a touch taken back, focus gone: its own hold ends. */
+  function padUp(event: PointerEvent, control: keyof Held) {
+    input.padUp(event, control);
+    letGoOf(control);
+  }
+
+  function padCancel(event: PointerEvent, control: keyof Held) {
+    input.padCancel(event, control);
+    letGoOf(control);
+  }
+
+  function padKeyUp(event: KeyboardEvent, control: keyof Held) {
+    input.padKey(event, control, false);
+    letGoOf(control);
+  }
+
+  function padBlur(control: keyof Held) {
+    input.padBlur(control);
+    letGoOf(control);
   }
 
   function onKeyDown(event: KeyboardEvent) {
@@ -3905,11 +3952,15 @@
     // A key's repeats latch a press too, unless a lesson is holding play for its own move.
     const what = lessonPress(control, !event.repeat);
     input.keyDown(key, what !== "drop");
+    if (what === "drop" && !event.repeat) gate.drop(control);
     if (what === "act") actOnLesson();
   }
 
   function onKeyUp(event: KeyboardEvent) {
-    input.keyUp(keyName(event));
+    const key = keyName(event);
+    input.keyUp(key);
+    const control = input.control(key);
+    if (control) letGoOf(control);
   }
 
   // --- Pause, restart, and finish --------------------------------------------------------
@@ -3917,7 +3968,7 @@
   async function pauseGame() {
     if (gameOver || paused) return;
     paused = true;
-    input.releaseAll();
+    releaseInput();
     setRunGlide(0);
     setMusicPaused(true);
     liveMessage = "The game is paused.";
@@ -3958,7 +4009,7 @@
     gameOver = true;
     coach.dismiss();
     cue = null;
-    input.releaseAll();
+    releaseInput();
     setRunGlide(0);
     syncHud();
     finalStats = breakdown(state);
@@ -4012,6 +4063,7 @@
     newBest = false;
     coach.reset();
     cue = null;
+    gate.clear();
     jumpHeld = 0;
     displayTea = 1;
     refillAt = -10;
@@ -4043,7 +4095,7 @@
   function restart() {
     stopMusic();
     timers.clear();
-    input.releaseAll();
+    releaseInput();
     setRunGlide(0);
     paused = false;
     gameOver = false;
@@ -4122,7 +4174,7 @@
     touchUI = touchWatch.touch;
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", input.releaseAll);
+    window.addEventListener("blur", releaseInput);
     document.addEventListener("visibilitychange", onVisible);
 
     newShift();
@@ -4145,13 +4197,15 @@
       touchWatch.stop();
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", input.releaseAll);
+      window.removeEventListener("blur", releaseInput);
       document.removeEventListener("visibilitychange", onVisible);
       unmountShell();
     };
   });
 
   $: deliveries = finalStats.deliveries;
+  /** The rush pad shows once a rush is ready, and always while the rush's lesson is up. */
+  $: rushShown = rushReady || coachLesson?.id === "rush";
   $: endingWords = finalStats.ending ? (ENDINGS[finalStats.ending as keyof typeof ENDINGS] ?? "the end") : "the end";
 </script>
 
@@ -4264,12 +4318,12 @@
           class:is-down={touchHeld.down}
           class:is-lit={padLit === "down"}
           on:pointerdown={(event) => padPress(event, "down")}
-          on:pointerup={(event) => input.padUp(event, "down")}
-          on:pointercancel={(event) => input.padCancel(event, "down")}
-          on:lostpointercapture={(event) => input.padUp(event, "down")}
+          on:pointerup={(event) => padUp(event, "down")}
+          on:pointercancel={(event) => padCancel(event, "down")}
+          on:lostpointercapture={(event) => padUp(event, "down")}
           on:keydown={(event) => padKeyDown(event, "down")}
-          on:keyup={(event) => input.padKey(event, "down", false)}
-          on:blur={() => input.padBlur("down")}
+          on:keyup={(event) => padKeyUp(event, "down")}
+          on:blur={() => padBlur("down")}
           on:contextmenu={(event) => event.preventDefault()}
         >
           <PixelIcon grid={PAD_ICONS.slide} palette={PAD_ICON_PAL} px={3} />
@@ -4281,16 +4335,16 @@
             class="sr-pad sr-rush boba-key is-primary"
             class:is-down={touchHeld.rush}
             class:is-lit={padLit === "rush"}
-            class:is-hidden={!rushReady}
-            tabindex={rushReady ? 0 : -1}
-            aria-hidden={!rushReady}
+            class:is-hidden={!rushShown}
+            tabindex={rushShown ? 0 : -1}
+            aria-hidden={!rushShown}
             on:pointerdown={(event) => padPress(event, "rush")}
-            on:pointerup={(event) => input.padUp(event, "rush")}
-            on:pointercancel={(event) => input.padCancel(event, "rush")}
-            on:lostpointercapture={(event) => input.padUp(event, "rush")}
+            on:pointerup={(event) => padUp(event, "rush")}
+            on:pointercancel={(event) => padCancel(event, "rush")}
+            on:lostpointercapture={(event) => padUp(event, "rush")}
             on:keydown={(event) => padKeyDown(event, "rush")}
-            on:keyup={(event) => input.padKey(event, "rush", false)}
-            on:blur={() => input.padBlur("rush")}
+            on:keyup={(event) => padKeyUp(event, "rush")}
+            on:blur={() => padBlur("rush")}
             on:contextmenu={(event) => event.preventDefault()}
           >
             <PixelIcon grid={PAD_ICONS.rush} palette={PAD_ICON_PAL} px={3} />
@@ -4302,12 +4356,12 @@
             class:is-down={touchHeld.jump}
             class:is-lit={padLit === "jump"}
             on:pointerdown={(event) => padPress(event, "jump")}
-            on:pointerup={(event) => input.padUp(event, "jump")}
-            on:pointercancel={(event) => input.padCancel(event, "jump")}
-            on:lostpointercapture={(event) => input.padUp(event, "jump")}
+            on:pointerup={(event) => padUp(event, "jump")}
+            on:pointercancel={(event) => padCancel(event, "jump")}
+            on:lostpointercapture={(event) => padUp(event, "jump")}
             on:keydown={(event) => padKeyDown(event, "jump")}
-            on:keyup={(event) => input.padKey(event, "jump", false)}
-            on:blur={() => input.padBlur("jump")}
+            on:keyup={(event) => padKeyUp(event, "jump")}
+            on:blur={() => padBlur("jump")}
             on:contextmenu={(event) => event.preventDefault()}
           >
             <PixelIcon grid={PAD_ICONS.jump} palette={PAD_ICON_PAL} px={3} />

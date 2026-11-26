@@ -2489,11 +2489,26 @@
    * Whether the lesson up holds the room this frame, out of its allowance
    * for the visit: the dial and all while the room is still planning and
    * Pour hasn't been pressed, the tea where it is while the pour is
-   * explained, or the next room while a result is explained.
+   * explained, or the next room while a result is explained. Never while a
+   * straw is being drawn.
    * @param dt Real seconds this frame.
    */
   function updateHold(dt: number) {
-    lessonHolds = lessonHold.take(coach.current, { leaving: coach.leaving, acting: coach.acting, holdable: holdableNow() }, dt);
+    lessonHolds = lessonHold.take(coach.current, { leaving: coach.leaving, acting: coach.acting, holdable: holdableNow(), drafting: !!world.draft }, dt);
+  }
+
+  /**
+   * The player is changing the straws (a pen down, a straw taken back,
+   * Clear): whatever the lesson up was holding runs on at once and for the
+   * rest of the visit, so planning done during a lesson costs planning time
+   * as usual (pouring early is points), and a pour stopped for a lesson
+   * starts again before anything is drawn into it. The lesson stays up:
+   * room 1's ghost keeps teaching while the dial runs.
+   */
+  function editing() {
+    const lesson = coach.current;
+    if (lesson) lessonHold.end(lesson.id);
+    lessonHolds = false;
   }
 
   /**
@@ -2505,7 +2520,7 @@
     return (
       phase === "play" &&
       holdableNow() &&
-      holds(lesson, { leaving: coach.leaving, acting: coach.acting, expert }) &&
+      holds(lesson, { leaving: coach.leaving, acting: coach.acting, expert, drafting: !!world.draft }) &&
       !!lesson &&
       lessonHold.left(lesson.id) > 0
     );
@@ -3370,8 +3385,9 @@
     if (world.strokes.length) teach({ lesson: LESSONS.takeBack, target: { kind: "gauge", index: 0 } });
   }
 
-  /** Starts a straw at a world point; says why if it can't. */
+  /** Starts a straw at a world point; says why if it can't. A pen down ends any lesson's hold. */
   function startDraft(x: number, y: number) {
+    editing();
     if (beginStroke(world, x, y)) {
       lastTick = clock;
       tickLength = 0;
@@ -3446,7 +3462,9 @@
 
   function removeById(id: number) {
     const stroke = world.strokes.find((s) => s.id === id);
-    if (!stroke || !removeStroke(world, id)) return false;
+    if (!stroke) return false;
+    editing();
+    if (!removeStroke(world, id)) return false;
     crumbs(stroke.points);
     sfxErase();
     strawVersion++;
@@ -3691,6 +3709,7 @@
 
   function clearAll() {
     if (!playable() || !world.strokes.length) return;
+    editing();
     for (const stroke of world.strokes) crumbs(stroke.points);
     clearStrokes(world);
     sfxErase();

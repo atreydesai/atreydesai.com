@@ -41,8 +41,9 @@
     FIRST_SITE_SEED,
     calloutFor,
     createFlightLessons,
+    cameraFloor,
     guidedDevice,
-    guidedStartLimit,
+    headroomFor,
     leadOn,
     pointAt,
     teaRows,
@@ -2336,12 +2337,13 @@
     cam.z += (target - cam.z) * Math.min(1, dt * 2.2);
     const z = cam.z;
     const f = (z - 1) / 1.5;
-    const yTarget = lerp(
-      viewHUnits / 2 - 6,
-      Math.max(viewHUnits / (2 * z) - 6, groundAt(site, shown.x) + (0.27 * viewHUnits) / z),
-      f,
+    const lowest = cameraLowest(z);
+    const yTarget = Math.max(
+      lowest,
+      lerp(viewHUnits / 2 - 6, Math.max(viewHUnits / (2 * z) - 6, groundAt(site, shown.x) + (0.27 * viewHUnits) / z), f),
     );
-    cam.y += (yTarget - cam.y) * Math.min(1, dt * 5);
+    // Eased, but never so low that the cup leaves the top of the screen.
+    cam.y = Math.max(lowest, cam.y + (yTarget - cam.y) * Math.min(1, dt * 5));
     const dead = (viewUnits / (2 * z)) * (0.56 - 0.46 * f);
     const xTarget = clamp(cam.x, shown.x - dead, shown.x + dead);
     cam.x += (xTarget - cam.x) * Math.min(1, dt * 7);
@@ -2350,8 +2352,19 @@
   function snapCamera() {
     snapShown();
     cam.z = 1;
-    cam.y = viewHUnits / 2 - 6;
+    cam.y = Math.max(viewHUnits / 2 - 6, cameraLowest(1));
     cam.x = ship.x;
+  }
+
+  /**
+   * The lowest the camera may sit at zoom `z`: the cup stays on screen under
+   * the tickets, however short the view (where the highest start is above
+   * the view at rest), and on a guided flight on a phone, with room for a
+   * lesson's line above it. The camera alone moves for this: every flight
+   * starts and flies the same.
+   */
+  function cameraLowest(z: number) {
+    return cameraFloor(shown.y, { viewHeight: viewHUnits, base, zoom: z, headroom: headroomFor(viewW, base, lessons.guided) });
   }
 
   // The rules step at a fixed 120 Hz. In slow motion a frame can fall
@@ -2441,20 +2454,9 @@
     siteIntro = introFor(n);
   }
 
-  /**
-   * A fresh cup at the top of the sky. Until the device has landed once it
-   * starts low enough under the tickets for a lesson's line to fit above it
-   * (on a phone, where the line is too wide to sit beside the cup).
-   */
-  function launchShip() {
-    const next = newShip(site, viewHUnits);
-    if (guidedDevice(coach)) next.y = Math.min(next.y, guidedStartLimit(viewHUnits, base));
-    return next;
-  }
-
   /** A fresh ship at the top of the sky, and a clean sheet around it. */
   function resetAttempt() {
-    ship = launchShip();
+    ship = newShip(site, viewHUnits);
     flightTime = 0;
     accumulator = 0;
     pathClock = 0;
@@ -2483,6 +2485,8 @@
     input.clearPresses();
     lessons.start({ revived: landerBlink > 0, flight: { ship, site, time: 0 }, ceiling });
     guideLight = lessons.guide ? 1 : 0;
+    // The camera's headroom follows whether this flight is guided.
+    snapCamera();
     if (autoplay) autopilot = createPilot(lessons.guide?.pad ?? richestPad(), ship);
     showIntro();
   }
@@ -2491,6 +2495,7 @@
   function previewGuide() {
     lessons.start({ flight: { ship, site, time: 0 }, ceiling });
     guideLight = lessons.guide ? 1 : 0;
+    snapCamera();
   }
 
   function nextAttempt() {
@@ -2830,7 +2835,9 @@
     // A move lesson holds play still until the move is made: the move itself,
     // read before any step has seen it, brings play back, and its press,
     // latched until a step sees it, then makes it.
-    if (mode === "flying") lessons.input(autoplay ? autoplayInput() : input.read());
+    // While a lesson still holds play stopped, a press that didn't make its
+    // move (a tap while a thing is explained) is dropped, never kept for play.
+    if (mode === "flying" && lessons.input(autoplay ? autoplayInput() : input.read())) input.clearPresses();
     // The development autopilot reads what pauses it, then continues.
     if (autoplay && coach.paused && coach.age >= 2) continueLesson();
     // A lesson pauses play while it is up, and play comes back once it ends:
@@ -3171,6 +3178,8 @@
   function continueLesson() {
     const lesson = coach.current;
     if (!lesson || coach.leaving || (mode !== "flying" && mode !== "landed")) return;
+    // Nothing pressed while play was stopped carries into it.
+    if (coach.paused) input.clearPresses();
     coach.done(lesson.id);
   }
 
@@ -3468,7 +3477,7 @@
     // A ghost's flight was planned under the old ceiling and view: plan it again.
     if (mode === "flying" && ceiling !== lastCeiling) lessons.replan();
     if (mode === "countdown") {
-      ship = launchShip();
+      ship = newShip(site, viewHUnits);
       path = { points: [ship.x, ship.y], ticks: [], crashed: false };
       snapCamera();
       previewGuide();

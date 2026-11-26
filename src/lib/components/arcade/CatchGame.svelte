@@ -59,7 +59,6 @@
     type Popup,
   } from "#lib/arcade/art.ts";
   import {
-    FREEZE_MIN,
     HOLD,
     LESSONS,
     MOVE_LATEST,
@@ -68,6 +67,9 @@
     catchPlaces,
     choosePlace,
     cupPlaces,
+    nearSlip,
+    slipBox,
+    waitStep,
     flightPath,
     ghostAt,
     keepOff,
@@ -76,7 +78,6 @@
     mayOffer,
     mayPause,
     nextDown,
-    onSpot,
     stillNext,
     type Box,
     type CupMarks,
@@ -346,10 +347,10 @@
   let lessonClock = 0;
   /** Real seconds since the last lesson came down (none yet this run: forever), so two never run together. */
   let quietFor = Infinity;
-  /** Real seconds the basket has stayed under the taught cup; a sweep through doesn't count. */
+  /** Real seconds the basket has waited under the taught cup, at rest, the pointer away from the slip; a sweep through doesn't count. */
   let settledFor = 0;
-  /** Where the basket stood as the catch's freeze took hold: moving it from there brings play back. */
-  let freezeFrom = 0;
+  /** That wait, carried from frame to frame (`waitStep`). */
+  const wait = { for: 0, at: 0 };
   /** `lessonClock` when the catch came up: the ghost's run counts from here. */
   let ghostFrom = 0;
   /** The first throw's way down, built once when its lesson starts, and the part still ahead of the cup. */
@@ -406,6 +407,8 @@
   let basketY = 0;
   let pointerX = 0;
   let mouseX = 0;
+  /** The pointer's height: never used to steer, only to tell a hand reaching for the slip's Continue. */
+  let mouseY = 0;
   /** Seconds on shift. The ramp reads it. */
   let elapsed = 0;
   let countdownElapsed = 0;
@@ -1147,17 +1150,14 @@
     const current = coach.current;
     if (current?.move && !coach.leaving && cue?.lesson === current) {
       // The catch: play is frozen until the player makes the move, the
-      // basket moved, or already waiting under the cup (a sweep through the
-      // spot doesn't count). Until the freeze has held a moment, where the
-      // basket stands is where the move counts from, so a hand already on
-      // its way still sees the freeze; its move is never lost, since the
-      // basket follows the pointer all the while.
+      // basket brought under the cup and held there. Merely moving it
+      // doesn't count (a hand on its way to the slip's Continue moves it
+      // too), nor does a pass through the spot, nor a pointer near the slip.
+      // The move is never lost: the basket follows the pointer all the while.
       const at = basketCenter();
-      settledFor = cue.cup && onSpot(at, cue.spot, basketW) ? settledFor + realDt : 0;
-      if (!coach.acting) {
-        if (coach.age < FREEZE_MIN) freezeFrom = at;
-        if (catchMoved(coach.age, freezeFrom, at, settledFor)) coach.acted(current.id);
-      }
+      const reaching = nearSlip(slipBox(cue.place, slipSize(current), coachView()), mouseX, mouseY);
+      settledFor = waitStep(wait, realDt, at, cue.spot, basketW, reaching || !cue.cup);
+      if (!coach.acting && catchMoved(coach.age, settledFor)) coach.acted(current.id);
       // A move being taught holds the stage until its cup is caught or goes
       // past, but never holds play for more than `HOLD`: then it comes down
       // uncounted, and waits for a later run.
@@ -1177,7 +1177,8 @@
       if (next.lesson.move) {
         catchFor = 0;
         ghostFrom = lessonClock;
-        freezeFrom = basketCenter();
+        wait.for = 0;
+        wait.at = basketCenter();
       }
     }
     if (!coach.current) cue = null;
@@ -1452,7 +1453,7 @@
     settledFor = 0;
     lessonDim = 0;
     catchFor = 0;
-    freezeFrom = 0;
+    wait.for = 0;
     ghostFrom = 0;
     timedOut.clear();
     pointer.enter();
@@ -1553,6 +1554,7 @@
     const steering = () => active && !paused && !gameOver;
     const onMove = (event: MouseEvent) => {
       mouseX = event.clientX;
+      mouseY = event.clientY;
       const target = event.target instanceof Element ? event.target : null;
       pointer.move(seconds(), event.clientX, event.clientY, !!target?.closest(".boba-hud"));
       // On the slip's Continue button, the basket keeps its aim: reaching
@@ -1563,10 +1565,8 @@
     // Off the page (not just onto another part of it), the pointer holds
     // play a beat before the shift pauses; back on, play goes on.
     const root = document.documentElement;
-    const onLeave = () => {
-      if (steering()) pointer.leave(seconds());
-    };
-    const onEnter = () => pointer.enter();
+    const onLeave = () => pointer.leave(seconds(), steering());
+    const onEnter = () => pointer.enter(seconds());
     // A press on the tickets' buttons during play counts only once the
     // pointer has come to rest on them, so a sweep that drifted up there
     // can't end in a click on pause; its click is dropped. A key's click

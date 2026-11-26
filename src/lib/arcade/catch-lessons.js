@@ -11,9 +11,13 @@
 // slip's button) brings it back. One move is taught, the catch itself: play
 // freezes the moment the first cup leaves its link, its way down is chalked
 // to the catch line, and a ghost basket runs from the basket to where it
-// will land, again and again, in real time. The player's own move (the
-// basket moved, or already waiting under the cup) brings play back, and the
-// lesson counts once that cup is caught. Everything else is a thing, named
+// will land, again and again, in real time. The player's own move brings
+// play back: the basket brought under the cup and held there. Moving it
+// isn't enough, since a hand on its way to the slip's Continue moves it too
+// (and the slip sits beyond the landing, so heading for the landing isn't
+// either); a hand passing through the spot isn't holding it there, and one
+// near the slip is reaching for Continue. The lesson counts once that cup
+// is caught. Everything else is a thing, named
 // once as it first matters (the glowing link, a golden cup, a pair, a lob,
 // a flick, a lost pearl, the bonus point).
 //
@@ -44,12 +48,14 @@ import { PLAYFIELD_EDGE, foldInto, predictLanding, reachSeconds } from "../boba-
 export const MOVE_LATEST = 0.5;
 /** The basket is at the spot once the cup will land this close to its middle (a share of its width)… */
 export const ON_SPOT = 0.35;
-/** …and it is waiting there once it has stayed this long (real seconds), not on a sweep through. */
+/** …and it is waiting there once it has stayed this long (real seconds), not on a sweep through… */
 export const SETTLE = 0.25;
-/** The catch's freeze holds at least this long (real seconds) before the basket's move brings play back, so a hand already moving still sees it. */
+/** …within this many px of where it stopped, so a hand's tremor still counts and a slow pass doesn't. */
+export const SETTLE_PX = 6;
+/** A pointer this close to the slip (px) is on its way to Continue, not waiting under the cup. */
+export const SLIP_NEAR = 24;
+/** The catch's freeze holds at least this long (real seconds) before the basket's move brings play back, so a hand already there still sees it. */
 export const FREEZE_MIN = 0.6;
-/** The basket has moved once it is this far (px, two of its cells) from where it stood: a twitch doesn't count. */
-export const MOVE_START = 12;
 /** Real seconds of full-speed play between two lines about things. */
 export const REST = 1.5;
 /**
@@ -261,15 +267,40 @@ export function onSpot(basketCenter, landing, basketWidth) {
 }
 
 /**
+ * Whether the pointer at `x, y` is within `margin` of the slip at `box`:
+ * on its way to Continue.
+ * @param {Box} box @param {number} x @param {number} y @param {number} [margin]
+ */
+export function nearSlip(box, x, y, margin = SLIP_NEAR) {
+  return x >= box.x0 - margin && x <= box.x1 + margin && y >= box.y0 - margin && y <= box.y1 + margin;
+}
+
+/**
+ * The basket's wait under the cup, a frame of `dt` real seconds on: it
+ * counts while the basket (centred at `at`) is on the spot, has stayed
+ * within `SETTLE_PX` of where it came to rest, and the pointer isn't
+ * `reaching` for the slip; anything else starts it again from here.
+ * Returns the real seconds it has waited.
+ * @param {{ for: number, at: number }} wait Carried from frame to frame.
+ * @param {number} dt @param {number} at @param {number} spot Where the cup lands.
+ * @param {number} basketWidth @param {boolean} [reaching]
+ */
+export function waitStep(wait, dt, at, spot, basketWidth, reaching = false) {
+  if (reaching || !onSpot(at, spot, basketWidth) || Math.abs(at - wait.at) > SETTLE_PX) {
+    wait.for = 0;
+    wait.at = at;
+  } else wait.for += dt;
+  return wait.for;
+}
+
+/**
  * Whether the player has made the catch's move while play is frozen for
  * it, `age` real seconds in: once the freeze has held `FREEZE_MIN`, the
- * basket has moved `MOVE_START` from `from` (where it stood then), or it
- * has been waiting under the cup for `SETTLE`.
- * @param {number} age @param {number} from @param {number} at Where the basket's centre is now.
- * @param {number} settledFor Real seconds it has stayed under the cup.
+ * basket has waited under the cup (`waitStep`) for `SETTLE`.
+ * @param {number} age @param {number} waited
  */
-export function catchMoved(age, from, at, settledFor) {
-  return age >= FREEZE_MIN && (Math.abs(at - from) >= MOVE_START || settledFor >= SETTLE);
+export function catchMoved(age, waited) {
+  return age >= FREEZE_MIN && waited >= SETTLE;
 }
 
 /** The ghost basket's run, in px a second: about a hand's speed, so it shows the move as it is made. */

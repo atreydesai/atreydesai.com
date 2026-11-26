@@ -271,6 +271,13 @@ body.boba-active .custom-cursor {
   line-height: 1.4;
 }
 
+/* On the accent face a translucent hint falls under 4.5:1: full cream on a
+   darker tag instead. */
+.boba-key.is-primary kbd {
+  color: #fdf8f3;
+  background: rgb(26 26 26 / 0.28);
+}
+
 @media (hover: none) and (pointer: coarse) {
   .boba-key kbd {
     display: none;

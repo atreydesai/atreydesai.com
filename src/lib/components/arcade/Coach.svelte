@@ -99,8 +99,9 @@
 
   // One live region that stays mounted, so a screen reader hears each lesson
   // as it appears (and nothing while the game is paused), with the input it
-  // actually has.
-  $: announcement =
+  // actually has. Once the lesson is over its words are held, so losing its
+  // Continue never says the lesson again.
+  $: fresh =
     lesson && !hidden
       ? [
           lesson.name ? `${lesson.name[0].toUpperCase()}${lesson.name.slice(1)}.` : "",
@@ -111,6 +112,9 @@
           .filter(Boolean)
           .join(" ")
       : "";
+
+  let announcement = "";
+  $: announcement = !lesson || hidden ? "" : (ended || leaving) && announcement ? announcement : fresh;
 
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.max(lo, v)));
 
@@ -135,7 +139,12 @@
   $: gapX = (marked ? reachX : 6) + 14;
   $: gapY = (marked ? reachY : 6) + 14;
   $: place = position(anchored, ax ?? viewW / 2, ay ?? viewH / 2, aSide, gapX, gapY, slipW, slipH, viewW, viewH, top);
-  $: reach = place.where === "left" || place.where === "right" ? reachX : reachY;
+  // Once over, the slip's own placement is held too, so its Continue going
+  // away (and the slip measuring smaller) never moves what is still on screen.
+  let heldPlace: ReturnType<typeof position> | null = null;
+  $: heldPlace = ended || leaving ? (heldPlace ?? place) : null;
+  $: shown = heldPlace ?? place;
+  $: reach = shown.where === "left" || shown.where === "right" ? reachX : reachY;
 
   /**
    * Whether the slip, at its measured size, fits on `where` of the anchor
@@ -182,7 +191,10 @@
       topY = vh - h - GUTTER * 6;
     }
     left = clamp(left, GUTTER, vw - GUTTER - w);
-    topY = clamp(topY, minTop, vh - GUTTER - h);
+    // Kept under the tickets, unless the slip is too tall for the room left
+    // (large text on a short screen): then it rises over them rather than
+    // leaving Continue below the screen, and scrolls if even that is short.
+    topY = clamp(topY, Math.max(GUTTER, Math.min(minTop, vh - GUTTER - h)), vh - GUTTER - h);
     // The tail runs from the slip's nearest edge toward the anchor.
     const cx = clamp(ax, left + 12, left + w - 12);
     const cy = clamp(ay, topY + 8, topY + h - 8);
@@ -198,13 +210,13 @@
   // The tail stops short of the loop, so the two marks don't touch.
   $: tail = (() => {
     if (!anchored || ax === null || ay === null) return null;
-    const dx = ax - place.tx;
-    const dy = ay - place.ty;
+    const dx = ax - shown.tx;
+    const dy = ay - shown.ty;
     const length = Math.hypot(dx, dy);
     const stop = (marked ? reach * 0.95 : 6) + 4;
     if (length <= stop + 6) return null;
     const k = (length - stop) / length;
-    return { x1: place.tx, y1: place.ty, x2: place.tx + dx * k, y2: place.ty + dy * k };
+    return { x1: shown.tx, y1: shown.ty, x2: shown.tx + dx * k, y2: shown.ty + dy * k };
   })();
 
   // Corner marks round the thing: four pixel L's at the corners of its box.
@@ -254,7 +266,7 @@
         bind:offsetWidth={slipW}
         bind:offsetHeight={slipH}
         class="slip"
-        style="left: {place.left}px; top: {place.top}px"
+        style="left: {shown.left}px; top: {shown.top}px"
       >
         <div class="face">
         <!-- The live region below reads the words; the slip shows them. -->
@@ -355,6 +367,9 @@
 
   .face {
     --cut: 4px;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     display: flex;
     flex-wrap: wrap;
     align-items: center;

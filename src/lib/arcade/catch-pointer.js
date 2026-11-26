@@ -28,6 +28,8 @@ export function createPointerGuard() {
   const trail = [];
   let over = false;
   let overSince = -Infinity;
+  /** When the pointer last came back onto the page: Infinity while it is off it, -Infinity if it never left. */
+  let backSince = -Infinity;
   /** @type {number | null} */
   let outSince = null;
 
@@ -37,6 +39,7 @@ export function createPointerGuard() {
      * @param {number} t @param {number} x @param {number} y @param {boolean} overTickets
      */
     move(t, x, y, overTickets) {
+      if (backSince === Infinity) backSince = t;
       if (overTickets && !over) overSince = t;
       over = overTickets;
       outSince = null;
@@ -49,16 +52,18 @@ export function createPointerGuard() {
     },
     /**
      * Whether a press on the tickets at `t`, during play, is meant: the
-     * pointer has been over them for `HUD_DWELL` and is at rest. A pointer
-     * that never moved (the tickets came up under it) has been resting.
+     * pointer has been over them for `HUD_DWELL`, on the page all that
+     * while, and is at rest. A pointer that never moved (the tickets came up
+     * under it) has been resting.
      * @param {number} t
      */
     pressCounts(t) {
       const newest = trail[trail.length - 1];
-      if (!newest) return true;
+      if (!newest) return backSince !== Infinity;
       // Over the tickets since it came onto them; under a pointer that last
-      // moved elsewhere, they came to it, and it has been there since.
-      const since = over ? overSince : newest.t;
+      // moved elsewhere, they came to it, and it has been there since. A
+      // pointer back from off the page starts again from when it came back.
+      const since = Math.max(over ? overSince : newest.t, backSince);
       if (t - since < HUD_DWELL) return false;
       // At rest: within `STILL_PX` of where it is now, at every move in the
       // last `STILL_FOR` and at where it was as that window opened.
@@ -69,13 +74,26 @@ export function createPointerGuard() {
       }
       return true;
     },
-    /** The pointer left the page at `t`. @param {number} t */
-    leave(t) {
-      outSince ??= t;
+    /**
+     * The pointer left the page at `t`: its time over the tickets is
+     * forgotten, and during play (`hold`) play holds while it is away.
+     * @param {number} t @param {boolean} [hold]
+     */
+    leave(t, hold = true) {
+      over = false;
+      overSince = -Infinity;
+      backSince = Infinity;
+      if (hold) outSince ??= t;
     },
-    /** The pointer is back on the page, or the player resumed: whatever it did off the page is forgotten. */
-    enter() {
+    /**
+     * The pointer came back onto the page at `t` (its dwell on the tickets
+     * starts again from there), or, with no time, the player resumed:
+     * whatever it did off the page no longer holds play.
+     * @param {number} [t]
+     */
+    enter(t) {
       outSince = null;
+      if (t !== undefined && backSince === Infinity) backSince = t;
     },
     /**
      * Where the pointer is for play at `t`: "in" (on the page), "held" (off

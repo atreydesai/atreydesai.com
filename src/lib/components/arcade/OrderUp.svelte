@@ -127,6 +127,7 @@
     type LessonView,
     type Target,
   } from "#lib/arcade/orders-lessons.js";
+  import { HAND_KEYS, createKeyLatch, keyHold, releaseFor } from "#lib/arcade/orders-keys.js";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
   import { hexToRgb, mixHex, mixRgb, type RGB } from "#lib/arcade/core/color.ts";
   import { bayer } from "#lib/arcade/core/dither.ts";
@@ -686,8 +687,10 @@
   let streamOn = false;
   let tankSteamTimer = 0;
 
-  /** Whatever is holding the pour open: keys, the hand, a tap, the bench. */
+  /** Whatever is holding the pour open: each key (see orders-keys.js), the hand, a tap, the bench. */
   const holds = new Set<string>();
+  /** An Enter that continued a lesson: its release is ignored, so it never lets go of anything. */
+  const keyLatch = createKeyLatch();
 
   /** The line of guests above the rail, and the tip jar at its end. */
   const crowd = new Crowd({
@@ -1473,6 +1476,7 @@
   /** Closes the tap without judging the pour (pause, blur, game over). */
   function releaseAll() {
     holds.clear();
+    keyLatch.clear();
     streamOn = false;
     lastShakeArrow = null;
     setPourStream(0);
@@ -4839,9 +4843,14 @@
     if (!running) return;
 
     // Enter (not on a focused control) continues past a line that holds play.
+    // The press is used up by it: its release must not let go of a pour
+    // another key is holding (and each key holds on its own anyway).
     if (key === "Enter" && !isOnControl(event) && lessonOpen()) {
       event.preventDefault();
-      if (!event.repeat) continueLesson();
+      if (!event.repeat) {
+        keyLatch.take(key);
+        continueLesson();
+      }
       return;
     }
 
@@ -4849,7 +4858,7 @@
       // A focused control keeps Space and Enter for itself.
       if (isOnControl(event)) return;
       event.preventDefault();
-      if (!event.repeat) act("key");
+      if (!event.repeat) act(keyHold("key", key));
       return;
     }
     if (key === "ArrowLeft" || key === "ArrowRight") {
@@ -4902,7 +4911,13 @@
   }
 
   function onKeyUp(event: KeyboardEvent) {
-    if (event.key === " " || event.key === "Enter") endHold("key", true);
+    const hold = releaseFor(keyLatch, "key", event.key);
+    if (hold) endHold(hold, true);
+  }
+
+  /** A control losing focus lets go of whatever its keys were holding, unjudged. */
+  function endKeyHolds(from: string) {
+    for (const key of HAND_KEYS) endHold(keyHold(from, key), false);
   }
 
   const isPrimary = (event: PointerEvent) => !(event.pointerType === "mouse" && event.button !== 0);
@@ -4929,12 +4944,12 @@
     if (event.key !== " " && event.key !== "Enter") return;
     event.preventDefault();
     if (!down) {
-      endHold("tap-key", true);
+      endHold(keyHold("tap-key", event.key), true);
       return;
     }
     if (event.repeat || !tapLive(index) || !selectTap(index)) return;
     leaveEarly();
-    startHold("tap-key");
+    startHold(keyHold("tap-key", event.key));
   }
 
   /** The hand acts on pointer down, never waiting for a click. */
@@ -4966,8 +4981,8 @@
   function handKey(event: KeyboardEvent, down: boolean) {
     if (event.key !== " " && event.key !== "Enter") return;
     event.preventDefault();
-    if (!down) endHold("hand-key", true);
-    else if (!event.repeat) act("hand-key");
+    if (!down) endHold(keyHold("hand-key", event.key), true);
+    else if (!event.repeat) act(keyHold("hand-key", event.key));
   }
 
   // --- Pause, restart, and finish -----------------------------------------
@@ -5477,7 +5492,7 @@
                   on:lostpointercapture={() => endHold("tap", false)}
                   on:keydown={(event) => tapKey(event, index, true)}
                   on:keyup={(event) => tapKey(event, index, false)}
-                  on:blur={() => endHold("tap-key", false)}
+                  on:blur={() => endKeyHolds("tap-key")}
                   on:contextmenu={(event) => event.preventDefault()}
                 >
                   <!-- Today's special: a star by the lid. Brewing: a bar
@@ -5668,7 +5683,7 @@
           on:lostpointercapture={() => endHold("hand", false)}
           on:keydown={(event) => handKey(event, true)}
           on:keyup={(event) => handKey(event, false)}
-          on:blur={() => endHold("hand-key", false)}
+          on:blur={() => endKeyHolds("hand-key")}
           on:contextmenu={(event) => event.preventDefault()}
         >
           {handLabel}

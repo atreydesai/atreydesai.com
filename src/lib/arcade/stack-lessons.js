@@ -12,7 +12,8 @@
 // player continues (Enter, the slip's button, or a drop press once the line
 // has been up a moment). The first cup slides at full speed over its ghost
 // and stops the moment it covers it, frozen there under its line, and a drop
-// both starts play again and drops it. In expert everything stays at full
+// both starts play again and drops it: whole, but not a perfect, since the
+// game timed it (`taughtDrop`). In expert everything stays at full
 // speed: its perfect window is the narrowest the game allows, and its board
 // must never get a slower or a stopped cup. There a line is up just long
 // enough to read, and the slice the trim line names falls slowly while it
@@ -138,11 +139,26 @@ export function ghostSpan(top, width) {
 }
 
 /**
+ * What the first cup's taught drop comes to (normal: made with the cup held
+ * on its ghost by its lesson). It lands whole where the ghost is, but the
+ * game timed it, not the player, so it scores as a plain whole drop: never a
+ * perfect, so it starts no streak, takes no step toward regrowth, isn't
+ * counted among the run's perfect drops, and shows white in the share. A
+ * drop the player timed is judged as ever.
+ * @template {{ kind: DropKind }} R
+ * @param {R} result `dropCup`'s judgement of the drop
+ * @returns {R}
+ */
+export function taughtDrop(result) {
+  return result.kind === "perfect" || result.kind === "close" ? { ...result, kind: "clean" } : result;
+}
+
+/**
  * One step of the first cup's slide while its ghost waits for it (normal):
  * the cup moves as `stepSlide` would, unless this step reaches the ghost, in
  * which case it stops exactly on it (`reached`), so play stops with the cup
  * covering its ghost, never a frame past it, and the drop made there lands
- * perfect.
+ * whole (`taughtDrop`).
  * @param {number} position the cup's left edge, in units
  * @param {1 | -1} direction
  * @param {number} distance units to travel this step

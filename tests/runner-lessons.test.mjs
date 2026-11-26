@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { HOLD_TIME, STEP, cloneRun, newRun, speedAt, step } from "../src/lib/arcade/runner-engine.js";
+import { HOLD_TIME, STEP, SUGAR_FULL, cloneRun, newRun, speedAt, step } from "../src/lib/arcade/runner-engine.js";
 import { botInput, createBot } from "../src/lib/arcade/runner-bot.js";
-import { LESSONS, MOVE_LEAD, MOVE_STOP, THING_LEAD, lessonAhead, moveAhead, placeCallout } from "../src/lib/arcade/runner-lessons.js";
+import { LESSONS, MOVE_LEAD, MOVE_STOP, THING_LEAD, createLessonGate, lessonAhead, moveAhead, placeCallout } from "../src/lib/arcade/runner-lessons.js";
 
 const VIEW = 600;
 
@@ -129,6 +129,81 @@ test("the move made from its post, as the ghost makes it, gets past what it is f
     }
   }
   for (const id of ["jump", "hold", "slide", "slam", "glide"]) assert.ok(taught.has(id), `${id} was never taught`);
+});
+
+// --- Keys around a pause ------------------------------------------------------
+
+/** Runs from a cue's state to its post, as play is held there, and returns the run. */
+function atPost(cue, state) {
+  const s = cloneRun(state);
+  while (s.runner.x + s.runner.vx * STEP <= cue.ghost.takeoff) step(s, {}, STEP);
+  return s;
+}
+
+/**
+ * The first jump lesson on seed 3 with down pressed and held while play is
+ * stopped, then jump tapped, and down let go after the first step back:
+ * through the gate, or (without it) as the keys were held.
+ */
+function jumpWithDownHeld(gated) {
+  const { cue, state } = cuesOf(3).find((c) => c.cue.lesson.id === "jump");
+  const s = atPost(cue, state);
+  const gate = createLessonGate();
+  gate.drop("down");
+  const events = [];
+  for (let i = 0; i < 300 && !(s.runner.x > cue.clear + 20 && s.runner.grounded); i++) {
+    if (i === 1) gate.release("down");
+    const keys = { jump: i < 4, down: i === 0, rush: false };
+    events.push(...step(s, gated ? gate.filter(s, keys) : keys, STEP));
+  }
+  return { events, s, cue };
+}
+
+test("a key dropped while a lesson holds play doesn't act when play resumes", () => {
+  // Without the gate the held down slams the jump straight off the post, into the gap.
+  const raw = jumpWithDownHeld(false);
+  assert.ok(raw.events.some((e) => e.type === "slam"), "down held through the pause didn't slam: the case is gone");
+  const { events, s, cue } = jumpWithDownHeld(true);
+  assert.ok(!events.some((e) => e.type === "slam"), "the dropped down slammed");
+  assert.ok(!events.some((e) => ["fall", "spareUsed", "hit"].includes(e.type)), "the jump didn't make it");
+  assert.ok(s.runner.x > cue.clear);
+});
+
+test("the gate keeps a dropped control out until it is let go, then passes its next press", () => {
+  const s = newRun(1);
+  const gate = createLessonGate();
+  gate.drop("down");
+  assert.equal(gate.filter(s, { jump: false, down: true, rush: false }).down, false);
+  assert.equal(gate.filter(s, { jump: false, down: true, rush: false }).down, false);
+  gate.release("down");
+  assert.equal(gate.filter(s, { jump: false, down: false, rush: false }).down, false);
+  assert.equal(gate.filter(s, { jump: false, down: true, rush: false }).down, true);
+  // Let go without being told (a blur): no longer held, no longer kept.
+  gate.drop("jump");
+  gate.filter(s, { jump: false, down: false, rush: false });
+  assert.equal(gate.keeps("jump"), false);
+});
+
+test("X held before the meter filled, let go and pressed in the rush lesson, starts the rush", () => {
+  const state = newRun(3);
+  const bot = createBot();
+  const allBut = (id) => (other) => other !== id;
+  let cue = null;
+  // The player holds X the whole way, so the run last saw it held.
+  for (let t = 0; t < 60 && state.status === "running" && !cue; t += STEP) {
+    const found = lessonAhead(state, allBut("rush"), { view: VIEW });
+    if (found?.lesson.id === "rush") cue = found;
+    else step(state, { ...botInput(bot, state), rush: true }, STEP);
+  }
+  assert.ok(cue, "the rush lesson never came");
+  assert.ok(state.held.rush && state.sugar >= SUGAR_FULL);
+  // Without the gate, X held again after the pause starts nothing.
+  const raw = cloneRun(state);
+  assert.ok(!step(raw, { rush: true }, STEP).some((e) => e.type === "rushStart"));
+  // Let go and pressed again while play was stopped: through the gate, the rush starts.
+  const gate = createLessonGate();
+  gate.release("rush");
+  assert.ok(step(state, gate.filter(state, { jump: false, down: false, rush: true }), STEP).some((e) => e.type === "rushStart"));
 });
 
 test("a thing is named as it becomes relevant, not as it comes into view", () => {

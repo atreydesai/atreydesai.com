@@ -76,7 +76,8 @@ function view(extra = {}) {
   return {
     coarse: false,
     expert: false,
-    started: false,
+    // A ticket has been taken this shift; the tests about the shift's first ticket say otherwise.
+    started: true,
     tapIndex: 0,
     jarIndex: 0,
     holding: false,
@@ -119,7 +120,7 @@ test("every lesson stops the shift until it is answered, however long it is read
 
 test("the first drink is walked through station by station, each pointing at what to press", () => {
   const g = guest(order);
-  const v = view({ guests: [g], tapIndex: TEAS.indexOf("matcha") });
+  const v = view({ guests: [g], tapIndex: TEAS.indexOf("matcha"), started: false });
   const learned = new Set();
   const knows = (id) => learned.has(id);
   const seen = [];
@@ -242,7 +243,7 @@ test("each line can be followed literally", () => {
 
 test("the ticket waits until it is on the rail", () => {
   const g = guest(order, { placed: false });
-  const v = view({ guests: [g] });
+  const v = view({ guests: [g], started: false });
   assert.equal(lessonNow(v, none), null);
   assert.equal(ticketBeckon(v, none), -1);
   g.placed = true;
@@ -283,7 +284,7 @@ test("until the shift's first ticket is taken, nothing else is said and the tick
   const memory = lessonMemory();
   const g = guest(order);
   const critic = guest(makeOrder(50, CRITIC, seeded(5)), { regular: CRITIC, left: 30 * CROSS_AT });
-  const v = view({ guests: [g, critic], jar: 4, special: "matcha", tanks: [0, TANK_CAPACITY, TANK_CAPACITY, TANK_CAPACITY] });
+  const v = view({ guests: [g, critic], jar: 4, special: "matcha", tanks: [0, TANK_CAPACITY, TANK_CAPACITY, TANK_CAPACITY], started: false });
   // The most restless guest's ticket: its line, and the mark on it.
   run(coach, v, memory, 0.5);
   assert.equal(coach.current?.id, "ticket");
@@ -304,6 +305,29 @@ test("until the shift's first ticket is taken, nothing else is said and the tick
   assert.equal(coach.current?.id, STATION_LESSON[v.cup.station]);
   // A device that has learned every step marks nothing.
   assert.equal(ticketBeckon(view({ guests: [g] }), all), -1);
+});
+
+test("on every shift, nothing but the ticket is said before its first ticket is taken", () => {
+  // A device that has finished the walk-through but never met a restless
+  // guest, a low tank, a tip or the special: a new shift opens.
+  const coach = createCoach("orders", { persist: false });
+  const memory = lessonMemory();
+  for (const id of WALK) coach.skip(id);
+  const g = guest({ ...order, tea: "taro" }, { left: 30 * CROSS_AT });
+  const v = view({ guests: [g], started: false, jar: 4, special: "taro", tanks: [0, TANK_CAPACITY, TANK_CAPACITY, TANK_CAPACITY] });
+  assert.equal(lessonNow(v, coach.learned), null);
+  run(coach, v, memory, THING_GAP * 4);
+  assert.equal(coach.current, null, "the guest grows restless, and still nothing is said");
+  // Nor is its ticket marked: the device knows to take it.
+  assert.equal(ticketBeckon(v, coach.learned), -1);
+  // The first drink made and served, the bench empty again: the patience line has its turn.
+  v.started = true;
+  run(coach, v, memory, 0.5);
+  assert.equal(coach.current?.id, "patience");
+  assert.equal(memory.cue.at.guest, g.id);
+  // The ticket's own line is the one exception, on a device that hasn't learned it.
+  const fresh = createCoach("orders", { persist: false });
+  assert.equal(lessonNow({ ...v, started: false }, fresh.learned).lesson.id, "ticket");
 });
 
 test("things wait for an empty bench", () => {
@@ -421,7 +445,7 @@ test("play stops while a step is taught, as long as it takes, and comes back wit
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
   const g = guest(order);
-  const v = view({ guests: [g], tapIndex: TEAS.indexOf("matcha") });
+  const v = view({ guests: [g], tapIndex: TEAS.indexOf("matcha"), started: false });
   run(coach, v, memory, 1);
   assert.equal(coach.current?.id, "ticket");
   assert.equal(memory.cue.at.kind, "ticket");
@@ -457,7 +481,7 @@ test("steps come one at a time, a short quiet of play apart", () => {
   const coach = createCoach("orders", { persist: false });
   const memory = lessonMemory();
   const g = guest(order);
-  const v = view({ guests: [g], tapIndex: TEAS.indexOf("matcha") });
+  const v = view({ guests: [g], tapIndex: TEAS.indexOf("matcha"), started: false });
   /** Plays on until a lesson is up; returns the play seconds with none on screen. */
   const quietUntilNext = () => {
     let quiet = 0;

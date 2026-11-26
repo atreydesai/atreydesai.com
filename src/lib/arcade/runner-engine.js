@@ -2670,6 +2670,17 @@ function railUnder(state, x) {
 }
 
 /**
+ * A control let go and pressed again with no step in between (a lesson's
+ * pause holds the steps back): the run forgets it was held, so the next
+ * step that sees it held takes it as a fresh press.
+ * @param {RunState} state
+ * @param {"jump" | "down" | "rush"} control
+ */
+export function letGo(state, control) {
+  state.held[control] = false;
+}
+
+/**
  * Advances the run by one fixed step. Mutates the state.
  *
  * Events, in the order they happen: jump {coyote, buffered}, slide, slideEnd,

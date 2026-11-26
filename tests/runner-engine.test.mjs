@@ -79,6 +79,7 @@ import {
   isLethal,
   jumpReach,
   landingSpill,
+  letGo,
   newRun,
   patternIntensity,
   patternMin,
@@ -843,6 +844,24 @@ test("jumping over a coaster misses it and breaks the streak", () => {
   assert.equal(s.streak, 0);
   assert.equal(s.stats.missed, 1);
   assert.deepEqual(s.log.coasters, ["missed"]);
+});
+
+test("a control let go and pressed again with no step between counts as a press once the run is told", () => {
+  // X held since before the meter filled: the run saw it held, so holding it again starts nothing.
+  const held = stage(floor(), [], { x: 100 });
+  run(held, { rush: true }, 0.2);
+  held.sugar = SUGAR_FULL;
+  assert.equal(kinds(run(held, { rush: true }, H), "rushStart").length, 0);
+  // Let go and pressed again while no step ran (a lesson's pause): told, the run sees the press.
+  letGo(held, "rush");
+  assert.equal(kinds(run(held, { rush: true }, H), "rushStart").length, 1);
+  // Jump the same way: held through a jump and its glide, back on the roof with jump still held.
+  const jumping = stage(floor(), [], { x: 100 });
+  run(jumping, { jump: true }, 3, (st) => st.runner.grounded && st.runner.x > 200);
+  assert.ok(jumping.runner.grounded && jumping.held.jump);
+  assert.equal(kinds(run(jumping, { jump: true }, H), "jump").length, 0);
+  letGo(jumping, "jump");
+  assert.equal(kinds(run(jumping, { jump: true }, H), "jump").length, 1);
 });
 
 test("pearls fill the sugar; a rush is faster, smashes, saves the tea, pulls pearls in, and ends", () => {

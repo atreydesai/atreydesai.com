@@ -43,6 +43,7 @@
     roomUnderSlice,
     sliceReadSeconds,
     slideOnto,
+    taughtDrop,
     towerCallout,
   } from "#lib/arcade/stack-lessons.js";
   import {
@@ -1904,7 +1905,9 @@
 
     const top = tower[tower.length - 1];
     const level = tower.length - 1;
-    const result = judge();
+    // The first cup held on its ghost by its lesson (normal) lands whole, but
+    // as a plain drop: the game timed it, so it is never a perfect.
+    const result = lessons.holdsCup ? taughtDrop(judge()) : judge();
     // The same snap dropCup made, from where the cup was drawn.
     const snapped = snapDrop(top, drawnLeft(paintedLeft, drawPx), slider.width);
     drops = [...drops, result.kind];

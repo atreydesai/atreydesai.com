@@ -421,6 +421,19 @@ test("each lesson holds for seven real seconds a visit, however often it is show
   assert.equal(expert.left("route"), HOLD);
 });
 
+test("a lesson holds only while it is read: never while a straw is drawn, and a straw changed ends it", () => {
+  const visit = createHolds(false);
+  assert.equal(holds(LESSONS.fan, { leaving: false, drafting: true }), false);
+  assert.equal(visit.take(LESSONS.fan, { leaving: false, drafting: true }, 1), false, "a straw being drawn holds nothing");
+  assert.equal(visit.left("fan"), HOLD, "and spends nothing");
+  assert.equal(visit.take(LESSONS.fan, { leaving: false }, 1), true);
+  // A pen down, a straw taken back, Clear: the hold is over for the visit.
+  visit.end("fan");
+  assert.equal(visit.left("fan"), 0);
+  assert.equal(visit.take(LESSONS.fan, { leaving: false }, 1 / 60), false);
+  assert.equal(visit.take(LESSONS.dial, { leaving: false }, 1 / 60), true, "other lessons still hold while they are read");
+});
+
 /** A room's state after a step, everything a held room could get out of step on. */
 function snapshot(world) {
   let sx = 0;
@@ -523,6 +536,145 @@ test("a hold during the pour stops the tea where it is, and it plays out step fo
       assert.deepEqual(held.result, plain.result);
     }
   }
+});
+
+/**
+ * A room played as the screen plays it, frame by frame, by a player who
+ * reads `lesson` for `read` real seconds while it holds the room, then draws
+ * the room's reference straws one after another, each over `seconds` real
+ * seconds from pen down to pen up, and presses Pour `pourAfter` real seconds
+ * after the last. `fair` plays by the screen's rules: the pen down ends the
+ * hold, and nothing holds while a straw is being drawn. Not fair is how it
+ * was before: the hold ran on through the drawing. With no lesson nothing
+ * holds, and the player starts at once.
+ */
+function playDrawing(room, { lesson = null, read = 0, seconds, pourAfter, fair = true }) {
+  const world = createWorld(room);
+  const visit = createHolds(false);
+  const frame = 1 / 60;
+  const strokes = room.solution.strokes;
+  const readFrames = Math.round(read * 60);
+  const drawFrames = Math.round(seconds * 60);
+  const pourFrame = strokes.length * drawFrames + Math.round(pourAfter * 60);
+  const trace = [];
+  let accumulator = 0;
+  for (let n = 0; n < 60 * 120 && world.status !== "cleared" && world.status !== "failed"; n++) {
+    const f = n - readFrames;
+    if (f >= 0 && f <= strokes.length * drawFrames) {
+      const k = Math.min(strokes.length - 1, Math.floor(f / drawFrames));
+      const [[ax, ay], [bx, by]] = strokes[k];
+      const along = f / drawFrames - k;
+      if (f === k * drawFrames && f < strokes.length * drawFrames) {
+        // Pen down.
+        if (fair && lesson) visit.end(lesson.id);
+        assert.ok(beginStroke(world, ax, ay));
+      } else if (f === (k + 1) * drawFrames) {
+        extendStroke(world, bx, by);
+        assert.ok(commitStroke(world) >= 0);
+      } else {
+        extendStroke(world, ax + (bx - ax) * along, ay + (by - ay) * along);
+      }
+      // The next straw's pen down comes on the frame the last one is laid.
+      if (f === (k + 1) * drawFrames && k + 1 < strokes.length) {
+        if (fair && lesson) visit.end(lesson.id);
+        assert.ok(beginStroke(world, strokes[k + 1][0][0], strokes[k + 1][0][1]));
+      }
+    }
+    if (f === pourFrame) pourNow(world);
+    const holding =
+      !!lesson && visit.take(lesson, { leaving: false, holdable: world.status === "waiting" && f < pourFrame, drafting: fair && !!world.draft }, frame);
+    if (fair) assert.ok(!(holding && world.draft), "nothing is drawn while the room stands still");
+    const clock = roomFrame(world, accumulator, frame, holding);
+    accumulator = clock.accumulator;
+    for (let k = 0; k < clock.steps; k++) {
+      step(world, STEP);
+      trace.push(snapshot(world));
+    }
+  }
+  return { trace, result: world.result };
+}
+
+test("drawing while a lesson is up costs planning time: the same straws at the same pace score the same, held or not", () => {
+  for (const id of ["first-pour", "two-kettles", "the-belt", "a-draft"]) {
+    const room = ROOMS.find((r) => r.id === id);
+    assert.ok(room, id);
+    const lesson = room.id === ROUTE_ROOM ? LESSONS.route : LESSONS.dial;
+    const seconds = 1;
+    const pourAfter = Math.max(0.25, (room.solution.pourAt ?? 1.5) - room.solution.strokes.length * seconds);
+    const plain = playDrawing(room, { seconds, pourAfter });
+    assert.ok(plain.result, `${id} comes to a verdict`);
+    for (const read of [0.5, 2, 6.5]) {
+      const held = playDrawing(room, { lesson, read, seconds, pourAfter });
+      assert.deepEqual(held.result, plain.result, `${id}, read for ${read} s`);
+      assert.deepEqual(held.trace, plain.trace, `${id}, read for ${read} s: step for step`);
+    }
+  }
+  // As it was, three seconds of drawing under room 1's route lesson were free, and paid early-pour points.
+  const room = ROOMS[0];
+  const plain = playDrawing(room, { seconds: 3, pourAfter: 0.25 });
+  const leaky = playDrawing(room, { lesson: LESSONS.route, read: 1, seconds: 3, pourAfter: 0.25, fair: false });
+  const fair = playDrawing(room, { lesson: LESSONS.route, read: 1, seconds: 3, pourAfter: 0.25 });
+  assert.ok(plain.result.cleared && plain.result.points > 0);
+  assert.ok(leaky.result.points > plain.result.points, `the old way paid ${leaky.result.points} for ${plain.result.points}`);
+  assert.equal(fair.result.points, plain.result.points);
+});
+
+test("nothing is drawn into a pour stopped for a lesson: a pen down starts the tea again first", () => {
+  const room = ROOMS[0];
+  // A straw drawn mid-pour, out of the way, over half a second.
+  const extra = [
+    [200, 60],
+    [232, 80],
+  ];
+  /**
+   * The pour, the fill line's lesson holding it from the first tea into the
+   * cup, and a pen down `penAfter` real seconds into that hold (or, with
+   * `atStep`, the same pen down on that step of the room, nothing holding).
+   */
+  function run({ penAfter = Infinity, atStep = -1, hold = true }) {
+    const world = createWorld(room);
+    drawStrokes(world, room.solution.strokes);
+    pourNow(world);
+    const visit = createHolds(false);
+    const frame = 1 / 60;
+    let accumulator = 0;
+    let upAt = -1;
+    let penFrame = -1;
+    let steps = 0;
+    let penStep = -1;
+    for (let n = 0; n < 60 * 60 && world.status !== "cleared" && world.status !== "failed"; n++) {
+      const due = atStep >= 0 ? steps === atStep && penFrame < 0 : upAt >= 0 && n === upAt + Math.round(penAfter * 60);
+      if (due) {
+        visit.end(LESSONS.fill.id);
+        assert.ok(beginStroke(world, extra[0][0], extra[0][1]));
+        penFrame = n;
+        penStep = steps;
+      }
+      if (penFrame >= 0 && world.draft) {
+        const along = Math.min(1, (n - penFrame) / 30);
+        extendStroke(world, extra[0][0] + (extra[1][0] - extra[0][0]) * along, extra[0][1] + (extra[1][1] - extra[0][1]) * along);
+        if (along >= 1) commitStroke(world);
+      }
+      const holding =
+        hold && upAt >= 0 && visit.take(LESSONS.fill, { leaving: false, holdable: inItsPart(LESSONS.fill, { phase: "play", status: world.status, poured: true }), drafting: !!world.draft }, frame);
+      assert.ok(!(holding && world.draft), "never a straw drawn with the tea standing still");
+      const clock = roomFrame(world, accumulator, frame, holding);
+      accumulator = clock.accumulator;
+      for (let k = 0; k < clock.steps; k++) {
+        step(world, STEP);
+        steps++;
+        for (let i = 0; i < world.events.count; i++) if (world.events.type[i] === EVENTS.INTO_CUP && upAt < 0) upAt = n;
+      }
+    }
+    return { result: world.result, penStep, strokes: world.strokes.length };
+  }
+  const held = run({ penAfter: 1 });
+  assert.ok(held.penStep > 0, "the pen went down during the pour");
+  assert.equal(held.strokes, 2, "and the straw was drawn");
+  // The same straw, drawn from the same moment of the pour with nothing ever holding, ends the same.
+  const plain = run({ atStep: held.penStep, hold: false });
+  assert.equal(plain.penStep, held.penStep);
+  assert.deepEqual(held.result, plain.result);
 });
 
 test("Pour pressed while a lesson holds starts the kettle on the next step", () => {
