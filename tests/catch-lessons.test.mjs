@@ -147,7 +147,7 @@ function shift(rules, seed, seconds, { drop = new Set(), hand = "quick", reads =
   let lives = createLives(rules);
   let quiet = Infinity;
   let settled = 0;
-  const wait = { for: 0, at: 0 };
+  const wait = { for: 0, x: 0, y: 0 };
   let catchFor = 0;
   let sweep = 1;
   let nextQueued = 0;
@@ -419,7 +419,7 @@ function shift(rules, seed, seconds, { drop = new Set(), hand = "quick", reads =
         if (offers.length > count && lesson.lesson.move) {
           catchFor = 0;
           wait.for = 0;
-          wait.at = basket;
+          wait.x = basket;
         }
       }
       if (!coach.current) cue = null;
@@ -460,7 +460,7 @@ test("every lesson fits the arcade's one-line voice", () => {
 test("a first shift stops on the glowing link, then freezes the moment its cup is thrown, until the basket moves", () => {
   for (const rules of [normal, expert]) {
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
-      for (const reads of [Infinity, 0.8]) {
+      for (const reads of [Infinity, 1.6]) {
         const name = `${rules.expert ? "expert" : "normal"} seed ${seed}${reads < Infinity ? " reading" : ""}`;
         const { offers } = shift(rules, seed, 30, { reads });
         const glow = offers[0];
@@ -501,7 +501,7 @@ test("the catch's freeze waits for a real move: the basket held under the cup, n
   const SPOT = 600;
   /** Plays a basket path (its centre each frame, and whether the pointer is near the slip) through `waitStep`; returns when the move counts, or null. */
   const madeAt = (path, from = 0) => {
-    const wait = { for: 0, at: path[0]?.x ?? 0 };
+    const wait = { for: 0, x: path[0]?.x ?? 0, y: 0 };
     for (let i = 0; i < path.length; i++) {
       const age = from + i * FRAME;
       if (catchMoved(age, waitStep(wait, FRAME, path[i].x, SPOT, W, path[i].reaching))) return age;
@@ -514,20 +514,20 @@ test("the catch's freeze waits for a real move: the basket held under the cup, n
     return Array.from({ length: frames + 1 }, (_, i) => ({ x: x0 + ((x1 - x0) * i) / frames, reaching: false }));
   };
   // Held under the cup: it counts, though never before the freeze has held a moment.
-  assert.equal(madeAt(still(SPOT, 120)), FREEZE_MIN);
+  assert.ok(Math.abs(madeAt(still(SPOT, 120)) - Math.max(FREEZE_MIN, SETTLE)) <= FRAME + 1e-9);
   assert.ok(Math.abs(madeAt(still(SPOT, 120), FREEZE_MIN) - (FREEZE_MIN + SETTLE)) <= FRAME + 1e-9);
   // A hand's tremor while it waits still counts.
   const tremor = Array.from({ length: 120 }, (_, i) => ({ x: SPOT + (i % 2 ? 2 : -2), reaching: false }));
   assert.notEqual(madeAt(tremor), null);
   // Moving it, even a long way, doesn't; nor a slow pass through the spot on the way to a Continue beyond it.
   assert.equal(madeAt(glide(200, 1100, 600)), null);
-  for (const speed of [40, 120, 400]) assert.equal(madeAt(glide(SPOT - 80, SPOT + 200, speed)), null, `a pass at ${speed} px/s counted`);
+  for (const speed of [10, 40, 120, 400]) assert.equal(madeAt(glide(SPOT - 80, SPOT + 200, speed)), null, `a pass at ${speed} px/s counted`);
   // Off the spot, or with the pointer at the slip, a basket at rest doesn't.
   assert.equal(madeAt(still(SPOT + W * 0.36, 120)), null);
   assert.equal(madeAt(still(SPOT, 120, true)), null);
   // The wait starts again once it leaves the slip.
   assert.ok(Math.abs(madeAt([...still(SPOT, 60, true), ...still(SPOT, 60)]) - (1 + SETTLE)) <= FRAME + 1e-9);
-  assert.ok(SETTLE_PX >= 4 && SETTLE_PX / SETTLE < 40, "a pass slower than a hand's tremor could count");
+  assert.ok(SETTLE_PX >= 4 && SETTLE_PX / SETTLE < 10, "a slow approach to Continue could count");
   // The ghost waits on the basket, runs to the landing at a hand's speed, waits there, and goes again.
   assert.equal(ghostAt(200, 800, 0), 200);
   let peak = 0;
@@ -670,7 +670,7 @@ test("an explanation stops play until it is continued, or for at most its hold; 
       // still for its hold, then goes; the catch only until the hand moves.
       const quick = shift(rules, seed, 120);
       for (const entry of quick.offers) {
-        const limit = entry.id === "catch" ? FREEZE_MIN : HOLD;
+        const limit = entry.id === "catch" ? Math.max(FREEZE_MIN, SETTLE) : HOLD;
         assert.ok(entry.stopped <= limit + 2 * FRAME, `seed ${seed}: ${entry.id} stopped play for ${entry.stopped.toFixed(2)} s`);
       }
       // A player who reads a line and presses Continue gets play back at once.
@@ -968,20 +968,20 @@ test("reaching for the catch's Continue, however slowly, never ends the freeze; 
     // far end) at a slow or a quick hand's pace, the freeze already held its
     // minimum; then it rests on the button.
     const button = { x: slip.x1 - 50, y: slip.y1 - 26 };
-    for (const speed of [30, 90, 300, 1200]) {
+    for (const speed of [10, 30, 90, 300, 1200]) {
       const from = { x: (basket.x0 + basket.x1) / 2, y: row };
       const length = Math.hypot(button.x - from.x, button.y - from.y);
       const frames = Math.max(1, Math.ceil(length / (speed * FRAME)));
-      const wait = { for: 0, at: from.x };
+      const wait = { for: 0, x: from.x, y: from.y };
       let aim = from.x;
       for (let i = 0; i <= frames + 60; i++) {
         const k = Math.min(1, i / frames);
-        const x = from.x + (button.x - from.x) * k;
-        const y = from.y + (button.y - from.y) * k;
+        const x = Math.round(from.x + (button.x - from.x) * k);
+        const y = Math.round(from.y + (button.y - from.y) * k);
         // On the button itself the basket keeps its aim, as the game does.
         const onButton = x >= slip.x1 - 110 && x <= slip.x1 - 10 && y >= slip.y1 - 42 && y <= slip.y1 - 10;
         if (!onButton) aim = Math.min(view.width - half, Math.max(half, x));
-        const waited = waitStep(wait, FRAME, aim, spot, w, nearSlip(slip, x, y));
+        const waited = waitStep(wait, FRAME, aim, spot, w, nearSlip(slip, x, y), x, y);
         assert.ok(!catchMoved(FREEZE_MIN + i * FRAME, waited), `a reach for Continue at ${speed} px/s ended the freeze`);
       }
       reaches += 1;

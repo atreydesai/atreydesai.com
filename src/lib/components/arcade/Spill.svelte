@@ -2498,8 +2498,8 @@
   }
 
   /**
-   * The player is changing the straws (a pen down, a straw taken back,
-   * Clear): whatever the lesson up was holding runs on at once and for the
+   * The player is aiming the keyboard pen or changing the straws: whatever
+   * the lesson up was holding runs on at once and for the
    * rest of the visit, so planning done during a lesson costs planning time
    * as usual (pouring early is points), and a pour stopped for a lesson
    * starts again before anything is drawn into it. The lesson stays up:
@@ -3672,6 +3672,7 @@
       heldFor = 0;
       return;
     }
+    if (lessonHolds && world.status === "waiting") editing();
     heldFor += dt;
     const speed = 45 + 200 * Math.min(1, heldFor / 0.7);
     const norm = dx && dy ? Math.SQRT1_2 : 1;

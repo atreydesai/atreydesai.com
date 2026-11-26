@@ -3856,14 +3856,14 @@
   /** Lets go of everything (pause, blur, the end of a run). */
   function releaseInput() {
     input.releaseAll();
+    gate.clear();
     for (const control of CONTROLS) gate.release(control);
   }
 
   /**
    * What a press of `control` does while a lesson is up. While a move is
    * taught, its own control makes it ("act": play resumes and the move is
-   * made at once) and the others wait ("drop": held, but no press is kept
-   * for when play comes back). While play is stopped to explain a thing, a
+   * made at once) and the others are dropped. While play is stopped to explain a thing, a
    * press is dropped too, except the rush's own key in its lesson, which
    * starts the rush. Otherwise a press goes through as ever ("pass").
    */
@@ -3877,9 +3877,10 @@
   }
 
   /** The press that makes the move being taught: play resumes, and the next step sees it at the post. */
-  function actOnLesson() {
+  function actOnLesson(control: keyof Held) {
     const lesson = coach.current;
     if (!lesson) return;
+    gate.release(control);
     if (lesson.id === "rush") coach.acted("rush");
     else beginTrial(lesson.id);
     accumulator = Math.max(accumulator, STEP);
@@ -3888,25 +3889,23 @@
   /** A pad pressed: held as ever, with a lesson's say over the press. */
   function padPress(event: PointerEvent, control: keyof Held) {
     const what = lessonPress(control, true);
-    if (!input.padDown(event, control)) return;
     if (what === "drop") {
-      input.clearPresses();
-      gate.drop(control);
-    } else if (what === "act") {
-      actOnLesson();
+      event.preventDefault();
+      return;
     }
+    if (input.padDown(event, control) && what === "act") actOnLesson(control);
   }
 
   /** Space or Enter on a focused pad, likewise. */
   function padKeyDown(event: KeyboardEvent, control: keyof Held) {
+    if (event.key !== " " && event.key !== "Enter") return;
     const what = lessonPress(control, !event.repeat);
-    if (!input.padKey(event, control, true)) return;
     if (what === "drop") {
-      input.clearPresses();
-      gate.drop(control);
-    } else if (what === "act") {
-      actOnLesson();
+      gate.acceptsKey(event.code || keyName(event), event.repeat, true);
+      event.preventDefault();
+      return;
     }
+    if (input.padKey(event, control, true) && what === "act") actOnLesson(control);
   }
 
   /** A pointer off a pad, a touch taken back, focus gone: its own hold ends. */
@@ -3951,14 +3950,17 @@
     event.preventDefault();
     // A key's repeats latch a press too, unless a lesson is holding play for its own move.
     const what = lessonPress(control, !event.repeat);
-    input.keyDown(key, what !== "drop");
-    if (what === "drop" && !event.repeat) gate.drop(control);
-    if (what === "act") actOnLesson();
+    const source = event.code || key;
+    if (!gate.acceptsKey(source, event.repeat, what === "drop")) return;
+    input.keyDown(key, true, source);
+    if (what === "act") actOnLesson(control);
   }
 
   function onKeyUp(event: KeyboardEvent) {
     const key = keyName(event);
-    input.keyUp(key);
+    const source = event.code || key;
+    input.keyUp(source);
+    gate.keyUp(source);
     const control = input.control(key);
     if (control) letGoOf(control);
   }

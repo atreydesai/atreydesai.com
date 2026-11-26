@@ -20,7 +20,6 @@ import {
   BURN_LEARNED,
   CUP,
   FIRST_SITE_SEED,
-  GUIDED,
   GUIDED_SLIP_H,
   LANDED,
   LESSONS,
@@ -1072,11 +1071,10 @@ test("guidance lasts until the device's first landing: Continue on the touchdown
   start();
   assert.equal(lessons.guide, null);
   assert.equal(guidedDevice(coach), false);
-  // A device that knew the touchdown before landings were remembered, and was never guided, has landed.
+  // An older save's touchdown flag might only mean the player pressed Continue.
   const old = freshCoach();
   old.skip("touchdown");
-  assert.equal(guidedDevice(old), false);
-  assert.equal(old.learned(GUIDED), false);
+  assert.equal(guidedDevice(old), true);
 
   // In flight: a hot approach warned, Continue pressed, then the crash; the next lander is still guided.
   const flown = freshCoach();

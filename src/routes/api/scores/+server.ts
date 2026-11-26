@@ -32,12 +32,15 @@ const EXPERT_BOARDS: Record<keyof typeof BOARDS, string> = {
 	spill: 'boba/spill-v1-expert-leaderboard.json',
 };
 
-function boardPath(game: unknown, mode: unknown): string | null {
+function boardPath(game: unknown, mode: unknown, spillVersion: unknown): string | null {
 	if (mode !== null && mode !== undefined && mode !== '' && mode !== 'normal' && mode !== 'expert') return null;
 	const key = game === null || game === undefined || game === '' ? 'catch' : game;
 	if (typeof key !== 'string' || !Object.hasOwn(BOARDS, key)) return null;
 	const id = key as keyof typeof BOARDS;
-	return mode === 'expert' ? EXPERT_BOARDS[id] : BOARDS[id];
+	if (mode === 'expert') return EXPERT_BOARDS[id];
+	// Cached clients keep using the v1 board, whose points may include free planning time.
+	if (id === 'spill' && spillVersion === '2') return 'boba/spill-v2-leaderboard.json';
+	return BOARDS[id];
 }
 
 const MAX_ENTRIES = 50; // keep the blob small
@@ -218,6 +221,7 @@ function rateLimited(ip: string, now: number): boolean {
 
 export const GET: RequestHandler = async ({ url }) => {
 	const name = askedName(url);
+	const spillVersion = url.searchParams.get('spillVersion');
 	// Every board for one name, in one mode: the arcade menu's prices.
 	if (url.searchParams.get('game') === 'all') {
 		const mode = url.searchParams.get('mode');
@@ -226,7 +230,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		}
 		if (!token) return Response.json({ available: false, bests: {} });
 		const ids = Object.keys(BOARDS) as Array<keyof typeof BOARDS>;
-		const boards = await Promise.all(ids.map((id) => readBoard(boardPath(id, mode)!)));
+		const boards = await Promise.all(ids.map((id) => readBoard(boardPath(id, mode, spillVersion)!)));
 		// A board that couldn't be read is left out; the others still answer.
 		if (boards.every((board) => board === null)) return Response.json({ available: false, bests: {} });
 		const bests: Partial<Record<keyof typeof BOARDS, number>> = {};
@@ -237,7 +241,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		});
 		return Response.json({ available: true, bests }, { headers: { 'cache-control': 'private, max-age=20' } });
 	}
-	const path = boardPath(url.searchParams.get('game'), url.searchParams.get('mode'));
+	const path = boardPath(url.searchParams.get('game'), url.searchParams.get('mode'), spillVersion);
 	if (!path) return Response.json({ available: false, scores: [] }, { status: 400 });
 	if (!token) return Response.json({ available: false, scores: [] });
 	const board = await readBoard(path);
@@ -274,14 +278,14 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 		return Response.json({ ok: false, reason: 'too many submissions, slow down' }, { status: 429 });
 	}
 
-	let body: { name?: unknown; score?: unknown; game?: unknown; mode?: unknown };
+	let body: { name?: unknown; score?: unknown; game?: unknown; mode?: unknown; spillVersion?: unknown };
 	try {
 		body = await request.json();
 	} catch {
 		return Response.json({ ok: false, reason: 'bad request' }, { status: 400 });
 	}
 
-	const path = boardPath(body.game, body.mode);
+	const path = boardPath(body.game, body.mode, body.spillVersion);
 	if (!path) return Response.json({ ok: false, reason: 'unknown game' }, { status: 400 });
 
 	// Validate score: a non-negative integer within a sane ceiling.

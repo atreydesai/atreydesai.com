@@ -34,6 +34,7 @@ const BEST_COOKIE: Record<GameId, string> = {
 };
 
 function bestCookie(game: GameId, mode: ArcadeMode) {
+  if (game === "spill" && mode === "normal") return "boba_best_spill_v2";
   return mode === "expert" ? `${BEST_COOKIE[game]}_expert` : BEST_COOKIE[game];
 }
 
@@ -177,6 +178,7 @@ export async function syncBests(mode: ArcadeMode = currentMode(), game?: GameId)
   if (!name) return false;
   try {
     const query = new URLSearchParams({ mode, name, game: game ?? "all" });
+    if (mode === "normal" && (!game || game === "spill")) query.set("spillVersion", "2");
     const response = await fetch(`/api/scores?${query}`);
     const data = await response.json();
     // A different name was signed while this was on its way: not this player's best.
@@ -203,16 +205,15 @@ export async function syncBests(mode: ArcadeMode = currentMode(), game?: GameId)
 // (private windows, blocked site data): every read and write is guarded, and
 // the game plays on without it.
 const SPILL_PROGRESS_KEY: Record<ArcadeMode, string> = {
-  normal: "boba_spill_progress_v1",
+  normal: "boba_spill_progress_v2",
   expert: "boba_spill_progress_expert_v1",
 };
 // The furthest room a run had reached, from before spill had levels.
 const SPILL_REACH_COOKIES = ["boba_reach_spill_v1", "boba_spill_reach"];
 /** The rooms there were when a reach was counted; rooms added since start locked. */
 const SPILL_REACH_ROOMS = 18;
-/** Stars and points a migrated room gets: cleared once, at the least a clear scores. */
+/** A reach cookie proves a clear, so each unlocked room keeps one star. */
 const MIGRATED_STARS = 1;
-const MIGRATED_POINTS = 100;
 
 /**
  * Spill progress as stored on this device for a mode, unchecked (null if
@@ -227,19 +228,29 @@ export function readSpillProgress(mode: ArcadeMode = currentMode()): unknown {
     // Unreadable or unavailable: fall through to the old cookie, then nothing.
   }
   if (mode === "expert") return null;
+  try {
+    const old = JSON.parse(localStorage.getItem("boba_spill_progress_v1") ?? "null");
+    if (Array.isArray(old?.stars)) {
+      // The old score cannot show how much planning time was free. Keep
+      // the room unlocks and stars, and start counting points anew.
+      const migrated = { stars: old.stars, points: [], afterHours: old.afterHours };
+      writeSpillProgress(migrated, mode);
+      return migrated;
+    }
+  } catch {
+    // An unreadable save may still have a reach cookie.
+  }
   let reached = 0;
   for (const name of SPILL_REACH_COOKIES) reached = Math.max(reached, parseInt(readCookie(name) ?? "", 10) || 0);
   if (reached <= 0) return null;
   const rooms = Math.min(reached, SPILL_REACH_ROOMS);
   const migrated = {
     stars: Array.from({ length: rooms }, () => MIGRATED_STARS),
-    points: Array.from({ length: rooms }, () => MIGRATED_POINTS),
+    points: [],
     afterHours: false,
   };
-  // Only once it is safely stored does the cookie go, so nothing is lost.
-  if (writeSpillProgress(migrated, mode)) {
-    for (const name of SPILL_REACH_COOKIES) document.cookie = `${name}=; path=/; max-age=0; samesite=lax`;
-  }
+  // A cached v1 client still needs its reach cookie to recover those rooms.
+  writeSpillProgress(migrated, mode);
   return migrated;
 }
 
@@ -269,6 +280,7 @@ interface Board {
 export async function fetchBoard(game: GameId, mode: ArcadeMode = currentMode()): Promise<Board> {
   try {
     const query = new URLSearchParams({ game, mode });
+    if (game === "spill" && mode === "normal") query.set("spillVersion", "2");
     const name = readPlayerName().trim();
     if (name) query.set("name", name);
     const response = await fetch(`/api/scores?${query}`);
@@ -300,7 +312,7 @@ export async function submitScore(
     const response = await fetch("/api/scores", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ game, name, score, mode }),
+      body: JSON.stringify({ game, name, score, mode, spillVersion: game === "spill" && mode === "normal" ? "2" : undefined }),
     });
     const data = await response.json();
     if (!response.ok || !data.ok) {

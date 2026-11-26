@@ -6,8 +6,8 @@
   // family, keys as pixel keycaps, pixel corner marks round the thing and a
   // dotted line between them. It is placed in viewport pixels by the game,
   // which follows the thing as it moves; once the lesson is over it holds
-  // its place, so it never chases its thing as play comes back. Only its
-  // Continue key takes a press. Paused, it hides.
+  // its place, so it never chases its thing as play comes back. Continue
+  // and an overflowing face take pointer input. Paused, it hides.
   //
   // The game decides where the eye already is and puts the callout there:
   // beside the runner, under the cup, by the station. `side` says which
@@ -71,7 +71,8 @@
   }
 
   const GUTTER = 16;
-  let slip: HTMLElement;
+  let faceH = 0;
+  let contentH = 0;
   /** The slip's measured size, bindable, so a game can tell whether it fits beside a thing. */
   export let slipW = 0;
   export let slipH = 0;
@@ -239,6 +240,7 @@
   {#key lesson.id}
     <div
       class="coach boba-ui"
+      class:above-hud={shown.top < top}
       class:is-leaving={leaving}
       class:is-hidden={hidden}
       class:is-light={scene === "light"}
@@ -262,30 +264,31 @@
       {/if}
 
       <div
-        bind:this={slip}
         bind:offsetWidth={slipW}
         bind:offsetHeight={slipH}
         class="slip"
         style="left: {shown.left}px; top: {shown.top}px"
       >
-        <div class="face">
-        <!-- The live region below reads the words; the slip shows them. -->
-        <p class="words" aria-hidden="true">
-          {#if lesson.name}<span class="name">{lesson.name}</span>{/if}
-          <span class="line">{lesson.text}</span>
-          {#if lesson.keys?.length}
-            <span class="boba-keys">
-              {#each lesson.keys as key}<kbd>{key}</kbd>{/each}
-            </span>
-          {/if}
-          {#if lesson.touch}<span class="touch">{lesson.touch}</span>{/if}
-        </p>
-        {#if continuable && !leaving}
-          <button type="button" class="go" use:handsBackFocus on:click={go}>
-            Continue
-            <kbd aria-hidden="true">Enter</kbd>
-          </button>
-        {/if}
+        <div class="face" bind:clientHeight={faceH} class:scrollable={contentH > faceH}>
+          <div class="content" bind:offsetHeight={contentH}>
+            <!-- The live region below reads the words; the slip shows them. -->
+            <p class="words" aria-hidden="true">
+              {#if lesson.name}<span class="name">{lesson.name}</span>{/if}
+              <span class="line">{lesson.text}</span>
+              {#if lesson.keys?.length}
+                <span class="boba-keys">
+                  {#each lesson.keys as key}<kbd>{key}</kbd>{/each}
+                </span>
+              {/if}
+              {#if lesson.touch}<span class="touch">{lesson.touch}</span>{/if}
+            </p>
+            {#if continuable && !leaving}
+              <button type="button" class="go" use:handsBackFocus on:click={go}>
+                Continue
+                <kbd aria-hidden="true">Enter</kbd>
+              </button>
+            {/if}
+          </div>
         </div>
       </div>
     </div>
@@ -333,6 +336,10 @@
     --coach-mark: #1a1a1a;
   }
 
+  .coach.above-hud {
+    z-index: calc(var(--layer-overlay) + 4);
+  }
+
   .coach.is-hidden {
     visibility: hidden;
   }
@@ -370,11 +377,6 @@
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
     overscroll-behavior: contain;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    padding: 0.625rem 0.875rem;
     color: var(--chip-text);
     background: var(--chip);
     box-shadow: inset 0 0 0 2px var(--chip-rule);
@@ -384,6 +386,18 @@
     font-weight: 400;
     line-height: 1.4;
     text-wrap: pretty;
+  }
+
+  .face.scrollable {
+    pointer-events: auto;
+  }
+
+  .content {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: 0.625rem 0.875rem;
   }
 
   .name {
@@ -421,7 +435,7 @@
     line-height: 1.2;
   }
 
-  /* Continue is a key too, the one part of the callout that takes a press. */
+  /* Continue is a pixel key. */
   .go {
     --cut: 2px;
     display: inline-flex;

@@ -6,12 +6,9 @@
 //
 // Holding the clock (the pause card, or a pearl line's stop) asks the shared
 // context to suspend; a context's suspend() takes a moment, and it still
-// reports "running" until it lands. A resume asked for in that moment is
-// skipped (sfx.ts resumes only a context that isn't running), so the
-// suspension lands afterwards and swallows it. The gate remembers that a
-// suspension is on its way until it sees the context leave "running" (its
-// statechange, or its state read on a frame), keeps the belt waiting while it
-// is, and then asks for the resume again. And a context that reports running
+// reports "running" until it lands. The shared audio controls expose the
+// pending suspension and queue the resume behind it. The gate blocks the
+// belt while that suspension is pending. A context that reports running
 // while its clock stands still holds the belt too, once that has lasted
 // CLOCK_STALL.
 //
@@ -19,26 +16,32 @@
 // readings, so it is tested in node with a stand-in context.
 
 /**
- * Page seconds the heard clock may stand still while its context reports
+ * Page seconds the rendering clock may stand still while its context reports
  * running before the belt waits for it: longer than the coarsest steps a
  * context's clock moves in (a large output buffer renders a tenth of a second
  * at a time), and between them the belt's offset snaps back to the clock it
  * reads (steadyOffset), so it never runs more than that snap past it.
  */
 export const CLOCK_STALL = 0.2;
+/** Page seconds to recover audio before continuing without the soundtrack. */
+export const AUDIO_RECOVERY_LIMIT = 5;
+/** Audio that ran on under a hold can skip a cup on rejoining the belt. */
+const MAX_RESUME_DRIFT = 0.08;
+
 /**
- * Page seconds a suspension asked for may take to land before the gate stops
- * waiting for it: one that never lands (refused) leaves a context that is
- * running after all, and the belt follows its clock again.
+ * @param {number | null} song The playable audio clock's song time.
+ * @param {number} heldSong The song time the belt is waiting at.
+ * @param {number} elapsed Page seconds since recovery began.
  */
-export const SUSPEND_LIMIT = 1;
+export function recoveryStatus(song, heldSong, elapsed) {
+  if (song !== null) return Math.abs(song - heldSong) <= MAX_RESUME_DRIFT ? "ready" : "silent";
+  return elapsed > AUDIO_RECOVERY_LIMIT ? "silent" : "wait";
+}
 
 /** @typedef {"running" | "suspended" | "closed" | "interrupted" | string} ContextState */
 
-export function createAudioGate() {
-  /** A suspension has been asked for and not yet seen to land, and when (page seconds). */
-  let suspending = false;
-  let askedAt = 0;
+/** @param {() => boolean} isSuspending Whether the suspend request is still pending. */
+export function createAudioGate(isSuspending) {
   /** The run wants the audio running (not while the clock is held). */
   let wanted = true;
   /** The last heard reading, and the page time it last moved. */
@@ -46,26 +49,10 @@ export function createAudioGate() {
   let last = null;
   let movedAt = 0;
 
-  /** @param {ContextState} state @param {number} [page] */
-  const saw = (state, page) => {
-    if (state !== "running" || (page !== undefined && page - askedAt > SUSPEND_LIMIT)) suspending = false;
-  };
-
   return {
-    /** A suspension asked for is still on its way: the context says "running", but won't be for long. */
-    get suspending() {
-      return suspending;
-    },
-    /**
-     * The clock is held (a pause, or a line's stop): the context is asked to
-     * suspend at page time `page`, and `state` is what it reports as it is asked.
-     * @param {ContextState} state
-     * @param {number} page
-     */
-    hold(state, page) {
+    /** The clock is held for a pause or a lesson. */
+    hold() {
       wanted = false;
-      suspending = state === "running";
-      askedAt = page;
       last = null;
     },
     /** The run asks for the audio back (Continue, or resume). */
@@ -73,61 +60,48 @@ export function createAudioGate() {
       wanted = true;
     },
     /**
-     * The context's state, as its statechange reports it (or a frame reads
-     * it): leaving "running" is a suspension landing.
-     * @param {ContextState} state
-     */
-    state(state) {
-      saw(state);
-    },
-    /**
      * Whether to ask the context to resume now: the audio is wanted back, no
      * suspension is still on its way to swallow the request, and the context
      * isn't running (a suspension that landed after the release, or one the
      * system made).
      * @param {ContextState} state
-     * @param {number} page
      */
-    needsResume(state, page) {
-      saw(state, page);
-      return wanted && !suspending && state !== "running" && state !== "closed";
+    needsResume(state) {
+      return wanted && !isSuspending() && state !== "running" && state !== "closed";
     },
     /**
      * Whether to ask the context to suspend again: the clock is held, no
      * suspension is on its way, and the context is running all the same (a
      * resume asked before the hold that landed after it).
      * @param {ContextState} state
-     * @param {number} page
      */
-    needsSuspend(state, page) {
-      saw(state, page);
-      return !wanted && !suspending && state === "running";
+    needsSuspend(state) {
+      return !wanted && !isSuspending() && state === "running";
     },
     /**
      * Whether the belt may move on the audio clock this frame: the audio is
-     * wanted, no suspension is on its way, the context runs, and its heard
-     * clock `heard` (null without one) has moved within CLOCK_STALL of page
+     * wanted, no suspension is on its way, the context runs, and its rendering
+     * clock has moved within CLOCK_STALL of page
      * time `page`.
-     * @param {number | null} heard
+     * @param {number | null} clock
      * @param {ContextState} state
      * @param {number} page
+     * @param {boolean} [requireMotion] Recovery needs two distinct readings.
      */
-    mayAdvance(heard, state, page) {
-      saw(state, page);
-      if (!wanted || suspending || state !== "running" || heard === null) {
+    mayAdvance(clock, state, page, requireMotion = false) {
+      if (!wanted || isSuspending() || state !== "running" || clock === null) {
         last = null;
         return false;
       }
-      if (last === null || heard !== last) {
-        last = heard;
+      const moved = last !== null && clock !== last;
+      if (last === null || moved) {
+        last = clock;
         movedAt = page;
-        return true;
       }
-      return page - movedAt <= CLOCK_STALL;
+      return requireMotion ? moved : page - movedAt <= CLOCK_STALL;
     },
     /** A fresh run. */
     reset() {
-      suspending = false;
       wanted = true;
       last = null;
       movedAt = 0;

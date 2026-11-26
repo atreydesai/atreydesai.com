@@ -82,18 +82,15 @@ import {
  */
 export const FIRST_SITE_SEED = 21320;
 /**
- * What the coach also remembers per device, beside its lessons (never shown):
- * that it has landed, and that it has flown a guided flight.
+ * What the coach also remembers per device, beside its lessons: a landing.
  */
 export const LANDED = "landed";
-export const GUIDED = "guided";
 /**
- * Whether a device's flights are guided: it has never landed. Only a landing
- * counts, never Continue on a lesson. A device that knew the touchdown
- * before landings were remembered, and was never guided, counts as landed.
+ * The old touchdown lesson could be marked read with Continue. Only a
+ * recorded landing ends guidance, including for devices with that flag.
  * @param {Pick<Coach, "learned">} coach
  */
-export const guidedDevice = (coach) => !coach.learned(LANDED) && (coach.learned(GUIDED) || !coach.learned("touchdown"));
+export const guidedDevice = (coach) => !coach.learned(LANDED);
 /** Flight seconds before any lesson, while "go" is still on screen. */
 export const LESSON_START = 0.62;
 /** Flight seconds of burn that have clearly slowed a fall: burning is known. */
@@ -963,7 +960,6 @@ export function createFlightLessons(coach) {
       revived = again;
       held.clear();
       guided = guidedDevice(coach);
-      if (guided) coach.skip(GUIDED);
       guide = null;
       along = 0;
       plannedAt = -Infinity;

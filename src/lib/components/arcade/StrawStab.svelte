@@ -6,6 +6,7 @@
   import {
     audioClock,
     resumeAudio,
+    audioSuspending,
     setMusicPhase,
     sfxBlip,
     sfxCountdown,
@@ -99,7 +100,7 @@
   } from "#lib/arcade/art.ts";
   import { createCoach, resetLessons, type Lesson } from "#lib/arcade/core/coach.ts";
   import { TICK_LOOKAHEAD, createTicks } from "#lib/arcade/stab-tick.ts";
-  import { createAudioGate } from "#lib/arcade/stab-clock.js";
+  import { createAudioGate, recoveryStatus } from "#lib/arcade/stab-clock.js";
   import { sharedAudioContext } from "#lib/audio-context.ts";
   import { hexToRgb, mixHex, mixRgb, rgbToHex, type RGB } from "#lib/arcade/core/color.ts";
   import { bayer, paintBands } from "#lib/arcade/core/dither.ts";
@@ -413,12 +414,7 @@
    * asked for is still landing, the context isn't running, or its clock
    * stands still (stab-clock.js).
    */
-  const gate = createAudioGate();
-  /** The shared context whose state changes the gate hears about. */
-  let watched: AudioContext | null = null;
-  const onAudioState = () => {
-    if (watched) gate.state(watched.state);
-  };
+  const gate = createAudioGate(audioSuspending);
   /** The song time last drawn, held while paused so the belt doesn't step back. */
   let lastShown = 0;
   /** The measured frame interval, in seconds: how far ahead a frame is drawn. */
@@ -433,19 +429,7 @@
 
   const perfSeconds = () => performance.now() / 1000;
 
-  /**
-   * The shared context's state, its changes reported to the gate. Only once
-   * the run plays on it, so the context is never made here.
-   */
-  function audioState(): string {
-    const context = useAudio ? sharedAudioContext() : null;
-    if (context && context !== watched) {
-      watched?.removeEventListener("statechange", onAudioState);
-      watched = context;
-      context.addEventListener("statechange", onAudioState);
-    }
-    return context?.state ?? "closed";
-  }
+  const audioState = () => (useAudio ? sharedAudioContext()?.state : null) ?? "closed";
 
   /**
    * Reads the audio clock and steadies the page-to-audio offset. False when
@@ -455,8 +439,10 @@
   function syncClock() {
     if (!useAudio) return true;
     const perf = perfSeconds();
+    const audio = sharedAudioContext();
     const heard = audioClock();
-    if (heard === null || !gate.mayAdvance(heard, audioState(), perf)) return false;
+    const clock = heard === null ? null : audio?.currentTime ?? null;
+    if (!gate.mayAdvance(clock, audio?.state ?? "closed", perf) || heard === null) return false;
     clockOffset = steadyOffset(clockSynced ? clockOffset : null, heard - perf);
     clockSynced = true;
     heardSong = heard - origin;
@@ -2008,7 +1994,7 @@
   function holdClock() {
     if (!waitingForAudio) heldSong = songNow();
     if (useAudio) {
-      gate.hold(audioState(), perfSeconds());
+      gate.hold();
       suspendAudio();
     }
   }
@@ -2436,6 +2422,7 @@
     setMusicPhase(tier >= 2 ? "rush" : "steady");
     const downbeat = startMusic(PLAYLIST);
     useAudio = downbeat !== null && audioClock() !== null;
+    heardSong = 0;
     clockSynced = false;
     clockOffset = 0;
     if (useAudio && downbeat !== null) {
@@ -2462,11 +2449,8 @@
     const dt = Math.min(rawDt, 0.05);
 
     if (paused || lessonHeld) {
-      // Held, the audio stays suspended: one landing is noted, as its
-      // statechange would, and a resume that landed after the hold (asked
-      // just before it) is suspended again, so no music runs under the hold.
-      if (useAudio && running && gate.needsSuspend(audioState(), perfSeconds())) {
-        gate.hold("running", perfSeconds());
+      // A resume requested just before the hold can still finish under it.
+      if (useAudio && running && gate.needsSuspend(audioState())) {
         suspendAudio();
       }
       if (!paused) holdFrame(rawDt);
@@ -2490,22 +2474,27 @@
     }
 
     if (waitingForAudio) {
-      const state = audioState();
-      // A suspension that landed after the audio was asked back swallowed
-      // that resume: ask again. While one is still landing, the wait for the
-      // audio hasn't begun.
-      if (gate.needsResume(state, perfSeconds())) resumeAudio();
-      if (gate.suspending) waitStarted = perfSeconds();
-      if (gate.mayAdvance(audioClock(), state, perfSeconds())) {
+      const audio = sharedAudioContext();
+      const state = audio?.state ?? "closed";
+      const now = perfSeconds();
+      if (gate.needsResume(state)) resumeAudio();
+      const heard = audioClock();
+      const clock = heard === null ? null : audio?.currentTime ?? null;
+      const moved = gate.mayAdvance(clock, state, now, true);
+      const song = moved && heard !== null ? heard - origin : null;
+      const recovery = recoveryStatus(song, heldSong, now - waitStarted);
+      if (recovery === "ready") {
         waitingForAudio = false;
         clockSynced = false;
-      } else if (perfSeconds() - waitStarted > 0.8) {
-        // Audio did not come back: carry on silently from the same beat.
+      } else if (recovery === "silent") {
+        // Keep the beat the player saw, even if the audio clock ran on.
         waitingForAudio = false;
         useAudio = false;
+        ticks.stop();
         stopMusic();
+        resumeAudio({ waitForSuspension: false });
         clockOffset = 0;
-        origin = perfSeconds() - heldSong;
+        origin = now - heldSong;
       } else {
         draw(lastShown);
         raf = requestAnimationFrame(frame);
@@ -2520,7 +2509,7 @@
       heldSong = heardSong;
       waitingForAudio = true;
       waitStarted = perfSeconds();
-      if (gate.needsResume(audioState(), perfSeconds())) resumeAudio();
+      if (gate.needsResume(audioState())) resumeAudio();
       draw(lastShown);
       raf = requestAnimationFrame(frame);
       return;
@@ -2653,7 +2642,7 @@
   function resetRun() {
     cancelAnimationFrame(raf);
     // A run left while a line held the belt mustn't leave the audio clock frozen.
-    if (lessonHeld) resumeAudio();
+    if (lessonHeld) resumeAudio({ waitForSuspension: false });
     lessonHeld = false;
     holdAt = null;
     stopUntil = null;
@@ -2815,11 +2804,10 @@
       active = false;
       cancelAnimationFrame(raf);
       // Never leave the shared audio clock frozen behind a closed game.
-      resumeAudio();
       stopMusic();
       ticks.stop();
+      resumeAudio({ waitForSuspension: false });
       timers.clear();
-      watched?.removeEventListener("statechange", onAudioState);
       unmountShell();
       window.removeEventListener("keydown", onPlayfieldTab, true);
     };

@@ -52,6 +52,9 @@ let pourPitch = 0;
 // While a game holds the clock (see suspendAudio), nothing may wake the
 // context: a stray blip would restart the soundtrack under a pause card.
 let clockHeld = false;
+let clockSuspension: Promise<void> | null = null;
+let resumeRequested = false;
+let clockResume: Promise<void> | null = null;
 
 let currentRoot = 60;
 let currentScale = [0, 2, 4, 7, 9];
@@ -362,6 +365,7 @@ export function audioClock(): number | null {
  * exactly where it stopped, so a paused rhythm game stays on the beat.
  */
 export function suspendAudio() {
+  resumeRequested = false;
   clockHeld = true;
   holdAudioClock(true);
   // Hard stop rather than a fade: the context freezes before a fade could
@@ -369,19 +373,33 @@ export function suspendAudio() {
   quietThruster(0);
   quietPour(0);
   quietLoops(0);
-  if (ctx?.state === "running") {
-    void ctx.suspend().catch(() => {
+  if (ctx?.state === "running" && !clockSuspension) {
+    clockSuspension = ctx.suspend().catch(() => {
       // Already suspended or closed.
+    }).finally(() => {
+      clockSuspension = null;
+      if (resumeRequested) resumeAudio();
     });
   }
 }
 
-export function resumeAudio() {
+export const audioSuspending = () => clockHeld && clockSuspension !== null;
+
+export function resumeAudio({ waitForSuspension = true } = {}) {
+  if (clockSuspension && waitForSuspension) {
+    resumeRequested = true;
+    return;
+  }
+  // A game can abandon a stalled clock. Unlock the arcade now and recover
+  // again if that context eventually suspends.
+  resumeRequested = clockSuspension !== null;
   clockHeld = false;
   holdAudioClock(false);
-  if (ctx && ctx.state !== "running" && ctx.state !== "closed") {
-    void ctx.resume().catch(() => {
+  if (!clockResume && ctx && ctx.state !== "running" && ctx.state !== "closed") {
+    clockResume = ctx.resume().catch(() => {
       // A later user gesture will retry.
+    }).finally(() => {
+      clockResume = null;
     });
   }
 }

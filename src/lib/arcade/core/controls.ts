@@ -30,8 +30,8 @@ export const keyName = (event: KeyboardEvent) => (event.key.length === 1 ? event
 
 export function createControls<C extends string>({ names, keys: keyMap, enabled, onPads }: ControlsOptions<C>) {
   const none = () => Object.fromEntries(names.map((name) => [name, false])) as Held<C>;
-  /** Keys down, by name, and what they hold. */
-  const keysDown = new Set<string>();
+  /** Keys down, by physical source, and what they hold. */
+  const keysDown = new Map<string, C>();
   const keys = none();
   /** Pointers on each hold button, and a key holding it while it has focus. */
   const padPointers = Object.fromEntries(names.map((name) => [name, new Set<number>()])) as Record<C, Set<number>>;
@@ -49,10 +49,7 @@ export function createControls<C extends string>({ names, keys: keyMap, enabled,
   /** What the keys down hold: a control stays held while any of its keys is. */
   function syncKeys() {
     for (const name of names) keys[name] = false;
-    for (const key of keysDown) {
-      const control = keyMap[key];
-      if (control) keys[control] = true;
-    }
+    for (const control of keysDown.values()) keys[control] = true;
   }
 
   /** What the hold buttons hold: any pointer on one, or a key on it while it has focus. */
@@ -87,16 +84,16 @@ export function createControls<C extends string>({ names, keys: keyMap, enabled,
       return keyMap[key];
     },
     /** A key the game's own handler let through went down: it holds its control, and with `latch` its press waits for a step. */
-    keyDown(key: string, latch: boolean) {
+    keyDown(key: string, latch: boolean, source = key) {
       const control = keyMap[key];
       if (!control) return;
-      keysDown.add(key);
+      keysDown.set(source, control);
       syncKeys();
       if (latch) pressedKeys[control] = true;
     },
     /** A key came up: its control stays held if another of its keys is still down. */
-    keyUp(key: string) {
-      if (keysDown.delete(key)) syncKeys();
+    keyUp(source: string) {
+      if (keysDown.delete(source)) syncKeys();
     },
     /**
      * A pointer down on a hold button: holds `control` until that pointer

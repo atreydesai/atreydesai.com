@@ -149,11 +149,11 @@ function jumpWithDownHeld(gated) {
   const { cue, state } = cuesOf(3).find((c) => c.cue.lesson.id === "jump");
   const s = atPost(cue, state);
   const gate = createLessonGate();
-  gate.drop("down");
+  const down = !gated || gate.acceptsKey("ArrowDown", false, true);
   const events = [];
   for (let i = 0; i < 300 && !(s.runner.x > cue.clear + 20 && s.runner.grounded); i++) {
-    if (i === 1) gate.release("down");
-    const keys = { jump: i < 4, down: i === 0, rush: false };
+    if (i === 1) gate.keyUp("ArrowDown");
+    const keys = { jump: i < 4, down: down && i === 0, rush: false };
     events.push(...step(s, gated ? gate.filter(s, keys) : keys, STEP));
   }
   return { events, s, cue };
@@ -169,19 +169,17 @@ test("a key dropped while a lesson holds play doesn't act when play resumes", ()
   assert.ok(s.runner.x > cue.clear);
 });
 
-test("the gate keeps a dropped control out until it is let go, then passes its next press", () => {
-  const s = newRun(1);
+test("a dropped key and its repeats stay out without masking another key for the same control", () => {
   const gate = createLessonGate();
-  gate.drop("down");
-  assert.equal(gate.filter(s, { jump: false, down: true, rush: false }).down, false);
-  assert.equal(gate.filter(s, { jump: false, down: true, rush: false }).down, false);
-  gate.release("down");
-  assert.equal(gate.filter(s, { jump: false, down: false, rush: false }).down, false);
-  assert.equal(gate.filter(s, { jump: false, down: true, rush: false }).down, true);
-  // Let go without being told (a blur): no longer held, no longer kept.
-  gate.drop("jump");
-  gate.filter(s, { jump: false, down: false, rush: false });
-  assert.equal(gate.keeps("jump"), false);
+  assert.equal(gate.acceptsKey("ShiftLeft", false, true), false);
+  assert.equal(gate.acceptsKey("ShiftLeft", true, false), false);
+  // A pad focused on Slide can consume the first Space, then hand focus
+  // back to the playfield. Its repeat there never becomes a jump.
+  assert.equal(gate.acceptsKey("Space", true, false), false);
+  assert.equal(gate.acceptsKey("KeyX", false, false), true);
+  assert.equal(gate.acceptsKey("ShiftRight", false, false), true);
+  gate.keyUp("ShiftLeft");
+  assert.equal(gate.acceptsKey("ShiftLeft", false, false), true);
 });
 
 test("X held before the meter filled, let go and pressed in the rush lesson, starts the rush", () => {
@@ -202,8 +200,10 @@ test("X held before the meter filled, let go and pressed in the rush lesson, sta
   assert.ok(!step(raw, { rush: true }, STEP).some((e) => e.type === "rushStart"));
   // Let go and pressed again while play was stopped: through the gate, the rush starts.
   const gate = createLessonGate();
+  assert.equal(gate.acceptsKey("ShiftLeft", false, true), false);
+  const rush = gate.acceptsKey("KeyX", false, false);
   gate.release("rush");
-  assert.ok(step(state, gate.filter(state, { jump: false, down: false, rush: true }), STEP).some((e) => e.type === "rushStart"));
+  assert.ok(step(state, gate.filter(state, { jump: false, down: false, rush }), STEP).some((e) => e.type === "rushStart"));
 });
 
 test("a thing is named as it becomes relevant, not as it comes into view", () => {

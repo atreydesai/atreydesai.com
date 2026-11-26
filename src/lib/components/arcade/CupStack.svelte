@@ -1638,6 +1638,7 @@
     if (playing) {
       sliderShown.left = drawnLeft(slider.left, drawPx);
       paintedLeft = slider.left;
+      if (taughtLeft !== null && sliderShown.left !== drawnLeft(taughtLeft, drawPx)) taughtLeft = null;
       sliderDrawn = true;
       sliderShown.width = slider.width;
       sliderShown.drink = slider.drink;
@@ -1852,6 +1853,9 @@
 
   // --- Rules in motion ---------------------------------------------------------
 
+  // Remember the parked cup until a frame paints it at a different position.
+  let taughtLeft: number | null = null;
+
   function nextSlider() {
     const top = tower[tower.length - 1];
     const width = sliderWidth(top, rules);
@@ -1866,6 +1870,7 @@
       speed,
     };
     sliderDrawn = false;
+    taughtLeft = null;
   }
 
   /** What a drop right now would come to, judged where the cup is drawn. */
@@ -1907,7 +1912,8 @@
     const level = tower.length - 1;
     // The first cup held on its ghost by its lesson (normal) lands whole, but
     // as a plain drop: the game timed it, so it is never a perfect.
-    const result = lessons.holdsCup ? taughtDrop(judge()) : judge();
+    const judgement = judge();
+    const result = taughtLeft !== null ? taughtDrop(judgement) : judgement;
     // The same snap dropCup made, from where the cup was drawn.
     const snapped = snapDrop(top, drawnLeft(paintedLeft, drawPx), slider.width);
     drops = [...drops, result.kind];
@@ -2043,7 +2049,7 @@
         const moved = slideOnto(slider.left, slider.direction, distance, track, ghost.left);
         slider.left = moved.position;
         slider.direction = moved.direction;
-        if (moved.reached) lessons.reachGhost();
+        if (moved.reached && lessons.reachGhost()) taughtLeft = slider.left;
       } else {
         const moved = stepSlide(slider.left, slider.direction, distance, track);
         slider.left = moved.position;

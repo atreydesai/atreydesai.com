@@ -350,7 +350,7 @@
   /** Real seconds the basket has waited under the taught cup, at rest, the pointer away from the slip; a sweep through doesn't count. */
   let settledFor = 0;
   /** That wait, carried from frame to frame (`waitStep`). */
-  const wait = { for: 0, at: 0 };
+  const wait = { for: 0, x: 0, y: 0 };
   /** `lessonClock` when the catch came up: the ghost's run counts from here. */
   let ghostFrom = 0;
   /** The first throw's way down, built once when its lesson starts, and the part still ahead of the cup. */
@@ -1156,7 +1156,7 @@
       // The move is never lost: the basket follows the pointer all the while.
       const at = basketCenter();
       const reaching = nearSlip(slipBox(cue.place, slipSize(current), coachView()), mouseX, mouseY);
-      settledFor = waitStep(wait, realDt, at, cue.spot, basketW, reaching || !cue.cup);
+      settledFor = waitStep(wait, realDt, at, cue.spot, basketW, reaching || !cue.cup, mouseX, mouseY);
       if (!coach.acting && catchMoved(coach.age, settledFor)) coach.acted(current.id);
       // A move being taught holds the stage until its cup is caught or goes
       // past, but never holds play for more than `HOLD`: then it comes down
@@ -1178,7 +1178,8 @@
         catchFor = 0;
         ghostFrom = lessonClock;
         wait.for = 0;
-        wait.at = basketCenter();
+        wait.x = mouseX;
+        wait.y = mouseY;
       }
     }
     if (!coach.current) cue = null;

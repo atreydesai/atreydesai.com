@@ -127,32 +127,34 @@ export const LESSON_CONTROL = Object.freeze(
  * What the run sees of the controls around a lesson's pause. A press
  * dropped while a lesson holds play (any control but the one it asks for)
  * is kept from the run until that control is let go and pressed again, so
- * a key still held when play resumes never acts as a press then (a jump at
- * the post must not slam because down was held through the pause). And a
+ * a dropped key and its repeats stay out of the input until its next
+ * fresh press. Other keys mapped to the same control remain independent. A
  * control let go and pressed again while no step ran (play stopped) is
  * shown to the run as the fresh press it is, though the run last saw it
  * held (the rush's X held before the meter filled, then pressed in its
- * lesson). DOM-free: the component tells it what happened and filters each
- * step's input through it.
+ * lesson).
  */
 export function createLessonGate() {
-  /** @type {Set<Control>} */
-  const kept = new Set();
+  /** @type {Set<string>} */
+  const acceptedKeys = new Set();
   /** @type {Set<Control>} */
   const letGoSinceStep = new Set();
   return {
-    /** A fresh press of `control` was dropped for a lesson: the run doesn't see it until it is let go. @param {Control} control */
-    drop(control) {
-      kept.add(control);
+    /** Whether to pass this physical key press to the held controls. */
+    acceptsKey(/** @type {string} */ source, /** @type {boolean} */ repeat, /** @type {boolean} */ drop) {
+      if (!repeat) {
+        if (drop) acceptedKeys.delete(source);
+        else acceptedKeys.add(source);
+      }
+      return !drop && acceptedKeys.has(source);
     },
-    /** Nothing holds `control` any more. @param {Control} control */
+    /** @param {string} source */
+    keyUp(source) {
+      acceptedKeys.delete(source);
+    },
+    /** Rearm an engine edge after a release or the fresh press that acts on a lesson. @param {Control} control */
     release(control) {
-      kept.delete(control);
       letGoSinceStep.add(control);
-    },
-    /** Whether the run is kept from seeing `control`. @param {Control} control */
-    keeps(control) {
-      return kept.has(control);
     },
     /**
      * The input one step should see, given what is held (and pressed) now;
@@ -161,19 +163,13 @@ export function createLessonGate() {
      * @param {Readonly<Record<Control, boolean>>} input
      */
     filter(state, input) {
-      const out = { jump: !!input.jump, down: !!input.down, rush: !!input.rush };
-      for (const control of kept) {
-        // Not held at all now: it was let go, whatever the events said.
-        if (!out[control]) kept.delete(control);
-        else out[control] = false;
-      }
-      for (const control of letGoSinceStep) if (out[control]) letGo(/** @type {any} */ (state), control);
+      for (const control of letGoSinceStep) if (input[control]) letGo(/** @type {any} */ (state), control);
       letGoSinceStep.clear();
-      return out;
+      return input;
     },
     /** A fresh run, or everything let go. */
     clear() {
-      kept.clear();
+      acceptedKeys.clear();
       letGoSinceStep.clear();
     },
   };

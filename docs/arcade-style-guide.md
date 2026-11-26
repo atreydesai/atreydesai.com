@@ -306,9 +306,11 @@ short and gentle and sit under the music's key where they can. Mute silences eve
 Straw stab draws its belt against the audio clock (`audioClock()`), so cups
 land on what is heard; pausing (the pause card, or a pearl line's stop)
 suspends the audio context so the music resumes on the same beat, and the
-belt waits for that clock to be running and moving again (a suspension still
-landing is waited out, and the resume asked again), so it never runs on in
-silence. Music has three phases (opening, steady, rush) that
+belt waits for the suspension to finish and for the audio clock to move
+again. If the audio clock drifts while the belt is held or fails to recover
+within five seconds, the soundtrack stops and the belt continues from the
+held beat on the page clock.
+Music has three phases (opening, steady, rush) that
 differ by arrangement, not volume.
 
 ## Voice
@@ -1013,11 +1015,14 @@ room, to steer it into the cup.
   planning lesson holds planning, the fill line stops the pour on the step
   tea first reaches a cup, taking a straw back holds whichever part it
   comes up in, and a result's lessons hold the next room. It holds only
-  while it is read: a pen down, a straw taken back or Clear ends the hold at
-  once and the room runs on, so drawing always costs planning time, and
+  while it is read: aiming with the keyboard, starting a straw, taking a
+  straw back or pressing Clear lets the room run, so planning and drawing cost time, and
   nothing is drawn while the tea stands still. The lesson stays up; room 1's
   ghost keeps teaching while the dial runs. Each lesson may hold for seven
   seconds of a visit (planning time is points).
+  Normal mode's v2 board uses points earned with this clock. Existing stars
+  and room unlocks carry over. The v1 board and save remain available to
+  older clients.
   Continue (`Enter`, or the slip's button), pressing Pour, or doing what the
   lesson asks lets the room run on. While any lesson is up the kitchen dims
   to the thing it is about, in expert too, though expert never holds its

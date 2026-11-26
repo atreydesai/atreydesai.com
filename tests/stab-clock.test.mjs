@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { CLOCK_SNAP, steadyOffset } from "../src/lib/arcade/stab-engine.js";
-import { CLOCK_STALL, SUSPEND_LIMIT, createAudioGate } from "../src/lib/arcade/stab-clock.js";
+import { AUDIO_RECOVERY_LIMIT, CLOCK_STALL, createAudioGate, recoveryStatus } from "../src/lib/arcade/stab-clock.js";
 
 const FRAME = 1 / 60;
 
@@ -17,7 +17,6 @@ function fakeContext({ suspendDelay = 0.04, resumeDelay = 0.03 } = {}) {
   let stalled = false;
   /** @type {Array<{ at: number, to: string }>} */
   const due = [];
-  const listeners = new Set();
   return {
     get state() {
       return state;
@@ -34,8 +33,8 @@ function fakeContext({ suspendDelay = 0.04, resumeDelay = 0.03 } = {}) {
     resume(page) {
       due.push({ at: page + resumeDelay, to: "running" });
     },
-    onState(listener) {
-      listeners.add(listener);
+    get suspending() {
+      return due.some(({ to }) => to === "suspended");
     },
     /** Runs the context from `page` for `dt` page seconds, landing what is due on the way. */
     run(page, dt) {
@@ -46,10 +45,7 @@ function fakeContext({ suspendDelay = 0.04, resumeDelay = 0.03 } = {}) {
         const next = due.shift();
         if (state === "running" && !stalled) time += Math.max(0, next.at - at);
         at = Math.max(at, next.at);
-        if (next.to !== state) {
-          state = next.to;
-          for (const listener of listeners) listener(state);
-        }
+        state = next.to;
       }
       if (state === "running" && !stalled) time += end - at;
     },
@@ -76,8 +72,7 @@ const audioClock = (context) => (context.state === "running" ? context.time : nu
  * back, and a frame with no reading keeps the last offset.
  */
 function belt(context, { gated = true } = {}) {
-  const gate = createAudioGate();
-  context.onState((state) => gate.state(state));
+  const gate = createAudioGate(() => context.suspending);
   let offset = 0;
   let synced = false;
   let held = false;
@@ -109,7 +104,7 @@ function belt(context, { gated = true } = {}) {
     hold(page) {
       held = true;
       if (!waiting) heldSong = songNow(page);
-      if (gated) gate.hold(context.state, page);
+      if (gated) gate.hold();
       suspendAudio(context, page);
     },
     release(page) {
@@ -124,13 +119,14 @@ function belt(context, { gated = true } = {}) {
       if (held) return lastShown;
       if (waiting) {
         const state = context.state;
-        if (gated && gate.needsResume(state, page)) resumeAudio(context, page);
-        if (gated && gate.suspending) waitStarted = page;
-        const back = gated ? gate.mayAdvance(audioClock(context), state, page) : audioClock(context) !== null;
-        if (back) {
+        if (gated && gate.needsResume(state)) resumeAudio(context, page);
+        const heard = audioClock(context);
+        const back = gated ? gate.mayAdvance(heard, state, page, true) : heard !== null;
+        const recovery = gated ? recoveryStatus(back ? heard : null, heldSong, page - waitStarted) : back ? "ready" : "wait";
+        if (recovery === "ready") {
           waiting = false;
           synced = false;
-        } else if (page - waitStarted > 0.8) {
+        } else if (recovery === "silent") {
           waiting = false;
           useAudio = false;
           offset = heldSong - page;
@@ -142,7 +138,7 @@ function belt(context, { gated = true } = {}) {
         heldSong = heardSong;
         waiting = true;
         waitStarted = page;
-        if (gate.needsResume(context.state, page)) resumeAudio(context, page);
+        if (gate.needsResume(context.state)) resumeAudio(context, page);
         return lastShown;
       }
       lastShown = songNow(page);
@@ -191,54 +187,31 @@ function playThrough(context, { holdAt = 1, releaseAfter = 0, seconds = 4, gated
 }
 
 test("the gate lets the belt follow a running clock, and holds it while a suspension is landing", () => {
-  const gate = createAudioGate();
+  let pending = false;
+  const gate = createAudioGate(() => pending);
   assert.ok(gate.mayAdvance(1, "running", 0));
-  assert.ok(gate.mayAdvance(1.016, "running", 0.016));
-  // Held: never, whatever the context says.
-  gate.hold("running", 1);
-  assert.ok(gate.suspending);
+  gate.hold();
+  pending = true;
   assert.ok(!gate.mayAdvance(1.02, "running", 1.01));
-  // Asked back before the suspension lands: still running, so no resume to
-  // ask for yet, and the belt still waits.
   gate.release();
-  assert.ok(!gate.needsResume("running", 1.02));
-  assert.ok(!gate.mayAdvance(1.03, "running", 1.02));
-  // It lands: now the resume it swallowed is asked again.
-  gate.state("suspended");
-  assert.ok(!gate.suspending);
-  assert.ok(gate.needsResume("suspended", 1.05));
-  assert.ok(!gate.mayAdvance(null, "suspended", 1.05));
-  // Running again: the belt follows.
-  assert.ok(!gate.needsResume("running", 1.1));
-  assert.ok(gate.mayAdvance(1.04, "running", 1.1));
-  // Seen on a frame rather than heard as an event, a suspension lands just the same.
-  const polled = createAudioGate();
-  polled.hold("running", 0);
-  polled.release();
-  assert.ok(polled.needsResume("suspended", 0.05));
-  // A suspension that never lands (refused) leaves a running context, followed again after SUSPEND_LIMIT.
-  const refused = createAudioGate();
-  refused.hold("running", 0);
-  refused.release();
-  assert.ok(!refused.mayAdvance(0.5, "running", SUSPEND_LIMIT - 0.01));
-  assert.ok(refused.mayAdvance(0.52, "running", SUSPEND_LIMIT + 0.01));
-  // Closed is never asked to resume.
-  assert.ok(!createAudioGate().needsResume("closed", 0));
-  // Held over a resume still on its way (Continue, then the pause card at
-  // once): once it lands the context is running under the hold, and is
-  // suspended again; never while a suspension is landing, nor once released.
-  const late = createAudioGate();
-  late.hold("suspended", 5);
-  assert.ok(!late.needsSuspend("suspended", 5.01));
-  assert.ok(late.needsSuspend("running", 5.05));
-  late.hold("running", 5.05);
-  assert.ok(!late.needsSuspend("running", 5.06));
-  late.release();
-  assert.ok(!late.needsSuspend("running", 5.1));
+  assert.ok(!gate.needsResume("running"));
+  assert.ok(!gate.mayAdvance(2.2, "running", 2.2), "a slow suspension released the belt");
+  pending = false;
+  assert.ok(gate.needsResume("suspended"));
+  assert.ok(!gate.mayAdvance(null, "suspended", 2.25));
+  assert.ok(gate.mayAdvance(2.25, "running", 2.3));
+  assert.ok(!gate.needsResume("closed"));
+
+  // A resume requested just before a hold can finish underneath it.
+  gate.hold();
+  assert.ok(!gate.needsSuspend("suspended"));
+  assert.ok(gate.needsSuspend("running"));
+  pending = true;
+  assert.ok(!gate.needsSuspend("running"));
 });
 
 test("the gate holds the belt on a clock that stands still while it reports running", () => {
-  const gate = createAudioGate();
+  const gate = createAudioGate(() => false);
   assert.ok(gate.mayAdvance(2, "running", 10));
   // Coarse steps (a large output buffer) are fine.
   assert.ok(gate.mayAdvance(2, "running", 10 + CLOCK_STALL - 0.01));
@@ -247,6 +220,17 @@ test("the gate holds the belt on a clock that stands still while it reports runn
   assert.ok(!gate.mayAdvance(2.2, "running", 10 + 2 * CLOCK_STALL + 0.01));
   assert.ok(gate.mayAdvance(2.21, "running", 10 + 2 * CLOCK_STALL + 0.02));
   assert.ok(CLOCK_STALL >= 0.12 && CLOCK_STALL <= 0.25);
+});
+
+test("recovery waits to observe a moving clock", () => {
+  const gate = createAudioGate(() => false);
+  gate.hold();
+  gate.release();
+  assert.ok(!gate.mayAdvance(1, "running", 10, true));
+  assert.ok(!gate.mayAdvance(1, "running", 10.2, true));
+  assert.ok(!gate.mayAdvance(null, "interrupted", 10.25, true));
+  assert.ok(!gate.mayAdvance(1.02, "running", 10.3, true));
+  assert.ok(gate.mayAdvance(1.04, "running", 10.35, true));
 });
 
 test("Continue at once, while the suspension is still landing: the belt never runs on in silence", () => {
@@ -258,8 +242,8 @@ test("Continue at once, while the suspension is still landing: the belt never ru
   // With the gate, at any delay a suspension or resume takes to land, and
   // however soon Continue comes, the belt is never ahead of the audio by
   // more than the offset's snap, and it ends back on it, with the music.
-  for (const suspendDelay of [0, 0.005, 0.04, 0.12, 0.4]) {
-    for (const resumeDelay of [0.005, 0.06, 0.3]) {
+  for (const suspendDelay of [0, 0.005, 0.04]) {
+    for (const resumeDelay of [0.005, 0.06, 0.3, 1.2]) {
       for (const releaseAfter of [0, 0.001, 0.02, FRAME * 2, 0.3, 2]) {
         const label = `suspend ${suspendDelay} s, resume ${resumeDelay} s, Continue after ${releaseAfter} s`;
         const result = playThrough(fakeContext({ suspendDelay, resumeDelay }), { releaseAfter, seconds: 5 });
@@ -291,4 +275,39 @@ test("a clock that stops or stands still under the running belt holds the belt u
   }
   assert.ok(worst <= CLOCK_SNAP + 1e-9, `${worst.toFixed(3)} s ahead`);
   assert.equal(context.state, "running");
+});
+
+
+test("unavailable audio switches to the page clock from the held beat", () => {
+  const context = fakeContext({ resumeDelay: Infinity });
+  const run = belt(context);
+  run.frame(0);
+  run.hold(0);
+  run.release(0);
+  context.run(0, 0.1);
+  assert.equal(run.frame(AUDIO_RECOVERY_LIMIT - 0.01), 0);
+  assert.ok(run.useAudio);
+  assert.equal(run.frame(AUDIO_RECOVERY_LIMIT + 0.01), 0);
+  assert.ok(!run.useAudio);
+  assert.ok(run.frame(AUDIO_RECOVERY_LIMIT + 0.1) > 0);
+});
+
+test("a suspension that lands late keeps the held beat when the audio has run ahead", () => {
+  const context = fakeContext({ suspendDelay: 1.2 });
+  const run = belt(context);
+  run.frame(0);
+  run.hold(0);
+  run.release(0);
+  context.run(0, 1.1);
+  assert.equal(run.frame(1.1), 0);
+  assert.ok(run.useAudio);
+  context.run(1.1, 0.11);
+  assert.equal(run.frame(1.21), 0);
+  context.run(1.21, 0.1);
+  assert.equal(run.frame(1.31), 0);
+  assert.ok(run.useAudio);
+  context.run(1.31, 0.02);
+  assert.equal(run.frame(1.33), 0);
+  assert.ok(!run.useAudio);
+  assert.ok(Math.abs(run.frame(1.43) - 0.1) < 1e-9);
 });

@@ -49,9 +49,9 @@ export const MOVE_LATEST = 0.5;
 /** The basket is at the spot once the cup will land this close to its middle (a share of its width)… */
 export const ON_SPOT = 0.35;
 /** …and it is waiting there once it has stayed this long (real seconds), not on a sweep through… */
-export const SETTLE = 0.25;
+export const SETTLE = 0.75;
 /** …within this many px of where it stopped, so a hand's tremor still counts and a slow pass doesn't. */
-export const SETTLE_PX = 6;
+export const SETTLE_PX = 5;
 /** A pointer this close to the slip (px) is on its way to Continue, not waiting under the cup. */
 export const SLIP_NEAR = 24;
 /** The catch's freeze holds at least this long (real seconds) before the basket's move brings play back, so a hand already there still sees it. */
@@ -277,18 +277,19 @@ export function nearSlip(box, x, y, margin = SLIP_NEAR) {
 
 /**
  * The basket's wait under the cup, a frame of `dt` real seconds on: it
- * counts while the basket (centred at `at`) is on the spot, has stayed
- * within `SETTLE_PX` of where it came to rest, and the pointer isn't
- * `reaching` for the slip; anything else starts it again from here.
+ * counts while the basket (centred at `at`) is on the spot and the pointer
+ * stays within `SETTLE_PX` of where it came to rest, clear of the slip.
  * Returns the real seconds it has waited.
- * @param {{ for: number, at: number }} wait Carried from frame to frame.
+ * @param {{ for: number, x: number, y: number }} wait Carried from frame to frame.
  * @param {number} dt @param {number} at @param {number} spot Where the cup lands.
  * @param {number} basketWidth @param {boolean} [reaching]
+ * @param {number} [x] @param {number} [y] Pointer position before the basket's edge clamp.
  */
-export function waitStep(wait, dt, at, spot, basketWidth, reaching = false) {
-  if (reaching || !onSpot(at, spot, basketWidth) || Math.abs(at - wait.at) > SETTLE_PX) {
+export function waitStep(wait, dt, at, spot, basketWidth, reaching = false, x = at, y = 0) {
+  if (reaching || !onSpot(at, spot, basketWidth) || Math.hypot(x - wait.x, y - wait.y) > SETTLE_PX) {
     wait.for = 0;
-    wait.at = at;
+    wait.x = x;
+    wait.y = y;
   } else wait.for += dt;
   return wait.for;
 }
