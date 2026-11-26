@@ -25,6 +25,11 @@ export interface Ticks {
    * into the songbook). False when there is no running audio to put it on.
    */
   at(at: number, song: number): boolean;
+  /**
+   * The audio context's own clock, the one a tick is scheduled in (ahead of
+   * what is heard by the output's latency); null without running audio.
+   */
+  now(): number | null;
   /** Silences every tick still to come: a new run, or the game closing. */
   stop(): void;
 }
@@ -57,6 +62,10 @@ export function createTicks(): Ticks {
       oscillator.stop(start + TICK_SECONDS + 0.02);
       voices.add(oscillator);
       return true;
+    },
+    now() {
+      const context = sharedAudioContext();
+      return context && context.state === "running" ? context.currentTime : null;
     },
     stop() {
       for (const voice of voices) {

@@ -64,6 +64,7 @@
   } from "#lib/arcade/runner-engine.js";
   import { LESSONS, lessonAhead, type LessonCue } from "#lib/arcade/runner-lessons.js";
   import { botInput, createBot } from "#lib/arcade/runner-bot.js";
+  import { CUBE, CUBE_EMPTY, CUBE_FULL, GLYPHS, KEYCAP_X, LABEL_ROWS, METER_CUP, METER_CUT, meterLayout, meterWord, sugarReading, teaHalfRows, wordWidth } from "#lib/arcade/runner-meter.js";
   import { RIM, WINDOW, stripSkyline } from "#lib/arcade/core/city.ts";
   import { createCoach, type Lesson } from "#lib/arcade/core/coach.ts";
   import { createControls, keyName, watchTouch } from "#lib/arcade/core/controls.ts";
@@ -72,7 +73,7 @@
   import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
   import { clamp, lerp, quantizeUp, smooth, snap as snapTo } from "#lib/arcade/core/math.ts";
   import { hash2, ihash } from "#lib/arcade/core/rng.ts";
-  import { beckon, chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { beckon, chalkPath, drawBrackets, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import {
     ACCENT,
     BALLOON,
@@ -102,7 +103,6 @@
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Countdown from "./Countdown.svelte";
-  import CupTimer from "./CupTimer.svelte";
   import Coach from "./Coach.svelte";
   import ExpertTag from "./ExpertTag.svelte";
   import HudButtons from "./HudButtons.svelte";
@@ -798,8 +798,8 @@
   let coachY: number | null = null;
   let coachRing = 0;
   let coachSide: "above" | "below" = "above";
-  /** Which part of the tray a lesson is about, so it lights up too. */
-  let trayLit: "tea" | "sugar" | null = null;
+  /** Which part of the meter a lesson is about, so it stays lit too. */
+  let meterLit: "tea" | "sugar" | null = null;
   /** The scene clock when the run began, and how long "go" stays up. */
   let begunAt = 0;
   const GO_SECONDS = 0.62;
@@ -841,9 +841,15 @@
   let playfield: HTMLElement;
   let hudRow: HTMLElement;
   let padsRow: HTMLElement | undefined;
-  let trayEl: HTMLElement | undefined;
-  /** The tray sits under the runner on a wide screen; this is its left edge. */
-  let trayLeft = 16;
+  /**
+   * The tea and sugar meter, drawn on the canvas: its layout in cells, the
+   * cell in CSS px, and its top left on screen. Placed only on a resize, so
+   * nothing moves mid-run.
+   */
+  let meter = meterLayout(false);
+  let meterU = SC;
+  let meterX = 16;
+  let meterY = 0;
   let ctx: CanvasRenderingContext2D | null = null;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
@@ -2708,7 +2714,9 @@
     drawHedge();
     drawStamps();
     ctx.restore();
+    drawMeter();
     drawLessonLight();
+    drawMeterMark();
     drawLines();
     drawNotes();
     pruneArt();
@@ -2811,7 +2819,7 @@
           dustBurst(ev.x, ev.y, 4, 0.7);
           // A jump is the first half of the jump, hold, glide and slam lessons.
           if (coach.current?.move && !coach.acting && ["jump", "hold", "glide", "slam"].includes(coach.current.id)) beginTrial(coach.current.id);
-          else coach.done("jump");
+          else knownMove("jump");
           break;
         case "slide":
           sfxRunSlide();
@@ -3158,7 +3166,17 @@
   /** A move the current lesson asks for was made: wait to see it work; otherwise it's simply known. */
   function moveMade(id: string) {
     if (coach.current?.id === id && coach.current.move && !coach.acting) beginTrial(id);
-    else coach.done(id);
+    else knownMove(id);
+  }
+
+  /**
+   * A move made outside its lesson is simply known, except the very move on
+   * trial now (a second jump before the first one has landed): judgeTrial
+   * decides that one, so a repeat never counts it early.
+   */
+  function knownMove(id: string) {
+    if (coach.acting && coach.current?.id === id) return;
+    coach.done(id);
   }
 
   // The attempt at the move being taught, judged every physics step: a
@@ -3217,7 +3235,7 @@
     if (!lesson || !cue || cue.lesson.id !== lesson.id || mode !== "running") {
       if (coachLesson) coachLesson = null;
       if (coachX !== null) coachX = coachY = null;
-      if (trayLit) trayLit = null;
+      if (meterLit) meterLit = null;
       if (padLit) padLit = null;
       return;
     }
@@ -3236,15 +3254,170 @@
     const side = y < sy(state.runner.y) - 140 ? "below" : "above";
     if (side !== coachSide) coachSide = side;
     const lit = lesson.id === "pearls" || lesson.id === "rush" ? "sugar" : lesson.id === "spill" || lesson.id === "customer" ? "tea" : null;
-    if (lit !== trayLit) trayLit = lit;
+    if (lit !== meterLit) meterLit = lit;
     const pad: keyof Held | null =
       coach.leaving || coach.acting || !touchUI ? null : lesson.id === "rush" ? "rush" : lesson.id === "slide" || lesson.id === "slam" ? "down" : lesson.move ? "jump" : null;
     if (pad !== padLit) padLit = pad;
   }
 
+  // --- The tea and sugar meter ----------------------------------------------------------
+
+  const METER_RULE = "rgba(253, 248, 243, 0.32)";
+  const METER_QUIET = "rgba(253, 248, 243, 0.62)";
+  /** The cup's glass where the tea has gone. */
+  const METER_GLASS = "#262c48";
+  const CUBE_SUGAR: Record<string, string> = { h: "#fffaf2", f: "#efe6d6", s: "#b9ab98" };
+  const CUBE_GOLD: Record<string, string> = { h: "#fff3c4", f: NOTE_GOLD, s: "#dba84d" };
+  const CUBE_SHINE: Record<string, string> = { h: "#fffaf2", f: "#fff3c4", s: NOTE_GOLD };
+  /** An empty cube's outline: fainter than the rule, so the full ones lead. */
+  const CUBE_HOLLOW: Record<string, string> = { e: "rgba(253, 248, 243, 0.2)" };
+  const KEYCAP_PAL: Record<string, string> = { c: CREAM, x: NOTE_BACK, s: "#b9ab98" };
+
+  /**
+   * Places the meter: under the runner on a wide screen, between the pads on
+   * touch (smaller if a phone has too little room there). Only on a resize.
+   */
+  function placeMeter() {
+    if (touchUI && padsRow) {
+      meter = meterLayout(true);
+      const row = padsRow.getBoundingClientRect();
+      const from = padsRow.firstElementChild?.getBoundingClientRect().right ?? row.left;
+      const to = padsRow.lastElementChild?.getBoundingClientRect().left ?? row.right;
+      meterU = meter.width * SC <= to - from - 16 ? SC : 3;
+      meterX = Math.round((from + to - meter.width * meterU) / 2);
+      meterY = Math.round(row.bottom - meter.height * meterU);
+      return;
+    }
+    meter = meterLayout(false);
+    meterU = SC;
+    const width = meter.width * SC;
+    // Centred under the runner, kept on screen, on the scene's own cell grid.
+    const left = Math.max(16, Math.min(viewW - width - 16, lead * viewW - width / 2));
+    meterX = Math.round(left / SC) * SC;
+    meterY = Math.floor((viewH - 16 - meter.height * SC) / SC) * SC;
+  }
+
+  /** Sets `box` to a part of the meter on screen, a cell round it. */
+  function meterPart(part: "tea" | "sugar", box: FocusBox) {
+    const r = part === "tea" ? meter.cup : meter.sugar;
+    box.x = meterX + (r.x - 1) * meterU;
+    box.y = meterY + (r.y - 1) * meterU;
+    box.w = (r.w + 2) * meterU;
+    box.h = (r.h + 2) * meterU;
+    return true;
+  }
+
+  /** Paints a palette grid a cell of `u` px at a time; "." and unknown characters are left clear. */
+  function paintCells(grid: readonly string[], palette: Record<string, string>, x: number, y: number, u: number) {
+    if (!ctx) return;
+    for (let row = 0; row < grid.length; row++) {
+      const line = grid[row];
+      for (let col = 0; col < line.length; col++) {
+        const color = palette[line[col]];
+        if (!color) continue;
+        ctx.fillStyle = color;
+        ctx.fillRect(x + col * u, y + row * u, u, u);
+      }
+    }
+  }
+
+  /** Prints a word in the arcade's pixel alphabet; returns the cells it took. */
+  function printWord(word: string, x: number, y: number, u: number, color: string) {
+    if (!ctx) return 0;
+    ctx.fillStyle = color;
+    let at = 0;
+    for (const letter of word) {
+      const glyph = GLYPHS[letter as keyof typeof GLYPHS];
+      if (glyph) {
+        for (let row = 0; row < LABEL_ROWS; row++) {
+          for (let col = 0; col < glyph[row].length; col++) {
+            if (glyph[row][col] === "#") ctx.fillRect(x + (at + col) * u, y + row * u, u, u);
+          }
+        }
+      }
+      at += (glyph?.[0].length ?? 3) + 1;
+    }
+    return wordWidth(word);
+  }
+
+  /**
+   * The meter, in the scene: a dark chip like the lesson callout's, with the
+   * cup of tea that hard landings spill and the ten sugar cubes the pearls
+   * fill. Read straight from the run each frame, so it moves smoothly in
+   * slow motion; it sits outside the shake and under the lesson's dim.
+   */
+  function drawMeter() {
+    if (!ctx || !viewW) return;
+    const u = meterU;
+    const width = meter.width * u;
+    const height = meter.height * u;
+    const cut = METER_CUT * u;
+    ctx.fillStyle = NOTE_BACK;
+    ctx.fillRect(meterX + cut, meterY, width - cut * 2, height);
+    ctx.fillRect(meterX, meterY + cut, width, height - cut * 2);
+    ctx.fillStyle = METER_RULE;
+    ctx.fillRect(meterX + cut, meterY, width - cut * 2, 2);
+    ctx.fillRect(meterX + cut, meterY + height - 2, width - cut * 2, 2);
+    ctx.fillRect(meterX, meterY + cut, 2, height - cut * 2);
+    ctx.fillRect(meterX + width - 2, meterY + cut, 2, height - cut * 2);
+
+    // The cup: its tea drains a half row at a time (the top row dithered),
+    // and under a quarter its outline turns the accent and blinks.
+    const tea = teaHalfRows(displayTea);
+    const rows = tea >> 1;
+    const low = displayTea < 0.25;
+    const outline = low && (reduceMotion || Math.floor(clock * 4) % 2 === 0) ? ACCENT : CREAM;
+    const cupX = meterX + meter.cup.x * u;
+    const cupY = meterY + meter.cup.y * u;
+    for (let row = 0; row < METER_CUP.length; row++) {
+      const line = METER_CUP[row];
+      for (let col = 0; col < line.length; col++) {
+        const ch = line[col];
+        if (ch === ".") continue;
+        let color: string;
+        if (ch === "O") color = outline;
+        else if (ch === "S") color = STRAW_PINK;
+        else if (ch === "b") color = PEARL;
+        else {
+          const level = Number(ch);
+          color = level <= rows || (level === rows + 1 && tea % 2 === 1 && (row + col) % 2 === 0) ? TEA : METER_GLASS;
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(cupX + col * u, cupY + row * u, u, u);
+      }
+    }
+
+    // The sugar: its word, the X key once a rush is ready, and the cubes.
+    const sugar = sugarReading(state, SUGAR_FULL, RUSH_TIME);
+    const rushy = sugar.ready || sugar.rushing;
+    const word = meterWord(rushy);
+    const labelX = meterX + meter.label.x * u;
+    const labelY = meterY + meter.label.y * u;
+    const cells = printWord(word, labelX, labelY, u, rushy ? NOTE_GOLD : METER_QUIET);
+    // While the rush's lesson is up its key is in the callout, not here; on touch the rush pad shows.
+    if (sugar.ready && !touchUI && coachLesson?.id !== "rush") paintCells(KEYCAP_X, KEYCAP_PAL, labelX + (cells + 2) * u, labelY, u);
+    // A ready rush runs a glint along the cubes (still under Reduce Motion).
+    const glint = sugar.ready && !reduceMotion ? Math.floor(clock * 12) % (meter.cubes.length + 8) : -1;
+    for (let index = 0; index < meter.cubes.length; index++) {
+      const cube = meter.cubes[index];
+      const full = index < sugar.cubes;
+      const palette = !full ? CUBE_HOLLOW : index === glint ? CUBE_SHINE : rushy ? CUBE_GOLD : CUBE_SUGAR;
+      paintCells(full ? CUBE_FULL : CUBE_EMPTY, palette, meterX + cube.x * u, meterY + cube.y * u, u);
+    }
+  }
+
+  /** The lesson's brackets round the part of the meter it is about, as the callout rings a thing. */
+  function drawMeterMark() {
+    if (!ctx || !meterLit || lessonDim < 0.5) return;
+    const box = focusBoxes[2];
+    drawBrackets(ctx, box.x, box.y, box.w, box.h, { color: ACCENT });
+  }
+
   /** How dim the scene is around a lesson, 0..1, eased in real time. */
   let lessonDim = 0;
-  const focusBoxes: FocusBox[] = [{ x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }];
+  const focusBoxes: FocusBox[] = [{ x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }, { x: 0, y: 0, w: 0, h: 0 }];
+  /** The boxes lit this frame, reused. */
+  const litBoxes: FocusBox[] = [];
 
   /**
    * The lesson's spotlight: the scene dims, and the runner and what the
@@ -3260,7 +3433,8 @@
     runnerBox.y = sy(drawY + 24) - pad;
     runnerBox.w = 20 * S + pad * 2;
     runnerBox.h = 24 * S + pad * 2;
-    let count = 1;
+    litBoxes.length = 0;
+    litBoxes.push(runnerBox);
     if (cue) {
       const thing = focusBoxes[1];
       if (cue.ghost) {
@@ -3285,9 +3459,11 @@
         thing.w = half * 2 * S;
         thing.h = half * 2 * S;
       }
-      count = 2;
+      litBoxes.push(thing);
     }
-    drawSpotlight(ctx, viewW, viewH, count === 2 ? focusBoxes : focusBoxes.slice(0, 1), lessonDim, { color: NOTE_BACK, cell: SC });
+    // A lesson about the tea or the sugar keeps that part of the meter lit.
+    if (meterLit && meterPart(meterLit, focusBoxes[2])) litBoxes.push(focusBoxes[2]);
+    drawSpotlight(ctx, viewW, viewH, litBoxes, lessonDim, { color: NOTE_BACK, cell: SC });
   }
 
   /**
@@ -3444,9 +3620,10 @@
     score = state.score;
     combo = state.combo.chain > 0 ? comboMultiplier(state.combo.chain) : 1;
     streak = state.streak;
-    rushing = state.rush > 0;
-    rushReady = !rushing && state.sugar >= SUGAR_FULL;
-    sugarPips = rushing ? Math.ceil((state.rush / RUSH_TIME) * 10) : Math.floor((state.sugar / SUGAR_FULL) * 10);
+    const sugar = sugarReading(state, SUGAR_FULL, RUSH_TIME);
+    rushing = sugar.rushing;
+    rushReady = sugar.ready;
+    sugarPips = sugar.cubes;
     teaShown = displayTea;
     followSpares(state.spare);
   }
@@ -3703,18 +3880,14 @@
     viewH = window.innerHeight;
     ctx = fitCanvas(canvas, viewW, viewH);
     playTop = hudRow ? hudRow.getBoundingClientRect().bottom : 80;
-    // The course stays above the thumb buttons on touch, and above the tray.
-    const padsTop = touchUI && padsRow ? padsRow.getBoundingClientRect().top : viewH;
-    const trayBox = trayEl?.getBoundingClientRect();
-    const trayTop = trayBox && trayBox.height > 0 ? trayBox.top : viewH;
-    playBottom = Math.max(playTop + 180, Math.min(viewH, padsTop - 8, trayTop - 8));
-    focusY = playTop + (playBottom - playTop) * 0.6;
-    horizonY = playTop + (playBottom - playTop) * 0.68;
     const wide = viewW >= viewH * 1.05;
     lead = wide ? 0.28 : 0.2;
-    // Centred under the runner, kept on screen.
-    const trayW = trayBox?.width ?? 0;
-    trayLeft = Math.round(Math.max(16, Math.min(viewW - trayW - 16, lead * viewW - trayW / 2)));
+    placeMeter();
+    // The course stays above the thumb buttons on touch, and above the meter.
+    const padsTop = touchUI && padsRow ? padsRow.getBoundingClientRect().top : viewH;
+    playBottom = Math.max(playTop + 180, Math.min(viewH, padsTop - 8, meterY - 8));
+    focusY = playTop + (playBottom - playTop) * 0.6;
+    horizonY = playTop + (playBottom - playTop) * 0.68;
     baseS = Math.min(viewW / (wide ? 560 : 300), (playBottom - playTop) / 230);
     stripS = baseS;
     sunR = Math.max(5, Math.round((Math.min(viewW, viewH) * 0.07) / SC));
@@ -3872,47 +4045,11 @@
 
   </header>
 
-  <!-- The tray, low and under the runner where the eye already is: the tea,
-       which hard landings slosh out, and the sugar meter the pearls fill. -->
-  <div
-    bind:this={trayEl}
-    class="sr-tray boba-ui"
-    class:is-touch={touchUI}
-    style={touchUI ? "" : `left: ${trayLeft}px`}
-    aria-label="Tea and sugar"
-    role="group"
-  >
-    <div class="boba-ticket boba-riso is-small sr-tray-sheet" class:has-slab={rushReady} style="--tilt: 0.7deg">
-      <span class="boba-stack sr-tea" class:is-lit={trayLit === "tea"}>
-        <CupTimer fraction={teaShown} rush={teaShown < 0.25} />
-        <span class="boba-meta sr-tea-label">tea</span>
-      </span>
-    <span
-      class="sr-sugar"
-      class:is-lit={trayLit === "sugar"}
-      class:is-ready={rushReady}
-      class:is-rushing={rushing}
-      role="img"
-      aria-label={rushing ? "Sugar rush running" : rushReady ? "Sugar rush ready" : `Sugar ${sugarPips} of 10`}
-    >
-      <span class="sr-sugar-label" aria-hidden="true">
-        {#if rushReady}
-          <span class="boba-phase">rush</span>
-          <!-- While the rush's lesson is up, its key is there, not here. -->
-          {#if coachLesson?.id !== "rush"}
-            <span class="boba-keys"><kbd>X</kbd></span>
-          {/if}
-        {:else}
-          <span class="boba-meta">{rushing ? "rushing" : "sugar"}</span>
-        {/if}
-      </span>
-      <span class="sr-pips" aria-hidden="true">
-        {#each Array(10) as _, index}
-          <span class="sr-pip" class:is-full={index < sugarPips}></span>
-        {/each}
-      </span>
-    </span>
-    </div>
+  <!-- The tea and sugar meter is drawn into the scene, low and under the
+       runner; this reads it out. -->
+  <div class="sr-only" role="group" aria-label="Tea and sugar">
+    <span role="img" aria-label={`Tea ${Math.round(teaShown * 100)} percent`}></span>
+    <span role="img" aria-label={rushing ? "Sugar rush running" : rushReady ? (touchUI ? "Sugar rush ready" : "Sugar rush ready, press X") : `Sugar ${sugarPips} of 10`}></span>
   </div>
 
   <!-- Inside the play scope, so Tab reaches its Continue button. -->
@@ -4026,7 +4163,7 @@
     game="runner"
     title="clocked out"
     deck={deliveries === 0
-      ? "The tea never arrived."
+      ? `No deliveries before ${endingWords}.`
       : `${deliveries} ${deliveries === 1 ? "delivery" : "deliveries"} before ${endingWords}.`}
     score={finalStats.score}
     unit="points"
@@ -4063,110 +4200,6 @@
   }
 
   .sr-score {
-    gap: 0;
-  }
-
-  /* --- The tray: tea and sugar, low and under the runner --- */
-
-  .sr-tray {
-    position: fixed;
-    bottom: max(var(--space-4), env(safe-area-inset-bottom));
-    z-index: calc(var(--layer-overlay) + 3);
-    pointer-events: none;
-  }
-
-  /* On touch it sits between the slide and jump pads. */
-  .sr-tray.is-touch {
-    left: 50%;
-    bottom: max(var(--space-5), env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-  }
-
-  .sr-tray-sheet {
-    gap: var(--space-4);
-    min-height: 0;
-    padding: var(--space-2) var(--space-3);
-  }
-
-  /* A lesson about the tea or the sugar underlines it on the tray too. */
-  .sr-tea,
-  .sr-sugar {
-    position: relative;
-  }
-
-  .sr-tea.is-lit::after,
-  .sr-sugar.is-lit::after {
-    content: "";
-    position: absolute;
-    inset: auto -4px -6px;
-    height: 3px;
-    background: var(--b-slab);
-    border-radius: 2px;
-    animation: boba-rise var(--motion-slow) var(--ease-emphasized) both;
-  }
-
-  .sr-sugar {
-    display: grid;
-    gap: var(--space-1);
-    justify-items: start;
-  }
-
-  .sr-sugar-label {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-1-5);
-    min-height: 1.1rem;
-  }
-
-  .sr-sugar-label .boba-keys kbd {
-    padding-block: 0;
-  }
-
-  .sr-pips {
-    display: grid;
-    grid-template-columns: repeat(10, auto);
-    gap: 3px;
-  }
-
-  /* Between the pads on a phone there is room for two rows of five. */
-  .sr-tray.is-touch .sr-pips {
-    grid-template-columns: repeat(5, auto);
-  }
-
-  /* Sugar cubes: an empty one is a dashed outline; a full one is printed in
-     the accent with a pale face, so full and empty differ by more than colour. */
-  .sr-pip {
-    width: 0.625rem;
-    height: 0.625rem;
-    border: 1.5px dashed var(--b-muted);
-    border-radius: 2px;
-    opacity: 0.7;
-  }
-
-  .sr-pip.is-full {
-    border: 1.5px solid var(--b-line);
-    background: linear-gradient(135deg, var(--b-raised) 0 35%, var(--b-slab) 35% 100%);
-    opacity: 1;
-  }
-
-  .sr-sugar.is-ready .sr-pips {
-    animation: sr-pulse 1.2s var(--ease-standard) infinite;
-    transform-origin: left center;
-  }
-
-  .sr-sugar.is-ready .boba-phase,
-  .sr-sugar.is-rushing .boba-meta {
-    color: var(--b-accent);
-  }
-
-  @keyframes sr-pulse {
-    50% {
-      transform: scale(1.06);
-    }
-  }
-
-  .sr-tea {
-    justify-items: center;
     gap: 0;
   }
 
@@ -4435,7 +4468,7 @@
   }
 
   /* Short, wide screens (a phone on its side): rush moves beside jump. Short
-     and narrow, it stays stacked, clear of the tray between the pads. */
+     and narrow, it stays stacked, clear of the meter between the pads. */
   @media (max-height: 500px) and (min-width: 600px) {
     .sr-pad-stack {
       flex-direction: row;
@@ -4452,9 +4485,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sr-tea.is-lit::after,
-    .sr-sugar.is-lit::after,
-    .sr-sugar.is-ready .sr-pips,
     .sr-slot.in,
     .sr-slot.in > *,
     .sr-slot.out > * {
@@ -4467,17 +4497,8 @@
   }
 
   @media (max-width: 640px) {
-    .sr-tray-sheet {
-      gap: var(--space-3);
-    }
-
     .sr-tea-label {
       display: none;
-    }
-
-    .sr-pip {
-      width: 0.5625rem;
-      height: 0.5625rem;
     }
   }
 </style>

@@ -159,10 +159,17 @@ export function savePlayerName(name: string) {
 }
 
 /**
+ * Dispatched on `window` when a sync has raised a best on this device, so a
+ * game already open (cup stack's best line) can show it.
+ */
+export const BESTS_SYNCED = "boba:bests-synced";
+
+/**
  * Brings back from the leaderboard any best this device has lost, for one
  * game or (without `game`) every game, in a mode. Needs the name signed on
  * this device; quietly does nothing without one or when the board is offline.
- * Resolves to whether any best changed.
+ * Resolves to whether any best changed, and announces a change as
+ * `BESTS_SYNCED`.
  */
 export async function syncBests(mode: ArcadeMode = currentMode(), game?: GameId): Promise<boolean> {
   const name = readPlayerName().trim();
@@ -173,11 +180,14 @@ export async function syncBests(mode: ArcadeMode = currentMode(), game?: GameId)
     const data = await response.json();
     // A different name was signed while this was on its way: not this player's best.
     if (!data?.available || readPlayerName().trim() !== name) return false;
-    if (game) return mergeBest(game, data.mine, mode);
     let changed = false;
-    for (const [id, best] of Object.entries(data.bests ?? {})) {
-      if (mergeBest(id as GameId, best as number, mode)) changed = true;
+    if (game) changed = mergeBest(game, data.mine, mode);
+    else {
+      for (const [id, best] of Object.entries(data.bests ?? {})) {
+        if (mergeBest(id as GameId, best as number, mode)) changed = true;
+      }
     }
+    if (changed && typeof window !== "undefined") window.dispatchEvent(new Event(BESTS_SYNCED));
     return changed;
   } catch {
     return false;

@@ -172,8 +172,10 @@ row). A paper wash fades the site header behind them.
 
 The top is for what is glanced at between moves. A meter the player reads
 while playing (a power-up filling, a level draining) belongs where the eye
-already is: sugar rush carries its tea and sugar on a tray low on the screen,
-under the runner, between the thumb pads on a phone.
+already is: sugar rush draws its tea and sugar into the scene, low on the
+screen under the runner, between the thumb pads on a phone. A thing drawn in
+a pixel scene is pixel art on the scene's own cell grid, never a paper
+ticket laid over it.
 
 - The score ticket is the one with a slab.
 - Timers are a drawn cup whose tea drains. Where a game has lives, they are
@@ -241,7 +243,11 @@ under the runner, between the thumb pads on a phone.
 ## Marks and feedback
 
 - Countdowns and final scores are circled with the same unclosed pen loops as
-  the homepage interest markers, drawn on with a stroke-dash reveal.
+  the homepage interest markers, drawn on with a stroke-dash reveal. Inside
+  a pixel scene a thing is ringed with pixel corner brackets instead
+  (`drawBrackets` in `core/ghost.ts`): a lesson's thing in the accent, a
+  landing in tea minus and straw stab's practice in cream, their arms
+  growing on.
 - A new personal best gets a crooked rubber stamp.
 - Canvas popups use the page's text colours for the active theme, except over
   a scene that is dark in both themes (tea minus), where they are cream on a
@@ -317,7 +323,10 @@ game decided it.
   - **One thing at a time, where the eye is.** A callout (`Coach.svelte`)
     sits beside the thing in the world, never in the tickets and never on a
     card: one short full sentence with its key chip (a touch word, and the
-    lit pad, on a phone), a dotted tail, and a pen loop around the thing.
+    lit pad, on a phone), a dotted tail, and pixel corner brackets around
+    the thing. The callout is a dark chip (`#141a2e`) with stepped pixel
+    corners and a faint cream rule inside its edge, cream text, keycaps
+    square, and Continue in gold; it steps in rather than fading.
   - **A move slows play.** About a second before a move is needed the game
     eases into slow motion, and a ghost of the player's own sprite, dithered
     through a Bayer screen door in cream (in the page's ink where a game
@@ -338,15 +347,17 @@ game decided it.
   - **The spotlight.** While something is being explained, the scene dims
     under a flat wash and what matters stays in full light: the player and
     the thing, stepped down at the edge by one band of half the wash, never
-    a soft glow. It eases in and out in a moment (at once under Reduce
+    a soft glow. On a pixel scene the lit shapes are cut from its cell grid,
+    so their edges step like the art; the wash itself is even, never a
+    dithered screen over the art, which reads as noise on a bright sky. It eases in and out in a moment (at once under Reduce
     Motion) and goes as soon as the move is made.
   - **Smooth at any speed.** Where a game steps its rules at a fixed rate,
     slow motion draws the player and the camera between the last two steps,
     so it glides rather than judders; the rules themselves never change.
   - **Where time can't bend** (a beat on the audio clock, a window in
     milliseconds), a ghost and a highlight teach instead of slow motion.
-  - Ghosts and loops are the arcade's only "holograms": dither, chalk and pen,
-    never glow. Under Reduce Motion nothing pulses or draws on; the lessons
+  - Ghosts, chalk and brackets are the arcade's only "holograms": dither,
+    chalk dashes and pixel steps, never glow. Under Reduce Motion nothing pulses or draws on; the lessons
     and the slow motion stay, because they are play.
 - **Share.** Each game builds its own emoji lines for the results slip's
   `share` prop (`emojiRows` in `src/lib/arcade/share.ts` wraps a sequence):
@@ -444,8 +455,8 @@ A conveyor belt carries cups past a straw; stab each on the beat.
   slows; a device's first run opens on a practice instead. Its first four
   cups score nothing and cost no pearl, and neither does the bare belt
   meanwhile. "Stab when the cup reaches the notch." sits under the belt by
-  the notch while a pen loop shrinks onto the notch for each practice cup,
-  snug on the cup exactly on its beat; for the first two, a dithered cream
+  the notch while cream pixel brackets close onto the notch for each
+  practice cup, snug on the cup exactly on its beat; for the first two, a dithered cream
   ghost straw goes in on the beat as a dead-on stab would. Two good stabs in
   a row end the practice early; one with no good stab comes back next run.
   After that each thing is named as it first happens, under the belt by the
@@ -766,9 +777,16 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   flock of pigeons only scatters it; it never costs a cup.
 - **Sugar rush.** Pearls fill a meter of ten sugar cubes; triggering it
   smashes anything that would cost a cup (never anything lethal) for a few
-  seconds, with afterimages and speed lines. The meter and the tea ride on
-  the tray under the runner, not in the tickets; the tray earns a slab when
-  the meter is full.
+  seconds, with afterimages and speed lines. The meter and the tea are drawn
+  in the scene under the runner, not in the tickets
+  (`src/lib/arcade/runner-meter.js`): a dark chip on the scene's 4 px grid,
+  like the lesson callout, with a pixel cup whose tea drains in half rows
+  (its outline blinks in the accent under a quarter) and ten sugar cubes
+  printed under the word "sugar". Full cubes are solid; empty ones are faint
+  outlines. A full meter turns the cubes gold under "rush", with the X key
+  beside it on a keyboard and a glint along the cubes (still under Reduce
+  Motion); a rush drains them. It is placed only on a resize, so it never
+  moves mid-run, and sits outside the screen shake.
 - **The course is authored, then shuffled.** Thirty-one set pieces unlock
   with distance and never repeat back to back. Besides awnings that bounce,
   vents that lift, cables to ride, crates, pigeons and split routes, things
@@ -881,7 +899,7 @@ room, to steer it into the cup.
   post under the stream and the pen keys beside it; the route counts as
   learned only when the straws as laid would pour into the cup, and then
   Pour is pointed out. A straw that spoils it is where taking a straw back
-  is taught. Each fixture is named, in italic with a pen loop round it, at
+  is taught. Each fixture is named, in italic with brackets round it, at
   the start of the first room that has one. The gauge is named the first
   time straw runs low, the dial as the kettle is about to pour by itself,
   and the fill line as tea first reaches a cup. The stars, the points and a

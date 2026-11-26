@@ -3673,7 +3673,9 @@
         checkLessons();
         dropLostTarget();
       }
-      updateHold(Math.min(rawDt, 0.25));
+      // Real time, capped at a second as the coach's own clock is, so a slow
+      // device's long frames still spend the hold as they pass.
+      updateHold(Math.min(rawDt, 1));
       if (phase === "play") {
         stepPen(dt);
         simulate(dt, lessonHolds);

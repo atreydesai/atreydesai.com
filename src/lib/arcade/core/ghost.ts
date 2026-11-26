@@ -161,6 +161,37 @@ export function beckon(seconds: number, reduce = false, period = 1.4) {
   return 0.5 + 0.5 * Math.sin((seconds / period) * Math.PI * 2);
 }
 
+/**
+ * Pixel corner brackets round a box: how a pixel scene rings a thing, the
+ * same mark the lesson callout draws in the page. Each corner is an arm
+ * `arm` long and `bar` thick, on whole pixels; `progress` below 1 grows the
+ * arms out from the corners, for a reveal.
+ */
+export function drawBrackets(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  { color = "#e85d4c", arm = 9, bar = 3, progress = 1 }: { color?: string; arm?: number; bar?: number; progress?: number } = {},
+) {
+  if (progress <= 0 || w <= 0 || h <= 0) return;
+  const reach = Math.max(bar, Math.round(Math.min(arm, w / 2, h / 2) * Math.min(1, progress)));
+  const left = Math.round(x);
+  const top = Math.round(y);
+  const right = Math.round(x + w);
+  const bottom = Math.round(y + h);
+  ctx.fillStyle = color;
+  ctx.fillRect(left, top, reach, bar);
+  ctx.fillRect(left, top, bar, reach);
+  ctx.fillRect(right - reach, top, reach, bar);
+  ctx.fillRect(right - bar, top, bar, reach);
+  ctx.fillRect(left, bottom - bar, reach, bar);
+  ctx.fillRect(left, bottom - reach, bar, reach);
+  ctx.fillRect(right - reach, bottom - bar, reach, bar);
+  ctx.fillRect(right - bar, bottom - reach, bar, reach);
+}
+
 export interface FocusBox {
   x: number;
   y: number;
@@ -169,13 +200,13 @@ export interface FocusBox {
 }
 
 /**
- * The lesson's spotlight, in the scenes' own language: everything outside
- * the `focus` boxes darkens through ordered dithering on the art's cell grid
- * (half the cells of `color` far off, a quarter in a band at the edge), and
- * each box is lit as the rounded shape inside it, so the light falls in
- * pixel steps like the dithered skies, never a flat rectangle or a soft
- * glow. `strength` 0..1 eases it in and out through the dither levels.
- * Boxes are in canvas units; they may overlap.
+ * The lesson's spotlight: everything outside the `focus` boxes darkens
+ * under an even wash of `color`, and each box is lit as the rounded shape
+ * round it, its edge one band of half the wash. On a pixel scene ("pixel")
+ * the shapes are cut from the art's cell grid, so the light falls in pixel
+ * steps, never a soft glow or a screen door over the art; over the page
+ * itself ("flat", catch) they are smooth. `strength` 0..1 eases the wash in
+ * and out. Boxes are in canvas units; they may overlap.
  */
 export function drawSpotlight(
   ctx: CanvasRenderingContext2D,
@@ -187,25 +218,22 @@ export function drawSpotlight(
     color = "#141a2e",
     cell = 4,
     edge = 2,
-    ink = 150,
-    pattern = "dither",
+    wash = 0.34,
+    pattern = "pixel",
   }: {
     color?: string;
     cell?: number;
     edge?: number;
-    /** How dark each dithered cell is, 0..255. */
-    ink?: number;
-    /**
-     * "dither" for a painted pixel scene; "flat" for a game played over the
-     * page itself (catch), where a screen door over text reads as noise: a
-     * soft even wash there, the lit shapes still rounded.
-     */
-    pattern?: "dither" | "flat";
+    /** How dark the wash is at full strength, 0..1. */
+    wash?: number;
+    /** "pixel" for a painted pixel scene; "flat" for a game played over the page itself. */
+    pattern?: "pixel" | "flat";
   } = {},
 ) {
   if (strength <= 0.01) return;
+  const dim = wash * Math.min(1, strength);
   if (pattern === "flat") {
-    flatSpotlight(ctx, width, height, focus, strength, color, edge * cell);
+    flatSpotlight(ctx, width, height, focus, dim, color, edge * cell);
     return;
   }
   const cols = Math.max(1, Math.ceil(width / cell));
@@ -223,8 +251,8 @@ export function drawSpotlight(
     count++;
   }
   const band = 1 + edge / 6;
-  const far = Math.round(8 * Math.min(1, strength));
-  const near = Math.round(4 * Math.min(1, strength));
+  const far = Math.round(255 * dim);
+  const near = Math.round(255 * dim * 0.5);
   const layer = spotLayer(cols, rows);
   if (!layer) return;
   const { g, image } = layer;
@@ -241,13 +269,11 @@ export function drawSpotlight(
         const q = dx * dx + dy * dy;
         if (q < d) d = q;
       }
-      const level = d < 1 ? 0 : d < band * band ? near : far;
       const o = (y * cols + x) * 4;
-      const on = level > 0 && BAYER[(y & 3) * 4 + (x & 3)] < level;
       data[o] = r;
       data[o + 1] = gc;
       data[o + 2] = b;
-      data[o + 3] = on ? ink : 0;
+      data[o + 3] = d < 1 ? 0 : d < band * band ? near : far;
     }
   }
   g.putImageData(image, 0, 0);
@@ -268,7 +294,7 @@ function flatSpotlight(
   width: number,
   height: number,
   focus: readonly FocusBox[],
-  strength: number,
+  dim: number,
   color: string,
   band: number,
 ) {
@@ -287,7 +313,7 @@ function flatSpotlight(
   g.setTransform(m.a, 0, 0, m.d, 0, 0);
   g.globalCompositeOperation = "source-over";
   g.fillStyle = color;
-  g.globalAlpha = 0.28 * strength;
+  g.globalAlpha = dim;
   g.fillRect(0, 0, width, height);
   g.globalAlpha = 1;
   g.globalCompositeOperation = "destination-out";

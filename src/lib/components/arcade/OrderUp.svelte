@@ -1221,7 +1221,7 @@
     if (guest) startCup(guest);
     const started = guest ? liveMessage : "";
     note("poured out");
-    if (started) liveMessage = `Poured out. ${started}`;
+    if (started) liveMessage = `The cup was poured out. ${started}`;
   }
 
   // --- Ice --------------------------------------------------------------------------
@@ -1256,7 +1256,7 @@
     if (!reduceMotion) iceArcs.push({ age: 0 });
     sfxIce(cup.ice);
     const target = ICE_CUBES[cup.order.ice];
-    liveMessage = `${cup.ice} of ${cubes(target)} of ice.`;
+    liveMessage = `The cup has ${cup.ice} of ${cubes(target)} of ice.`;
     if (cup.station === "ice" && cup.ice >= target) {
       // Right on: once the cube lands, a ding, and on to the pour.
       cup.busy = true;
@@ -1284,7 +1284,7 @@
     // A cube still in the air is the one that comes back.
     if (iceArcs.length) iceArcs.pop();
     sfxIce(0);
-    liveMessage = `${cup.ice} of ${cubes(ICE_CUBES[cup.order.ice])} of ice.`;
+    liveMessage = `The cup has ${cup.ice} of ${cubes(ICE_CUBES[cup.order.ice])} of ice.`;
     refresh();
   }
 
@@ -1297,7 +1297,7 @@
     pumpAge = 0;
     sfxPump(cup.sugar);
     const target = sugarPumps(cup.order.sugar);
-    liveMessage = `${cup.sugar} of ${target} ${target === 1 ? "pump" : "pumps"} of syrup.`;
+    liveMessage = `The cup has ${cup.sugar} of ${target} ${target === 1 ? "pump" : "pumps"} of syrup.`;
     if (cup.sugar >= target) {
       // Right on: a ding, and on to the next station.
       cup.busy = true;
@@ -1321,7 +1321,7 @@
     pumpAge = 10;
     sfxPump(0);
     const target = sugarPumps(cup.order.sugar);
-    liveMessage = `${cup.sugar} of ${target} ${target === 1 ? "pump" : "pumps"} of syrup.`;
+    liveMessage = `The cup has ${cup.sugar} of ${target} ${target === 1 ? "pump" : "pumps"} of syrup.`;
     refresh();
   }
 
@@ -1337,7 +1337,7 @@
     if (cup.stations.includes("sugar") && sugarState(cup.sugar, cup.order.sugar) === "short") short.push("sugar");
     if (short.length) {
       popBeside(`short on ${short.join(" and ")}`, "miss", 0.9, 12);
-      liveMessage = `Short on ${short.join(" and ")}.`;
+      liveMessage = `The cup is short on ${short.join(" and ")}.`;
     }
     enterStation("pour");
   }
@@ -1353,7 +1353,7 @@
     }
     if (index !== tapIndex) {
       tapIndex = index;
-      liveMessage = `Under the ${TEA_NAMES[TEAS[index]]} tap.`;
+      liveMessage = `The cup is under the ${TEA_NAMES[TEAS[index]]} tap.`;
       // Moved under the ordered tea's tap: the move is known.
       if (TEAS[index] === cup.order.tea) coach.done("tap");
     }
@@ -1430,7 +1430,7 @@
     cup.pourGrade = pourGrade(cup.level, cup.order.ice, expert);
     const word = gradeWord(cup.pourGrade);
     popBeside(word, popupKind(cup.pourGrade), 1.1, 5);
-    liveMessage = `Pour ${word}.`;
+    liveMessage = `The pour was ${word}.`;
     lessonResult("pour", cup.tea === cup.order.tea && cup.pourGrade >= LESSON_PASS);
     refresh();
     after(AFTER_POUR, () => enterStation(cup.stations.includes("scoop") ? "scoop" : "shake"));
@@ -1600,7 +1600,7 @@
       const grade = shakeGrade(cup.shakeSeconds, expert);
       const word = gradeWord(grade);
       popBeside(word, popupKind(grade), 1.1, 5);
-      liveMessage = `Shake ${word}.`;
+      liveMessage = `The shake was ${word}.`;
       lessonResult("shake", grade >= LESSON_PASS);
       after(AFTER_SHAKE, () => enterStation("seal"));
     }
@@ -1620,7 +1620,7 @@
     const result = sealResult(value, expert);
     const grade = sealGrade(value, expert);
     popBeside(SEAL_WORDS[result], result === "sealed" ? "perfect" : grade >= 55 ? "plain" : "miss", 1.1, 5);
-    liveMessage = `Seal ${SEAL_WORDS[result]}.`;
+    liveMessage = `The lid is ${SEAL_WORDS[result]}.`;
     // A perfect drink turns once on the counter as it goes (drawn only
     // without Reduce Motion, checked as it is drawn; its timing never changes).
     const judged = judge(cup);
@@ -1670,7 +1670,7 @@
     coach.done("brew");
     coach.done("dry");
     refreshTanks();
-    liveMessage = `Brewing ${tea}.`;
+    liveMessage = `The ${tea} is brewing.`;
   }
 
   function stepBrewing() {
@@ -1758,7 +1758,7 @@
         until,
       };
       if (!reduceMotion) veilAge = 0;
-      liveMessage = `${line}. Sent back. You lose a pearl.`;
+      liveMessage = `${line}. The drink was sent back, and you lose a pearl.`;
       loseLife();
       return;
     }

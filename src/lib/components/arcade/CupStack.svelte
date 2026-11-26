@@ -77,7 +77,7 @@
   import { approach, clamp, damp, lerp, smoothstep, snap } from "#lib/arcade/core/math.ts";
   import { createPool } from "#lib/arcade/core/pool.ts";
   import { createRng, hash2, noise2 } from "#lib/arcade/core/rng.ts";
-  import { readBest } from "#lib/arcade/scores.ts";
+  import { BESTS_SYNCED, readBest } from "#lib/arcade/scores.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
   import Coach from "./Coach.svelte";
@@ -2263,8 +2263,16 @@
     begin();
     loop.start();
     focusPlayfield();
+    // A game opened from a link syncs its best from the board as it opens;
+    // when that lands after the climb has begun, the line moves up to it.
+    const onBestsSynced = () => {
+      const best = readBest("stack");
+      if (best > previousBest) previousBest = best;
+    };
+    window.addEventListener(BESTS_SYNCED, onBestsSynced);
 
     return () => {
+      window.removeEventListener(BESTS_SYNCED, onBestsSynced);
       loop.stop();
       timers.clear();
       stopMusic();
@@ -2324,23 +2332,25 @@
       </div>
     </div>
   </header>
-</div>
 
-<!-- Lessons sit by the tower, over the row the cup slides in, under a falling slice, or on the best line, never in the tickets. -->
-<Coach
-  lesson={coachLesson}
-  x={coachX}
-  y={coachY}
-  side={coachSide}
-  scene={coachScene}
-  width={coachWidth}
-  leaving={coachLeaving}
-  continuable={coachContinuable}
-  on:continue={continueLesson}
-  returnFocus={focusPlayfield}
-  hidden={paused || gameOver || coachHeld}
-  top={coachTop + 8}
-/>
+  <!-- Lessons sit by the tower, over the row the cup slides in, under a
+       falling slice, or on the best line, never in the tickets. Inside the
+       play scope, so Tab reaches its Continue button. -->
+  <Coach
+    lesson={coachLesson}
+    x={coachX}
+    y={coachY}
+    side={coachSide}
+    scene={coachScene}
+    width={coachWidth}
+    leaving={coachLeaving}
+    continuable={coachContinuable}
+    on:continue={continueLesson}
+    returnFocus={focusPlayfield}
+    hidden={paused || gameOver || coachHeld}
+    top={coachTop + 8}
+  />
+</div>
 
 {#if paused && !gameOver}
   <PauseCard

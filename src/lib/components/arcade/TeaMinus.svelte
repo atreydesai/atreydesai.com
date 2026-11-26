@@ -55,7 +55,6 @@
     cachedSprite,
     drawChipNote,
     drawHalo,
-    drawLoop,
     drawSprite,
     fitCanvas,
     stepPopups,
@@ -65,7 +64,7 @@
   import { createControls, keyName, watchTouch } from "#lib/arcade/core/controls.ts";
   import { hexToRgb, mixHex, mixRgb } from "#lib/arcade/core/color.ts";
   import { bayer, cellLayer, paintBands } from "#lib/arcade/core/dither.ts";
-  import { beckon, chalkPath, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { beckon, chalkPath, drawBrackets, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import { createFrameLoop, every } from "#lib/arcade/core/loop.ts";
   import { clamp, lerp, smooth, snap } from "#lib/arcade/core/math.ts";
   import { createPool } from "#lib/arcade/core/pool.ts";
@@ -136,7 +135,6 @@
   /** Flame by heat: core, yellow, gold, red, and the tail at the ragged edge. */
   const FLAME = ["#fff6d8", "#ffd166", "#dba84d", "#e85d4c", "#8a3251"];
   const SMOKE = "#cfc6ba";
-  const LOOP_COLORS = { ink: CREAM, paper: COASTER_PAPER, slab: ACCENT, muted: CREAM };
 
   // Each terrain has its own ground, its own far silhouettes, and its own
   // sun height (a low sun throws long shadows). The lit tones stay pale
@@ -2193,9 +2191,9 @@
   }
 
   /**
-   * The pen loop's box around the landed cup, in screen px. A quarter larger
-   * than the sprite plus a margin, because the hand-drawn loops sit inside
-   * their box and would otherwise cut through the feet and the straw.
+   * The room round the landed cup, in screen px, that its notes, its lesson
+   * and its light are laid out by: a quarter larger than the sprite plus a
+   * margin, so nothing there sits on the feet or the straw.
    */
   function loopBox() {
     const width = (LANDER_COLUMNS * CELL * S + 34) * 1.25;
@@ -2204,11 +2202,19 @@
     return { x: sx(ship.x) - width / 2, y: centerY - height / 2, width, height };
   }
 
+  /**
+   * A landing is ringed with cream pixel brackets snug round the lander, as
+   * the lesson callout rings a thing, their arms growing on (at once under
+   * Reduce Motion).
+   */
   function drawLandingLoop() {
     if (!ctx || !landedLoop || ship.state !== "landed") return;
-    const box = loopBox();
+    const cell = Math.max(2, Math.round(CELL * S));
+    const width = LANDER_COLUMNS * CELL * S + cell * 6;
+    const height = LANDER.length * CELL * S + cell * 4;
+    const centerY = sy(ship.y + (LANDER_TOP - 8) / 2);
     const progress = reduceMotion ? 1 : Math.min(1, landedLoop.age / 0.42);
-    drawLoop(ctx, landedLoop.index, box.x, box.y, box.width, box.height, LOOP_COLORS, 2, progress);
+    drawBrackets(ctx, sx(ship.x) - width / 2, centerY - height / 2, width, height, { color: CREAM, arm: cell * 3, bar: cell, progress });
   }
 
   /** Landing notes: cream on a night backing, gold for a feather, legible in either theme. */

@@ -9,7 +9,9 @@
   //
   // The game decides where the eye already is and puts the callout there:
   // beside the runner, under the cup, by the station. `side` says which
-  // side of the anchor the slip sits on; it stays on screen either way.
+  // side of the anchor the slip sits on; where it won't fit there at its
+  // measured size, it takes the opposite side, then above or below, so it
+  // never covers its thing, and it always stays on screen.
   import { createEventDispatcher, onMount } from "svelte";
 
   import type { Lesson } from "#lib/arcade/core/coach.ts";
@@ -105,31 +107,54 @@
   $: anchored = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y);
   $: loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
   $: loopH = ring * 1.75;
-  $: horizontal = side === "left" || side === "right";
-  // How far the slip sits from the anchor: clear of the loop (or the thing) on its side.
-  $: reach = horizontal ? Math.max(ring * 0.8, loopW / 2, width) : Math.max(ring * 0.8, loopH / 2);
-  $: gap = (ring > 0 || width > 0 ? reach : 6) + 14;
-  $: place = position(anchored, x ?? viewW / 2, y ?? viewH / 2, side, gap, slipW, slipH, viewW, viewH, top);
+  // How far the slip sits from the anchor on each axis: clear of the loop (or the thing).
+  $: reachX = Math.max(ring * 0.8, loopW / 2, width);
+  $: reachY = Math.max(ring * 0.8, loopH / 2);
+  $: marked = ring > 0 || width > 0;
+  $: gapX = (marked ? reachX : 6) + 14;
+  $: gapY = (marked ? reachY : 6) + 14;
+  $: place = position(anchored, x ?? viewW / 2, y ?? viewH / 2, side, gapX, gapY, slipW, slipH, viewW, viewH, top);
+  $: reach = place.where === "left" || place.where === "right" ? reachX : reachY;
+
+  /**
+   * Whether the slip, at its measured size, fits on `where` of the anchor
+   * without being pushed back over it by the screen's edge.
+   */
+  function fits(where: typeof side, ax: number, ay: number, gx: number, gy: number, w: number, h: number, vw: number, vh: number, minTop: number) {
+    if (where === "left") return ax - gx - w >= GUTTER;
+    if (where === "right") return ax + gx + w <= vw - GUTTER;
+    if (where === "above") return ay - gy - h >= minTop;
+    return ay + gy + h <= vh - GUTTER;
+  }
 
   function position(
     has: boolean,
     ax: number,
     ay: number,
-    where: typeof side,
-    away: number,
+    asked: typeof side,
+    gx: number,
+    gy: number,
     w: number,
     h: number,
     vw: number,
     vh: number,
     minTop: number,
   ) {
+    // The side asked for, unless the slip won't fit there (a narrow phone):
+    // then the opposite side, then above or below, so it never covers its thing.
+    let where = asked;
+    if (has && w > 0 && h > 0 && !fits(where, ax, ay, gx, gy, w, h, vw, vh, minTop)) {
+      const opposite = ({ left: "right", right: "left", above: "below", below: "above" } as const)[where];
+      const order: Array<typeof side> = [opposite, "above", "below"];
+      where = order.find((other) => fits(other, ax, ay, gx, gy, w, h, vw, vh, minTop)) ?? asked;
+    }
     let left = ax - w / 2;
     let topY = ay - h / 2;
     if (has) {
-      if (where === "above") topY = ay - away - h;
-      if (where === "below") topY = ay + away;
-      if (where === "left") left = ax - away - w;
-      if (where === "right") left = ax + away;
+      if (where === "above") topY = ay - gy - h;
+      if (where === "below") topY = ay + gy;
+      if (where === "left") left = ax - gx - w;
+      if (where === "right") left = ax + gx;
     } else if (where === "below") {
       topY = vh - h - GUTTER * 6;
     }
@@ -144,7 +169,7 @@
     if (where === "below") ty = topY;
     if (where === "left") tx = left + w;
     if (where === "right") tx = left;
-    return { left: Math.round(left), top: Math.round(topY), tx, ty };
+    return { left: Math.round(left), top: Math.round(topY), tx, ty, where };
   }
 
   // The tail stops short of the loop, so the two marks don't touch.
@@ -153,7 +178,7 @@
     const dx = x - place.tx;
     const dy = y - place.ty;
     const length = Math.hypot(dx, dy);
-    const stop = (ring > 0 || width > 0 ? reach * 0.95 : 6) + 4;
+    const stop = (marked ? reach * 0.95 : 6) + 4;
     if (length <= stop + 6) return null;
     const k = (length - stop) / length;
     return { x1: place.tx, y1: place.ty, x2: place.tx + dx * k, y2: place.ty + dy * k };

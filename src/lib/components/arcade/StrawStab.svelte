@@ -83,10 +83,8 @@
     arcadeFont,
     cachedSprite,
     drawChipNote,
-    drawLoop,
     drawParticles,
     fitCanvas,
-    risoColors,
     stepParticles,
     stepPopups,
     type Particle,
@@ -96,7 +94,7 @@
   import { TICK_LOOKAHEAD, createTicks } from "#lib/arcade/stab-tick.ts";
   import { hexToRgb, mixHex, mixRgb, rgbToHex, type RGB } from "#lib/arcade/core/color.ts";
   import { bayer, paintBands } from "#lib/arcade/core/dither.ts";
-  import { drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
+  import { drawBrackets, drawGhost, drawSpotlight, type FocusBox } from "#lib/arcade/core/ghost.ts";
   import { clamp, quantize, smoothstep, snap } from "#lib/arcade/core/math.ts";
   import { createRng } from "#lib/arcade/core/rng.ts";
   import { arcadeExits, concludeRun, createTimers, isOnControl, mountShell } from "#lib/arcade/shell.ts";
@@ -1686,32 +1684,30 @@
   //
   // Taught once per device, inside the live run: stab-lessons.js says what
   // and when, and the coach shows one line at a time. Nothing here touches
-  // the beat: lines, loops, the ghost straw and the spotlight are all drawn
+  // the beat: lines, brackets, the ghost straw and the spotlight are all drawn
   // for the song time on screen, and play never slows.
 
   /** Song seconds after the first downbeat that "go" is gone by; nothing is taught before. */
   const GO_SECONDS = 0.62;
-  /** Coach's distance from an anchor with no loop round it (its 6 + 14 px), and its margin from the window's edges. */
+  /** Coach's distance from an anchor with no ring round it (its 6 + 14 px), and its margin from the window's edges. */
   const SLIP_GAP = 20;
   const SLIP_GUTTER = 16;
   /** A slip's size until it has been on screen to measure: its widest, and two lines with Continue. */
   const SLIP_GUESS = Object.freeze({ id: "", w: 320, h: 76 });
   /** How far above the lane's top the judgement notes reach (two rows, the upper one rising). */
   const NOTES_CLEAR = 52;
-  /** The practice loop: beats it takes to shrink onto the notch, and how much bigger it starts. */
+  /** The practice brackets: beats they take to close onto the notch, and how much bigger they start. */
   const APPROACH_BEATS = 2;
   const LOOP_GROW = 2.4;
-  /** Song seconds the loop stays snug on the notch after the beat, while the cup is still in reach. */
+  /** Song seconds the brackets stay snug on the notch after the beat, while the cup is still in reach. */
   const LOOP_AFTER = 0.12;
-  /** Real seconds a lesson's loop round its cup takes to draw on: quick, as the cup may be close. */
+  /** Real seconds a lesson's brackets round its cup take to grow on: quick, as the cup may be close. */
   const LOOP_DRAW = 0.1;
   /** The ghost straw shows the stab for this many of the practice's cups. */
   const GHOST_CUPS = 2;
   /** Song seconds the ghost straw rides in its cup after the beat, fading over the last part. */
   const GHOST_RIDE = 0.36;
   const GHOST_FADE = 0.16;
-  /** The loop's colours: cream pen, its accent print behind it, as on any dark scene. */
-  const LOOP_COLORS = risoColors(true);
 
   // In development, `?autoplay` stabs for you, mostly dead on and now and
   // then off (early, late, a graze, a cup let go, a stab at the bare belt),
@@ -1765,9 +1761,9 @@
 
   /**
    * The practice's hologram, drawn for the song time on screen (the moment
-   * the frame is seen) so it lands with the music: a pen loop round the
-   * notch that shrinks onto the next practice cup as it comes and is snug on
-   * it exactly on its beat, and for the first two cups a ghost straw that
+   * the frame is seen) so it lands with the music: cream pixel brackets
+   * round the notch that close onto the next practice cup as it comes and
+   * are snug on it exactly on its beat, and for the first two cups a ghost straw that
    * stabs as a dead-on stab should, its tip meeting the lid on the beat, then
    * rides in the cup a moment. Under Reduce Motion the ghost shows only its
    * contact pose, from the beat, and doesn't fade.
@@ -1779,7 +1775,8 @@
       const beat = 60 / barPosition(TEMPOS, next.bar).bpm;
       const ahead = next.time - now;
       if (ahead <= APPROACH_BEATS * beat && ahead >= -LOOP_AFTER) {
-        loopCup(strawX, next.number, 1 + (LOOP_GROW - 1) * clamp(ahead / (APPROACH_BEATS * beat), 0, 1));
+        // Under Reduce Motion they sit closed on the notch, still timed to the beat.
+        bracketCup(strawX, CREAM, reduceMotion ? 1 : 1 + (LOOP_GROW - 1) * clamp(ahead / (APPROACH_BEATS * beat), 0, 1));
       }
     }
     // The ghost's tip meets the lid on the beat (see ghostPlunge).
@@ -1809,22 +1806,26 @@
     }
   }
 
-  /** A pen loop snug round a cup whose centre is at `x`, `progress` of it drawn. */
-  function loopCup(x: number, index: number, grow = 1, progress = 1) {
+  /**
+   * Pixel brackets snug round a cup whose centre is at `x`, as the lesson
+   * callout rings a thing: `grow` times as big (the practice's close-in),
+   * `progress` of their arms grown on.
+   */
+  function bracketCup(x: number, color: string, grow = 1, progress = 1) {
     if (!ctx) return;
-    const w = cupW * 1.9 * grow;
-    const h = cupH * 1.5 * grow;
-    drawLoop(ctx, index, x - w / 2, beltY - cupH / 2 - h / 2, w, h, LOOP_COLORS, 2.5, progress);
+    const w = (cupW + px * 4) * grow;
+    const h = (cupH + px * 4) * grow;
+    drawBrackets(ctx, x - w / 2, beltY - cupH / 2 - h / 2, w, h, { color, arm: px * 3, bar: px, progress });
   }
 
   /**
    * The golden and off-beat lines ring their cup on the canvas, on the
-   * belt's own clock, so the loop rides the cup exactly; the slip stays put
-   * by the notch, where the cup is headed. Drawn on, unless motion is reduced.
+   * belt's own clock, so the brackets ride the cup exactly; the slip stays
+   * put by the notch, where the cup is headed. Grown on, unless motion is reduced.
    */
   function drawCupLesson(now: number) {
     if (!cue?.cup || coach.current !== cue.lesson || coach.leaving) return;
-    loopCup(cupX(cue.cup, now), cue.cup.number, 1, reduceMotion ? 1 : Math.min(1, coach.age / LOOP_DRAW));
+    bracketCup(cupX(cue.cup, now), ACCENT, 1, reduceMotion ? 1 : Math.min(1, coach.age / LOOP_DRAW));
   }
 
   /**
@@ -1955,18 +1956,20 @@
    * Puts each practice cup's tick on the audio clock as its beat comes
    * within the look-ahead, so the practice can be followed by ear: the
    * downbeat is in the clock notes are scheduled in, so a cup's beat there
-   * is the downbeat plus its song time. Without audio there is nothing to
-   * tick, and the visual practice carries on.
+   * is the downbeat plus its song time. The look-ahead is measured on that
+   * same clock, not the heard one, which lags it by the output's latency (a
+   * Bluetooth headset's can be longer than the look-ahead itself). Without
+   * audio there is nothing to tick, and the visual practice carries on.
    */
   function scheduleTicks() {
     if (!useAudio || !practiceOn(practice)) return;
-    const heard = audioClock();
-    if (heard === null) return;
+    const now = ticks.now();
+    if (now === null) return;
     for (const cup of cups) {
       if (cup.ticked) continue;
-      if (!practiceAt(practice, cup.time) || origin + cup.time - heard > TICK_LOOKAHEAD) break;
+      if (!practiceAt(practice, cup.time) || origin + cup.time - now > TICK_LOOKAHEAD) break;
       cup.ticked = true;
-      if (origin + cup.time >= heard) ticks.at(origin + cup.time, PLAYLIST[barPosition(TEMPOS, cup.bar).song]);
+      if (origin + cup.time >= now) ticks.at(origin + cup.time, PLAYLIST[barPosition(TEMPOS, cup.bar).song]);
     }
   }
 
