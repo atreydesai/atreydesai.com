@@ -788,7 +788,8 @@ whole way. **Spare cups are the lives; the tea is the pay.**
   beside it on a keyboard and a glint along the cubes (still under Reduce
   Motion); a rush drains them. On a phone it sits between the slide and
   jump pads, its cubes in two rows of five, smaller if the room is short,
-  and just over the pads when larger text leaves none. It is placed only on
+  just over the pads when larger text leaves none, and under the tickets if
+  even that would squeeze the course. It is placed only on
   a resize, so it never moves mid-run, and sits outside the screen shake.
 - **The course is authored, then shuffled.** Thirty-one set pieces unlock
   with distance and never repeat back to back. Besides awnings that bounce,

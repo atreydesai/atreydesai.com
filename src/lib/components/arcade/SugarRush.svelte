@@ -850,6 +850,8 @@
   let meterU = SC;
   let meterX = 16;
   let meterY = 0;
+  /** The meter is low on the screen (always, but for very large text on a small phone), so the course stays above it. */
+  let meterLow = true;
   let ctx: CanvasRenderingContext2D | null = null;
   let pauseCard: PauseCard;
   let slip: ResultsSlip;
@@ -3286,19 +3288,26 @@
       const from = slide?.right ?? row.left;
       const to = stack?.getBoundingClientRect().left ?? row.right;
       const fit = [SC, 3].find((u) => meter.width * u <= to - from - 16);
+      meterLow = true;
       if (fit) {
         meterU = fit;
         meterX = Math.round((from + to - meter.width * fit) / 2);
         meterY = Math.round(row.bottom - meter.height * fit);
-      } else {
-        // Larger text leaves no room between the pads: centred just over them.
-        meterU = 3;
-        const jumpTop = stack?.lastElementChild?.getBoundingClientRect().top ?? row.top;
-        meterX = Math.round((viewW - meter.width * 3) / 2);
-        meterY = Math.round(Math.min(slide?.top ?? row.top, jumpTop) - 8 - meter.height * 3);
+        return;
+      }
+      // Larger text leaves no room between the pads: centred just over all
+      // of them (the rush pad's place included), if the course still has its
+      // height above; failing that, under the tickets, clear of the course.
+      meterU = 3;
+      meterX = Math.round((viewW - meter.width * 3) / 2);
+      meterY = Math.round(row.top - 8 - meter.height * 3);
+      if (meterY - 8 < playTop + 180) {
+        meterLow = false;
+        meterY = Math.round(playTop + 8);
       }
       return;
     }
+    meterLow = true;
     meter = meterLayout(false);
     meterU = SC;
     const width = meter.width * SC;
@@ -3892,7 +3901,7 @@
     placeMeter();
     // The course stays above the thumb buttons on touch, and above the meter.
     const padsTop = touchUI && padsRow ? padsRow.getBoundingClientRect().top : viewH;
-    playBottom = Math.max(playTop + 180, Math.min(viewH, padsTop - 8, meterY - 8));
+    playBottom = Math.max(playTop + 180, Math.min(viewH, padsTop - 8, meterLow ? meterY - 8 : viewH));
     focusY = playTop + (playBottom - playTop) * 0.6;
     horizonY = playTop + (playBottom - playTop) * 0.68;
     baseS = Math.min(viewW / (wide ? 560 : 300), (playBottom - playTop) / 230);

@@ -1339,10 +1339,18 @@
     const short: string[] = [];
     if (cup.stations.includes("ice") && iceState(cup.ice, cup.order.ice) === "short") short.push("ice");
     if (cup.stations.includes("sugar") && sugarState(cup.sugar, cup.order.sugar) === "short") short.push("sugar");
-    if (short.length) popBeside(`short on ${short.join(" and ")}`, "miss", 0.9, 12);
+    if (short.length) {
+      popBeside(`short on ${short.join(" and ")}`, "miss", 0.9, 12);
+      // Said with whatever the rest of this press says (the pour station's
+      // line, an empty tank), once the press is done, so nothing said after
+      // it replaces it; alone if the press said nothing new.
+      const warning = `The cup is short on ${short.join(" and ")}.`;
+      const before = liveMessage;
+      queueMicrotask(() => {
+        liveMessage = liveMessage === before ? warning : `${warning} ${liveMessage}`;
+      });
+    }
     enterStation("pour");
-    // Said after the pour station's own line, which would otherwise replace it.
-    if (short.length) liveMessage = `The cup is short on ${short.join(" and ")}. ${liveMessage}`;
   }
 
   // --- The pour --------------------------------------------------------------------
@@ -4001,7 +4009,7 @@
     let tall = 0;
     if (at.kind === "step" && lesson.id === "pour" && making && x - half - room < 16) {
       const tap = tapEls[tapFor(making.order)]?.getBoundingClientRect();
-      if (tap && tap.width > 0) {
+      if (tap && tap.width > 0 && tap.height > 0) {
         x = tap.left + tap.width / 2;
         y = tap.top + tap.height / 2;
         // Brackets snug round the tap itself, tall and narrow.
