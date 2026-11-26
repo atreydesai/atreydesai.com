@@ -3422,7 +3422,9 @@
     commit(inside, roomLayer);
 
     // The counter: a lip, a plain wood face in three panels, and the urn.
-    const below = rows - counter + 2;
+    // The bench can sit below the fold when the counter needs to scroll.
+    // Always leave room to bake the lip, even when it is offscreen.
+    const below = Math.max(4, rows - counter + 2);
     const o = URN_ROWS;
     const front = newBuf(cols, o + below);
     const wood = mixRgb(WOOD, DEEP, L.dark);
@@ -5206,7 +5208,7 @@
     popupFont = arcadeFont();
     special = pickSpecial();
 
-    const smallQuery = window.matchMedia("(max-width: 640px)");
+    const smallQuery = window.matchMedia("(max-width: 640px), (orientation: landscape) and (max-height: 28rem)");
     const onSmall = () => {
       small = smallQuery.matches;
       void tick().then(measure);
@@ -6792,7 +6794,7 @@
      about 460, leaving room for a card with a fourth order line; anything
      spare goes to the bench. */
 
-  @media (max-width: 640px) {
+  @media (max-width: 640px), (orientation: landscape) and (max-height: 28rem) {
     .ou-counter {
       padding: calc(var(--hud-h) + var(--space-2)) var(--space-4) max(var(--space-2), env(safe-area-inset-bottom));
     }
@@ -6967,6 +6969,54 @@
       flex: 1 1 auto;
       min-width: 0;
       min-height: 2.75rem;
+    }
+  }
+
+  /* Keep tickets, machines and the hand within reach on a sideways phone. */
+  @media (orientation: landscape) and (max-height: 28rem) {
+    .ou-counter {
+      padding-block: calc(var(--hud-h) + var(--space-1)) max(var(--space-1), env(safe-area-inset-bottom));
+    }
+
+    .ou-column {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 5fr);
+      grid-template-rows: minmax(min-content, 1fr) auto;
+      column-gap: var(--space-4);
+    }
+
+    .ou-line {
+      grid-row: span 2;
+      align-self: start;
+    }
+
+    .ou-guests,
+    .ou-guests.is-four {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      row-gap: var(--space-4);
+    }
+
+    .ou-bench-art {
+      min-height: 9rem;
+    }
+
+    .ou-hand .boba-key {
+      min-height: 2.75rem;
+    }
+  }
+
+  @media (min-width: 33rem) and (max-width: 640px) and (orientation: landscape) and (max-height: 28rem) {
+    .boba-hud-row {
+      grid-template-columns: auto auto auto;
+      gap: var(--space-2);
+    }
+
+    .boba-ticket-center {
+      grid-area: 1 / 2;
+    }
+
+    .boba-ticket-end {
+      grid-column: 3;
     }
   }
 
