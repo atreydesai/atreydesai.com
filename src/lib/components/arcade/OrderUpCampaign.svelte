@@ -30,7 +30,7 @@
   import OrderServiceCounter from "./OrderServiceCounter.svelte";
   import OrderPixelWord from "./OrderPixelWord.svelte";
   import PauseCard from "./PauseCard.svelte";
-  import { money, type ShopSound } from "#lib/arcade/orders-display.ts";
+  import { money, shopSaveKey, type ShopSound } from "#lib/arcade/orders-display.ts";
   import { shiftContracts, shiftContractReward } from "#lib/arcade/orders-challenges.ts";
   import { commissionOffer, commissionCups } from "#lib/arcade/orders-commissions.ts";
 
@@ -67,10 +67,6 @@
   let pauseCard: PauseCard;
   let serviceCounter: OrderServiceCounter;
   let ledger: OrderShopLedger;
-  let classic: typeof import("./OrderUp.svelte").default | null = null;
-  let loadingClassic = false;
-  let mounted = false;
-  let unsubscribeShell: (() => void) | undefined;
   let activeSeconds = 0;
   let sinceSave = 0;
   let serviceTime = 0;
@@ -90,8 +86,6 @@
   $: till = summary && shift ? summary.revenue + Math.round(summary.tips * shift.effects.tipMultiplier) : 0;
   $: remaining = shift ? Math.max(0, Math.ceil(shift.duration - shift.elapsed)) : 0;
   $: clockFace = Math.floor(remaining / 60) + ":" + String(remaining % 60).padStart(2, "0");
-
-  const saveKey = (selected: CampaignMode) => "boba_order_up_shop_v1_" + selected;
 
   function openingShift(source: Campaign, reserveTable: boolean, blend: HouseBlend | null, bookCatering = false, startPrep = false) {
     return createServiceDay({
@@ -159,7 +153,7 @@
   function readSave(selected: CampaignMode) {
     let data: { campaign?: unknown; shift?: unknown; bookedDay?: unknown; cateringDay?: unknown; houseBlend?: unknown; blendTin?: unknown } | null = null;
     try {
-      const serialized = window.localStorage.getItem(saveKey(selected));
+      const serialized = window.localStorage.getItem(shopSaveKey(selected));
       data = serialized ? JSON.parse(serialized) : null;
     } catch {
       storageAvailable = false;
@@ -195,7 +189,7 @@
 
   function save() {
     try {
-      window.localStorage.setItem(saveKey(mode), JSON.stringify({ campaign, shift, bookedDay, cateringDay, houseBlend, blendTin }));
+      window.localStorage.setItem(shopSaveKey(mode), JSON.stringify({ campaign, shift, bookedDay, cateringDay, houseBlend, blendTin }));
       sinceSave = 0;
       storageAvailable = true;
       storageNotice = "";
@@ -216,7 +210,7 @@
   }
 
   function onOtherTab(event: StorageEvent) {
-    if (event.key !== saveKey(mode)) return;
+    if (event.key !== shopSaveKey(mode)) return;
     if (isServing) stopMusic();
     readSave(mode);
     isServing = false;
@@ -509,33 +503,14 @@
     draw,
   });
 
-  async function openClassic() {
-    if (loadingClassic) return;
-    loadingClassic = true;
-    try {
-      const game = await import("./OrderUp.svelte");
-      if (!mounted) return;
-      save();
-      loop.stop();
-      unsubscribeShell?.();
-      unsubscribeShell = undefined;
-      classic = game.default;
-    } catch {
-      notice = "Score attack could not open. Try again.";
-    } finally {
-      loadingClassic = false;
-    }
-  }
-
   onMount(() => {
-    mounted = true;
     readSave(mode);
     try {
       closeView = window.localStorage.getItem(cameraKey) === "1";
     } catch {
       closeView = false;
     }
-    unsubscribeShell = mountShell({
+    const unsubscribeShell = mountShell({
       isOver: () => false,
       isPaused: () => paused,
       pause,
@@ -577,163 +552,156 @@
     loop.start();
     heading?.focus({ preventScroll: true });
     return () => {
-      mounted = false;
       if (shift) save();
-      if (!classic) stopMusic();
+      stopMusic();
       loop.stop();
-      unsubscribeShell?.();
+      unsubscribeShell();
       window.removeEventListener("pagehide", persistOnLeave);
       window.removeEventListener("storage", onOtherTab);
     };
   });
 </script>
 
-{#if classic}
-  <svelte:component this={classic} on:close={() => dispatch("close")} on:menu={() => dispatch("menu")} />
-{:else}
-  <div class="boba-stage shop-wall" aria-hidden="true"></div>
-  <canvas bind:this={canvas} class="boba-canvas shop-scene" aria-hidden="true"></canvas>
-  <div
-    bind:this={host}
-    class="shop boba-ui order-pixel-ui"
-    class:is-working={inKitchen}
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="order-shop-title"
-  >
-    <div class="shop-frame" inert={paused}>
-      <header class="shop-header">
-        <div class="shop-sign">
-          <PixelIcon grid={illustration.grid} palette={illustration.palette} px={3} />
-          <div>
-            <h1 id="order-shop-title" bind:this={heading} tabindex="-1" data-arcade-tab-anchor>
-              <span class="sr-only">order up</span><OrderPixelWord text="Order Up" />
-            </h1>
-            {#if isServing && shift?.expert}
-              <span class="shop-expert"><ExpertTag /></span>
-            {:else if !inKitchen}
-              <span class="shop-tagline">milk tea counter</span>
-            {/if}
-          </div>
+<div class="boba-stage shop-wall" aria-hidden="true"></div>
+<canvas bind:this={canvas} class="boba-canvas shop-scene" aria-hidden="true"></canvas>
+<div
+  bind:this={host}
+  class="shop boba-ui order-pixel-ui"
+  class:is-working={inKitchen}
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="order-shop-title"
+>
+  <div class="shop-frame" inert={paused}>
+    <header class="shop-header">
+      <div class="shop-sign">
+        <PixelIcon grid={illustration.grid} palette={illustration.palette} px={3} />
+        <div>
+          <h1 id="order-shop-title" bind:this={heading} tabindex="-1" data-arcade-tab-anchor>
+            <span class="sr-only">order up</span><OrderPixelWord text="Order Up" />
+          </h1>
+          {#if isServing && shift?.expert}
+            <span class="shop-expert"><ExpertTag /></span>
+          {:else if !inKitchen}
+            <span class="shop-tagline">milk tea counter</span>
+          {/if}
         </div>
-        {#if practice}
-          <span class="practice-meter"><span class="sr-only">Practice counter</span><OrderPixelWord text="Practice" cells={1.5} /></span>
-          <HudButtons {paused} on:pause={pause} />
-        {:else if isServing && shift}
-          <div class="shop-meter" aria-label="Shift status">
-            <span>Day <strong><span class="sr-only">{campaign.day}</span><OrderPixelWord text={String(campaign.day)} cells={1.5} /></strong></span>
-            {#if shift.preOpen !== undefined}
-              <span>Prep <strong><span class="sr-only">{Math.ceil(shift.preOpen)} seconds</span><OrderPixelWord text={String(Math.ceil(shift.preOpen))} cells={1.5} /></strong></span>
-            {:else if shift.status === "open"}
-              <span>Time <strong><span class="sr-only">{clockFace}</span><OrderPixelWord text={clockFace} cells={1.5} /></strong></span>
-            {:else}
-              <span class="last-call">Last call</span>
-            {/if}
-            <span class="shop-till">Till <strong><span class="sr-only">{money(till)}</span><OrderPixelWord text={money(till)} cells={1.5} /></strong></span>
-          </div>
-          <HudButtons {paused} on:pause={pause} />
-        {:else}
-          <div class="shop-modes" role="group" aria-label="Shop difficulty">
-            <button class="boba-key" type="button" aria-pressed={mode === "normal"} on:click={() => switchMode("normal")}>
-              <span class="sr-only">Normal</span><OrderPixelWord text="Normal" cells={1} />
-            </button>
-            <button class="boba-key" type="button" aria-pressed={mode === "expert"} on:click={() => switchMode("expert")}>
-              <span class="sr-only">Expert</span><OrderPixelWord text="Expert" cells={1} />
-            </button>
-          </div>
-          <button class="shop-menu boba-key" type="button" aria-label="Arcade menu" on:click={toMenu}>Arcade<span class="wide-menu">menu</span></button>
-        {/if}
-      </header>
+      </div>
+      {#if practice}
+        <span class="practice-meter"><span class="sr-only">Practice counter</span><OrderPixelWord text="Practice" cells={1.5} /></span>
+        <HudButtons {paused} on:pause={pause} />
+      {:else if isServing && shift}
+        <div class="shop-meter" aria-label="Shift status">
+          <span>Day <strong><span class="sr-only">{campaign.day}</span><OrderPixelWord text={String(campaign.day)} cells={1.5} /></strong></span>
+          {#if shift.preOpen !== undefined}
+            <span>Prep <strong><span class="sr-only">{Math.ceil(shift.preOpen)} seconds</span><OrderPixelWord text={String(Math.ceil(shift.preOpen))} cells={1.5} /></strong></span>
+          {:else if shift.status === "open"}
+            <span>Time <strong><span class="sr-only">{clockFace}</span><OrderPixelWord text={clockFace} cells={1.5} /></strong></span>
+          {:else}
+            <span class="last-call">Last call</span>
+          {/if}
+          <span class="shop-till">Till <strong><span class="sr-only">{money(till)}</span><OrderPixelWord text={money(till)} cells={1.5} /></strong></span>
+        </div>
+        <HudButtons {paused} on:pause={pause} />
+      {:else}
+        <div class="shop-modes" role="group" aria-label="Shop difficulty">
+          <button class="boba-key" type="button" aria-pressed={mode === "normal"} on:click={() => switchMode("normal")}>
+            <span class="sr-only">Normal</span><OrderPixelWord text="Normal" cells={1} />
+          </button>
+          <button class="boba-key" type="button" aria-pressed={mode === "expert"} on:click={() => switchMode("expert")}>
+            <span class="sr-only">Expert</span><OrderPixelWord text="Expert" cells={1} />
+          </button>
+        </div>
+        <button class="shop-menu boba-key" type="button" aria-label="Arcade menu" on:click={toMenu}>Arcade<span class="wide-menu">menu</span></button>
+      {/if}
+    </header>
 
-      <main class="shop-content" class:counter-content={inKitchen}>
-        {#if inKitchen && counterShift}
-          {#key practice?.ticket ?? -1}
-          <OrderServiceCounter
-            bind:this={serviceCounter}
-            campaign={practice?.source ?? campaign}
-            shift={counterShift}
-            notice={practice ? "" : storageAvailable ? notice : storageNotice}
-            {paused}
-            {reduceMotion}
-            {closeView}
-            contracts={practice ? [] : contracts}
-            commission={practice ? null : commission}
-            training={!!practice}
-            onApply={applyShift}
-            onPowerup={(id, orderId) => practice ? false : activate(id, orderId)}
-            onExpress={(id) => practice ? false : callExpress(id)}
-            onCamera={saveCamera}
-            onNextPractice={nextPractice}
-            onExitPractice={returnToLedger}
-          />
+    <main class="shop-content" class:counter-content={inKitchen}>
+      {#if inKitchen && counterShift}
+        {#key practice?.ticket ?? -1}
+        <OrderServiceCounter
+          bind:this={serviceCounter}
+          campaign={practice?.source ?? campaign}
+          shift={counterShift}
+          notice={practice ? "" : storageAvailable ? notice : storageNotice}
+          {paused}
+          {reduceMotion}
+          {closeView}
+          contracts={practice ? [] : contracts}
+          commission={practice ? null : commission}
+          training={!!practice}
+          onApply={applyShift}
+          onPowerup={(id, orderId) => practice ? false : activate(id, orderId)}
+          onExpress={(id) => practice ? false : callExpress(id)}
+          onCamera={saveCamera}
+          onNextPractice={nextPractice}
+          onExitPractice={returnToLedger}
+        />
+        {/key}
+      {:else}
+        <div class="ledger-space">
+          {#key mode}
+            <OrderShopLedger
+              bind:this={ledger}
+              {campaign}
+              {contracts}
+              {commission}
+              {todaySpecials}
+              {shortages}
+              {houseBlend}
+              {todayBlend}
+              {blendTin}
+              tableBooked={shift ? !!shift.reservation : bookedDay === campaign.day}
+              cateringBooked={shift ? !!shift.catering : cateringDay === campaign.day}
+              {initialReceipt}
+              hasActiveShift={!!shift}
+              hasPrepShift={shift?.preOpen !== undefined}
+              saveNotice={storageAvailable ? notice : storageNotice}
+              onStart={openDay}
+              onPractice={openPractice}
+              onPrint={(id) => show(setCupPrint(campaign, id))}
+              onBuyUpgrade={(id) => show(buyUpgrade(campaign, id))}
+              onBuyPowerup={(id) => show(buyPowerup(campaign, id))}
+              onOrderStock={(id, supplier, crates) => show(buyStock(campaign, id, supplier, crates))}
+              onStandingOrder={(id, supplier) => show(setStandingOrder(campaign, id, supplier))}
+              onHire={(id) => show(hireCrew(campaign, id))}
+              onCertify={(id) => show(certifyCrew(campaign, id))}
+              onAssign={(id, active) => show(setCrewActive(campaign, id, active))}
+              onBuyBranch={(id) => show(buyBranch(campaign, id))}
+              onFitBranch={(id) => show(fitBranch(campaign, id))}
+              onSelectBranch={(id) => show(selectBranch(campaign, id))}
+              onManagedBranch={(id) => show(setManagedBranch(campaign, id))}
+              onManagerBranch={(id) => show(setManagerBranch(campaign, id))}
+              onHireLocationManager={(id) => show(hireLocationManager(campaign, id))}
+              onScheduleLocationManager={(id, working) => show(scheduleLocationManager(campaign, id, working))}
+              onCertifyLocationManager={(id) => show(certifyLocationManager(campaign, id))}
+              onManagerMenu={(branch, menu) => show(setManagerMenu(campaign, branch, menu))}
+              onPublicity={(id) => show(buyPublicity(campaign, id))}
+              onReserve={reserveTable}
+              onCatering={reserveCatering}
+              onCommission={() => show(takeCommission(campaign))}
+              onPaint={(paint) => show(paintShop(campaign, paint))}
+              onHouseBlend={saveHouseBlend}
+              onBlendTin={updateBlendTin}
+              onRestart={resetShop}
+            />
           {/key}
-        {:else}
-          <div class="ledger-space">
-            {#key mode}
-              <OrderShopLedger
-                bind:this={ledger}
-                {campaign}
-                {contracts}
-                {commission}
-                {todaySpecials}
-                {shortages}
-                {houseBlend}
-                {todayBlend}
-                {blendTin}
-                tableBooked={shift ? !!shift.reservation : bookedDay === campaign.day}
-                cateringBooked={shift ? !!shift.catering : cateringDay === campaign.day}
-                {initialReceipt}
-                hasActiveShift={!!shift}
-                hasPrepShift={shift?.preOpen !== undefined}
-                saveNotice={storageAvailable ? notice : storageNotice}
-                onStart={openDay}
-                onPractice={openPractice}
-                onPrint={(id) => show(setCupPrint(campaign, id))}
-                onBuyUpgrade={(id) => show(buyUpgrade(campaign, id))}
-                onBuyPowerup={(id) => show(buyPowerup(campaign, id))}
-                onOrderStock={(id, supplier, crates) => show(buyStock(campaign, id, supplier, crates))}
-                onStandingOrder={(id, supplier) => show(setStandingOrder(campaign, id, supplier))}
-                onHire={(id) => show(hireCrew(campaign, id))}
-                onCertify={(id) => show(certifyCrew(campaign, id))}
-                onAssign={(id, active) => show(setCrewActive(campaign, id, active))}
-                onBuyBranch={(id) => show(buyBranch(campaign, id))}
-                onFitBranch={(id) => show(fitBranch(campaign, id))}
-                onSelectBranch={(id) => show(selectBranch(campaign, id))}
-                onManagedBranch={(id) => show(setManagedBranch(campaign, id))}
-                onManagerBranch={(id) => show(setManagerBranch(campaign, id))}
-                onHireLocationManager={(id) => show(hireLocationManager(campaign, id))}
-                onScheduleLocationManager={(id, working) => show(scheduleLocationManager(campaign, id, working))}
-                onCertifyLocationManager={(id) => show(certifyLocationManager(campaign, id))}
-                onManagerMenu={(branch, menu) => show(setManagerMenu(campaign, branch, menu))}
-                onPublicity={(id) => show(buyPublicity(campaign, id))}
-                onReserve={reserveTable}
-                onCatering={reserveCatering}
-                onCommission={() => show(takeCommission(campaign))}
-                onPaint={(paint) => show(paintShop(campaign, paint))}
-                onHouseBlend={saveHouseBlend}
-                onBlendTin={updateBlendTin}
-                onRestart={resetShop}
-                onClassic={openClassic}
-                {loadingClassic}
-              />
-            {/key}
-          </div>
-        {/if}
-      </main>
-    </div>
-    {#if paused}
-      <PauseCard
-        bind:this={pauseCard}
-        pixel
-        resumeLabel="Resume shift"
-        menuLabel="Shop ledger"
-        on:resume={resume}
-        on:menu={returnToLedger}
-        on:exit={exit}
-      />
-    {/if}
+        </div>
+      {/if}
+    </main>
   </div>
-{/if}
+  {#if paused}
+    <PauseCard
+      bind:this={pauseCard}
+      pixel
+      resumeLabel="Resume shift"
+      menuLabel="Shop ledger"
+      on:resume={resume}
+      on:menu={returnToLedger}
+      on:exit={exit}
+    />
+  {/if}
+</div>
 
 <style>
   .shop-scene,

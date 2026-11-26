@@ -3131,7 +3131,7 @@
   // --- Lessons ------------------------------------------------------------------------------
 
   /** Lessons about things that move on their own, so the callout follows them. */
-  const MOVING_LESSONS = new Set(["barrel", "drone", "pigeons", "rush"]);
+  const MOVING_LESSONS = new Set(["barrel", "drone", "rush"]);
 
   /** Asks the lessons what this moment should teach, and keeps the callout on it. */
   function checkLessons() {

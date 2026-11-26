@@ -5,6 +5,7 @@
   import { GAMES, arcadeExpert, canPlay, setExpert, type GameId } from "#lib/boba.ts";
   import { MENU_ICONS } from "#lib/arcade/art.ts";
   import { trapFocus } from "#lib/arcade/focus.ts";
+  import { readBestShiftScore } from "#lib/arcade/orders-display.ts";
   import { readBest, syncBests } from "#lib/arcade/scores.ts";
   import { sfxBlip, unlockAudio } from "#lib/sfx.ts";
   import Leaderboards from "./Leaderboards.svelte";
@@ -27,10 +28,10 @@
   $: if (playable.catch !== undefined) refreshBests(mode);
 
   function refreshBests(which: "normal" | "expert") {
-    bests = Object.fromEntries(GAMES.map((game) => [game.id, readBest(game.id, which)]));
+    bests = Object.fromEntries(GAMES.map((game) => [game.id, game.id === "orders" ? readBestShiftScore(which) : readBest(game.id, which)]));
     // Read again whenever a sync ends, changed or not: another sync may have restored one meanwhile.
     void syncBests(which).then(() => {
-      if (which === mode) bests = Object.fromEntries(GAMES.map((game) => [game.id, readBest(game.id, which)]));
+      if (which === mode) bests = Object.fromEntries(GAMES.map((game) => [game.id, game.id === "orders" ? readBestShiftScore(which) : readBest(game.id, which)]));
     });
   }
 
@@ -167,13 +168,21 @@
                 <span class="line">
                   <span class="name">{game.name}</span>
                   <span class="best">
-                    {bests[game.id] ? `best ${bests[game.id]}` : ""}
+                    {bests[game.id] ? `${game.id === "orders" ? "best shift" : "best"} ${bests[game.id]}` : ""}
                   </span>
                 </span>
                 {#if playable[game.id] === false}
                   <span class="blurb">This game needs a mouse.</span>
                 {:else if failed === game.id}
                   <span class="blurb" role="alert">It didn’t load. Try again.</span>
+                {:else}
+                  <span class="blurb">
+                    {#if typeof game.blurb === "string"}
+                      {game.blurb}
+                    {:else}
+                      {game.blurb.before} <s aria-hidden="true">{game.blurb.crossedOut}</s> {game.blurb.after}
+                    {/if}
+                  </span>
                 {/if}
               </span>
               <kbd class="key" aria-hidden="true">{game.key}</kbd>

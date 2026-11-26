@@ -25,7 +25,6 @@ import {
   GRAVITY,
   HOLD_TIME,
   MAX_SPARES,
-  PIGEON_WARNING,
   SLAM_DRIFT,
   SLAM_SPEED,
   STEAM_PIPE,
@@ -67,8 +66,6 @@ const MOVE_LATE = 0.02;
 export const THING_LEAD = 0.6;
 /** Nor once the runner is this close to it (seconds): too late to be any use. */
 const THING_LATEST = 0.15;
-/** Pigeons are named while they still sit, just before they take off. */
-const PIGEON_LEAD = PIGEON_WARNING + 0.1;
 /** The runner's sprite, in world units above its feet (the box the art fills, a little over the engine's). */
 export const RUNNER_ART_H = 26;
 const RUNNER_ART_HALF = 10;
@@ -108,12 +105,11 @@ export const LESSONS = Object.freeze({
   awning: { id: "awning", text: "Land on the awning to bounce up.", ...thing },
   vent: { id: "vent", text: "Glide over the vent to ride the updraft.", ...thing },
   cable: { id: "cable", text: "Jump to catch the cable and ride it.", ...thing },
-  pigeons: { id: "pigeons", text: "Pigeons are harmless and just scatter.", ...thing },
-  barrel: { id: "barrel", text: "Barrels roll at you, so hop them.", ...thing },
-  drone: { id: "drone", text: "The drone flies in low, so slide under.", ...thing },
-  steam: { id: "steam", text: "Steam blows on a beat, so hop between.", ...thing },
+  barrel: { id: "barrel", text: "Hop over the rolling barrels.", ...thing },
+  drone: { id: "drone", text: "Slide under the floating drones.", ...thing },
+  steam: { id: "steam", text: "Jump between bursts of steam.", ...thing },
   boards: { id: "boards", text: "Rotten boards give way, so keep running.", ...thing },
-  swing: { id: "swing", text: "Slide under the swinging sign, or time it.", ...thing },
+  swing: { id: "swing", text: "Slide under or jump over the swinging sign.", ...thing },
 });
 
 /** The control a lesson's own move is made with: pressing it resumes play and makes the move. */
@@ -479,10 +475,10 @@ export function lessonAhead(state, learned, { view }) {
   /**
    * A thing, by its box (the part of it the brackets go round, never a
    * whole set piece), met at `near` (closing at `closing` units a second)
-   * and passed at `clear`. It is named once it is `lead` seconds off, while
+   * and passed at `clear`. It is named once it is `THING_LEAD` seconds off, while
    * it is on screen, and not once it is all but met.
    * @param {Lesson} lesson @param {{ x0: number, y0: number, x1: number, y1: number }} box
-   * @param {{ near?: number, clear?: number, item?: any, lead?: number, closing?: number }} [extra]
+   * @param {{ near?: number, clear?: number, item?: any, closing?: number }} [extra]
    */
   const offerThing = (lesson, box, extra = {}) => {
     const x = (box.x0 + box.x1) / 2;
@@ -490,7 +486,7 @@ export function lessonAhead(state, learned, { view }) {
     const closing = extra.closing ?? v;
     const off = (near - r.x) / closing;
     if (lesson.id === "hazard" && off > 0 && off <= MOVE_LEAD) found.hazardSoon = true;
-    if (learned(lesson.id) || off < THING_LATEST || off > (extra.lead ?? THING_LEAD) || x > r.x + view) return;
+    if (learned(lesson.id) || off < THING_LATEST || off > THING_LEAD || x > r.x + view) return;
     /** @type {LessonCue} */
     const cue = {
       lesson,
@@ -563,9 +559,6 @@ export function lessonAhead(state, learned, { view }) {
           offerThing(LESSONS.cable, { x0: at - 30, x1: at + 30, y0: y - 24, y1: y + 6 }, { near: it.x0, clear: it.x1 });
           break;
         }
-        case "pigeon":
-          if (it.state === "sit") offerThing(LESSONS.pigeons, { x0: it.x - 6, x1: it.x + 6, y0: it.y, y1: it.y + 8 }, { lead: PIGEON_LEAD, near: it.x });
-          break;
         case "barrel":
           // Followed as it rolls, so the line stays on the barrel it named.
           if (it.state === "wait" || it.state === "roll") {

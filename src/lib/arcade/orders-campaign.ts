@@ -204,6 +204,7 @@ export interface Delivery extends StockLot {
 }
 
 export interface DayEarnings {
+  shiftScore?: number;
   revenue: number;
   tips: number;
   served: number;
@@ -223,6 +224,7 @@ export interface DayEarnings {
 }
 
 export interface DayReport {
+  shiftScore?: number;
   day: number;
   revenue: number;
   tips: number;
@@ -261,6 +263,7 @@ export interface Campaign {
   xp: number;
   reputation: number;
   highestReputation: number;
+  bestShiftScore: number;
   status: "planning" | "open" | "closed";
   inventory: StockLot[];
   deliveries: Delivery[];
@@ -385,7 +388,7 @@ function openingStock(mode: CampaignMode, day: number, nextId = 1): StockLot[] {
 export function newCampaign(mode: CampaignMode): Campaign {
   const inventory = openingStock(mode, 1);
   return {
-    version: 2, mode, day: 1, cash: mode === "expert" ? 4200 : 5400, xp: 0, reputation: 50, highestReputation: 50,
+    version: 2, mode, day: 1, cash: mode === "expert" ? 4200 : 5400, xp: 0, reputation: 50, highestReputation: 50, bestShiftScore: 0,
     status: "planning", inventory, deliveries: [], upgrades: [], powerups: blankPowerups(), activePowerups: [],
     legacyUnlimitedStock: false, crew: [], crewShifts: {}, certifiedCrew: [], activeCrew: [], branches: ["corner"], branchFittings: [], activeBranch: "corner", managedBranch: null, managerBranch: null, locationManagers: {}, managerMenus: {}, publicity: null,
     commission: null, standingOrders: {}, paint: "clay", paintUnlocked: ["clay"], recipeRecords: {}, cupPrint: "house",
@@ -408,7 +411,10 @@ function savedReport(value: unknown, day: number): DayReport | null {
   if (!entry) return null;
   const reportDay = whole(entry.day);
   if (!reportDay || reportDay > day) return null;
+  const shiftScore = typeof entry.shiftScore === "number"
+    ? { shiftScore: whole(entry.shiftScore, 0, whole(entry.served) * 100) } : {};
   return {
+    ...shiftScore,
     day: reportDay, revenue: whole(entry.revenue), tips: whole(entry.tips), served: whole(entry.served),
     quality: whole(entry.quality, 0, 100), missed: whole(entry.missed), expired: whole(entry.expired),
     rent: whole(entry.rent), rentOwed: whole(entry.rentOwed), wages: whole(entry.wages), branchIncome: whole(entry.branchIncome), contractBonus: whole(entry.contractBonus),
@@ -510,6 +516,7 @@ export function normalizeCampaign(value: unknown, mode: CampaignMode): Campaign 
   }
   const activeCrew = savedIds(CREW, saved.activeCrew).filter((id): id is LiveCrewId => id !== "manager" && crew.includes(id) && (!managedBranch || id !== "runner"));
   const reputation = whole(saved.reputation, initial.reputation, 100);
+  const lastDay = savedReport(saved.lastDay, day);
   const runningEvent = status === "open" ? DAY_EVENTS.find(({ id }) => id === saved.currentEvent) : undefined;
 
   return {
@@ -522,7 +529,7 @@ export function normalizeCampaign(value: unknown, mode: CampaignMode): Campaign 
     highestReputation: Math.max(reputation, whole(saved.highestReputation, reputation, 100)),
     upgrades: purchased.filter((value): value is UpgradeId => UPGRADES.some(({ id }) => value === id)),
     activePowerups: active.filter((value): value is PowerupId => POWERUPS.some(({ id }) => value === id)),
-    currentEvent: runningEvent?.id ?? eventForDay(day).id, lastDay: savedReport(saved.lastDay, day),
+    currentEvent: runningEvent?.id ?? eventForDay(day).id, lastDay, bestShiftScore: Math.max(whole(saved.bestShiftScore), lastDay?.shiftScore ?? 0),
     regularVisits: visitCounts(saved.regularVisits), rentPaid: whole(saved.rentPaid), rentBook: normalizeRentBook(saved.rentBook),
   };
 }
@@ -707,7 +714,9 @@ export function finishDay(campaign: Campaign, earnings: DayEarnings): CampaignRe
   }));
   const regularVisits = { ...campaign.regularVisits, ...visitsToday };
   const publicityCost = publicityFor(campaign.publicity)?.price ?? 0;
+  const shiftScore = earnings.shiftScore === undefined ? {} : { shiftScore: whole(earnings.shiftScore, 0, served * 100) };
   const lastDay: DayReport = {
+    ...shiftScore,
     standingOrders: 0, standingSpent: 0, day: campaign.day, revenue, tips, served, quality, missed, expired, rent, rentOwed, wages, branchIncome,
     contractBonus, reservationBonus, cateringBonus, managedSales, managedOrders, managerSales, managerOrders, publicityCost, promotion, level, reason, commissionReward,
     ...(commissionReward && offer ? { commissionName: offer.name } : {}),
@@ -715,7 +724,7 @@ export function finishDay(campaign: Campaign, earnings: DayEarnings): CampaignRe
     ...(newAward ? { newAward } : {}),
   };
   const settled: Campaign = {
-    ...campaign, cash: proceeds - rent, xp, lastDay, regularVisits, crewShifts, activePowerups: [], publicity: null,
+    ...campaign, bestShiftScore: Math.max(campaign.bestShiftScore, lastDay.shiftScore ?? 0), cash: proceeds - rent, xp, lastDay, regularVisits, crewShifts, activePowerups: [], publicity: null,
     recipeRecords: mergeRecipeRecords(campaign.recipeRecords, earnings.recipeRecords ?? {}),
     rentBook: recordRentDay(campaign.rentBook, {
       day: campaign.day, cups: served + managedOrders + managerOrders, takings: dayTakings(lastDay), payroll: wages, expired, rent, reserve: proceeds - rent,

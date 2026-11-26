@@ -188,6 +188,7 @@ export function servicePlan(orders: readonly ServiceOrder[]): ServicePlan {
 export type ServiceState = ServiceDay;
 
 export interface ServiceSummary {
+  shiftScore: number;
   revenue: number;
   tips: number;
   served: number;
@@ -1757,7 +1758,7 @@ export function serviceSummary(state: ServiceDay): ServiceSummary {
     if (receipt.packedAt === undefined && receipt.quality >= 70) regularVisits[receipt.customerId] = (regularVisits[receipt.customerId] ?? 0) + 1;
   }
   return {
-    revenue, tips, served: receipts.length, quality: receipts.length ? Math.round(quality / receipts.length) : 0,
+    revenue, tips, served: receipts.length, shiftScore: quality, quality: receipts.length ? Math.round(quality / receipts.length) : 0,
     missed: state.orders.filter((order) => order.status === "missed").length, regularVisits,
   };
 }

@@ -262,31 +262,31 @@
 
   // --- Copy ------------------------------------------------------------------
 
-  const INTRO_FIRST = "The moon ordered a milk tea. You're the last mile.";
+  const INTRO_FIRST = "The moon ordered a milk tea.";
   const INTRO_SECOND = "Crosswind reported. Yes, on the moon.";
   const INTRO_LATER = [
-    "Smaller coasters, less tea. Budget cuts.",
-    "The coasters keep shrinking. The order doesn't.",
+    "Smaller coasters, less tea. Houston, we got budget cuts.",
+    "The coasters are getting smaller.",
   ];
   const LANDINGS = [
-    "Contact. The tea didn't ripple.",
-    "Down and upright. The straw salutes.",
+    "The tea didn't ripple.",
+    "Down and upright.",
     "Delivered. Someone up here ordered ahead.",
     "Soft enough to keep the foam.",
-    "Landed. The pearls barely noticed.",
+    "You landed, and the pearls barely noticed.",
   ];
   const CRASHES: Record<CrashReason, string[]> = {
     fast: [
-      "That was a spill. A fast one.",
-      "New crater. It smells faintly of oolong.",
-      "The moon has been served, all at once.",
+      "That was a fast spill.",
+      "The new crater smells faintly of oolong.",
+      "The moon has been served.",
     ],
-    hard: ["On the coaster, through the coaster.", "Right place, wrong speed."],
-    tilt: ["Lid side down. Tea prefers upright.", "Sideways counts as a pour, not a landing."],
-    drift: ["A gentle descent, then a long skid.", "Down softly, but still going somewhere."],
-    off: ["A lovely approach to a place with no coaster.", "The coasters are the flat parts."],
+    hard: ["You punched through the coaster.", "You hit that coaster too fast."],
+    tilt: ["Tea prefers to land upright.", "Sideways counts as a pour."],
+    drift: ["That was a long skid.", "You touched down with too much drift."],
+    off: ["You made a lovely approach to nowhere.", "The coasters are the flat parts."],
   };
-  const EMPTY_LINE = "The cup is empty. Gravity has noticed.";
+  const EMPTY_LINE = "Gravity noticed the empty cup.";
 
   // --- The lander sprite -------------------------------------------------------
 

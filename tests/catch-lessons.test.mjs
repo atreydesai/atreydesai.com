@@ -164,7 +164,7 @@ function shift(rules, seed, seconds, { drop = new Set(), hand = "quick", reads =
     const x = lesson.id === "catch" ? flightPath(cup, cup.gravity, field, []).at(-1).x : 0;
     cue = { lesson, cup, spawn, x };
     const down = cup ? soonestDown(cups) : null;
-    const before = (other) => other !== cup && !other.passed && other.landAt < cup.landAt && (lesson.id !== "volley" || other.volley === cup.volley);
+    const before = (other) => other !== cup && !other.passed && other.landAt < cup.landAt;
     offers.push({
       id: lesson.id,
       at: elapsed,
@@ -406,8 +406,7 @@ function shift(rules, seed, seconds, { drop = new Set(), hand = "quick", reads =
       if (!coach.current && quiet >= REST && learned("catch")) {
         const down = soonestDown(cups);
         if (down && down.landAt - elapsed >= backFromSlip(down) + PAUSE_SLACK) {
-          const paired = down.volley > 0 && cups.some((other) => other !== down && other.volley === down.volley && !other.passed);
-          for (const sort of [down.golden ? "golden" : "", paired ? "volley" : "", down.kind]) {
+          for (const sort of [down.golden ? "golden" : "", down.kind]) {
             if (sort && firstChance[sort] === undefined) firstChance[sort] = elapsed;
           }
         }
@@ -451,7 +450,7 @@ const first = (offers, id) => offers.find((entry) => entry.id === id);
 test("every lesson fits the arcade's one-line voice", () => {
   for (const lesson of Object.values(LESSONS)) {
     const words = lesson.text.trim().split(/\s+/);
-    assert.ok(words.length <= 8, `${lesson.id} runs to ${words.length} words`);
+    assert.ok(words.length <= 10, `${lesson.id} runs to ${words.length} words`);
     assert.ok(!/[!·]/.test(lesson.text), `${lesson.id} uses a mark the voice avoids`);
     assert.match(lesson.text, /^[A-Z][^.]*[^.\s]\.$/, `${lesson.id} isn't one full sentence`);
   }
@@ -580,7 +579,6 @@ const FITS = {
   catch: () => true,
   golden: (entry) => entry.cup.golden,
   comeback: (entry) => entry.cup.golden && entry.pearlDown,
-  volley: (entry) => entry.cup.volley > 0,
   lob: (entry) => entry.cup.kind === "lob",
   flick: (entry) => entry.cup.kind === "flick",
 };
@@ -609,11 +607,11 @@ test("every lesson about a cup is about the next cup down, and stands down if a 
 
 test("each new thing is named on the next cup down, the first time play may stop for it, with time to get back under it", () => {
   for (const [rules, seconds, least] of [[normal, 200, 8], [expert, 150, 6]]) {
-    const taughtIn = { golden: 0, volley: 0, lob: 0, flick: 0 };
+    const taughtIn = { golden: 0, lob: 0, flick: 0 };
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       const name = `${rules.expert ? "expert" : "normal"} seed ${seed}`;
       const { offers, firstChance } = shift(rules, seed, seconds);
-      for (const id of ["golden", "volley", "lob", "flick"]) {
+      for (const id of ["golden", "lob", "flick"]) {
         const entry = first(offers, id);
         assert.equal(LESSONS[id].slow, 0);
         // Never before such a cup was next down with time to stop for it…

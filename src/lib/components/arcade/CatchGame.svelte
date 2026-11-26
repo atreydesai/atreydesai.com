@@ -204,8 +204,6 @@
     golden: boolean;
     /** How it was thrown: a plain throw, a high lob that hangs, or a low flick. */
     kind: "throw" | "lob" | "flick";
-    /** Shared by the cups of one pair or three; 0 for a cup thrown alone. */
-    volley: number;
     /** When (on the sim clock) and where it reaches the catch line. */
     landAt: number;
     landCenter: number;
@@ -225,7 +223,6 @@
     source: HTMLElement | null;
     /** The link's centre and size on screen, for the lesson that rings it. */
     link: { x: number; y: number; width: number; height: number } | null;
-    volley: number;
   }
 
   // --- Reactive UI state ---------------------------------------------------
@@ -245,7 +242,7 @@
   let phase: GamePhase = "opening";
   let missPulse = 0;
   let missFlash = false;
-  let liveMessage = "Boba catch is starting.";
+  let liveMessage = "";
   let localBest = 0;
   let newBest = false;
   let share: string[] = [];
@@ -417,7 +414,6 @@
   let spawnTimer = 0;
   let spawnNumber = 0;
   /** Volleys thrown this run, so the cups of one share a number. */
-  let volleys = 0;
   let basketSquash = 0;
   /** Seconds the basket has left to flicker after a pearl drops or comes back. */
   let basketBlink = 0;
@@ -698,13 +694,12 @@
   /** One throw: a single cup, or a volley from several links at once. */
   function queueVolley(size: number, difficulty: Difficulty) {
     const links = eligibleLinks();
-    const volley = size > 1 ? ++volleys : 0;
     for (let index = 0; index < size; index++) {
-      queueSpawn(links, difficulty.telegraph + index * VOLLEY_STAGGER, volley);
+      queueSpawn(links, difficulty.telegraph + index * VOLLEY_STAGGER);
     }
   }
 
-  function queueSpawn(links: ReturnType<typeof eligibleLinks>, telegraph: number, volley: number) {
+  function queueSpawn(links: ReturnType<typeof eligibleLinks>, telegraph: number) {
     let centerX = BOBA_W / 2 + Math.random() * Math.max(1, viewW - BOBA_W);
     let centerY = MIN_SPAWN_CENTER_Y + Math.random() * Math.max(1, viewH * 0.2);
     let source: HTMLElement | null = null;
@@ -738,7 +733,6 @@
       golden,
       source,
       link,
-      volley,
     });
   }
 
@@ -768,7 +762,6 @@
       grid: [...straw, ...CUP],
       golden: spawn.golden,
       kind: plan.kind,
-      volley: spawn.volley,
       landAt: plan.landAt,
       landCenter: plan.landCenter,
       passed: false,
@@ -1444,7 +1437,6 @@
     countdownElapsed = 0;
     spawnTimer = 0;
     spawnNumber = 0;
-    volleys = 0;
     basketSquash = 0;
     basketBlink = 0;
     shiftLabel = formatShift(0);

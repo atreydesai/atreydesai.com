@@ -211,8 +211,8 @@ test("a thing is named as it becomes relevant, not as it comes into view", () =>
     for (const { cue, x, v } of cuesOf(seed)) {
       if (cue.ghost || cue.onRunner) continue;
       const off = ((cue.near ?? cue.x) - x) / v;
-      // Pigeons just before they take off; barrels and drones by how fast they close; anything else at THING_LEAD.
-      const most = cue.lesson.id === "pigeons" ? 0.86 : cue.item ? 0.95 : THING_LEAD + 0.01;
+      // Barrels and drones by how fast they close, other objects at THING_LEAD.
+      const most = cue.item ? 0.95 : THING_LEAD + 0.01;
       assert.ok(off <= most, `seed ${seed}: ${cue.lesson.id} named ${off.toFixed(2)} s off`);
       assert.ok(off >= 0.14, `seed ${seed}: ${cue.lesson.id} named only ${off.toFixed(2)} s off`);
     }

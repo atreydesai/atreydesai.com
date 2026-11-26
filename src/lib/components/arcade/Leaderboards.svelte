@@ -14,6 +14,7 @@
 
   const dispatch = createEventDispatcher<{ pick: GameId }>();
   const SHOWN = 5;
+  const rankedGames = GAMES.filter(({ id }) => id !== "orders");
 
   type Status = "loading" | "ready" | "offline";
   let boards: Partial<Record<GameId, { status: Status; scores: BoardEntry[] }>> = {};
@@ -22,9 +23,9 @@
 
   async function load(which: ArcadeMode) {
     loadedMode = which;
-    boards = Object.fromEntries(GAMES.map((game) => [game.id, { status: "loading", scores: [] }]));
+    boards = Object.fromEntries(rankedGames.map((game) => [game.id, { status: "loading", scores: [] }]));
     await Promise.all(
-      GAMES.map(async (game) => {
+      rankedGames.map(async (game) => {
         const result = await fetchBoard(game.id, which);
         // The switch may have flipped while this was on its way.
         if (loadedMode !== which) return;
@@ -39,17 +40,17 @@
   $: if (mode !== loadedMode) void load(mode);
 
   onMount(() => {
-    playable = Object.fromEntries(GAMES.map((game) => [game.id, canPlay(game.id)]));
+    playable = Object.fromEntries(rankedGames.map((game) => [game.id, canPlay(game.id)]));
   });
 
-  $: anyOffline = GAMES.every((game) => boards[game.id]?.status === "offline");
+  $: anyOffline = rankedGames.every((game) => boards[game.id]?.status === "offline");
 </script>
 
 {#if anyOffline}
-  <p class="boba-deck offline">The leaderboards are offline.</p>
+  <p class="boba-deck offline">Leaderboards are offline.</p>
 {:else}
   <ol class="boards">
-    {#each GAMES as game (game.id)}
+    {#each rankedGames as game (game.id)}
       {@const board = boards[game.id]}
       <li class="board">
         <h3 class="head">

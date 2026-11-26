@@ -335,9 +335,9 @@
 
     <p class="sr-only" aria-live="polite">
       {imageState === "copied"
-        ? "The image is copied."
+        ? "Image copied."
         : textState === "copied"
-          ? "The text is copied."
+          ? "Text copied."
           : imageState === "failed" || textState === "failed"
             ? "Copying failed."
             : ""}

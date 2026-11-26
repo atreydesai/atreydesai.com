@@ -337,7 +337,7 @@ game decided it.
   message is one short full sentence in sentence case with a full stop
   ("Hold jump to go higher.", "The last pearl dropped."). Labels and titles
   stay lowercase words (`points`, `paused`, `clocked out`).
-- **One thing at a time.** A lesson is one sentence of eight words or fewer,
+- **One thing at a time.** A lesson is one sentence, preferably eight words or fewer,
   plus its key. No kicker above it, no second clause after it.
 - **Nothing to say, say nothing.** An empty state shows nothing: no "no
   combo yet", no "none yet", no line under a countdown that only repeats the
@@ -632,7 +632,7 @@ favorite recipes, including blends of strawberries and banana.
   the crate arrives. Ingredient controls can lead there when their bin is empty.
   On the public side, the entrance leads to the order line and the separate
   pickup mark. The original Order Up cast walks in, reacts to the wait, and
-  takes a sip before carrying out a boba cup. Reuse Score Attack's faces and
+  takes a sip before carrying out a boba cup. Reuse the original guest faces and
   emotes so a guest's reaction matches their receipt. Tap a guest to take their ticket
   or work on their order. At Serve, a guest with a sealed cup can be served
   directly. The ticket rail repeats the guest's name, patience, and pickup
@@ -716,9 +716,13 @@ favorite recipes, including blends of strawberries and banana.
   and readouts use drawn letters. Longer labels and recipes use Neue Haas
   Grotesk.
 
-#### Score attack
+Each drink served or packed at the player's counter adds its quality out
+of 100 to the shift score. The closing receipt shows the total. The Arcade
+menu shows the best completed shift for the current difficulty and shop save.
 
-The ledger also links to the short leaderboard shift.
+#### Original Score Attack archive
+
+The original leaderboard shift is archived.
 
 Guests walk up to the counter and hand over a ticket, which goes up and is
 clipped to the rail. You take one ticket at a time through the stations:

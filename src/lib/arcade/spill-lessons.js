@@ -73,7 +73,7 @@ export const LESSONS = Object.freeze({
   // Above the route move: a straw off the ghost is taken back before the route goes on.
   takeBack: { id: "takeBack", text: "Click a straw to get its length back.", ...thing, priority: 3, during: "any" },
   gauge: { id: "gauge", text: "This is your straw left, running low.", ...thing, during: "plan" },
-  dial: { id: "dial", text: "The kettle pours by itself at zero.", ...thing, during: "plan" },
+  dial: { id: "dial", text: "The kettle starts pouring at zero.", ...thing, during: "plan" },
   // The pour stops where it is, the tea in the air and all, while this is read.
   fill: { id: "fill", text: "Fill the cup to its dashed line.", ...thing, during: "pour" },
   stars: { id: "stars", text: "Fuller cups and less spill earn more stars.", ...thing, during: "result" },
@@ -109,7 +109,7 @@ const WORDINGS = {
   route: { keys: { text: "Hold Space and steer along the ghost.", keys: ["Space", "←↑↓→"] } },
   takeBack: {
     touch: { text: "Tap a straw to get its length back." },
-    keys: { text: "Delete refunds the straw under the pen.", keys: ["Delete"] },
+    keys: { text: "Get your straw back by deleting old lines.", keys: ["Delete"] },
   },
 };
 

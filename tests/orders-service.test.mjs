@@ -162,12 +162,27 @@ test("a full recipe, fresh prep, and a timely handoff earn a graded receipt and 
   assert.deepEqual(receipt.grades, { brew: 100, build: 100, finish: 100, wait: 100 });
   assert.ok(receipt.revenue > 400 && receipt.tips > 0);
   assert.deepEqual(serviceSummary(served), {
-    revenue: receipt.revenue, tips: receipt.tips, served: 1, quality: 100, missed: 0, regularVisits: { biscuit: 1 },
+    revenue: receipt.revenue, tips: receipt.tips, served: 1, shiftScore: 100, quality: 100, missed: 0, regularVisits: { biscuit: 1 },
   });
   assert.deepEqual(restoreService(JSON.parse(JSON.stringify(served)), 1, false), served);
   assert.equal(serveOrder(served, order.id), served);
   const liked = day({ regularVisits: { biscuit: 4 } });
   assert.equal(liked.orders[1].patience, initial.orders[1].patience + 4);
+});
+
+test("shift points add the actual grades and count only completed handoffs", () => {
+  const initial = day();
+  const first = initial.orders[0];
+  const second = initial.orders[1];
+  const accepted = brew(initial, first);
+  assert.equal(serviceSummary(accepted).shiftScore, 0);
+  const one = serve(build(accepted, first), first);
+  const two = serve(brew(one, second), second);
+  const grades = two.receipts.map(({ quality }) => quality);
+  assert.equal(grades.length, 2);
+  assert.ok(grades[1] < grades[0]);
+  assert.equal(serviceSummary(two).shiftScore, grades[0] + grades[1]);
+  assert.equal(serviceSummary(serveOrder(two, first.id)).shiftScore, grades[0] + grades[1]);
 });
 
 test("wrong choices grade below the intended recipe and a remake never refunds ingredients", () => {

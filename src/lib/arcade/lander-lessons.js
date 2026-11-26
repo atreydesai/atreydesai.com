@@ -151,8 +151,8 @@ export const LESSONS = Object.freeze({
   steer: { id: "steer", text: "Tilt and burn to stop over a coaster.", keys: ["←", "→"], touch: "tilt", ...move },
   // A touchdown about to go wrong outranks any other move: it is needed first.
   touchdown: { id: "touchdown", text: "Come down slow, level and still.", keys: ["Space"], touch: "hold burn", ...move, priority: 3 },
-  fuel: { id: "fuel", text: "Burn in bursts: leftover tea is your score.", ...thing },
-  wind: { id: "wind", text: "Pennants show the wind; tilt against it.", ...thing },
+  fuel: { id: "fuel", text: "Conserve your fuel to get a better score.", ...thing },
+  wind: { id: "wind", text: "Pennants show the wind.", ...thing },
   landers: { id: "landers", text: "Each crash costs one lander.", ...thing },
   feather: { id: "feather", name: "feather", text: "A landing this soft pays a bonus.", ...thing },
 });

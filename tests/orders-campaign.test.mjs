@@ -18,6 +18,20 @@ import { shiftContractReward } from "../src/lib/arcade/orders-challenges.ts";
 
 const noSales = { revenue: 0, tips: 0, served: 0, quality: 0 };
 
+test("completed shift points persist per campaign without using old arcade scores", () => {
+  const oldSave = newCampaign("normal");
+  delete oldSave.bestShiftScore;
+  let campaign = normalizeCampaign(oldSave, "normal");
+  assert.equal(campaign.bestShiftScore, 0);
+  campaign = endDay(campaign, { ...noSales, served: 2, quality: 88, shiftScore: 175 });
+  assert.equal(campaign.lastDay.shiftScore, 175);
+  assert.equal(campaign.bestShiftScore, 175);
+  campaign = endDay(campaign, { ...noSales, served: 1, quality: 90, shiftScore: 90 });
+  assert.equal(campaign.lastDay.shiftScore, 90);
+  assert.equal(normalizeCampaign(JSON.parse(JSON.stringify(campaign)), "normal").bestShiftScore, 175);
+  assert.equal(newCampaign("expert").bestShiftScore, 0);
+});
+
 test("commissions persist across shifts, pay once, and count toward rent", () => {
   for (const mode of ["normal", "expert"]) {
     const initial = newCampaign(mode);

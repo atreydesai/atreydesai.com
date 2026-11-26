@@ -13,7 +13,7 @@ interface GameInfo {
   /** Lowercase display name, in the site's voice. */
   name: string;
   /** One sentence for the menu. */
-  blurb: string;
+  blurb: string | { before: string; crossedOut: string; after: string };
   /** Menu shortcut. */
   key: string;
   /** Catch steers a basket with the mouse, so it needs a fine pointer. */
@@ -24,42 +24,42 @@ export const GAMES: GameInfo[] = [
   {
     id: "catch",
     name: "boba catch",
-    blurb: "Cups fly out of the page’s links. Catch them in the basket.",
+    blurb: "Catch the cups in the bucket.",
     key: "1",
     desktopOnly: true,
   },
   {
     id: "runner",
     name: "sugar rush",
-    blurb: "Run the rooftops and deliver the tea before it spills.",
+    blurb: "Deliver the tea to customers and avoid obstacles along the way!",
     key: "2",
     desktopOnly: false,
   },
   {
     id: "lander",
     name: "tea minus",
-    blurb: "Land a cup of milk tea on the moon. The tea is also the fuel.",
+    blurb: "One step for tea, one giant leap for teakind.",
     key: "3",
     desktopOnly: false,
   },
   {
     id: "stack",
     name: "cup stack",
-    blurb: "Drop each cup on the last. Whatever hangs over gets sliced off.",
+    blurb: "Stack the cups on top of one another.",
     key: "4",
     desktopOnly: false,
   },
   {
     id: "spill",
     name: "spill",
-    blurb: "Draw straws to steer the pour into the cup.",
+    blurb: { before: "Where’s your", crossedOut: "water", after: "tea?" },
     key: "5",
     desktopOnly: false,
   },
   {
     id: "stab",
     name: "straw stab",
-    blurb: "Punch a straw into every cup, right on the beat.",
+    blurb: "Punch a straw into every cup.",
     key: "6",
     desktopOnly: false,
   },

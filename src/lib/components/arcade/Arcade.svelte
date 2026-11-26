@@ -38,7 +38,7 @@
 
   async function load(id: GameId) {
     // A game opened from a link skips the menu: bring back its best from the board.
-    void syncBests(undefined, id);
+    if (id !== "orders") void syncBests(undefined, id);
     try {
       const module = await LOADERS[id]();
       // The visitor may have moved on while it loaded.

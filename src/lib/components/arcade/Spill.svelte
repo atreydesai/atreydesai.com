@@ -3020,7 +3020,7 @@
       sfxRoomFail();
       if (!reduceMotion) shake = 1;
       showCaption(room.hint, Infinity);
-      liveMessage = `Spilled. Hint: ${room.hint}.`;
+      liveMessage = `Spilled. ${room.hint}`;
     }
     // What the room's end means, the first time: the stars, the points, a spill's hint.
     endLesson();

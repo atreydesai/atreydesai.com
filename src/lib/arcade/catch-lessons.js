@@ -18,7 +18,7 @@
 // either); a hand passing through the spot isn't holding it there, and one
 // near the slip is reaching for Continue. The lesson counts once that cup
 // is caught. Everything else is a thing, named
-// once as it first matters (the glowing link, a golden cup, a pair, a lob,
+// once as it first matters (the glowing link, a golden cup, a lob,
 // a flick, a lost pearl, the bonus point).
 //
 // Stopping play must never cost a pearl. A lesson about a cup is only ever
@@ -80,19 +80,18 @@ const aCup = { slow: 0, life: HOLD, minLife: 1.4 };
 /** A line about something that just happened, beside the basket. */
 const anEvent = { slow: 0, life: HOLD, minLife: 1.6 };
 
-/** Every lesson: one short full sentence, eight words or fewer. @type {Readonly<Record<string, Lesson>>} */
+/** Every lesson: one short full sentence, ten words or fewer. @type {Readonly<Record<string, Lesson>>} */
 export const LESSONS = Object.freeze({
   // Play stops while the first link to light is still lit; once it has been
   // continued, the link throws and play freezes again for the catch.
-  glow: { id: "glow", text: "A glowing link is about to throw.", slow: 0, life: HOLD, minLife: 1.3 },
-  catch: { id: "catch", text: "Move the basket under the cup.", slow: 0, life: Infinity, minLife: 0.8, move: true },
-  miss: { id: "miss", text: "Each missed cup costs a pearl.", ...anEvent },
-  perfect: { id: "perfect", text: "Catch in the middle for a bonus point.", ...anEvent },
+  glow: { id: "glow", text: "A cup will fly from the glowing link.", slow: 0, life: HOLD, minLife: 1.3 },
+  catch: { id: "catch", text: "Move the bucket under the cup.", slow: 0, life: Infinity, minLife: 0.8, move: true },
+  miss: { id: "miss", text: "Every missed cup costs one pearl.", ...anEvent },
+  perfect: { id: "perfect", text: "Catch cups in the middle for a bonus.", ...anEvent },
   golden: { id: "golden", text: "Golden cups are worth three points.", ...aCup },
-  comeback: { id: "comeback", text: "Three straight golden cups win a pearl back.", ...aCup },
-  volley: { id: "volley", text: "Catch the first to land, then the next.", ...aCup },
-  lob: { id: "lob", text: "High lobs drift, so follow them down.", ...aCup },
-  flick: { id: "flick", text: "Low flicks land fast, so move early.", ...aCup },
+  comeback: { id: "comeback", text: "Three consecutive golden cups earn a pearl back.", ...aCup },
+  lob: { id: "lob", text: "High lobs tend to drift, so pay special attention.", ...aCup },
+  flick: { id: "flick", text: "Low flicks land very fast, so prepare your bucket early.", ...aCup },
 });
 
 /**
@@ -102,7 +101,6 @@ export const LESSONS = Object.freeze({
  * @property {number} y Top of the sprite.
  * @property {boolean} golden
  * @property {"throw" | "lob" | "flick"} kind
- * @property {number} volley Shared by the cups of one pair or three; 0 for a cup thrown alone.
  * @property {number} landAt When it reaches the catch line, on the shift's clock.
  * @property {number} landCenter Where its centre is then.
  * @property {boolean} [passed] It has gone past the catch line uncaught, and only has to fall off the page.
@@ -188,16 +186,6 @@ export function mayPause(moment, about = null) {
 }
 
 /**
- * Whether another cup of `cup`'s pair (or three) is in the air with it.
- * @param {CupInFlight} cup @param {CupInFlight[]} cups
- */
-function inVolley(cup, cups) {
-  if (!cup.volley) return false;
-  for (const other of cups) if (other !== cup && other.volley === cup.volley && !other.passed) return true;
-  return false;
-}
-
-/**
  * The lesson this moment needs, if the device still needs one: the catch on
  * the next cup to come down (while there is time to get under it; if not,
  * nothing until it has gone past), then the glow on a link about to throw,
@@ -231,7 +219,6 @@ export function lessonNow(moment, learned) {
     if (!learned("golden")) return about(LESSONS.golden);
     if (moment.pearlDown && moment.pearlsComeBack && !learned("comeback")) return about(LESSONS.comeback);
   }
-  if (!learned("volley") && inVolley(next, cups)) return about(LESSONS.volley);
   for (const kind of /** @type {const} */ (["lob", "flick"])) {
     if (!learned(kind) && SORTS[kind](next)) return about(LESSONS[kind]);
   }

@@ -86,8 +86,6 @@
   export let onHouseBlend: (value: HouseBlend | null) => void;
   export let onBlendTin: (book: BlendTin) => void;
   export let onRestart: () => void;
-  export let onClassic: () => void;
-  export let loadingClassic = false;
 
   type View = "opening" | "receipt" | "pantry" | "workshop" | "office" | "regulars" | "house";
   const tools = [
@@ -407,9 +405,6 @@
           <button class="ledger-link" type="button" on:click={() => onPractice()}>
             <OrderKitchenItem kind="cup" size={23} /> Practice a ticket
           </button>
-          <button class="ledger-link classic-link" type="button" on:click={onClassic} disabled={loadingClassic}>
-            <OrderKitchenItem kind="bell" size={22} /> Score attack
-          </button>
         </div>
       </div>
     </div>
@@ -433,6 +428,9 @@
           </p>
         </div>
         <div class="receipt-details">
+          {#if closing.shiftScore !== undefined}
+            <p class="receipt-note"><strong>{closing.shiftScore.toLocaleString("en-US")} shift points.</strong> Each drink you hand off adds its quality in points.</p>
+          {/if}
           <dl class="till-items">
             <div><dt>Sales</dt><dd>{money(closing.revenue)}</dd></div>
             <div><dt>Tips</dt><dd>{money(closing.tips)}</dd></div>
@@ -1052,7 +1050,6 @@
     .ledger-link:not(:disabled):hover { color: var(--b-accent); text-decoration: underline; text-underline-offset: 3px; }
   }
 
-  .classic-link { margin-inline-start: auto; }
   .previous-receipt { font-style: italic; font-weight: 400; }
   .back { transform: scaleX(-1); }
 
@@ -1364,7 +1361,6 @@
   @media (max-width: 620px) {
     .pantry-grid, .workshop-grid, .regulars-list { grid-template-columns: minmax(0, 1fr); }
     .back-to-shelf { display: inline-flex; }
-    .classic-link { margin-inline-start: 0; }
   }
 
   @media (min-width: 760px) and (min-height: 521px) {
@@ -1416,7 +1412,6 @@
     .opening > .notice { grid-area: notice; }
     .opening-footer { grid-area: footer; display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem 1.15rem; margin: 0; }
     .shop-tools { margin: 0; column-gap: 0.7rem; }
-    .shop-tools .classic-link { margin-inline-start: 0; }
     .opening-art :global(svg) { width: 5.25rem; }
     .headline { font-size: clamp(1.6rem, 4.25vw, 2.3rem); }
     .opening-deck { margin-top: 0.5rem; }

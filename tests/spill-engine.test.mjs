@@ -734,7 +734,7 @@ test("forty-eight rooms in sixteen pages of three, each with a name, a hint and 
     assert.equal(room.page, Math.floor(i / 3) + 1);
     assert.equal(room.name, room.name.toLowerCase());
     assert.ok(room.hint.length > 10 && !room.hint.includes("!"));
-    assert.ok(room.hint === room.hint.toLowerCase() && !room.hint.includes("·"));
+    assert.match(room.hint, /^[A-Z][^.·]+\.$/);
     assert.ok(room.straw > 0);
   });
 });
