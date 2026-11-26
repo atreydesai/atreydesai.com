@@ -4,6 +4,8 @@
   /** One sentence the player needs while paused; most games need none. */
   export let deck = "";
   export let resumeLabel = "Resume";
+  export let menuLabel = "Menu";
+  export let pixel = false;
 
   const dispatch = createEventDispatcher<{ resume: null; menu: null; exit: null }>();
   let resumeButton: HTMLButtonElement;
@@ -19,7 +21,7 @@
   aria-modal="true"
   aria-labelledby="boba-pause-title"
 >
-  <div class="boba-card boba-riso boba-pause-card" tabindex="-1">
+  <div class="boba-card boba-pause-card" class:boba-riso={!pixel} class:order-pixel-sheet={pixel} tabindex="-1">
     <h2 id="boba-pause-title" class="boba-title">paused</h2>
     {#if deck}
       <p class="boba-deck">{deck}</p>
@@ -29,19 +31,19 @@
       <button
         bind:this={resumeButton}
         type="button"
-        class="boba-btn"
+        class={pixel ? "boba-key is-primary" : "boba-btn"}
         aria-keyshortcuts="P"
         on:click={() => dispatch("resume")}
       >
         {resumeLabel}
         <kbd aria-hidden="true">P</kbd>
       </button>
-      <button type="button" class="boba-btn secondary" on:click={() => dispatch("menu")}>
-        Menu
+      <button type="button" class={pixel ? "boba-key order-pixel-paper-key" : "boba-btn secondary"} on:click={() => dispatch("menu")}>
+        {menuLabel}
       </button>
       <button
         type="button"
-        class="boba-btn secondary"
+        class={pixel ? "boba-key order-pixel-paper-key" : "boba-btn secondary"}
         aria-keyshortcuts="Escape"
         on:click={() => dispatch("exit")}
       >
@@ -51,3 +53,7 @@
     </div>
   </div>
 </div>
+
+<style>
+  .boba-pause-card.order-pixel-sheet .boba-key { min-height: 44px; }
+</style>

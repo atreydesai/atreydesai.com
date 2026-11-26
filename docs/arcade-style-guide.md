@@ -41,7 +41,7 @@ Three rules hold everywhere:
 | cup stack  | Drop cups onto a tower          | Tap, click, Space                                    | Everywhere   |
 | spill      | Draw straws to steer the pour   | Drag to draw; arrows and Space as a pen              | Everywhere   |
 | straw stab | Stab each cup on the beat       | Tap, click, Space                                    | Everywhere   |
-| order up   | Ice, syrup, pour, scoop, serve  | Hold, tap, click, Space                              | Everywhere   |
+| order up   | Brew, build, serve, run a shop | Tap, click, or keyboard                              | Everywhere   |
 
 The menu lists them in this order, and their shortcut keys are `1` to `7` in
 the same order.
@@ -570,6 +570,154 @@ A conveyor belt carries cups past a straw; stab each on the beat.
   exactly where a cup's centre is at its beat.
 
 ### Order up
+
+The arcade entry opens the milk tea shop ledger. During a shift, up to five
+stations run at once. Brew handles tea and milk. Prep cooks tapioca pearls,
+steamed buns, and from day 13, sesame waffles. The waffle press cooks quickly,
+so time it close to handoff for crisp edges. Build layers the ticket's fruit,
+syrup, toppings, and ice. Serve shakes, seals, and hands over the drink for an
+itemized grade and tip. Returning guests remember their earlier visits and have
+favorite recipes, including blends of strawberries and banana.
+
+- Both modes stock from immediate and scheduled suppliers, use the oldest
+  ingredients first, and settle rent after every seven-day shop month. Normal
+  has more starting stock and cash, longer shelf life, and lower rent. Expert
+  adds tighter timing and more pressure from the queue. An unpaid rent bill
+  closes the shop. A missed ticket costs a sale and reputation.
+- New days bring a shuffled event, recipe and regular unlocks, and chances to
+  spend earnings on equipment or single-shift boosts. Equipment can catch a
+  brew at its target or portion recipe ingredients from the ticket. The Tea
+  Carafe can hold the extra portion of a double brew for the next guest who
+  orders that tea. Milk still goes in at the pitcher. The Warm Shelf gives
+  all three prep batches another fifteen seconds before they cool.
+  The Cold Tray keeps ice-cream finishes cold a little longer. A Wide Ticket
+  Rack gives you room to prepare four orders at once. The Automatic Sealer
+  handles a matching drink after its last finishing step.
+  The chalkboard pays extra for fresh pastries on rainy days and correct
+  extra-ice recipes on campus breaks.
+  The opening menu grows through day 31. Toasted sesame gets a dark syrup pump
+  on day 18, and yuzu gets a citrus bowl on day 23. Some recipes use two
+  kettles at once from day 21. Both choices print on the ticket, and either
+  pick order is valid. Both tea colors show in the stacked cup. Sparkling
+  orders arrive on day 27. Charge a shaken tea at the seltzer tap and show
+  the bubbles in the cup. Starting on day 5, repeat customers
+  can request a variation. Keep their words and the exact measured recipe
+  on the ticket, and show the bonus on the handoff receipt when it is earned.
+- The ledger and any active tickets, timers, pantry, and equipment are saved
+  together on the device. Normal and Expert keep separate shops. Practice
+  a ticket from the opening notice to work through an upcoming recipe
+  without a shift clock or pantry costs. Practice preserves any open shift.
+  The Opening Key gives a short prep window with real stock and a closed
+  door. The guest clock starts when the doors open.
+- The Supplier Ledger allows four standing orders. Mark a supplier on a
+  shelf. At closing, that supplier sends a crate when the new day's stock
+  falls below four and no shipment is due. The ledger sets aside payroll
+  and approaching rent first. Street Market and Fruit Special days mark
+  down fruit from the named supplier. The Wall Calendar forecasts the next
+  three events, expected deliveries, and rent. The receipt shows any
+  restocking spend.
+- Brew, Build, Serve, Prep, and Stockroom are physical counters in one three-quarter
+  kitchen. Choose a counter in the room or press `1` through `5` to move the
+  chef. The Prep counter gives pearls and buns their own timed equipment and
+  freshness meters. Ingredient pictures and small portion marks print on the
+  recipe slip. Open the slip for the full ingredient names at any counter.
+- The counter camera (`V`) puts the eye-level station artwork first and keeps
+  the room in reach. Space presses the current station's primary key when
+  focus rests on the counter. Arrow keys follow the positions of the physical
+  counters. The chef carries the cup from Brew to Build or Build to Serve.
+  A streak of three well-made drinks earns a
+  tasting tray for the people currently waiting.
+- The Stockroom opens on day 3. Ring the market bell for a small express
+  crate during the shift, watch the courier, and use the ingredients when
+  the crate arrives. Ingredient controls can lead there when their bin is empty.
+  On the public side, the entrance leads to the order line and the separate
+  pickup mark. The original Order Up cast walks in, reacts to the wait, and
+  takes a sip before carrying out a boba cup. Reuse Score Attack's faces and
+  emotes so a guest's reaction matches their receipt. Tap a guest to take their ticket
+  or work on their order. At Serve, a guest with a sealed cup can be served
+  directly. The ticket rail repeats the guest's name, patience, and pickup
+  status for a quick scan. Market awnings, campus pennants, and festival
+  lanterns belong outside the glass and stay behind the kitchen tools.
+- The close-up worktop accepts taps on illustrated kettles, pumps, jars and
+  the serving tray, with labelled keys for each action within reach. A gold
+  square marks the equipment or portion called for on the ticket. Build
+  highlights the selected recipe's bins and lets the player open the full
+  ingredient rack. The cup uses sprite stacking. A sealed cup brings its
+  guest into view at the pickup window, where you can tap to hand it over
+  and see them take a sip. The Pickup Counter can hand out two or more sealed
+  cups together. Exterior windows share the shift's daylight, rain, or night
+  across the kitchen, worktop, and pickup view. Match steam to the running kettles.
+  The chef, customers, cup, and scene animations stay still with Reduce Motion.
+- Purchased boosts are kept together beside the kitchen. Counter Help
+  finishes the selected brewed drink if its ingredients and prep are ready.
+  Emergency Run replenishes short stock through closing. Tip Special applies
+  to the next three handoffs and shows how many are left.
+  The Window Chime holds the line's patience for a few seconds while
+  brewing, prep, and the shift clock keep moving.
+- The shop office hires a host, prep cook, and runner. Schedule them for a
+  shift, pay their wages at close, and show their posts in the kitchen.
+  Two shifts with sales qualify a worker for a certificate. Show the one-time
+  cost and new wage on the roster. Their badge and benefit are active on duty.
+  Purchased branches add rent and change the active shift's traffic and
+  sales. Branch and event recipes rotate onto the opening chalkboard. The
+  notice offers two shift contracts and, from day 5, an optional group
+  reservation. Booked guests sit together and can be served with one
+  handoff at their table when their drinks are sealed. A runner can carry a
+  complete tray to the table on your behalf.
+  The Takeout Rack unlocks three-cup courier jobs from day 12. Pack sealed
+  cups into the kraft carrier at Serve. Green tickets share a fixed pickup
+  time, and the rail shows how many cups are packed. You can book a table or
+  a takeout job for a shift. Both bonuses print on the till receipt when earned.
+  From day 4, the neighborhood board offers a commission
+  that carries over between shifts. Complete it before rent day to collect
+  the payout. The first completed commission of each kind unlocks a paint
+  color for the shop and apron. Choose it at the office.
+  Reputation milestones earn permanent neighborhood awards for longer guest
+  patience, bigger tips, and lower location prices. An enamel pin joins the
+  office cabinet and the same cabinet hangs behind the pass after the first award.
+- Book one optional promotion in the shop office to trade cash for different
+  traffic, wait times, tips, or fruit sales. A purchased Menu Easel opens a
+  tasting counter. Make a house blend with the ingredient pictures and check
+  it in the layered cup before putting it on the chalkboard.
+  At level five, the recipe tin keeps up to three drafts. With two or more,
+  the player can rotate one onto each new day's board.
+  The recipe album keeps serving stamps and best grades for the regular
+  menu. Signature recipes unlock printed cup seals, rendered on the cup
+  itself. Select a recipe in the album to practice it.
+- The runner can staff an owned side stand instead of working the live pass.
+  It shares the pantry and rings its sales under a separate line on the till
+  receipt. A branch manager can open another location at the same time and
+  serve that counter's own drink from the shared pantry. Both jobs are
+  booked at the office before the shift. A certified manager can choose a
+  fruit or dessert menu with its own stock requirements. The office and
+  the Stockroom show how many cups the shared pantry can cover.
+  A branch renovation changes both the scene and the service at that address.
+  The Skyline Tea Loft is a level-ten shop. Its drifting clouds cross the
+  window from beyond its edges, behind the rooftop fixtures.
+  Each location has a different
+  street view that appears through its windows. Inspect a shop on the office
+  map to open there, send staff, or check the price.
+- Select later recipes add a milk-foam cap at the Serve pitcher after
+  shaking. The day 16 freezer adds banana and vanilla scoops for floats.
+  Scoop just before the handoff. The receipt keeps the customer's short
+  tasting note.
+- Three good handoffs to a regular fill their guestbook card. Completed
+  cards earn keepsakes, with the postcard, plant, charm, and cup trophy
+  displayed in the kitchen as the collection grows.
+- The shop runs on dark pixel chips and arcade keys. The active recipe and
+  handoff receipt print on warm slips against that counter. The opening
+  notice leads with the day's event and menu. If the pantry falls short for
+  the first tickets, ingredient marks on the notice link right to those
+  shelves. The closing receipt leads
+  with the shift's takings and leaves next-day setup to the opening notice.
+  Pantry, Workshop, and Regulars open from illustrated tools on the notice.
+  Use spacing and type to group information on these sheets. Painted signs
+  and readouts use drawn letters. Longer labels and recipes use Neue Haas
+  Grotesk.
+
+#### Score attack
+
+The ledger also links to the short leaderboard shift.
 
 Guests walk up to the counter and hand over a ticket, which goes up and is
 clipped to the rail. You take one ticket at a time through the stations:

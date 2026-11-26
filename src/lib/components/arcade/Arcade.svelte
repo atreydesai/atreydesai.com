@@ -25,7 +25,7 @@
   const LOADERS: Record<GameId, () => Promise<{ default: any }>> = {
     catch: () => import("./CatchGame.svelte"),
     stab: () => import("./StrawStab.svelte"),
-    orders: () => import("./OrderUp.svelte"),
+    orders: () => import("./OrderUpCampaign.svelte"),
     stack: () => import("./CupStack.svelte"),
     lander: () => import("./TeaMinus.svelte"),
     runner: pending("./SugarRush.svelte"),

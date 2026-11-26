@@ -1,0 +1,86 @@
+/* The shop's paper and its quiet controls follow the arcade's one-cell cut. */
+.order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *) {
+  position: relative;
+  isolation: isolate;
+}
+
+.order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::before,
+.order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::after {
+  --paper-cut: 4px;
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  clip-path: polygon(
+    var(--paper-cut) 0,
+    calc(100% - var(--paper-cut)) 0,
+    calc(100% - var(--paper-cut)) var(--paper-cut),
+    100% var(--paper-cut),
+    100% calc(100% - var(--paper-cut)),
+    calc(100% - var(--paper-cut)) calc(100% - var(--paper-cut)),
+    calc(100% - var(--paper-cut)) 100%,
+    var(--paper-cut) 100%,
+    var(--paper-cut) calc(100% - var(--paper-cut)),
+    0 calc(100% - var(--paper-cut)),
+    0 var(--paper-cut),
+    var(--paper-cut) var(--paper-cut)
+  );
+}
+
+.order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::before {
+  z-index: -2;
+  inset: 0;
+  background: var(--order-paper-edge, var(--b-line));
+}
+
+.order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::after {
+  --paper-cut: 2px;
+  z-index: -1;
+  inset: 2px;
+  background: var(--order-paper, var(--b-paper));
+}
+
+.order-pixel-ui .boba-key.order-pixel-paper-key {
+  --key-face: var(--b-raised);
+  --key-foot: color-mix(in srgb, var(--b-line) 32%, var(--b-raised));
+  --key-rule: color-mix(in srgb, var(--b-line) 38%, var(--b-raised));
+  color: var(--b-strong);
+}
+
+@media (hover: hover) {
+  .order-pixel-ui .boba-key.order-pixel-paper-key:not(:disabled):hover {
+    --key-face: color-mix(in srgb, var(--b-line) 7%, var(--b-raised));
+    --key-rule: var(--b-line);
+  }
+}
+
+.order-pixel-ui .boba-key.order-pixel-paper-key:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--b-accent), inset 0 -4px 0 var(--key-foot);
+}
+
+@media (forced-colors: active) {
+  .order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::before,
+  .order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::after {
+    forced-color-adjust: none;
+  }
+
+  .order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::before {
+    background: CanvasText;
+  }
+
+  .order-pixel-sheet:where(.order-pixel-ui, .order-pixel-ui *)::after {
+    background: Canvas;
+  }
+
+  .order-pixel-ui .boba-key {
+    border: 1px solid ButtonText;
+  }
+
+  .order-pixel-ui .boba-key:disabled {
+    border-color: GrayText;
+  }
+
+  .order-pixel-ui .boba-key:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -4px;
+  }
+}

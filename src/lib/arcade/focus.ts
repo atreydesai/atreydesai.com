@@ -1,10 +1,10 @@
 const FOCUSABLE =
-  'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), details > summary:first-of-type, [tabindex]:not([tabindex="-1"])';
 
 /** Keeps Tab and Shift+Tab cycling inside `container`. */
 export function trapFocus(event: KeyboardEvent, container: Element | null) {
   const focusable = container
-    ? Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
+    ? Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((element) => element.getClientRects().length > 0)
     : [];
   if (!focusable.length) {
     event.preventDefault();
@@ -16,12 +16,19 @@ export function trapFocus(event: KeyboardEvent, container: Element | null) {
   const last = focusable[focusable.length - 1];
   const active = document.activeElement;
   const inside = active instanceof Node && container?.contains(active);
-  // Focus on something inside that Tab itself never stops on (a game's
-  // playfield, focused by the game): the next Tab goes to the first control,
-  // Shift+Tab to the last, never out of the game.
+  // Programmatically focused headings can opt into the controls next to them.
+  // Playfields keep the first/last-control shortcuts.
   if (inside && active instanceof HTMLElement && !focusable.includes(active)) {
     event.preventDefault();
-    (event.shiftKey ? last : first).focus();
+    const boundary = event.shiftKey ? last : first;
+    if (!active.hasAttribute("data-arcade-tab-anchor")) {
+      boundary.focus();
+      return;
+    }
+    const direction = event.shiftKey ? Node.DOCUMENT_POSITION_PRECEDING : Node.DOCUMENT_POSITION_FOLLOWING;
+    const ordered = event.shiftKey ? focusable.slice().reverse() : focusable;
+    const next = ordered.find((element) => (active.compareDocumentPosition(element) & direction) !== 0);
+    (next ?? boundary).focus();
     return;
   }
   if (event.shiftKey && (active === first || !inside)) {

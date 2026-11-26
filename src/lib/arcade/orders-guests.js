@@ -15,7 +15,7 @@ import { CRITIC, REGULARS } from "./orders-engine.js";
 
 /** @typedef {"calm" | "blink" | "glance" | "glanceAlt" | "cross" | "storm" | "starry" | "wow" | "content" | "meh" | "unimpressed" | "sentBack"} Face */
 /** @typedef {"crop" | "side" | "bob" | "long" | "bun" | "buns" | "pigtails" | "spiky" | "mohawk" | "curly" | "afro" | "none"} Hair */
-/** @typedef {"glasses" | "shades" | "headphones" | "beanie" | "cap" | "headband" | "bandana" | "bow" | "flower" | "beret" | "phone" | "pencil" | "hood" | "scarf" | "mustache" | "freckles" | "earrings" | "sprout" | "straw" | "sunhat" | "tired" | "tie" | "blush"} Extra */
+/** @typedef {"glasses" | "shades" | "headphones" | "beanie" | "cap" | "headband" | "bandana" | "bow" | "flower" | "beret" | "phone" | "pencil" | "hood" | "scarf" | "mustache" | "freckles" | "earrings" | "sprout" | "straw" | "sunhat" | "tired" | "tie" | "blush" | "camera"} Extra */
 /** @typedef {{ hair: Hair, hairColor: string, extras: Extra[], color?: string, shirt?: string, drop?: number }} Look */
 
 export const FIGURE_W = 14;
@@ -89,6 +89,15 @@ export const LOOKS = {
   lychee: { hair: "long", hairColor: BLACK, extras: ["sunhat"], color: "#f2d8a7" },
   oats: { hair: "mohawk", hairColor: TEAL, extras: ["earrings"] },
   chai: { hair: "bob", hairColor: BROWN, extras: ["scarf"], color: "#b0442f" },
+  sloe: { hair: "side", hairColor: "#42323f", extras: ["camera"], color: "#8e6a80", shirt: "#805e75" },
+  clove: { hair: "curly", hairColor: "#563125", extras: ["cap", "scarf"], color: "#a75a43", shirt: "#484f66" },
+  marzipan: { hair: "afro", hairColor: "#48302b", extras: ["bow", "freckles"], color: "#d9b36e", shirt: "#a7594f" },
+  clover: { hair: "pigtails", hairColor: BROWN, extras: ["sunhat", "freckles"], color: "#e3b65c", shirt: "#6c995f" },
+  crumb: { hair: "long", hairColor: "#343345", extras: ["pencil", "glasses"], color: "#82a08b", shirt: "#5a7780" },
+  mallow: { hair: "side", hairColor: GREY, extras: ["cap", "tie"], color: "#52789a", shirt: "#8dbbd7" },
+  fennel: { hair: "pigtails", hairColor: "#664a37", extras: ["glasses", "scarf"], color: "#bea668", shirt: "#8c786a" },
+  wren: { hair: "spiky", hairColor: "#653941", extras: ["headphones", "freckles"], color: "#aa909b", shirt: "#608383" },
+  inkcap: { hair: "bob", hairColor: "#5a5566", extras: ["beret", "earrings"], color: "#826478", shirt: "#7f5c65" },
   [CRITIC.name]: { hair: "side", hairColor: GREY, extras: ["glasses", "beret"], color: "#2b2320", shirt: "#3a3f44" },
 };
 
@@ -210,6 +219,10 @@ const EXTRAS = {
   tired: { 8: "...b....b..." },
   tie: { 12: "....wAAw....", 13: ".....AA....." },
   blush: { 8: "..R......R.." },
+  camera: {
+    12: "...G....G...", 13: "....G..G....", 14: "...GGDGGG...",
+    15: "...GDLDDG...", 16: "...GGGGGG...",
+  },
 };
 
 /** The features of each face: brows, eyes, cheeks and mouth. @type {Record<Face, Layer>} */

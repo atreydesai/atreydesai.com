@@ -66,7 +66,7 @@ export const GAMES: GameInfo[] = [
   {
     id: "orders",
     name: "order up",
-    blurb: "Pour to the line, scoop the toppings, shake, and serve before anyone gives up.",
+    blurb: "Run a tea shop. Brew drinks, learn the regulars, and upgrade your counter.",
     key: "7",
     desktopOnly: false,
   },
