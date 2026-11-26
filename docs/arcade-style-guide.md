@@ -164,6 +164,17 @@ being made, so they read as a set:
 - Paused, the scene is frozen. Under Reduce Motion it is static at its
   current state.
 
+The painted studies in `src/lib/arcade/scenery/` are shared by the local
+gallery and the games. Cup stack uses the tower camera for its five
+altitude bands and distant ice belt. Sugar rush changes from greenhouses
+to rain by distance, tea minus changes horizon art between sites, straw
+stab goes from the ferry market to lanterns by tier, spill changes kitchen
+walls by room page, and order up goes from the courtyard to the back bar
+over the shift. Catch prints two small illustrations around the page's
+margin. The paintings sit behind live cups, routes, controls and coasters.
+They run off the existing game clocks, with the same pauses and motion
+preference.
+
 ## Buttons
 
 Arcade buttons (`.boba-btn`) are hand-cut labels, not the site's plain

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { flip } from "svelte/animate";
   import { cubicOut } from "svelte/easing";
@@ -618,6 +619,7 @@
   let hud: HTMLElement;
   let hudHeight = 80;
   let benchArt: HTMLElement;
+  const drawBackdrop = createBackdrop("orders");
   let canvas: HTMLCanvasElement;
   let tapEls: HTMLButtonElement[] = [];
   /** Each tap's Brew chip, while its tank wants brewing. */
@@ -3402,7 +3404,6 @@
 
     // The room: the ceiling, the wall, and what hangs on the side walls.
     const inside = newBuf(cols, rows);
-    fill(inside, 0, 0, cols, rows, L.wall);
     fill(inside, 0, 0, cols, room.soffit, SOFFIT);
     fill(inside, 0, room.soffit - 1, cols, 1, SOFFIT_BEAM);
     paintWindowFrame(inside);
@@ -3617,9 +3618,25 @@
     far.imageSmoothingEnabled = false;
     far.clearRect(0, 0, w, h);
     far.drawImage(skyLayer, 0, 0, w, h);
-    // Near: the room, a little muted.
-    g.imageSmoothingEnabled = false;
     g.clearRect(0, 0, w, h);
+    // The painted wall sits between the view through the glass and the
+    // original counter, clock, lamps and bench. Keep the real window clear.
+    g.save();
+    g.beginPath();
+    g.rect(0, 0, w, h);
+    const glass = room.window;
+    if (glass.w && glass.h) g.rect(glass.x * SC, glass.y * SC, glass.w * SC, glass.h * SC);
+    g.clip("evenodd");
+    g.fillStyle = css(light.wall);
+    g.fillRect(0, 0, w, h);
+    drawBackdrop(g, {
+      width: w, height: room.counterPx, rows: 114, time: elapsed, still: reduceMotion,
+      alternate: 1 - clamp((elapsed / SHIFT_SECONDS - 0.35) / 0.33, 0, 1),
+      opacity: 0.76, focus: 0.62,
+    });
+    g.restore();
+    // Near: the fixtures in front of the wall.
+    g.imageSmoothingEnabled = false;
     g.drawImage(roomLayer, 0, 0, w, h);
     drawClockHand(g);
     g.drawImage(counterLayer, 0, Math.round(room.counterPx) - URN_ROWS * SC, w, counterLayer.height * SC);

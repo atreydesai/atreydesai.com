@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
@@ -340,6 +341,7 @@
 
   // --- Canvas, clock, and lifecycle state ----------------------------------
 
+  const drawBackdrop = createBackdrop("stab");
   let canvas: HTMLCanvasElement;
   /** The playfield and the tickets: where Tab cycles during a run. */
   let playScope: HTMLElement;
@@ -1687,6 +1689,13 @@
     drawSparks();
     drawStrip(near, nearScroll);
     drawWindows(near, nearScroll, false);
+    // The ferry is there early. The lantern market takes over as the
+    // music rises through tiers; the lane and its beat notch stay in front.
+    drawBackdrop(ctx, {
+      width: viewW, height: laneTop, rows: 126, time: now, still: reduceMotion,
+      alternate: 1 - clamp((nightAt() - 0.14) / 0.49, 0, 1),
+      opacity: 0.9, focus: 0.8,
+    });
     drawRigs(now);
     // Everything behind the cups' lane is laid under one flat dark band.
     drawLane();

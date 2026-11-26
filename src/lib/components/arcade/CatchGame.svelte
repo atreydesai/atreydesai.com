@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
@@ -387,6 +388,7 @@
 
   // --- Canvas and lifecycle state -----------------------------------------
 
+  const drawBackdrop = createBackdrop("catch");
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D | null = null;
   let popupFont = '500 13px "neue-haas-grotesk-text", Helvetica, Arial, sans-serif';
@@ -652,6 +654,14 @@
   function drawScene() {
     if (!ctx) return;
     ctx.clearRect(0, 0, viewW, viewH);
+    // Small paper illustrations around the page keep its links visible as
+    // the real sources of throws. The original basket is drawn in front.
+    const printWidth = Math.min(248, Math.floor(viewW * 0.22));
+    const printHeight = Math.round(printWidth * 168 / 320);
+    const printY = Math.max(0, basketY - printHeight - 10);
+    const print = { top: printY, width: printWidth, height: printHeight, time: simTime, still: reduceMotion, opacity: 0.34 };
+    drawBackdrop(ctx, { ...print, left: 16 });
+    drawBackdrop(ctx, { ...print, left: viewW - printWidth - 16, alternate: 1 });
     drawLessonGhost();
     for (const spawn of pendingSpawns) drawTelegraph(spawn);
     for (const boba of bobas) drawBoba(boba);

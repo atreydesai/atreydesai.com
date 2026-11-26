@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
@@ -848,6 +849,7 @@
   /** Expert mode, read once when the game opens; the switch lives on the menu. */
   const expert = get(arcadeExpert);
 
+  const drawBackdrop = createBackdrop("runner");
   let canvas: HTMLCanvasElement;
   let playScope: HTMLElement;
   let playfield: HTMLElement;
@@ -2724,6 +2726,13 @@
     drawBalloon();
     drawStrip(STRIPS[0]);
     drawStrip(STRIPS[1]);
+    // The greenhouse roofs give way to a rain-soaked skyline on the same
+    // distance curve as the original night. The course sits in front of it.
+    drawBackdrop(ctx, {
+      width: viewW, height: viewH, time: clock, still: reduceMotion,
+      alternate: 1 - clamp((night - 0.26) / 0.42, 0, 1),
+      opacity: 0.9, align: { row: 120, y: horizonY - 4 * SC },
+    });
 
     ctx.save();
     if (shake > 0 && !reduceMotion) {

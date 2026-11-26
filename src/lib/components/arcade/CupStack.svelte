@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
@@ -309,6 +310,7 @@
   let previousBest = 0;
   let newBest = false;
 
+  const drawBackdrop = createBackdrop("stack");
   let canvas: HTMLCanvasElement;
   let hudRow: HTMLElement;
   let ctx: CanvasRenderingContext2D | null = null;
@@ -1602,9 +1604,17 @@
     drawPlane(c);
     drawCity(c, CITY[1]);
     drawClouds(c, CLOUDS[1]);
-    drawFlock(c);
     drawBalloon(c);
     drawClouds(c, CLOUDS[2]);
+    drawBackdrop(c, {
+      width: viewW, height: viewH,
+      // The five painted bands follow the camera, including the way back
+      // down. The ice belt comes in only after the moon-coaster flyby.
+      altitude: (view / SKY_AT[SKY_AT.length - 1]) * 100,
+      alternate: smoothstep(60, 68, view),
+      time: windClock, still: reduceMotion, opacity: 0.94, focus: 0.72,
+    });
+    drawFlock(c);
   }
 
   function draw() {

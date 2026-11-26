@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
@@ -479,6 +480,7 @@
   let pourAnnounced = false;
   let shake = 0;
 
+  const drawBackdrop = createBackdrop("spill");
   let canvas: HTMLCanvasElement;
   let stage: HTMLElement;
   let playScope: HTMLElement;
@@ -543,6 +545,7 @@
   };
   let kitchenCanvas: HTMLCanvasElement | null = null;
   let kitchenCols = 0;
+  let kitchenWallBottom = 0;
   let kitchenRows = 0;
   let roomCanvas: HTMLCanvasElement | null = null;
   let roomImage: ImageData | null = null;
@@ -741,6 +744,7 @@
     const rightSpace = cols - rightStart - 2;
     // Beside the room, the cabinet of controls takes the wall's lower part.
     const cabinet = sideLayout ? cabinetCells() : null;
+    kitchenWallBottom = Math.min(floorRow, cabinet?.y0 ?? floorRow) * SC;
     const shelvesEnd = cabinet ? Math.min(wainscotRow, cabinet.y0 - 3) : wainscotRow;
     if (leftSpace >= 12) paintShelves(2, leftSpace, below, wainscotRow, 0);
     if (rightSpace >= 12) {
@@ -3163,6 +3167,14 @@
     ctx.fillStyle = WALL_HEX;
     ctx.fillRect(0, 0, viewW, viewH);
     if (kitchenCanvas) ctx.drawImage(kitchenCanvas, 0, 0, kitchenCols * SC, kitchenRows * SC);
+    // The painting is on the wall, under the authored puzzle and above
+    // the native steel counter and the sockets for its controls.
+    drawBackdrop(ctx, {
+      width: viewW, height: kitchenWallBottom, rows: 117, time: clock, still: reduceMotion,
+      alternate: pageIndex() >= TILE_TINTS.length / 2 ? 1 : 0,
+      opacity: 0.84, focus: 0.56,
+      align: viewW < 600 ? { row: 66, y: Math.max(hudBottomPx + 12, oy - 18) } : undefined,
+    });
     const jolt = shake > 0 && !reduceMotion ? Math.round((Math.random() - 0.5) * 6 * shake) : 0;
     const x = ox + jolt;
     const y = oy;

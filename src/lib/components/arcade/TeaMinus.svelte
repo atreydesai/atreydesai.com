@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { createEventDispatcher, onMount, tick } from "svelte";
   import { get } from "svelte/store";
 
@@ -495,6 +496,7 @@
   /** The tickets' numbers refresh about ten times a second, not every frame. */
   const hudTick = every(0.1);
 
+  const drawBackdrop = createBackdrop("lander");
   let canvas: HTMLCanvasElement;
   let playScope: HTMLElement;
   let playfield: HTMLElement;
@@ -2304,6 +2306,12 @@
     drawStars();
     drawEarth();
     drawRanges();
+    // This is distant terrain. The native surface, flight path, and every
+    // real coaster are drawn later using the zoomed world camera.
+    drawBackdrop(ctx, {
+      width: viewW, height: viewH, time: flightTime, still: reduceMotion,
+      alternate: siteN % 2 === 0 ? 1 : 0, opacity: 0.87, focus: 0.65,
+    });
     drawWind();
     for (const ghost of ghosts) drawPath(ghost, 0.3);
     drawPath(path, 0.7);
