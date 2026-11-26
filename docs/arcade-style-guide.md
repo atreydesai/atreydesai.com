@@ -164,10 +164,9 @@ being made, so they read as a set:
 - Paused, the scene is frozen. Under Reduce Motion it is static at its
   current state.
 
-The painted studies in `src/lib/arcade/scenery/` are shared by the local
-gallery and the games. Cup stack uses the tower camera for its five
-altitude bands and distant ice belt. Sugar rush changes from greenhouses
-to rain by distance, tea minus changes horizon art between sites, straw
+The paintings live in `src/lib/arcade/scenery/`. Cup stack uses the tower camera
+for its five altitude bands and distant ice belt. Sugar rush changes from
+greenhouses to rain by distance, tea minus changes horizon art between sites, straw
 stab goes from the ferry market to lanterns by tier, spill changes kitchen
 walls by room page, and order up goes from the courtyard to the back bar
 over the shift. Catch prints two small illustrations around the page's

@@ -1,6 +1,6 @@
 import type { GameId } from "#lib/boba.ts";
 import { clamp, HEIGHT, WIDTH } from "./pixel";
-import { drawStudy } from "./stage";
+import { renderBackdrop } from "./stage";
 
 interface Placement {
   left?: number;
@@ -48,7 +48,7 @@ export function createBackdrop(game: GameId) {
     }
     const height = alternate ? 0 : altitude;
     if (frame.time !== time || frame.altitude !== height) {
-      drawStudy(frame.canvas, game, height, time, false, alternate);
+      renderBackdrop(frame.canvas, game, height, time, alternate);
       frame.time = time;
       frame.altitude = height;
     }

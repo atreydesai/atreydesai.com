@@ -1,12 +1,11 @@
 import type { GameId } from "#lib/boba.ts";
 import { bayer } from "#lib/arcade/core/dither.ts";
-import { paintCup, paintTower, skyline } from "./ascent";
+import { skyline } from "./ascent";
 import { hash, HEIGHT, Pixels, raster, WIDTH, wrap } from "./pixel";
 import { paintProp } from "./props";
-import { paintLander, paintRunner } from "./streets";
 
 let icePlate: HTMLCanvasElement;
-function iceBelt(p: Pixels, time: number, gameplay: boolean) {
+function iceBelt(p: Pixels, time: number) {
   icePlate ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#172134", 0, 0, WIDTH, HEIGHT);
     for (let y = 0; y < HEIGHT; y++) {
@@ -48,11 +47,10 @@ function iceBelt(p: Pixels, time: number, gameplay: boolean) {
   p.oval("#55687d", x + 14, y + 33, 28, 7);
   p.oval("#81979f", x + 9, y + 31, 19, 4);
   paintProp(p, "mirror", x - 6, y, 1, Math.sin(time / 6) * 33);
-  if (gameplay) paintTower(p, 94, time);
 }
 
 let gardenSky: HTMLCanvasElement;
-function glassRoofs(p: Pixels, time: number, gameplay: boolean) {
+function glassRoofs(p: Pixels, time: number) {
   gardenSky ??= raster(WIDTH, HEIGHT, (q) => {
     q.bands("#5d5f78", "#a4777c", "#dca384", 62, 19);
     q.oval("#edbf93", 73, 77, 27, 27);
@@ -80,11 +78,10 @@ function glassRoofs(p: Pixels, time: number, gameplay: boolean) {
     p.rect("#6a625d", x + 5, 155, 18);
   }
   for (const [x, turn] of [[49, 0], [238, 65]]) paintProp(p, "planter", x, 105, 1, turn);
-  if (gameplay) paintRunner(p, time);
 }
 
 let flats: HTMLCanvasElement;
-function longShadow(p: Pixels, time: number, gameplay: boolean) {
+function longShadow(p: Pixels, time: number) {
   flats ??= raster(WIDTH, HEIGHT, (q) => {
     q.bands("#282b40", "#444052", "#776075", 62, 19);
     q.oval("#bd9d8a", 58, 57, 22, 22);
@@ -116,16 +113,10 @@ function longShadow(p: Pixels, time: number, gameplay: boolean) {
   p.line("#624c61", x + 7, 139, x + 52, 144, 3);
   paintProp(p, "vault", x, 113, 1, 45);
   if (Math.floor(time) % 3 < 2) p.rect("#dfb07e", 207, 104, 2, 2);
-  if (gameplay) {
-    p.rect("#926e73", 108, 118, 66, 3);
-    p.rect("#b99184", 118, 114, 42, 2);
-    p.rect("#eac68f", 126, 115, 27);
-    paintLander(p, time);
-  }
 }
 
 let serviceRoom: HTMLCanvasElement;
-function belowSink(p: Pixels, time: number, gameplay: boolean) {
+function belowSink(p: Pixels, time: number) {
   serviceRoom ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#65576a", 0, 0, WIDTH, HEIGHT);
     for (let row = 0; row < 11; row++) {
@@ -159,19 +150,10 @@ function belowSink(p: Pixels, time: number, gameplay: boolean) {
   paintProp(p, "valve", 69, 76, 1, Math.sin(time / 3) * 31);
   const drop = wrap(time * 20, 62);
   p.rect("#a5bbac", 158, 52 + drop, 2, 3);
-  if (gameplay) {
-    p.line("#f0d9ba", 115, 72, 151, 92, 3);
-    p.line("#e08a80", 115, 74, 151, 92);
-    paintCup(p, 140, 111, ["#8d666c", "#c39395"]);
-    for (let i = 0; i < 8; i++) {
-      const fall = wrap(time * 33 + i * 4, 35);
-      p.rect(i % 2 ? "#e4c193" : "#c28e74", fall < 22 ? 114 + fall * 1.5 : 151, 69 + fall, 2, 2);
-    }
-  }
 }
 
 let waterfront: HTMLCanvasElement;
-function ferryMarket(p: Pixels, time: number, gameplay: boolean) {
+function ferryMarket(p: Pixels, time: number) {
   waterfront ??= raster(WIDTH, HEIGHT, (q) => {
     q.bands("#8f8290", "#be9d98", "#e2b69e", 48, 19);
     q.oval("#f2c995", 232, 55, 22, 22);
@@ -199,19 +181,10 @@ function ferryMarket(p: Pixels, time: number, gameplay: boolean) {
   for (let i = 0; i < 14; i++) p.rect(i % 3 ? "#b19899" : "#d0a99b", wrap(i * 49 + time * 2.6, 320), 104 + (i * 7) % 20, 4 + i % 13);
   paintProp(p, "dock-lamp", 15, 102);
   paintProp(p, "dock-lamp", 278, 102, 1, 45);
-  if (gameplay) {
-    p.rect("#f19a82", 157, 135, 6, 4);
-    p.line("#eb9a86", 159, 93, 159, 115, 3);
-    p.line("#fee1be", 160, 93, 160, 112);
-    for (let i = 0; i < 6; i++) {
-      const x = wrap(2 + i * 62 - time * 27, 345) - 18;
-      paintCup(p, x, 125, i % 2 ? ["#9f646d", "#d39c9a"] : ["#718180", "#a8b69e"]);
-    }
-  }
 }
 
 let courtyard: HTMLCanvasElement;
-function courtyardStand(p: Pixels, time: number, gameplay: boolean) {
+function courtyardStand(p: Pixels, time: number) {
   courtyard ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#e3b495", 0, 0, WIDTH, HEIGHT);
     q.rect("#c58c81", 0, 75, WIDTH, 35); q.rect("#e3a68e", 0, 74, WIDTH, 2);
@@ -253,16 +226,11 @@ function courtyardStand(p: Pixels, time: number, gameplay: boolean) {
   const sway = Math.sin(time / 3) * 2;
   paintProp(p, "lantern", 71 + sway, 36);
   paintProp(p, "lantern", 227 - sway, 36);
-  if (gameplay) {
-    paintProp(p, "tray", 123, 91);
-    paintProp(p, "ticket", 158, 45 + Math.sin(time * 0.6) * 2);
-  } else {
-    paintProp(p, "tray", 101, 93);
-  }
+  paintProp(p, "tray", 101, 93);
 }
 
 let folded: HTMLCanvasElement;
-function foldedMenu(p: Pixels, time: number, gameplay: boolean) {
+function foldedMenu(p: Pixels) {
   folded ??= raster(WIDTH, HEIGHT, (q) => {
     q.rect("#e7ccac", 0, 0, WIDTH, HEIGHT);
     q.rect("#e2bb9d", 0, 96, WIDTH, 72);
@@ -298,16 +266,9 @@ function foldedMenu(p: Pixels, time: number, gameplay: boolean) {
     paintProp(q, "basket", 226, 106);
   });
   p.image(folded, 0, 0);
-  if (gameplay) {
-    const t = wrap(time, 3.9) / 3.9;
-    const x = 79 + t * 88, y = 56 - 122 * t * (1 - t) + t * 66;
-    paintCup(p, x, y, ["#ac7064", "#d99b81"]);
-    p.line("#b47870", x + 15, y - 6, x + 15, y, 2);
-    paintProp(p, "basket", 143 + Math.sin(time * 1.4) * 32, 124);
-  }
 }
 
-export const alternateScenes: Record<GameId, (p: Pixels, time: number, gameplay: boolean) => void> = {
+export const alternateScenes: Record<GameId, (p: Pixels, time: number) => void> = {
   stack: iceBelt,
   runner: glassRoofs,
   lander: longShadow,

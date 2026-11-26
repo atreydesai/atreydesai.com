@@ -1,7 +1,6 @@
 import { drawSprite } from "#lib/arcade/art.ts";
 import { models } from "./stacks/models";
-import { TURN_STEPS } from "#lib/arcade/core/sprite-stack.ts";
-import { modelFrame, paintSheet } from "./stacks/frames";
+import { TURN_STEPS, stackGrid } from "#lib/arcade/core/sprite-stack.ts";
 import type { SpriteModel } from "./stacks/types";
 import { dockLamp, iceChest, inkStamp, mirrorArray, rollerValve, roofPlanter, sampleVault } from "./new-stacks";
 import { Pixels, raster } from "./pixel";
@@ -21,7 +20,7 @@ function stacked(name: string, model: SpriteModel, angle: number): Prop {
     name,
     slices: model,
     art: (turn = 0) => {
-      const { grid } = modelFrame(model, angle + turn, 0.75, 1);
+      const { grid } = stackGrid(model.slices, { turn: ((angle + turn) % 360) * Math.PI / 180, outline: "O" });
       return raster(grid[0].length, grid.length, (p) => drawSprite(p.ctx, grid, 0, 0, 1, model.palette));
     },
   };
@@ -401,14 +400,6 @@ export function propArt(id: string, turn = 0) {
     artCache.set(key, art);
   }
   return art;
-}
-
-export function propSheet(id: string) {
-  const model = props[id].slices;
-  if (!model) return;
-  const sheet = document.createElement("canvas");
-  paintSheet(sheet, model);
-  return sheet;
 }
 
 export function paintProp(p: Pixels, id: string, x: number, y: number, scale = 1, turn = 0) {

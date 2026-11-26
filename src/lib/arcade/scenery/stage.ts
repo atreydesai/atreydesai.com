@@ -5,7 +5,7 @@ import { Pixels } from "./pixel";
 import { paintBar, paintKitchen, paintMarket } from "./shops";
 import { paintCatch, paintRille, paintRoute } from "./streets";
 
-const streetStudies = {
+const scenes = {
   runner: paintRoute,
   lander: paintRille,
   spill: paintKitchen,
@@ -14,9 +14,9 @@ const streetStudies = {
   catch: paintCatch,
 };
 
-export function drawStudy(canvas: HTMLCanvasElement, game: GameId, altitude: number, time: number, gameplay: boolean, alternate = false) {
+export function renderBackdrop(canvas: HTMLCanvasElement, game: GameId, altitude: number, time: number, alternate = false) {
   const ink = new Pixels(canvas.getContext("2d")!);
-  if (alternate) alternateScenes[game](ink, time, gameplay);
-  else if (game === "stack") paintAscent(ink, altitude, time, gameplay);
-  else streetStudies[game](ink, time, gameplay);
+  if (alternate) alternateScenes[game](ink, time);
+  else if (game === "stack") paintAscent(ink, altitude, time);
+  else scenes[game](ink, time);
 }

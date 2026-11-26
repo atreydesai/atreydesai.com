@@ -1,4 +1,4 @@
-import { paintCup, skyline } from "./ascent";
+import { skyline } from "./ascent";
 import { HEIGHT, hash, Pixels, raster, WIDTH, wrap } from "./pixel";
 import { paintProp } from "./props";
 
@@ -83,28 +83,13 @@ function kitchenPlate(p: Pixels) {
   paintProp(p, "kettle", 41, 71);
 }
 
-export function paintKitchen(p: Pixels, time: number, gameplay: boolean) {
+export function paintKitchen(p: Pixels, time: number) {
   kitchen ??= raster(WIDTH, HEIGHT, kitchenPlate);
   p.image(kitchen, 0, 0);
   windowView(p, 116, 18, 105, 72, time, true);
   p.rect("#717472", 97, 25, 135, 3);
   p.rect("#b0a496", 99, 24, 132);
   paintProp(p, "sieve", 183 + Math.sin(time / 3) * 25, 23);
-  if (gameplay) {
-    const phase = wrap(time, 6);
-    const landingX = 159;
-    p.line("#f8dfbe", 123, 75, 163, 92, 3);
-    p.line("#e7867d", 123, 76, 161, 92);
-    paintCup(p, landingX - 11, 107, ["#ac7264", "#dda893"]);
-    if (phase < 4.6) {
-      for (let i = 0; i < 19; i++) {
-        const step = wrap(time * 1.25 + i / 19, 1);
-        const x = step < 0.7 ? 122 + Math.round(step * 54) : landingX - 1 + Math.sin(step * 9) * 2;
-        const y = step < 0.7 ? 64 + Math.max(0, (step - 0.16) * 42) : 88 + (step - 0.7) * 67;
-        p.rect(i % 6 ? "#d4a16d" : "#f0c48a", x, y, i % 3 ? 2 : 1, 2);
-      }
-    }
-  }
 }
 
 let stalls: HTMLCanvasElement;
@@ -142,7 +127,7 @@ function marketPlate(p: Pixels) {
   p.rect("#655462", 0, 154, WIDTH, 2);
 }
 
-export function paintMarket(p: Pixels, time: number, gameplay: boolean) {
+export function paintMarket(p: Pixels, time: number) {
   stalls ??= raster(WIDTH, HEIGHT, marketPlate);
   p.image(stalls, 0, 0);
   for (const [i, x] of [38, 91, 217, 270].entries()) {
@@ -150,19 +135,6 @@ export function paintMarket(p: Pixels, time: number, gameplay: boolean) {
     const sway = Math.sin(time + i) * 2;
     paintProp(p, "lantern", x + sway, y);
     if (Math.floor(time / 2 + i) % 3 === 0) p.rect("#eab178", x + sway + 9, y + 11, 3, 4);
-  }
-  if (gameplay) {
-    for (let i = 0; i < 12; i++) {
-      const x = wrap(-time * 25 + i * 28, WIDTH);
-      p.rect("#73616b", x, 148, 15, 2);
-    }
-    p.rect("#e97866", 156, 136, 6, 6); p.rect("#f1c6a2", 158, 136, 2, 4);
-    p.line("#e8807d", 159, 92, 159, 114, 2); p.line("#fddebf", 160, 92, 160, 111, 2);
-    const colors = [["#9f5b69", "#d99498"], ["#688280", "#afbb99"], ["#ac7650", "#e3b477"]];
-    for (let i = 0; i < 6; i++) {
-      const x = wrap(-time * 29 + i * 59, WIDTH + 24) - 24;
-      paintCup(p, x, 126, colors[i % colors.length]);
-    }
   }
 }
 
@@ -199,7 +171,7 @@ function counterPlate(p: Pixels) {
   }
 }
 
-export function paintBar(p: Pixels, time: number, gameplay: boolean) {
+export function paintBar(p: Pixels, time: number) {
   counter ??= raster(WIDTH, HEIGHT, counterPlate);
   p.image(counter, 0, 0);
   windowView(p, 107, 17, 118, 73, time, false);
@@ -207,11 +179,4 @@ export function paintBar(p: Pixels, time: number, gameplay: boolean) {
   paintProp(p, "pump", 259, 89);
   p.oval("#835e52", 156, 121, 28, 4);
   p.oval("#cba175", 155, 119, 26, 3);
-  if (gameplay) {
-    paintCup(p, 142 + Math.sin(time * 0.6) * 5, 106, ["#a4704d", "#dba881"]);
-    const x = 163 + Math.sin(time * 0.8) * 8;
-    p.line("#ecddc2", x, 58, x - 3, 105, 1);
-    paintProp(p, "ticket", x - 23, 57);
-    p.rect("#936759", x - 14, 58, 4, 5);
-  }
 }

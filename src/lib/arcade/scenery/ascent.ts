@@ -197,41 +197,7 @@ function crescent(p: Pixels, cx: number, cy: number) {
   p.rect("#6d7583", cx - 9, cy + 4, 2, 2);
 }
 
-const cups = [
-  ["#a95457", "#e2a68a"], ["#677983", "#a4b9af"], ["#9a743e", "#e9bc75"],
-  ["#866587", "#c3a4c2"], ["#a5636a", "#e7a0a4"], ["#63826f", "#a8be92"],
-];
-
-export function paintCup(p: Pixels, x: number, y: number, colors: readonly string[], scale = 1) {
-  const [shade, fill] = colors;
-  const dot = (color: string, dx: number, dy: number, w: number, h = 1) => p.rect(color, x + dx * scale, y + dy * scale, w * scale, h * scale);
-  dot("#f6e5d2", 1, 0, 23);
-  dot("#f6e5d2", 0, 1, 25, 2);
-  dot("#312b31", 1, 2, 23, 2);
-  dot("#edcfaa", 2, 2, 20);
-  dot("#312b31", 2, 4, 21, 6);
-  dot(fill, 3, 4, 19, 4);
-  dot(shade, 5, 8, 15, 3);
-  dot("#f6e5d2", 3, 10, 19);
-  dot("#312b31", 4, 9, 17, 2);
-  dot(shade, 5, 8, 15, 2);
-  dot(fill, 5, 6, 2, 3);
-  dot("#47343a", 9, 8, 2); dot("#47343a", 15, 8, 2);
-}
-
-export function paintTower(p: Pixels, altitude: number, time: number) {
-  const top = 74 + (altitude < 9 ? (9 - altitude) * 5 : 0);
-  const height = Math.min(9, 2 + Math.floor(altitude / 2));
-  for (let i = height - 1; i >= 0; i--) {
-    paintCup(p, 142 + (i % 3) - 1, top + i * 10, cups[(Math.floor(altitude / 6) + i) % cups.length]);
-  }
-  const slide = Math.round(Math.sin(time * 1.35) * 37);
-  paintCup(p, 142 + slide, top - 17, cups[(Math.floor(altitude / 6) + 1) % cups.length]);
-  p.rect("#f2ce9d", 139, top - 3, 3);
-  p.rect("#f2ce9d", 168, top - 3, 3);
-}
-
-export function paintAscent(p: Pixels, altitude: number, time: number, gameplay: boolean) {
+export function paintAscent(p: Pixels, altitude: number, time: number) {
   p.image(sky(altitude), 0, 0);
   const horizon = 116 + altitude * 2.45;
   if (altitude < 16) {
@@ -251,12 +217,6 @@ export function paintAscent(p: Pixels, altitude: number, time: number, gameplay:
     for (let x = 4; x < WIDTH; x += 18) p.rect("#644c55", x, roof + 8, 9);
     paintProp(p, "tank", 39, roof - 41);
     paintProp(p, "awning", 253, roof - 22);
-    if (gameplay) {
-      p.rect("#8c6147", 126, roof - 2, 59, 5);
-      p.rect("#e0ae84", 122, roof - 4, 68, 2);
-      p.rect("#71504b", 130, roof + 3, 3, 17);
-      p.rect("#71504b", 178, roof + 3, 3, 17);
-    }
   }
 
   if (altitude > 14 && altitude < 40) {
@@ -301,6 +261,4 @@ export function paintAscent(p: Pixels, altitude: number, time: number, gameplay:
     p.rect("#687e8e", cometX + 2, cometY + 29, 2);
     p.ctx.restore();
   }
-
-  if (gameplay) paintTower(p, altitude, time);
 }
