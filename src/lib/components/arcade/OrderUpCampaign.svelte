@@ -7,7 +7,7 @@
   import { createBackdrop } from "#lib/arcade/scenery/live.ts";
   import { arcadeExits, mountShell } from "#lib/arcade/shell.ts";
   import {
-    blankPowerups, buyBranch, buyPowerup, buyPublicity, buyStock, buyUpgrade, campaignEffects, certifyCrew, consumeIngredients, dayEvent, hireCrew, selectBranch, setCrewActive,
+    blankPowerups, buyBranch, buyPowerup, buyPublicity, buyStock, buyUpgrade, campaignEffects, certifyCrew, certifyLocationManager, hireLocationManager, scheduleLocationManager, consumeIngredients, dayEvent, hireCrew, selectBranch, setCrewActive,
     finishDay, fitBranch, INGREDIENTS, levelFor, newCampaign, normalizeCampaign, paintShop, setCupPrint, setManagedBranch, setManagerBranch, setManagerMenu, setStandingOrder, settleManagedBranch, settleManagerBranch, startDay, takeCommission,
     type Campaign, type CampaignMode, type IngredientId, type PowerupId,
   } from "#lib/arcade/orders-campaign.ts";
@@ -152,7 +152,7 @@
       recipeRecords: serviceRecipeRecords(settled.service),
       reservationBonus: reservationProgress(settled.service).earned, cateringBonus: cateringProgress(settled.service)?.earned ?? 0,
       managedOrders: stand.orders, managedSales: stand.sales,
-      managerOrders: managed.orders, managerSales: managed.sales,
+      managerOrders: managed.orders, managerSales: managed.sales, floatingManagerWorked: managed.floatingManagerWorked,
       commissionServed: offer ? commissionCups(offer, settled.service) : 0 });
   }
 
@@ -701,6 +701,9 @@
                 onSelectBranch={(id) => show(selectBranch(campaign, id))}
                 onManagedBranch={(id) => show(setManagedBranch(campaign, id))}
                 onManagerBranch={(id) => show(setManagerBranch(campaign, id))}
+                onHireLocationManager={(id) => show(hireLocationManager(campaign, id))}
+                onScheduleLocationManager={(id, working) => show(scheduleLocationManager(campaign, id, working))}
+                onCertifyLocationManager={(id) => show(certifyLocationManager(campaign, id))}
                 onManagerMenu={(branch, menu) => show(setManagerMenu(campaign, branch, menu))}
                 onPublicity={(id) => show(buyPublicity(campaign, id))}
                 onReserve={reserveTable}

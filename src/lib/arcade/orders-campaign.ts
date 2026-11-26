@@ -145,6 +145,12 @@ export type LiveCrewId = Exclude<CrewId, "manager">;
 export type BranchId = typeof BRANCHES[number]["id"];
 export type ManagerMenuId = "classic" | "fruit" | "dessert";
 
+interface LocationManager {
+  scheduled: boolean;
+  shifts: number;
+  certified: boolean;
+}
+
 export interface BranchFitting {
   name: string;
   description: string;
@@ -210,6 +216,7 @@ export interface DayEarnings {
   managedOrders?: number;
   managerSales?: number;
   managerOrders?: number;
+  floatingManagerWorked?: boolean;
   commissionServed?: number;
   regularVisits?: Record<string, number>;
   recipeRecords?: RecipeRecords;
@@ -267,6 +274,7 @@ export interface Campaign {
   activeBranch: BranchId;
   managedBranch?: BranchId | null;
   managerBranch?: BranchId | null;
+  locationManagers: Partial<Record<BranchId, LocationManager>>;
   managerMenus: Partial<Record<BranchId, ManagerMenuId>>;
   publicity?: PublicityId | null;
   standingOrders?: StandingOrders;
@@ -379,7 +387,7 @@ export function newCampaign(mode: CampaignMode): Campaign {
   return {
     version: 2, mode, day: 1, cash: mode === "expert" ? 4200 : 5400, xp: 0, reputation: 50, highestReputation: 50,
     status: "planning", inventory, deliveries: [], upgrades: [], powerups: blankPowerups(), activePowerups: [],
-    legacyUnlimitedStock: false, crew: [], crewShifts: {}, certifiedCrew: [], activeCrew: [], branches: ["corner"], branchFittings: [], activeBranch: "corner", managedBranch: null, managerBranch: null, managerMenus: {}, publicity: null,
+    legacyUnlimitedStock: false, crew: [], crewShifts: {}, certifiedCrew: [], activeCrew: [], branches: ["corner"], branchFittings: [], activeBranch: "corner", managedBranch: null, managerBranch: null, locationManagers: {}, managerMenus: {}, publicity: null,
     commission: null, standingOrders: {}, paint: "clay", paintUnlocked: ["clay"], recipeRecords: {}, cupPrint: "house",
     currentEvent: eventForDay(1).id, lastDay: null, regularVisits: {}, rentPaid: 0, rentBook: normalizeRentBook(null), nextId: inventory.length + 1,
   };
@@ -483,10 +491,21 @@ export function normalizeCampaign(value: unknown, mode: CampaignMode): Campaign 
   const managerBranch = status !== "closed" && crew.includes("manager")
     ? branches.find((id) => id !== activeBranch && id !== managedBranch && id === saved.managerBranch) ?? null
     : null;
+  const locationManagers: Campaign["locationManagers"] = {};
+  const savedManagers = record(saved.locationManagers);
+  for (const branch of branches) {
+    const entry = record(savedManagers?.[branch]);
+    if (!entry) continue;
+    const shifts = whole(entry.shifts, 0, CREW_CERTIFICATE_SHIFTS);
+    locationManagers[branch] = {
+      scheduled: entry.scheduled === true && status !== "closed" && branch !== managedBranch && branch !== managerBranch,
+      shifts, certified: entry.certified === true && shifts === CREW_CERTIFICATE_SHIFTS,
+    };
+  }
   const savedMenus = record(saved.managerMenus);
   const managerMenus: Campaign["managerMenus"] = {};
   for (const branch of branches) {
-    const menu = managerMenuOptions({ day, certifiedCrew }, branch).find(({ id }) => id === savedMenus?.[branch]);
+    const menu = managerMenuOptions({ day, certifiedCrew, locationManagers }, branch).find(({ id }) => id === savedMenus?.[branch]);
     if (menu && menu.id !== "classic") managerMenus[branch] = menu.id;
   }
   const activeCrew = savedIds(CREW, saved.activeCrew).filter((id): id is LiveCrewId => id !== "manager" && crew.includes(id) && (!managedBranch || id !== "runner"));
@@ -495,7 +514,7 @@ export function normalizeCampaign(value: unknown, mode: CampaignMode): Campaign 
 
   return {
     version: 2, mode, day, status, inventory, deliveries, powerups, nextId,
-    legacyUnlimitedStock, crew, crewShifts, certifiedCrew, activeCrew, branches, branchFittings, activeBranch, managedBranch, managerBranch, managerMenus, standingOrders,
+    legacyUnlimitedStock, crew, crewShifts, certifiedCrew, activeCrew, branches, branchFittings, activeBranch, managedBranch, managerBranch, locationManagers, managerMenus, standingOrders,
     publicity: status === "closed" ? null : publicityFor(saved.publicity)?.id ?? null,
     commission: status === "closed" ? null : normalizeCommission(saved.commission, day, mode === "expert"),
     paint, paintUnlocked, recipeRecords, cupPrint,
@@ -559,14 +578,19 @@ function branchFor(id: BranchId | undefined) {
   return BRANCHES.find((branch) => branch.id === id) ?? BRANCHES[0];
 }
 
-export function crewWages(campaign: Pick<Campaign, "activeCrew" | "managedBranch" | "managerBranch"> & Partial<Pick<Campaign, "certifiedCrew">>) {
+export function crewWages(campaign: Pick<Campaign, "activeCrew" | "managedBranch" | "managerBranch"> &
+  Partial<Pick<Campaign, "certifiedCrew" | "locationManagers" | "activeBranch">>) {
+  const branchWages = BRANCHES.reduce((sum, { id }) => sum + (
+    id !== campaign.activeBranch && id !== campaign.managedBranch && id !== campaign.managerBranch && campaign.locationManagers?.[id]?.scheduled
+      ? managerWage(campaign.locationManagers[id].certified) : 0
+  ), 0);
   return CREW.reduce((sum, worker) => {
     const working = worker.id === "manager"
       ? Boolean(campaign.managerBranch)
       : campaign.activeCrew.includes(worker.id) || (worker.id === "runner" && campaign.managedBranch);
     const premium = campaign.certifiedCrew?.includes(worker.id) ? worker.certificate.premium : 0;
     return sum + (working ? worker.wage + premium : 0);
-  }, 0);
+  }, branchWages);
 }
 
 function publicityFor(id: unknown) {
@@ -661,7 +685,7 @@ export function finishDay(campaign: Campaign, earnings: DayEarnings): CampaignRe
   const managerOrders = whole(earnings.managerOrders);
   const worked = new Set<CrewId>(served ? campaign.activeCrew : []);
   if (campaign.managedBranch && managedOrders) worked.add("runner");
-  if (campaign.managerBranch && managerOrders) worked.add("manager");
+  if (campaign.managerBranch && (earnings.floatingManagerWorked ?? managerOrders > 0)) worked.add("manager");
   const crewShifts = { ...campaign.crewShifts };
   for (const id of campaign.crew) {
     if (worked.has(id)) crewShifts[id] = Math.min(CREW_CERTIFICATE_SHIFTS, (crewShifts[id] ?? 0) + 1);
@@ -702,7 +726,9 @@ export function finishDay(campaign: Campaign, earnings: DayEarnings): CampaignRe
     reputation, highestReputation,
     rentPaid: campaign.rentPaid + (rent > 0 ? 1 : 0),
   };
-  if (closed) return success({ ...settled, status: "closed", managedBranch: null, managerBranch: null }, reason ?? "The shop has closed.");
+  if (closed) return success({ ...settled, status: "closed", managedBranch: null, managerBranch: null,
+    locationManagers: Object.fromEntries(Object.entries(campaign.locationManagers).map(([id, manager]) => [id, { ...manager, scheduled: false }])),
+  }, reason ?? "The shop has closed.");
 
   const inventory = campaign.inventory.filter((lot) => lot.expiresOn > day);
   const deliveries: Delivery[] = [];
@@ -789,7 +815,7 @@ export function setManagedBranch(campaign: Campaign, id: BranchId | null): Campa
   if (id === null) return success({ ...campaign, managedBranch: null });
   if (!campaign.crew.includes("runner")) return failure(campaign, "Hire the Order Runner before assigning a side stand.");
   if (!campaign.branches.includes(id) || id === campaign.activeBranch) return failure(campaign, "Choose an owned branch apart from your main shift.");
-  if (id === campaign.managerBranch) return failure(campaign, "The Branch Manager is already assigned there.");
+  if (managerOnDuty(campaign, id)) return failure(campaign, "A manager is already assigned there.");
   return success({ ...campaign, managedBranch: id, activeCrew: campaign.activeCrew.filter((worker) => worker !== "runner") });
 }
 
@@ -824,7 +850,64 @@ export function setManagerBranch(campaign: Campaign, id: BranchId | null): Campa
   if (!campaign.crew.includes("manager")) return failure(campaign, "Hire the Branch Manager before assigning a branch.");
   if (!campaign.branches.includes(id) || id === campaign.activeBranch) return failure(campaign, "Choose an owned branch apart from your main shift.");
   if (id === campaign.managedBranch) return failure(campaign, "The Order Runner is already assigned there.");
+  if (campaign.locationManagers[id]) return failure(campaign, "This shop already has its own manager.");
   return success({ ...campaign, managerBranch: id });
+}
+
+export const BRANCH_MANAGER = CREW.find(({ id }) => id === "manager")!;
+
+export function managerWage(certified: boolean) {
+  return BRANCH_MANAGER.wage + (certified ? BRANCH_MANAGER.certificate.premium : 0);
+}
+
+export function managerOnDuty(campaign: Campaign, branch: BranchId) {
+  return campaign.status !== "closed" && branch !== campaign.activeBranch && branch !== campaign.managedBranch &&
+    (campaign.managerBranch === branch || campaign.locationManagers[branch]?.scheduled === true);
+}
+
+export function managerBranches(campaign: Campaign) {
+  // Keep the original manager first, then serve from the other shops in purchase order.
+  return campaign.branches.filter((branch) => managerOnDuty(campaign, branch))
+    .sort((a, b) => Number(b === campaign.managerBranch) - Number(a === campaign.managerBranch));
+}
+
+export function hireLocationManager(campaign: Campaign, branch: BranchId): CampaignResult {
+  if (campaign.status !== "planning") return failure(campaign, "Hire managers before opening the shop.");
+  if (!campaign.branches.includes(branch) || branch === campaign.activeBranch) return failure(campaign, "Choose another owned shop.");
+  if (campaign.locationManagers[branch] || campaign.managerBranch === branch) return failure(campaign, "This shop already has a manager.");
+  if (levelFor(campaign) < BRANCH_MANAGER.level) return failure(campaign, `Managers unlock at level ${BRANCH_MANAGER.level}.`);
+  if (campaign.cash < BRANCH_MANAGER.price) return failure(campaign, "There is not enough cash to hire a manager.");
+  return success({
+    ...campaign, cash: campaign.cash - BRANCH_MANAGER.price,
+    managedBranch: campaign.managedBranch === branch ? null : campaign.managedBranch,
+    locationManagers: { ...campaign.locationManagers, [branch]: { scheduled: true, shifts: 0, certified: false } },
+  }, `Manager hired at ${branchFor(branch).name}.`);
+}
+
+export function scheduleLocationManager(campaign: Campaign, branch: BranchId, scheduled: boolean): CampaignResult {
+  const manager = campaign.locationManagers[branch];
+  if (campaign.status !== "planning" || !manager || branch === campaign.activeBranch) return failure(campaign, "Set the manager’s schedule before opening the shop.");
+  return success({
+    ...campaign,
+    managedBranch: scheduled && campaign.managedBranch === branch ? null : campaign.managedBranch,
+    locationManagers: { ...campaign.locationManagers, [branch]: { ...manager, scheduled } },
+  });
+}
+
+export function certifyLocationManager(campaign: Campaign, branch: BranchId): CampaignResult {
+  const manager = campaign.locationManagers[branch];
+  const course = BRANCH_MANAGER.certificate;
+  if (campaign.status !== "planning" || !manager || manager.certified) return failure(campaign, "Choose an eligible manager before opening the shop.");
+  if (manager.shifts < CREW_CERTIFICATE_SHIFTS) return failure(campaign, "This manager needs two shifts with sales before training.");
+  if (campaign.cash < course.price) return failure(campaign, "There is not enough cash for crew training.");
+  return success({
+    ...campaign, cash: campaign.cash - course.price,
+    locationManagers: { ...campaign.locationManagers, [branch]: { ...manager, certified: true } },
+  }, `${course.name} earned at ${branchFor(branch).name}.`);
+}
+
+export function managerTrained(campaign: Pick<Campaign, "certifiedCrew" | "locationManagers">, branch: BranchId) {
+  return campaign.locationManagers[branch]?.certified ?? campaign.certifiedCrew.includes("manager");
 }
 
 const MANAGER_MENUS: Record<BranchId, { name: string; tea: IngredientId; milk: IngredientId | null; price: number }> = {
@@ -859,12 +942,12 @@ const MANAGER_FRUIT: Record<BranchId, { ingredient: IngredientId; name: string }
   loft: { ingredient: "yuzu", name: "Skyline Yuzu Jasmine" },
 };
 
-export function managerMenuOptions(campaign: Pick<Campaign, "day" | "certifiedCrew">, branch: BranchId): ManagerMenuOption[] {
+export function managerMenuOptions(campaign: Pick<Campaign, "day" | "certifiedCrew" | "locationManagers">, branch: BranchId): ManagerMenuOption[] {
   const classic = managerMenu(branch);
   const portions: IngredientPortions = { [classic.tea]: 1 };
   if (classic.milk) portions[classic.milk] = 1;
   const options: ManagerMenuOption[] = [{ id: "classic", name: classic.name, portions, price: classic.price, icon: classic.tea }];
-  if (!campaign.certifiedCrew.includes("manager")) return options;
+  if (!managerTrained(campaign, branch)) return options;
 
   const fruit = MANAGER_FRUIT[branch];
   const milk = classic.milk ?? "milk";
@@ -876,15 +959,15 @@ export function managerMenuOptions(campaign: Pick<Campaign, "day" | "certifiedCr
     !portions[id] || INGREDIENT_UNLOCK_DAYS[id] <= campaign.day))];
 }
 
-export function selectedManagerMenu(campaign: Pick<Campaign, "day" | "certifiedCrew" | "managerMenus">, branch: BranchId): ManagerMenuOption {
+export function selectedManagerMenu(campaign: Pick<Campaign, "day" | "certifiedCrew" | "locationManagers" | "managerMenus">, branch: BranchId): ManagerMenuOption {
   const options = managerMenuOptions(campaign, branch);
   return options.find(({ id }) => id === campaign.managerMenus[branch]) ?? options[0];
 }
 
 export function setManagerMenu(campaign: Campaign, branch: BranchId, menu: ManagerMenuId): CampaignResult {
   if (campaign.status !== "planning") return failure(campaign, "Choose the branch menu before opening the shop.");
-  if (!campaign.crew.includes("manager") || !campaign.certifiedCrew.includes("manager")) return failure(campaign, "Certify the Branch Manager to change the menu.");
-  if (!campaign.branches.includes(branch) || campaign.managerBranch !== branch) return failure(campaign, "Choose the branch assigned to the manager.");
+  if (!managerOnDuty(campaign, branch)) return failure(campaign, "Choose a shop with a manager on duty.");
+  if (!managerTrained(campaign, branch)) return failure(campaign, "Certify this manager to change the menu.");
   const option = managerMenuOptions(campaign, branch).find(({ id }) => id === menu);
   if (!option) return failure(campaign, "This branch menu needs ingredients you have not unlocked.");
   const managerMenus = { ...campaign.managerMenus };
@@ -909,29 +992,51 @@ export function managerSupplyCapacity(campaign: Campaign, branch: BranchId) {
   const ingredients = INGREDIENTS.filter(({ id }) => (portions[id] ?? 0) > 0);
   if (ingredients.some(({ id }) => campaign.day < INGREDIENT_UNLOCK_DAYS[id])) return 0;
   return Math.min(
-    managerOrderCap(campaign.certifiedCrew.includes("manager")),
+    managerOrderCap(managerTrained(campaign, branch)),
     ...ingredients.map(({ id }) => Math.floor(stockCount(campaign, id) / (portions[id] ?? 1))),
   );
 }
 
-/** Apply the manager's stock use after the Order Runner and immediately before closing the shift. */
-export function settleManagerBranch(campaign: Campaign, elapsed: number) {
-  const id = campaign.managerBranch;
-  const empty = { campaign, orders: 0, sales: 0 };
-  if (campaign.status !== "open" || campaign.legacyUnlimitedStock || !Number.isFinite(elapsed) ||
-      !id || id === campaign.activeBranch || id === campaign.managedBranch ||
-      !campaign.branches.includes(id) || !campaign.crew.includes("manager")) return empty;
+function allocateManagerOrders(campaign: Campaign, elapsed: number) {
+  let remaining = campaign;
+  const branches = managerBranches(campaign).map((branch) => {
+    const menu = selectedManagerMenu(campaign, branch);
+    const trained = managerTrained(campaign, branch);
+    const orders = Math.min(managerSupplyCapacity(remaining, branch), Math.floor(elapsed / managerOrderInterval(campaign.mode, trained)));
+    if (orders > 0) {
+      const usage = Object.fromEntries(Object.entries(menu.portions).map(([ingredient, quantity]) => [ingredient, quantity * orders]));
+      remaining = consumeIngredients(remaining, usage).campaign;
+    }
+    return { branch, menu, orders, max: managerOrderCap(trained) };
+  });
+  return { campaign: remaining, branches };
+}
 
-  const { portions, price } = selectedManagerMenu(campaign, id);
-  const trained = campaign.certifiedCrew.includes("manager");
-  const orders = Math.min(
-    managerSupplyCapacity(campaign, id),
-    Math.floor(elapsed / managerOrderInterval(campaign.mode, trained)),
-  );
-  if (orders <= 0) return empty;
-  const usage = Object.fromEntries(Object.entries(portions).map(([ingredient, amount]) => [ingredient, amount * orders]));
-  const used = consumeIngredients(campaign, usage);
-  return used.ok ? { campaign: used.campaign, orders, sales: orders * price } : empty;
+export function managerPantryForecast(campaign: Campaign) {
+  if (campaign.status === "closed" || campaign.legacyUnlimitedStock) return [];
+  const runner = settleManagedBranch({ ...campaign, status: "open" }, 120);
+  return allocateManagerOrders(runner.campaign, Infinity).branches;
+}
+
+/** Managers use whatever the main shop and runner have left at the end of the shift. */
+export function settleManagerBranch(campaign: Campaign, elapsed: number) {
+  if (campaign.status !== "open" || campaign.legacyUnlimitedStock || !Number.isFinite(elapsed)) {
+    return { campaign, orders: 0, sales: 0, floatingManagerWorked: false };
+  }
+  const allocation = allocateManagerOrders(campaign, Math.max(0, elapsed));
+  const locationManagers = { ...allocation.campaign.locationManagers };
+  let orders = 0;
+  let sales = 0;
+  let floatingManagerWorked = false;
+  for (const { branch, menu, orders: count } of allocation.branches) {
+    orders += count;
+    sales += count * menu.price;
+    if (!count) continue;
+    const manager = locationManagers[branch];
+    if (manager) locationManagers[branch] = { ...manager, shifts: Math.min(CREW_CERTIFICATE_SHIFTS, manager.shifts + 1) };
+    else floatingManagerWorked = true;
+  }
+  return { campaign: { ...allocation.campaign, locationManagers }, orders, sales, floatingManagerWorked };
 }
 
 export function buyBranch(campaign: Campaign, id: BranchId): CampaignResult {

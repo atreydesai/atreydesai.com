@@ -1,7 +1,7 @@
 <script lang="ts">
   import {
-    BRANCHES, BRANCH_FITTINGS, branchPurchasePrice, branchRentCharge, levelFor, MANAGED_ORDER_CAP, managedOrderInterval,
-    managerMenuOptions, managerOrderCap, managerOrderInterval, managerSupplyCapacity, selectedManagerMenu, type BranchId, type Campaign, type ManagerMenuId,
+    BRANCHES, BRANCH_FITTINGS, BRANCH_MANAGER, CREW_CERTIFICATE_SHIFTS, branchPurchasePrice, branchRentCharge, levelFor, MANAGED_ORDER_CAP, managedOrderInterval,
+    managerMenuOptions, managerOrderCap, managerOrderInterval, managerOnDuty, managerPantryForecast, managerTrained, managerWage, selectedManagerMenu, type BranchId, type Campaign, type ManagerMenuId,
   } from "#lib/arcade/orders-campaign.ts";
   import { money } from "#lib/arcade/orders-display.ts";
   import OrderBranchStamp from "./OrderBranchStamp.svelte";
@@ -15,11 +15,14 @@
     onOpen: (id: BranchId) => void;
     onRunner: (id: BranchId | null) => void;
     onManager: (id: BranchId | null) => void;
+    onHireManager: (id: BranchId) => void;
+    onScheduleManager: (id: BranchId, working: boolean) => void;
+    onCertifyManager: (id: BranchId) => void;
     onFit: (id: BranchId) => void;
     onMenu: (branch: BranchId, menu: ManagerMenuId) => void;
   }
 
-  let { campaign, disabled = false, onBuy, onOpen, onRunner, onManager, onFit, onMenu }: Props = $props();
+  let { campaign, disabled = false, onBuy, onOpen, onRunner, onManager, onHireManager, onScheduleManager, onCertifyManager, onFit, onMenu }: Props = $props();
   const mapId = $props.id();
   let inspected = $state<BranchId | null>(null);
   const shortNames: Record<BranchId, string> = {
@@ -37,12 +40,13 @@
   const owned = $derived(campaign.branches.includes(branch.id));
   const main = $derived(campaign.activeBranch === branch.id);
   const runner = $derived(campaign.managedBranch === branch.id);
-  const manager = $derived(campaign.managerBranch === branch.id);
-  const certifiedManager = $derived(campaign.certifiedCrew.includes("manager"));
+  const manager = $derived(managerOnDuty(campaign, branch.id));
+  const localManager = $derived(campaign.locationManagers[branch.id]);
+  const certifiedManager = $derived(managerTrained(campaign, branch.id));
   const certifiedRunner = $derived(campaign.certifiedCrew.includes("runner"));
   const menu = $derived(selectedManagerMenu(campaign, branch.id));
   const availableMenus = $derived(manager ? managerMenuOptions(campaign, branch.id) : []);
-  const menuSupply = $derived(manager ? managerSupplyCapacity(campaign, branch.id) : 0);
+  const menuSupply = $derived(manager ? managerPantryForecast(campaign).find((entry) => entry.branch === branch.id)?.orders ?? 0 : 0);
   const level = $derived(levelFor(campaign));
   const price = $derived(branchPurchasePrice(campaign, branch));
   const fitting = $derived(BRANCH_FITTINGS[branch.id]);
@@ -65,7 +69,7 @@
     {#each BRANCHES as location (location.id)}
       {@const marker = location.id === campaign.activeBranch ? tags.main
         : location.id === campaign.managedBranch ? tags.runner
-        : location.id === campaign.managerBranch ? tags.manager
+        : managerOnDuty(campaign, location.id) ? tags.manager
         : campaign.branches.includes(location.id) ? tags.owned : null}
       <li class:skyline={location.id === "loft"}>
         <button class="map-pin" type="button" aria-label={`Inspect ${location.name}`}
@@ -99,24 +103,40 @@
     <p class="facts assignment">
       <span><OrderKitchenItem kind={menu.icon} size={16} />{menu.name}, {money(menu.price)} per cup</span>
       <span>Stock covers {menuSupply}/{managerOrderCap(certifiedManager)} · One every {managerOrderInterval(campaign.mode, certifiedManager)}s</span>
+      <span>{money(managerWage(certifiedManager))} wages per shift</span>
     </p>
   {:else if runner}
-    <p class="assignment">Up to {MANAGED_ORDER_CAP} milk teas, one every {managedOrderInterval(campaign.mode, certifiedRunner)}s. Uses shared stock.</p>
+    <p class="assignment">Your runner sells up to {MANAGED_ORDER_CAP} milk teas from the shared pantry, one every {managedOrderInterval(campaign.mode, certifiedRunner)}s.</p>
   {/if}
   {#if owned && !main}
+    {#if !localManager && !manager && level < BRANCH_MANAGER.level}
+      <p class="assignment">Managers unlock at level {BRANCH_MANAGER.level}.</p>
+    {/if}
     <div class="actions">
       <button class="boba-key order-pixel-paper-key" type="button" disabled={locked}
         aria-label={`Open at ${branch.name}`} onclick={() => onOpen(branch.id)}>Open here</button>
       {#if campaign.crew.includes("runner")}
         <button class="boba-key order-pixel-paper-key" type="button" disabled={locked || manager} aria-pressed={runner}
           aria-label={`Staff side stand at ${branch.name}`} onclick={() => onRunner(runner ? null : branch.id)}>
-          {runner ? "Stand staffed" : "Staff stand"}
+          {runner ? "Stand staffed" : "Send runner to stand"}
         </button>
       {/if}
-      {#if campaign.crew.includes("manager")}
+      {#if localManager}
+        <button class="boba-key order-pixel-paper-key" type="button" disabled={locked} aria-pressed={manager}
+          aria-label={manager ? `Give the manager at ${branch.name} the day off` : `Schedule the manager at ${branch.name}`}
+          onclick={() => onScheduleManager(branch.id, !manager)}>
+          {manager ? "Manager on duty" : "Schedule manager"}
+        </button>
+      {:else if campaign.crew.includes("manager") && (manager || !campaign.managerBranch) && !runner}
         <button class="boba-key order-pixel-paper-key" type="button" disabled={locked || runner} aria-pressed={manager}
           aria-label={`Send manager to ${branch.name}`} onclick={() => onManager(manager ? null : branch.id)}>
           {manager ? "Manager assigned" : "Send manager"}
+        </button>
+      {:else}
+        <button class="boba-key order-pixel-paper-key" type="button"
+          disabled={locked || level < BRANCH_MANAGER.level || campaign.cash < BRANCH_MANAGER.price}
+          aria-label={`Hire manager at ${branch.name} for ${money(BRANCH_MANAGER.price)}`} onclick={() => onHireManager(branch.id)}>
+          Hire manager · {money(BRANCH_MANAGER.price)}
         </button>
       {/if}
     </div>
@@ -143,6 +163,19 @@
           aria-label={`Build ${fitting.name} for ${money(fitting.price)}`} onclick={() => onFit(branch.id)}>{money(fitting.price)}</button>
       {/if}
     </section>
+  {/if}
+  {#if localManager && !localManager.certified}
+    <div class="fitting">
+      <OrderKitchenItem kind="quality" size={25} lit={localManager.shifts >= CREW_CERTIFICATE_SHIFTS} />
+      <div>
+        <strong>{BRANCH_MANAGER.certificate.name}</strong>
+        <small>{localManager.shifts} of {CREW_CERTIFICATE_SHIFTS} shifts with sales</small>
+      </div>
+      {#if localManager.shifts >= CREW_CERTIFICATE_SHIFTS}
+        <button class="boba-key order-pixel-paper-key" type="button" disabled={locked || campaign.cash < BRANCH_MANAGER.certificate.price}
+          onclick={() => onCertifyManager(branch.id)}>Train · {money(BRANCH_MANAGER.certificate.price)}</button>
+      {/if}
+    </div>
   {/if}
   {#if availableMenus.length > 1}
     <div class="manager-menu" role="group" aria-label="Manager's menu">

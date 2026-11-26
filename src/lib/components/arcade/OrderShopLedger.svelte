@@ -5,7 +5,7 @@
     POWERUPS, PROMOTIONS_BOARD,
     SUPPLIERS, STANDING_ORDER_LIMIT, STANDING_ORDER_THRESHOLD,
     UPGRADES,
-    crewWages, dayEvent, dayTakings, daysUntilRent, deliveryShelfLife,
+    crewWages, managerBranches, dayEvent, dayTakings, daysUntilRent, deliveryShelfLife,
     eventForDay,
     levelFor, levelProgress,
     neighborhoodAwardCount, nextExpiry,
@@ -73,6 +73,9 @@
   export let onFitBranch: (id: BranchId) => void;
   export let onSelectBranch: (id: BranchId) => void;
   export let onManagedBranch: (id: BranchId | null) => void;
+  export let onHireLocationManager: (id: BranchId) => void;
+  export let onScheduleLocationManager: (id: BranchId, working: boolean) => void;
+  export let onCertifyLocationManager: (id: BranchId) => void;
   export let onManagerBranch: (id: BranchId | null) => void;
   export let onManagerMenu: (branch: BranchId, menu: ManagerMenuId) => void;
   export let onPublicity: (id: PublicityId) => void;
@@ -151,6 +154,7 @@
   $: completedCards = completedGuestCards(campaign.regularVisits);
   $: activeBranch = BRANCHES.find(({ id }) => id === campaign.activeBranch) ?? BRANCHES[0];
   $: sideStand = BRANCHES.find(({ id }) => id === campaign.managedBranch);
+  $: managersWorking = managerBranches(campaign).length;
   $: managedShop = BRANCHES.find(({ id }) => id === campaign.managerBranch);
   $: payroll = crewWages(campaign);
   $: crewGap = Math.max(0, payroll - campaign.cash);
@@ -317,7 +321,7 @@
           {/if}
           {#if publicity}<p class="rent-note"><OrderKitchenItem kind={publicityIcons[publicity.id]} size={20} />{publicity.name}</p>{/if}
           {#if sideStand}<p class="rent-note"><OrderKitchenItem kind="serve" size={20} />Runner at {sideStand.name}</p>{/if}
-          {#if managedShop}<p class="rent-note"><OrderKitchenItem kind="street-sign" size={20} />Manager at {managedShop.name}</p>{/if}
+          {#if managersWorking}<p class="rent-note"><OrderKitchenItem kind="street-sign" size={20} />{managersWorking} managed {managersWorking === 1 ? "shop" : "shops"} open</p>{/if}
           {#if shortages.length}
             <section class="opening-stock" aria-label="Stock short for opening">
               <h3>Short for opening</h3>
@@ -434,7 +438,7 @@
             <div><dt>Tips</dt><dd>{money(closing.tips)}</dd></div>
             {#if closing.branchIncome}<div><dt>Location bonus</dt><dd>{money(closing.branchIncome)}</dd></div>{/if}
             {#if closing.managedSales}<div><dt>Side stand <small>({closing.managedOrders} sold)</small></dt><dd>{money(closing.managedSales)}</dd></div>{/if}
-            {#if closing.managerSales}<div><dt>Managed shop <small>({closing.managerOrders} sold)</small></dt><dd>{money(closing.managerSales)}</dd></div>{/if}
+            {#if closing.managerSales}<div><dt>Managed shops <small>({closing.managerOrders} sold)</small></dt><dd>{money(closing.managerSales)}</dd></div>{/if}
             {#if closing.contractBonus}<div><dt>Contracts earned</dt><dd>{money(closing.contractBonus)}</dd></div>{/if}
             {#if closing.reservationBonus}<div><dt>Reservation bonus</dt><dd>{money(closing.reservationBonus)}</dd></div>{/if}
             {#if closing.cateringBonus}<div><dt>Takeout bonus</dt><dd>{money(closing.cateringBonus)}</dd></div>{/if}
@@ -680,7 +684,8 @@
             <section aria-labelledby="order-office-locations">
               <h3 id="order-office-locations">Locations</h3>
               <OrderBranchOffice {campaign} disabled={hasActiveShift} onBuy={onBuyBranch} onOpen={onSelectBranch}
-                onRunner={onManagedBranch} onManager={onManagerBranch} onFit={onFitBranch} onMenu={onManagerMenu} />
+                onRunner={onManagedBranch} onManager={onManagerBranch} onFit={onFitBranch} onMenu={onManagerMenu}
+                onHireManager={onHireLocationManager} onScheduleManager={onScheduleLocationManager} onCertifyManager={onCertifyLocationManager} />
             </section>
           </div>
           {#if campaign.day >= 3 || awards}

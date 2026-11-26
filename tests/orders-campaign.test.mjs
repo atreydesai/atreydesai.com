@@ -5,6 +5,7 @@ import {
   BRANCHES, BRANCH_FITTINGS, CREW, DAY_EVENTS, INGREDIENTS, INGREDIENT_UNLOCK_DAYS, LATE_EVENT_DAY, MANAGED_SALE_PRICE, POWERUPS, PROMOTIONS_BOARD, RENT_CYCLE_DAYS, SUPPLIERS, UPGRADES,
   branchPurchasePrice, buyBranch, buyPowerup, buyPublicity, buyStock, buyUpgrade, campaignEffects, certifyCrew, consumeIngredients, crewWages, daysUntilRent,
   eventForDay, finishDay, fitBranch, levelFor, newCampaign, nextExpiry, normalizeCampaign, rentDue,
+  certifyLocationManager, hireLocationManager, managerBranches, managerPantryForecast, scheduleLocationManager,
   hireCrew, managerMenu, managerOrderInterval, neighborhoodAwardCount, selectBranch, setCrewActive, setCupPrint, setManagedBranch, setManagerBranch, setStandingOrder, settleManagedBranch, settleManagerBranch, startDay, stockCount, supplierPrice, takeCommission, usePowerup,
 } from "../src/lib/arcade/orders-campaign.ts";
 import {
@@ -365,6 +366,58 @@ test("A Branch Manager runs a third location and shares pantry and payroll with 
     const closed = resultOf(finishDay({ ...opened, day: 7, cash: 0 }, noSales));
     assert.equal(closed.status, "closed");
     assert.equal(closed.managerBranch, null);
+  }
+});
+
+test("Each owned shop can hire a manager with separate wages and training on one shared pantry", () => {
+  for (const mode of ["normal", "expert"]) {
+    const base = newCampaign(mode);
+    const initial = { ...base, day: 16, currentEvent: eventForDay(16).id, cash: 300000, xp: 2350,
+      inventory: base.inventory.map((lot) => ({ ...lot, expiresOn: 30 })) };
+    const owned = BRANCHES.slice(1).reduce((campaign, { id }) => resultOf(buyBranch(campaign, id)), initial);
+    const hires = owned.branches.filter((id) => id !== owned.activeBranch);
+    const staffed = hires.reduce((campaign, id) => resultOf(hireLocationManager(campaign, id)), owned);
+    assert.deepEqual(managerBranches(staffed), hires);
+    assert.equal(staffed.cash, owned.cash - 6 * 5200);
+    assert.equal(crewWages(staffed), 6 * 310);
+    assert.equal(hireLocationManager(staffed, "corner").ok, false);
+    assert.equal(hireLocationManager(owned, owned.activeBranch).ok, false);
+    assert.equal(startDay({ ...staffed, cash: 6 * 310 - 1 }).ok, false);
+    assert.deepEqual(normalizeCampaign(JSON.parse(JSON.stringify(staffed)), mode), staffed);
+
+    const benched = resultOf(scheduleLocationManager(staffed, "campus", false));
+    assert.equal(crewWages(benched), 5 * 310);
+    const visit = resultOf(selectBranch(staffed, "corner"));
+    assert.equal(managerBranches(visit).includes("corner"), false);
+    assert.equal(crewWages(visit), 5 * 310);
+    assert.deepEqual(managerBranches(resultOf(selectBranch(visit, "loft"))), hires);
+
+    const shared = { ...staffed, inventory: [
+      { id: 1, ingredient: "black", quantity: 5, expiresOn: 18 },
+      { id: 2, ingredient: "milk", quantity: 4, expiresOn: 18 },
+    ] };
+    const forecast = managerPantryForecast(shared);
+    assert.equal(forecast.find(({ branch }) => branch === "corner").orders, 4);
+    assert.equal(forecast.find(({ branch }) => branch === "station").orders, 1);
+    assert.equal(stockCount(shared, "black"), 5);
+    const opened = resultOf(startDay(shared));
+    const remote = settleManagerBranch(opened, 120);
+    assert.equal(remote.orders, 5);
+    assert.equal(remote.sales, 4 * managerMenu("corner").price + managerMenu("station").price);
+    assert.equal(stockCount(remote.campaign, "black"), 0);
+    assert.equal(remote.campaign.locationManagers.corner.shifts, 1);
+    assert.equal(remote.campaign.locationManagers.campus.shifts, 0);
+    const closing = resultOf(finishDay(remote.campaign, { ...noSales, managerOrders: remote.orders, managerSales: remote.sales }));
+    assert.equal(closing.lastDay.wages, 1860);
+    assert.equal(closing.cash, opened.cash + remote.sales - 1860);
+
+    const experienced = { ...closing, locationManagers: {
+      ...closing.locationManagers, corner: { ...closing.locationManagers.corner, shifts: 2 },
+    } };
+    const certified = resultOf(certifyLocationManager(experienced, "corner"));
+    assert.equal(crewWages(certified), 6 * 310 + 75);
+    assert.equal(certified.locationManagers.campus.certified, false);
+    assert.deepEqual(normalizeCampaign(JSON.parse(JSON.stringify(certified)), mode), certified);
   }
 });
 

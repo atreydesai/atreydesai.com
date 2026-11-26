@@ -686,11 +686,12 @@ favorite recipes, including blends of strawberries and banana.
   itself. Select a recipe in the album to practice it.
 - The runner can staff an owned side stand instead of working the live pass.
   It shares the pantry and rings its sales under a separate line on the till
-  receipt. A branch manager can open another location at the same time and
-  serve that counter's own drink from the shared pantry. Both jobs are
-  booked at the office before the shift. A certified manager can choose a
-  fruit or dessert menu with its own stock requirements. The office and
-  the Stockroom show how many cups the shared pantry can cover.
+  receipt. Hire a manager at each additional shop from the Locations map.
+  Schedule managers before opening. Each scheduled manager earns their own
+  wage and serves their shop's tea from the shared pantry. The original
+  Branch Manager can move between locations. A certified manager can choose
+  a fruit or dessert menu. The office and Stockroom forecasts account for
+  the runner and other managers drawing from the same stock.
   A branch renovation changes both the scene and the service at that address.
   The Skyline Tea Loft is a level-ten shop. Its drifting clouds cross the
   window from beyond its edges, behind the rooftop fixtures.

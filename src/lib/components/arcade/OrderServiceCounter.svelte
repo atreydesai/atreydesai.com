@@ -2,8 +2,8 @@
   import { tick } from "svelte";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
   import { TAKEAWAY } from "#lib/arcade/orders-guests.js";
-  import { BRANCHES, INGREDIENTS, POWERUPS, campaignPowerupBlockReason, dayEvent, managerOrderCap, managerSupplyCapacity, neighborhoodAwardCount,
-    runnerHandoffSeconds, selectedManagerMenu, stockCount, type Campaign, type IngredientId, type PowerupId } from "#lib/arcade/orders-campaign.ts";
+  import { BRANCHES, INGREDIENTS, POWERUPS, campaignPowerupBlockReason, dayEvent, managerPantryForecast, neighborhoodAwardCount,
+    runnerHandoffSeconds, stockCount, type Campaign, type IngredientId, type PowerupId } from "#lib/arcade/orders-campaign.ts";
   import {
     addIngredient, applyServiceExtras, applyServiceToppings, AUTO_SEAL_SECONDS, canAutoSeal, canFillCarafe, carafeRemaining, cateringProgress,
     chargeSparkle, closeServiceDay, collectBatch, discardPrepBatch,
@@ -146,10 +146,7 @@
   $: stockUnlocked = !training && shift.day >= EXPRESS_DELIVERY_DAY;
   $: deliveryQuote = expressDeliveryQuote(campaign, deliveryIngredient);
   $: dispatchBlock = expressDeliveryBlockReason(campaign, shift, deliveryIngredient);
-  $: managedKitchen = station === "stock" && !training ? BRANCHES.find(({ id }) => id === campaign.managerBranch) : undefined;
-  $: dispatchMenu = managedKitchen ? selectedManagerMenu(campaign, managedKitchen.id) : null;
-  $: dispatchStock = managedKitchen ? managerSupplyCapacity(campaign, managedKitchen.id) : 0;
-  $: dispatchMax = managerOrderCap(campaign.certifiedCrew.includes("manager"));
+  $: dispatches = station === "stock" && !training ? managerPantryForecast(campaign) : [];
   $: replacement = !training && selected && (station === "brew" || station === "build")
     ? ingredientSwapQuote(campaign, shift, selected.id) : null;
   $: pending = shift.pendingDelivery;
@@ -855,13 +852,13 @@
           {/if}
 
         {:else if station === "stock"}
-          {#if managedKitchen && dispatchMenu}
+          {#each dispatches as { branch, menu, orders, max } (branch)}
             <aside class="dispatch-slip" aria-label="Branch pantry forecast">
-              <OrderKitchenItem kind={dispatchMenu.icon} size={27} lit={dispatchStock > 0} />
-              <div><strong>{managedKitchen.name}</strong><small>{dispatchMenu.name}</small></div>
-              <span title="Cups the shared pantry can cover">{dispatchStock}/{dispatchMax} stocked</span>
+              <OrderKitchenItem kind={menu.icon} size={27} lit={orders > 0} />
+              <div><strong>{BRANCHES.find(({ id }) => id === branch)?.name}</strong><small>{menu.name}</small></div>
+              <span title="Cups the shared pantry can cover">{orders}/{max} stocked</span>
             </aside>
-          {/if}
+          {/each}
           {#if pending}
             <div class="delivery-readout" aria-label="Express delivery on its way">
               <OrderKitchenItem kind={pending.ingredient} size={31} />
