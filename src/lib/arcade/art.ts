@@ -19,8 +19,8 @@ export const CREAM = PAPER_WHITE;
 export const ACCENT = "#e85d4c";
 /** The paper halo every sprite keeps over a scene. */
 export const HALO = "rgba(253, 248, 243, 0.8)";
-/** The dark chip behind canvas popups over a scene. */
-export const NOTE_BACK = "#141a2e";
+/** The dark chip behind canvas popups over a scene: the site's dark riso paper. */
+export const NOTE_BACK = "#2a2422";
 /** Golden things: a full cup, a golden cup, a ×5. */
 export const NOTE_GOLD = "#ffd166";
 

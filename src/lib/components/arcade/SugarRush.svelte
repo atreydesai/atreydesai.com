@@ -3267,7 +3267,7 @@
   const METER_RULE = "rgba(253, 248, 243, 0.32)";
   const METER_QUIET = "rgba(253, 248, 243, 0.62)";
   /** The cup's glass where the tea has gone. */
-  const METER_GLASS = "#262c48";
+  const METER_GLASS = "#463a35";
   const CUBE_SUGAR: Record<string, string> = { h: "#fffaf2", f: "#efe6d6", s: "#b9ab98" };
   const CUBE_GOLD: Record<string, string> = { h: "#fff3c4", f: NOTE_GOLD, s: "#dba84d" };
   const CUBE_SHINE: Record<string, string> = { h: "#fffaf2", f: "#fff3c4", s: NOTE_GOLD };

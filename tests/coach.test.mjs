@@ -175,3 +175,20 @@ test("a finished lesson stays readable for its minimum, then fades", () => {
   run(coach, 0.3);
   assert.equal(coach.current, null);
 });
+
+test("a lesson with slow 0 pauses play within a beat, and play comes back once it is done", () => {
+  const coach = createCoach("runner", { persist: false });
+  coach.offer({ id: "stop", text: "Stop.", slow: 0, life: Infinity });
+  let t = 0;
+  while (!coach.paused && t < 1) {
+    coach.step(1 / 60);
+    t += 1 / 60;
+  }
+  assert.ok(coach.paused, "never paused");
+  assert.ok(t <= 0.35, `took ${t.toFixed(2)} s to stop`);
+  assert.equal(coach.step(1 / 60, 1 / 60), 0, "game time still ran while paused");
+  coach.done("stop");
+  assert.equal(coach.paused, false);
+  for (let i = 0; i < 90; i++) coach.step(1 / 60);
+  assert.equal(coach.scale, 1);
+});

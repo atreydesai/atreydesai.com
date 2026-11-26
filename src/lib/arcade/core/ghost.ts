@@ -201,12 +201,14 @@ export interface FocusBox {
 
 /**
  * The lesson's spotlight: everything outside the `focus` boxes darkens
- * under an even wash of `color`, and each box is lit as the rounded shape
- * round it, its edge one band of half the wash. On a pixel scene ("pixel")
- * the shapes are cut from the art's cell grid, so the light falls in pixel
- * steps, never a soft glow or a screen door over the art; over the page
- * itself ("flat", catch) they are smooth. `strength` 0..1 eases the wash in
- * and out. Boxes are in canvas units; they may overlap.
+ * under an even wash of `color`, and each box is lit as a rectangle round
+ * it, its edge one band of half the wash. On a pixel scene ("pixel") the
+ * rectangles are cut from the art's cell grid with stepped corners, the
+ * same shape as the chips and callouts, so the light falls in pixel steps,
+ * never an oval, a soft glow, or a screen door over the art; over the page
+ * itself ("flat", catch) they are rounded like the page's own cards.
+ * `strength` 0..1 eases the wash in and out. Boxes are in canvas units;
+ * they may overlap.
  */
 export function drawSpotlight(
   ctx: CanvasRenderingContext2D,
@@ -215,7 +217,7 @@ export function drawSpotlight(
   focus: readonly FocusBox[],
   strength: number,
   {
-    color = "#141a2e",
+    color = "#2a2422",
     cell = 4,
     edge = 2,
     wash = 0.34,
@@ -238,19 +240,20 @@ export function drawSpotlight(
   }
   const cols = Math.max(1, Math.ceil(width / cell));
   const rows = Math.max(1, Math.ceil(height / cell));
-  // Each box as an ellipse in cell units, padded a little so the thing itself is never cut.
+  // Each box as a rectangle of whole cells, a cell clear of it all round so
+  // the thing itself is never cut, with a stepped corner sized to it.
   let count = 0;
   for (const box of focus) {
     if (box.w <= 0 || box.h <= 0) continue;
-    const e = ellipses[count] ?? (ellipses[count] = { cx: 0, cy: 0, rx: 1, ry: 1 });
-    e.cx = (box.x + box.w / 2) / cell;
-    e.cy = (box.y + box.h / 2) / cell;
-    // An ellipse through the box's corners (√2 × the half-sides) covers the whole box.
-    e.rx = Math.max(2, (box.w / 2 / cell) * Math.SQRT2);
-    e.ry = Math.max(2, (box.h / 2 / cell) * Math.SQRT2);
+    const r = lit[count] ?? (lit[count] = { x0: 0, y0: 0, x1: 0, y1: 0, cut: 1 });
+    r.x0 = Math.floor(box.x / cell) - 1;
+    r.y0 = Math.floor(box.y / cell) - 1;
+    r.x1 = Math.ceil((box.x + box.w) / cell) + 1;
+    r.y1 = Math.ceil((box.y + box.h) / cell) + 1;
+    r.cut = Math.min(r.x1 - r.x0, r.y1 - r.y0) >= 8 ? 2 : 1;
     count++;
   }
-  const band = 1 + edge / 6;
+  const band = Math.max(1, Math.round(edge / 2));
   const far = Math.round(255 * dim);
   const near = Math.round(255 * dim * 0.5);
   const layer = spotLayer(cols, rows);
@@ -260,20 +263,16 @@ export function drawSpotlight(
   const [r, gc, b] = hexRgb(color);
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      // The nearest any ellipse comes: under 1 inside it, under `band` in its edge.
-      let d = Infinity;
-      for (let k = 0; k < count; k++) {
-        const e = ellipses[k];
-        const dx = (x + 0.5 - e.cx) / e.rx;
-        const dy = (y + 0.5 - e.cy) / e.ry;
-        const q = dx * dx + dy * dy;
-        if (q < d) d = q;
+      let level = far;
+      for (let k = 0; k < count && level > 0; k++) {
+        if (inStepped(x, y, lit[k], 0)) level = 0;
+        else if (inStepped(x, y, lit[k], band)) level = near;
       }
       const o = (y * cols + x) * 4;
       data[o] = r;
       data[o + 1] = gc;
       data[o + 2] = b;
-      data[o + 3] = d < 1 ? 0 : d < band * band ? near : far;
+      data[o + 3] = level;
     }
   }
   g.putImageData(image, 0, 0);
@@ -284,10 +283,23 @@ export function drawSpotlight(
   ctx.restore();
 }
 
+/** Whether cell (x, y) is inside rectangle `r` grown by `grow` cells, its corners stepped. */
+function inStepped(x: number, y: number, r: { x0: number; y0: number; x1: number; y1: number; cut: number }, grow: number) {
+  const x0 = r.x0 - grow;
+  const y0 = r.y0 - grow;
+  const x1 = r.x1 + grow;
+  const y1 = r.y1 + grow;
+  if (x < x0 || x >= x1 || y < y0 || y >= y1) return false;
+  const dx = Math.min(x - x0, x1 - 1 - x);
+  const dy = Math.min(y - y0, y1 - 1 - y);
+  return dx + dy >= r.cut + grow;
+}
+
 /**
- * The flat wash: the page dims evenly and each box is lit as the ellipse
- * round it. Drawn on its own layer, with the lit shapes erased from it, so
- * overlapping shapes stay lit rather than darkening where they cross.
+ * The flat wash: the page dims evenly and each box is lit as a rounded
+ * rectangle round it. Drawn on its own layer, with the lit shapes erased
+ * from it, so overlapping shapes stay lit rather than darkening where they
+ * cross.
  */
 function flatSpotlight(
   ctx: CanvasRenderingContext2D,
@@ -319,19 +331,12 @@ function flatSpotlight(
   g.globalCompositeOperation = "destination-out";
   for (const box of focus) {
     if (box.w <= 0 || box.h <= 0) continue;
-    const cx = box.x + box.w / 2;
-    const cy = box.y + box.h / 2;
-    const rx = (box.w / 2) * Math.SQRT2;
-    const ry = (box.h / 2) * Math.SQRT2;
-    // A half-lit ring for the edge, then the shape itself fully lit.
+    const pad = 6;
+    // A half-lit band for the edge, then the box itself fully lit.
     g.globalAlpha = 0.5;
-    g.beginPath();
-    g.ellipse(cx, cy, rx + band, ry + band, 0, 0, Math.PI * 2);
-    g.fill();
+    roundedRect(g, box.x - pad - band, box.y - pad - band, box.w + (pad + band) * 2, box.h + (pad + band) * 2, 14 + band);
     g.globalAlpha = 1;
-    g.beginPath();
-    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    g.fill();
+    roundedRect(g, box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2, 14);
   }
   g.globalCompositeOperation = "source-over";
   ctx.save();
@@ -340,9 +345,21 @@ function flatSpotlight(
   ctx.restore();
 }
 
+function roundedRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number) {
+  const r = Math.min(radius, w / 2, h / 2);
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+  g.fill();
+}
+
 let washLayer: HTMLCanvasElement | null = null;
 
-const ellipses: Array<{ cx: number; cy: number; rx: number; ry: number }> = [];
+const lit: Array<{ x0: number; y0: number; x1: number; y1: number; cut: number }> = [];
 let spot: { canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; image: ImageData } | null = null;
 
 /** The cell-sized layer the spotlight is drawn into, reused frame to frame. */

@@ -1,9 +1,10 @@
 // In-game teaching, shared by every game. A lesson is one thing taught at
 // the moment it first matters, inside the live game rather than on a card
-// in front of it: where the game allows, play eases into slow motion, a
-// callout sits beside the thing in the world (never up in the HUD, where
-// the eye isn't), the game may draw a ghost of the move, and play eases
-// back to speed once the player has done it. Each lesson is shown until it
+// in front of it: where the game allows, play stops (or, for a lesson that
+// asks for it, eases into slow motion), a callout sits beside the thing in
+// the world (never up in the HUD, where the eye isn't), the game may draw a
+// ghost of the move, and play comes back to speed once the player has
+// continued or made the move. Each lesson is shown until it
 // has been done `times` times on this device, then never again.
 //
 // DOM-free apart from guarded storage, so the rules can be tested in node.
@@ -21,7 +22,10 @@ export interface Lesson {
   keys?: string[];
   /** The gesture on touch ("tap", "hold"), shown there instead of the keys. */
   touch?: string;
-  /** Time scale while the lesson holds: 1 teaches at full speed. */
+  /**
+   * Time scale while the lesson holds: 0 pauses play outright (anything
+   * important), a fraction slows it, 1 teaches at full speed.
+   */
   slow?: number;
   /** Real seconds before it ends by itself; Infinity waits for `done`. */
   life?: number;
@@ -58,6 +62,8 @@ export interface Coach {
   readonly age: number;
   /** The time scale to run the game at this frame (1 is full speed). */
   readonly scale: number;
+  /** Play is stopped for the current lesson, which still holds (its scale has reached 0). */
+  readonly paused: boolean;
   /** The current lesson has been done and is on its way out. */
   readonly leaving: boolean;
   /** The last part of leaving, after it has been readable long enough: the callout fades now. */
@@ -100,6 +106,8 @@ const STORE_KEY = "boba_coach_v1";
 /** How quickly play eases into slow motion, and back out (seconds). */
 const EASE_IN = 0.16;
 const EASE_OUT = 0.25;
+/** How quickly play comes to a stop for a lesson that pauses: a beat, not a jolt. */
+const PAUSE_IN = 0.06;
 /** A lesson's callout stays up this long by default (real seconds). */
 const DEFAULT_LIFE = 4.5;
 const DEFAULT_MIN_LIFE = 0.9;
@@ -181,6 +189,9 @@ export function createCoach(game: GameId, { persist = true } = {}): Coach {
     get scale() {
       return scale;
     },
+    get paused() {
+      return !!current && !leaving && !acting && scale === 0;
+    },
     get leaving() {
       return leaving;
     },
@@ -258,7 +269,7 @@ export function createCoach(game: GameId, { persist = true } = {}): Coach {
         if (current && leaving && age >= Math.max(minLife, leftAt) + FADE) retire();
         else if (current && !leaving && !acting) target = current.slow ?? 1;
       }
-      const tau = target < scale ? EASE_IN : EASE_OUT;
+      const tau = target < scale ? (target === 0 ? PAUSE_IN : EASE_IN) : EASE_OUT;
       scale += (target - scale) * (1 - Math.exp(-dt / tau));
       if (Math.abs(target - scale) < 0.01) scale = target;
       // The scale applies to the game's capped step, so a slow device still slows.

@@ -1,11 +1,13 @@
 <script lang="ts">
   // The lesson's callout, set in the world beside the thing it is about and
-  // drawn in the scenes' own pixel language, like the score notes the games
-  // already float over their scenes: a dark chip with stepped corners and
-  // cream type, the line and its key, pixel corner marks round the thing,
-  // and a dotted line between them. It is placed in viewport pixels by the
-  // game, which follows the thing as it moves; only its small Continue takes
-  // a press, so play carries on underneath. Paused, it hides.
+  // drawn in the scenes' own pixel language in the site's colours: a chip of
+  // the dark riso paper with stepped corners, a faint cream rule and the
+  // accent printed a cell off behind it, cream type in the arcade's one
+  // family, keys as pixel keycaps, pixel corner marks round the thing and a
+  // dotted line between them. It is placed in viewport pixels by the game,
+  // which follows the thing as it moves; once the lesson is over it holds
+  // its place, so it never chases its thing as play comes back. Only its
+  // Continue key takes a press. Paused, it hides.
   //
   // The game decides where the eye already is and puts the callout there:
   // beside the runner, under the cup, by the station. `side` says which
@@ -31,6 +33,11 @@
   export let scene: "dark" | "light" = "dark";
   /** The lesson is fading out (it has been readable long enough). */
   export let leaving = false;
+  /**
+   * The lesson is over (done, skipped, or its move made): the slip and its
+   * marks hold where they are from here on, rather than following the thing.
+   */
+  export let ended = false;
   /** Paused, or something covers the game: hide without forgetting. */
   export let hidden = false;
   /** Keep the slip below this many pixels from the top (under the tickets). */
@@ -107,7 +114,13 @@
 
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.max(lo, v)));
 
-  $: anchored = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y);
+  // Once the lesson is over (or fading), the anchor is held where it last was.
+  let held: { x: number | null; y: number | null } | null = null;
+  $: held = ended || leaving ? (held ?? { x, y }) : null;
+  $: ax = held ? held.x : x;
+  $: ay = held ? held.y : y;
+
+  $: anchored = ax !== null && ay !== null && Number.isFinite(ax) && Number.isFinite(ay);
   $: loopW = Math.max(ring * 2.3, width > 0 ? (width + 6) * 2 : 0);
   $: loopH = Math.max(ring * 1.75, height > 0 ? (height + 4) * 2 : 0);
   // How far the slip sits from the anchor on each axis: clear of the loop (or the thing).
@@ -116,7 +129,7 @@
   $: marked = ring > 0 || width > 0;
   $: gapX = (marked ? reachX : 6) + 14;
   $: gapY = (marked ? reachY : 6) + 14;
-  $: place = position(anchored, x ?? viewW / 2, y ?? viewH / 2, side, gapX, gapY, slipW, slipH, viewW, viewH, top);
+  $: place = position(anchored, ax ?? viewW / 2, ay ?? viewH / 2, side, gapX, gapY, slipW, slipH, viewW, viewH, top);
   $: reach = place.where === "left" || place.where === "right" ? reachX : reachY;
 
   /**
@@ -179,9 +192,9 @@
 
   // The tail stops short of the loop, so the two marks don't touch.
   $: tail = (() => {
-    if (!anchored || x === null || y === null) return null;
-    const dx = x - place.tx;
-    const dy = y - place.ty;
+    if (!anchored || ax === null || ay === null) return null;
+    const dx = ax - place.tx;
+    const dy = ay - place.ty;
     const length = Math.hypot(dx, dy);
     const stop = (marked ? reach * 0.95 : 6) + 4;
     if (length <= stop + 6) return null;
@@ -192,8 +205,8 @@
   // Corner marks round the thing: four pixel L's at the corners of its box.
   const ARM = 9;
   const BAR = 3;
-  $: bx = (x ?? 0) - loopW / 2;
-  $: by = (y ?? 0) - loopH / 2;
+  $: bx = (ax ?? 0) - loopW / 2;
+  $: by = (ay ?? 0) - loopH / 2;
   $: corners = [
     [bx, by, 1, 1],
     [bx + loopW, by, -1, 1],
@@ -215,7 +228,7 @@
       class:is-touch={touch === true}
       class:is-keys={touch === false}
     >
-      {#if anchored && x !== null && y !== null}
+      {#if anchored && ax !== null && ay !== null}
         <svg class="marks" width={viewW} height={viewH} aria-hidden="true">
           {#if ring > 0}
             <g class="corners">
@@ -238,6 +251,7 @@
         class="slip"
         style="left: {place.left}px; top: {place.top}px"
       >
+        <div class="face">
         <!-- The live region below reads the words; the slip shows them. -->
         <p class="words" aria-hidden="true">
           {#if lesson.name}<span class="name">{lesson.name}</span>{/if}
@@ -255,6 +269,7 @@
             <kbd aria-hidden="true">Enter</kbd>
           </button>
         {/if}
+        </div>
       </div>
     </div>
   {/key}
@@ -268,56 +283,20 @@
     inset: 0;
     z-index: calc(var(--layer-overlay) + 2);
     pointer-events: none;
+    /* The site's dark riso paper and its cream ink, the same in both themes,
+       since the scenes don't follow the theme. */
     --coach-mark: #fdf8f3;
-    --chip: #141a2e;
+    --chip: #2a2422;
     --chip-text: #fdf8f3;
-    --chip-quiet: rgb(253 248 243 / 0.62);
-    --chip-rule: rgb(253 248 243 / 0.32);
-    --chip-gold: #ffd166;
-  }
-
-  .coach.is-light {
-    --coach-mark: #2b2320;
-  }
-
-  .coach.is-hidden {
-    visibility: hidden;
-  }
-
-  .marks {
-    position: absolute;
-    inset: 0;
-    overflow: visible;
-    shape-rendering: crispEdges;
-  }
-
-  /* Pixel corner marks, in the accent, like the corner ticks a link shows before it throws. */
-  .corners rect {
-    fill: #e85d4c;
-  }
-
-  .tail {
-    stroke: var(--coach-mark);
-    stroke-width: 3;
-    stroke-linecap: butt;
-    stroke-dasharray: 3 5;
-  }
-
-  /* A dark chip with one cell cut from each corner: the scenes' own note chips, larger. */
-  .slip {
-    --cut: 4px;
-    position: absolute;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1-5) var(--space-3);
-    max-width: min(20rem, calc(100vw - 2rem));
-    margin: 0;
-    padding: var(--space-2) var(--space-3);
-    color: var(--chip-text);
-    background: var(--chip);
-    box-shadow: inset 0 0 0 2px var(--chip-rule);
-    clip-path: polygon(
+    --chip-quiet: #e8d5c4;
+    --chip-rule: rgb(253 248 243 / 0.22);
+    --chip-name: #dba84d;
+    --chip-slab: #e85d4c;
+    --key-face: #fdf8f3;
+    --key-ink: #1a1a1a;
+    --key-shade: #b9ab98;
+    /* One cell cut from each corner: the pixel chip's outline. */
+    --notch: polygon(
       var(--cut) 0,
       calc(100% - var(--cut)) 0,
       calc(100% - var(--cut)) var(--cut),
@@ -331,14 +310,64 @@
       0 var(--cut),
       var(--cut) var(--cut)
     );
-    font-size: 0.8125rem;
-    line-height: 1.35;
-    text-wrap: balance;
+  }
+
+  .coach.is-light {
+    --coach-mark: #1a1a1a;
+  }
+
+  .coach.is-hidden {
+    visibility: hidden;
+  }
+
+  .marks {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    shape-rendering: crispEdges;
+  }
+
+  /* Pixel corner marks round the thing, in the accent. */
+  .corners rect {
+    fill: var(--chip-slab);
+  }
+
+  .tail {
+    stroke: var(--coach-mark);
+    stroke-width: 3;
+    stroke-linecap: butt;
+    stroke-dasharray: 3 5;
+  }
+
+  /* The slip carries the accent, printed one cell down and right of the chip
+     (the riso slab, pixel-crisp); the chip itself is cut on the inner face. */
+  .slip {
+    position: absolute;
+    max-width: min(19rem, calc(100vw - 2rem));
+    filter: drop-shadow(4px 4px 0 var(--chip-slab));
     animation: coach-in var(--motion-slow) steps(3, end) both;
   }
 
+  .face {
+    --cut: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: 0.625rem 0.875rem;
+    color: var(--chip-text);
+    background: var(--chip);
+    box-shadow: inset 0 0 0 2px var(--chip-rule);
+    clip-path: var(--notch);
+    font-family: var(--font-ui);
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 1.4;
+    text-wrap: pretty;
+  }
+
   .name {
-    color: var(--chip-gold);
+    color: var(--chip-name);
     font-style: italic;
   }
 
@@ -350,45 +379,79 @@
     margin: 0;
   }
 
-  /* Keys as square pixel keycaps on the chip. */
+  /* Keys are pixel keycaps: a cream face, ink lettering, a shaded foot. */
   .slip :global(.boba-keys) {
+    gap: var(--space-1);
     color: var(--chip-quiet);
   }
 
-  .slip :global(.boba-keys kbd),
-  .go kbd {
-    padding: 0 var(--space-1);
-    color: var(--chip-text);
-    background: rgb(253 248 243 / 0.08);
-    border: 1px solid var(--chip-rule);
+  .slip :global(.boba-keys kbd) {
+    --cut: 2px;
+    margin: 0;
+    padding: 0.125rem 0.375rem 0.25rem;
+    color: var(--key-ink);
+    background: var(--key-face);
+    border: 0;
     border-radius: 0;
-    font: inherit;
-    font-size: 0.75rem;
-    line-height: 1.4;
-  }
-
-  /* Continue: a small square key on the chip, the only part that takes a press. */
-  .go {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1-5);
-    min-height: 1.75rem;
-    margin-left: auto;
-    padding: 0 var(--space-1-5);
-    color: var(--chip-gold);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 0;
-    cursor: pointer;
-    font: inherit;
+    box-shadow: inset 0 -2px 0 var(--key-shade);
+    clip-path: var(--notch);
+    font-family: var(--font-ui);
     font-size: 0.75rem;
     font-weight: 500;
+    line-height: 1.2;
+  }
+
+  /* Continue is a key too, the one part of the callout that takes a press. */
+  .go {
+    --cut: 2px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 2rem;
+    margin-left: auto;
+    padding: 0 0.625rem 0.125rem;
+    color: var(--key-ink);
+    background: var(--key-face);
+    border: 0;
+    border-radius: 0;
+    box-shadow: inset 0 -3px 0 var(--key-shade);
+    clip-path: var(--notch);
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1;
     pointer-events: auto;
     touch-action: manipulation;
   }
 
-  .go:hover {
-    border-color: var(--chip-rule);
+  @media (hover: hover) {
+    .go:hover {
+      background: #ffffff;
+    }
+  }
+
+  .go:active {
+    box-shadow: inset 0 -1px 0 var(--key-shade);
+    transform: translateY(2px);
+  }
+
+  /* The clip would cut a ring drawn outside, so focus is drawn inside the key. */
+  .go:focus-visible {
+    outline: 2px solid transparent;
+    box-shadow:
+      inset 0 -3px 0 var(--key-shade),
+      inset 0 0 0 2px var(--chip-slab);
+  }
+
+  .go kbd {
+    padding: 0;
+    color: #666666;
+    background: none;
+    border: 0;
+    font: inherit;
+    font-size: 0.6875rem;
+    font-weight: 500;
   }
 
   .is-keys .go kbd {
@@ -445,6 +508,12 @@
     }
   }
 
+  @media (max-width: 640px) {
+    .face {
+      font-size: 0.875rem;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .slip {
       animation: none;
@@ -452,6 +521,10 @@
 
     .is-leaving {
       transition: none;
+    }
+
+    .go:active {
+      transform: none;
     }
   }
 </style>
