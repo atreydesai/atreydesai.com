@@ -109,11 +109,37 @@ It sits `5px` down-right (`3px` on small sheets and buttons) and takes a
 `--tilt` of at most `±2deg`. Dialog cards carry `shadow-dialog` instead (black
 at 32% in the dark theme, where the ink outline is the boundary).
 
+### Pixel chips and keys
+
+A painted scene prints its own HUD and on-screen controls in its pixel
+language rather than laying paper over the art. Dialogs (menu, pause card,
+results slip) sit outside the scene and stay paper; catch plays on the page,
+so its tickets stay paper too.
+
+- **Chips.** The dark riso paper (`#2A2422`) cut with one cell stepped off
+  each corner (`--notch`, a `4px` cell), a faint cream rule just inside the
+  edge, cream type in the one family. The same in both themes, as the
+  scenes are. HUD tickets in a scene (`.boba-hud.is-bare`) render this way
+  automatically, with the dark palette; `.boba-chip` prints any other.
+- **The accent step.** Where a riso sheet earns a slab, a chip earns the
+  accent printed a cell down and right of it, pixel-crisp, never tilted or
+  roughened: the score ticket, a ticket in a rush (where it jumps a cell),
+  and the lesson callout.
+- **Keys** (`.boba-key`): on-screen controls in a scene (touch pads, a
+  game's bottom bar) are pixel keys. A dark face with the chip's rule and a
+  shaded foot; pressed (`:active` or `.is-down`) it sinks into the foot. A
+  primary key (`.is-primary`) has the accent face. Key chips ride inside as
+  small cream-on-dark tags, hidden on touch. Focus is drawn inside the key
+  (the notch would cut a ring outside).
+- **Canvas** chips and the sugar rush meter use the same paper
+  (`NOTE_BACK`).
+
 ### Stages
 
 - Catch plays on the page itself, lightly dimmed.
 - Every other game paints its own opaque pixel scene, the same in both
-  themes, and drops the HUD's paper wash (`.boba-hud.is-bare`). See Scenes.
+  themes, and drops the HUD's paper wash (`.boba-hud.is-bare`), its tickets
+  printed as pixel chips. See Scenes.
 
 ## Scenes
 
@@ -157,8 +183,11 @@ controls.
 - **Key chips.** A button's shortcut sits inside it as a small `<kbd>` chip
   (`Resume` `P`, `Exit` `Esc`), hidden on touch. No screen lists its keys a
   second time.
-- **States.** Disabled is 60% opacity with no lift. The global focus ring
-  follows the label's shape and is never restyled or removed.
+- **States.** Disabled is 60% opacity with no lift. Keyboard focus is the
+  site's ring (`focus-ring`, `2px` past a paper gap), drawn on the face
+  itself, so the rough filter bends it with the label's hand-cut edge
+  rather than a smooth rectangle round it; a transparent outline stays for
+  forced colours.
 - **Reduced motion.** No lift, tip, or press travel; the colour changes stay.
 
 HUD icon buttons (pause, mute) stay quiet: a `32px` pixel icon with a wash on
@@ -324,41 +353,46 @@ game decided it.
     sits beside the thing in the world, never in the tickets and never on a
     card: one short full sentence with its key chip (a touch word, and the
     lit pad, on a phone), a dotted tail, and pixel corner brackets around
-    the thing. The callout is a dark chip (`#141a2e`) with stepped pixel
-    corners and a faint cream rule inside its edge, cream text, keycaps
-    square, and Continue in gold; it steps in rather than fading.
-  - **A move slows play.** About a second before a move is needed the game
-    eases into slow motion, and a ghost of the player's own sprite, dithered
-    through a Bayer screen door in cream (in the page's ink where a game
-    plays on the page itself), runs the move from where to make it along a
-    line of chalk dashes. Play comes back to speed the moment the move is
-    made, and the lesson counts once the move has worked. A move made before
-    it is taught is never taught; a move
-    missed takes its lesson down so the next one teaches it, and play never
-    stays slow.
-  - **A thing says what it's for as it comes into view**: a golden cup, a
-    hazard, a power-up (named in italic, then one sentence). In the fast
-    games (sugar rush, boba catch, tea minus, cup stack in normal) every
-    explanation slows play while it is up, so nothing has to be read at
-    full speed, and a Continue button on the slip (`Enter` on the
-    playfield; a focused button keeps its own Enter) ends it and brings
-    play back to speed. Running past the thing ends it too, and no
-    explanation holds longer than about seven seconds of real time.
+    the thing. The callout is a pixel chip (see Pixel chips and keys): the
+    dark riso paper, stepped corners, the accent a cell behind it, cream
+    text at deck size, the thing's name in ochre italic, keys as pixel
+    keycaps (a cream face, ink lettering, a shaded foot) and Continue as a
+    pixel key. It steps in rather than fading, and once the lesson is over
+    it holds its place instead of following its thing.
+  - **Important things pause play.** A lesson that explains something
+    stops the game (`slow: 0`) within a beat, and Continue (`Enter` on the
+    playfield; a focused button keeps its own Enter) brings it back to
+    speed. A lesson that asks for a move freezes play at the exact moment
+    to make it, while a ghost of the player's own sprite, dithered in cream
+    (in the page's ink where a game plays on the page itself), runs the
+    move in real time from where to make it along a line of chalk dashes;
+    the player's move both resumes play and makes the move, and the lesson
+    counts once the move has worked. A move made before it is taught is
+    never taught; a move missed takes its lesson down so the next one
+    teaches it. A lesson asks for its moment, not before it: a thing is
+    named as it becomes relevant, not as it enters the screen's edge.
+  - **Placement.** A callout never covers the player, the thing it names,
+    the path the player is about to take, or the place they need to look or
+    act; it takes the side away from the action, measured.
   - **The spotlight.** While something is being explained, the scene dims
     under a flat wash and what matters stays in full light: the player and
-    the thing, stepped down at the edge by one band of half the wash, never
-    a soft glow. On a pixel scene the lit shapes are cut from its cell grid,
-    so their edges step like the art; the wash itself is even, never a
-    dithered screen over the art, which reads as noise on a bright sky. It eases in and out in a moment (at once under Reduce
-    Motion) and goes as soon as the move is made.
+    the thing, each in a rectangle a cell clear of it, stepped down at the
+    edge by one band of half the wash. On a pixel scene the rectangles are
+    cut from its cell grid with stepped corners, the same shape as its
+    chips; on the page (catch) they are rounded like the page's cards.
+    Never an oval, a soft glow, or a dithered screen over the art. It eases
+    in and out in a moment (at once under Reduce Motion) and goes as soon
+    as the move is made.
   - **Smooth at any speed.** Where a game steps its rules at a fixed rate,
-    slow motion draws the player and the camera between the last two steps,
-    so it glides rather than judders; the rules themselves never change.
+    play easing into and out of a pause draws the player and the camera
+    between the last two steps, so it glides rather than judders; the rules
+    themselves never change.
   - **Where time can't bend** (a beat on the audio clock, a window in
-    milliseconds), a ghost and a highlight teach instead of slow motion.
+    milliseconds), a ghost and a highlight teach instead.
   - Ghosts, chalk and brackets are the arcade's only "holograms": dither,
-    chalk dashes and pixel steps, never glow. Under Reduce Motion nothing pulses or draws on; the lessons
-    and the slow motion stay, because they are play.
+    chalk dashes and pixel steps, never glow. Under Reduce Motion nothing
+    pulses or draws on; the lessons and the pauses stay, because they are
+    play.
 - **Share.** Each game builds its own emoji lines for the results slip's
   `share` prop (`emojiRows` in `src/lib/arcade/share.ts` wraps a sequence):
   at most four short lines that say how the run went without explaining it.
