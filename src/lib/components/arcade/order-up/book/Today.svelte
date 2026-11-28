@@ -3,7 +3,7 @@
   // money on one side; the contracts to take on, as chits, on the other.
   import type { Campaign } from "#lib/arcade/orders-campaign.ts";
   import { calendar } from "#lib/arcade/order-up/engine/calendar.ts";
-  import { newToday } from "#lib/arcade/order-up/engine/opened.ts";
+  import { newToday, goalScaleOpen, DAILY_DAY } from "#lib/arcade/order-up/engine/opened.ts";
   import { GOALS } from "#lib/arcade/order-up/content/index.ts";
   import { rentOnDueDay, wage, MARKETING } from "#lib/arcade/order-up/engine/management.ts";
   import { money } from "#lib/arcade/orders-display.ts";
@@ -19,6 +19,13 @@
     ["job", "Jobs"],
     ["season", "Season"],
   ] as const;
+  // A contract kind shows from its day, or while one of it is taken; promotions and the daily shift likewise.
+  $: scales = SCALES.filter(
+    ([id]) => goalScaleOpen(campaign, id) || campaign.expansion.selectedGoals.some((g) => GOALS.find((x) => x.id === g)?.scale === id),
+  );
+  $: if (!scales.some(([id]) => id === goalScale)) goalScale = "shift";
+  $: promotions = MARKETING.filter((m) => m.day <= campaign.day || campaign.expansion.marketing === m.id);
+  $: daily = campaign.day >= DAILY_DAY || Object.keys(campaign.expansion.dailyBests).length > 0;
   $: today = calendar(campaign.day);
   $: fresh = newToday(campaign);
   $: report = campaign.expansion.lastReport;
@@ -118,15 +125,18 @@
           {/if}
         </div>
       {/if}
-      <div class="lg-row">
-        <span>Daily shift <small class="lg-mark">Best {campaign.expansion.dailyBests[todayKey] ?? 0} points</small></span><span></span>
-        <button type="button" class="boba-key order-pixel-paper-key" disabled={live || campaign.status === "closed"} onclick={() => action("daily")}>Play it</button>
-      </div>
+      {#if daily}
+        <div class="lg-row">
+          <span>Daily shift <small class="lg-mark">Best {campaign.expansion.dailyBests[todayKey] ?? 0} points</small></span><span></span>
+          <button type="button" class="boba-key order-pixel-paper-key" disabled={live || campaign.status === "closed"} onclick={() => action("daily")}>Play it</button>
+        </div>
+      {/if}
     </div>
 
+    {#if promotions.length}
     <div class="lg-rubric"><h3>Promotion</h3><span class="lg-meta">One a day</span></div>
     <div class="lg-chips" role="group" aria-label="Promotion">
-      {#each MARKETING as item (item.id)}
+      {#each promotions as item (item.id)}
         <button
           type="button"
           class="boba-key order-pixel-paper-key promo"
@@ -137,12 +147,13 @@
         >
       {/each}
     </div>
+    {/if}
   </div>
 
   <section class="contracts" aria-labelledby="contracts-title">
     <div class="lg-rubric"><h3 id="contracts-title">Contracts</h3><span class="lg-meta">{booked} of 6 taken</span></div>
     <div class="lg-chips" role="group" aria-label="Contract length">
-      {#each SCALES as [id, label] (id)}
+      {#each scales as [id, label] (id)}
         <button type="button" class="boba-key order-pixel-paper-key" aria-pressed={goalScale === id} onclick={() => (goalScale = id)}>{label}</button>
       {/each}
     </div>

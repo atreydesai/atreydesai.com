@@ -610,6 +610,18 @@ DOM-free engine and one module per skill); the components in
   the right, and the tool belt runs along the foot. Every place keeps one
   control row of the same height under its picture, so switching places or
   picking options never rescales the picture or moves a key.
+- **A little at a time.** A new shop shows only what day 1 uses, and the
+  rest arrives on the day its first content does (`engine/opened.ts`): the
+  book's Workshop on day 4, Crew on day 5 and Shops on day 12, each tab
+  marked new on its first day; week contracts, promotions and the second
+  supplier on day 3, job contracts and the third supplier on day 5, season
+  contracts on day 8, the daily shift once the first shift is done; the
+  album's pages, the shops list, the belt's slots and the job board grow
+  the same way. A new shop's shelves hold only day 1's ingredients, and each
+  later one arrives with its opening crate. Today lists nothing as new on
+  day 1, and later only what the player acts on in the book; skills are
+  taught at the counter on first use and places on first visit. Whatever a
+  save already holds is never hidden.
 - **One place strip.** Over the picture a strip of pixel signs (room,
   counter, order window, street, stockroom and the rest as they open) picks
   the place; `V` steps through them. There is no other place picker.

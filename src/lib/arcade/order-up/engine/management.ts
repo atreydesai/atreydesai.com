@@ -16,6 +16,7 @@ import { STATIONS, createStaff, emptyShop, type StaffState } from "./state.ts";
 import { TUNING } from "./tuning.ts";
 import { calendar } from "./calendar.ts";
 import { machineEntry, machineModel, instanceKey } from "./equipment.ts";
+import { goalScaleOpen } from "./opened.ts";
 export { machineEntry, machineAt, machineModel, machineDefinition } from "./equipment.ts";
 export function rankFor(c: Campaign) {
   return Math.min(60, Math.max(1, Math.min(Math.floor(c.day / 2) + 1, RANKS.filter((r) => r.xp <= c.xp).length)));
@@ -331,19 +332,21 @@ export function selectGoal(c: Campaign, id: string) {
   if (!item || item.day > c.day || c.status === "open") return false;
   const found = c.expansion.selectedGoals.includes(id);
   if (found) c.expansion.selectedGoals = c.expansion.selectedGoals.filter((g) => g !== id);
+  else if (!goalScaleOpen(c, item.scale)) return false;
   else if (c.expansion.selectedGoals.length < 6) c.expansion.selectedGoals.push(id);
   else return false;
   return true;
 }
+/** Promotions, from day 3: the first days are for learning the counter. */
 export const MARKETING = [
-  { id: "flyers", name: "flyers", price: 180, arrivals: 1.2, tips: 1 },
-  { id: "radio", name: "radio spot", price: 360, arrivals: 1.4, tips: 1 },
-  { id: "loyalty", name: "loyalty cards", price: 240, arrivals: 1.1, tips: 1.45 },
-  { id: "display", name: "window display", price: 160, arrivals: 1.1, tips: 1.2 },
+  { id: "flyers", name: "flyers", price: 180, arrivals: 1.2, tips: 1, day: 3 },
+  { id: "radio", name: "radio spot", price: 360, arrivals: 1.4, tips: 1, day: 3 },
+  { id: "loyalty", name: "loyalty cards", price: 240, arrivals: 1.1, tips: 1.45, day: 3 },
+  { id: "display", name: "window display", price: 160, arrivals: 1.1, tips: 1.2, day: 3 },
 ];
 export function bookMarketing(c: Campaign, id: string) {
   const item = MARKETING.find((m) => m.id === id);
-  if (!item || c.status === "open" || c.cash < item.price || c.expansion.marketing) return false;
+  if (!item || item.day > c.day || c.status === "open" || c.cash < item.price || c.expansion.marketing) return false;
   c.cash -= item.price;
   c.expansion.marketing = id;
   return true;

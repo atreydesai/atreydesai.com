@@ -27,7 +27,7 @@ import { newCampaign } from "../src/lib/arcade/orders-campaign.ts";
 import { saveEnvelope } from "../src/lib/arcade/order-up/engine/save.ts";
 import { startShift } from "../src/lib/arcade/order-up/engine/shift.ts";
 import { rankFor } from "../src/lib/arcade/order-up/engine/management.ts";
-import { SHOPS, RECIPE_BY_ID } from "../src/lib/arcade/order-up/content/index.ts";
+import { SHOPS, RECIPE_BY_ID, INGREDIENT_BY_ID } from "../src/lib/arcade/order-up/content/index.ts";
 import { pantryCount } from "../src/lib/arcade/order-up/engine/pantry.ts";
 
 function memoryStore(entries = {}) {
@@ -121,7 +121,12 @@ test("cheats: the till, the day with its rank, every shop, the pantry and the co
   assert.ok(pantryCount(c) > 0);
   assert.equal(jumpToDay(c, 60).ok, true);
   assert.equal(c.day, 60);
-  assert.equal(pantryCount(c), 0, "stock kept to an earlier day spoils on the jump");
+  const left = [...c.inventory, ...c.expansion.extraInventory];
+  assert.ok(left.every((lot) => lot.expiresOn > 60), "stock kept to an earlier day spoils on the jump");
+  assert.ok(
+    left.every((lot) => INGREDIENT_BY_ID[lot.ingredient].day > 1),
+    "what was stocked on day 1 is gone; what's left is the opening crates of the days passed",
+  );
   assert.equal(rankFor(c), 31, "day 60's rank is reached, not only the date");
   assert.equal(jumpToDay(c, 10).ok, true);
   assert.equal(c.day, 10);

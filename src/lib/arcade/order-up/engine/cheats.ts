@@ -10,7 +10,7 @@
 import type { Campaign } from "../../orders-campaign.ts";
 import { BADGES, DECOR, INGREDIENTS, RANKS, RECIPE_BY_ID, SHOPS } from "../content/index.ts";
 import { rankFor } from "./management.ts";
-import { addStock, expireAndDeliver, pantryCapacity, pantryCount } from "./pantry.ts";
+import { addStock, expireAndDeliver, openingGifts, pantryCapacity, pantryCount } from "./pantry.ts";
 import { grantRankUnlocks } from "./progression.ts";
 import { emptyShop } from "./state.ts";
 import type { Shift, Ticket } from "./shift-types.ts";
@@ -39,16 +39,23 @@ export function addCash(c: Campaign, amount: number): CheatResult {
 /**
  * Moves the shop to a day, between shifts only, with the experience that
  * day's rank needs, so everything that opens by then is open. Going back to
- * an earlier day keeps what was earned. Stock past its day spoils and
- * shipments due by then arrive, as they would at the start of that day.
+ * an earlier day keeps what was earned. Each day passed brings its new
+ * ingredients' opening crates, stock past its day spoils and shipments due by
+ * then arrive, as playing through those days would.
  */
 export function jumpToDay(c: Campaign, day: number): CheatResult {
   if (c.status === "open") return refused("Finish the shift before changing the day.");
   const target = Math.max(1, Math.min(LAST_DAY, Math.floor(day)));
   const before = rankFor(c);
+  // Each day passed brings its new ingredients' opening crates, as playing through it would.
+  for (let day = c.day + 1; day <= target; day++) {
+    c.day = day;
+    openingGifts(c);
+  }
   c.day = target;
   c.status = "planning";
   expireAndDeliver(c);
+  openingGifts(c);
   const rank = Math.min(RANKS.length, Math.floor(target / 2) + 1);
   c.xp = Math.max(c.xp, RANKS[rank - 1]?.xp ?? 0);
   grantRankUnlocks(c, before, rankFor(c));

@@ -4,10 +4,12 @@ import type { Recipe } from "../content/schema.ts";
 import { INGREDIENTS, INGREDIENT_BY_ID, MACHINES } from "../content/index.ts";
 import { calendar, seasonalPrice } from "./calendar.ts";
 import { TUNING } from "./tuning.ts";
+import { INGREDIENTS as FIRST_CAMPAIGN_INGREDIENTS } from "../content/legacy-economy.ts";
+/** The suppliers, each from the day it opens: one to start, bulk and longer-keeping crates later. */
 export const SUPPLIER_OFFERS = [
-  { id: "market", name: "corner market", quantity: 4, delay: 0, factor: 1, life: 0 },
-  { id: "wholesaler", name: "night freight", quantity: 16, delay: 1, factor: 0.72, life: 0 },
-  { id: "cooperative", name: "orchard co-op", quantity: 10, delay: 2, factor: 0.92, life: 2 },
+  { id: "market", name: "corner market", quantity: 4, delay: 0, factor: 1, life: 0, day: 1 },
+  { id: "wholesaler", name: "night freight", quantity: 16, delay: 1, factor: 0.72, life: 0, day: 3 },
+  { id: "cooperative", name: "orchard co-op", quantity: 10, delay: 2, factor: 0.92, life: 2, day: 5 },
 ] as const;
 export function pantryLots(c: Campaign) {
   return [...c.inventory, ...c.expansion.extraInventory];
@@ -110,7 +112,7 @@ export function stockPrice(c: Campaign, id: string, supplier = "market") {
 export function buyPantry(c: Campaign, id: string, supplier = "market") {
   const ingredient = INGREDIENT_BY_ID[id],
     offer = SUPPLIER_OFFERS.find((s) => s.id === supplier);
-  if (!ingredient || !offer || ingredient.day > c.day) return false;
+  if (!ingredient || !offer || ingredient.day > c.day || offer.day > c.day) return false;
   const price = stockPrice(c, id, supplier);
   if (c.cash < price || pantryCount(c) + offer.quantity > pantryCapacity(c)) return false;
   c.cash -= price;
@@ -154,10 +156,20 @@ export function expireAndDeliver(c: Campaign) {
     if (lot.expiresOn > c.day) addStock(c, lot.ingredient, lot.quantity, 0, lot.expiresOn);
   return expired;
 }
-/** A one-time tasting crate makes each ingredient's debut playable, not a cash gate. */
+/**
+ * A one-time crate makes each ingredient's debut playable, not a cash gate.
+ * A first-campaign ingredient's crate is its old opening stock, which a new
+ * shop no longer holds from day 1; a save that still holds some gets none.
+ */
 export function openingGifts(c: Campaign) {
   if (c.expansion.giftedDays.includes(c.day)) return;
-  for (const ingredient of INGREDIENTS.filter((i) => i.day === c.day && !i.legacy)) addStock(c, ingredient.id, 6);
+  for (const ingredient of INGREDIENTS.filter((i) => i.day === c.day)) {
+    if (!ingredient.legacy) addStock(c, ingredient.id, 6);
+    else if (stock(c, ingredient.id) === 0) {
+      const first = FIRST_CAMPAIGN_INGREDIENTS.find((x) => x.id === ingredient.id);
+      addStock(c, ingredient.id, (first?.openingStock ?? 6) + (c.mode === "normal" ? 4 : 0));
+    }
+  }
   c.expansion.giftedDays.push(c.day);
 }
 export function emergencyRestock(c: Campaign) {

@@ -12,11 +12,16 @@ import {
   chapters,
   listedShops,
   newToday,
+  DAILY_DAY,
+  GOAL_SCALE_DAYS,
+  goalScaleOpen,
 } from "../src/lib/arcade/order-up/engine/opened.ts";
-import { candidates } from "../src/lib/arcade/order-up/engine/management.ts";
+import { bookMarketing, candidates, selectGoal, MARKETING } from "../src/lib/arcade/order-up/engine/management.ts";
 import { unlocks } from "../src/lib/arcade/order-up/engine/calendar.ts";
-import { BADGES, DECOR, GUESTS, RECIPES, SHOPS } from "../src/lib/arcade/order-up/content/index.ts";
+import { BADGES, DECOR, GOALS, GUESTS, INGREDIENTS, RECIPES, SHOPS } from "../src/lib/arcade/order-up/content/index.ts";
 import { newCampaign } from "../src/lib/arcade/orders-campaign.ts";
+import { newShop } from "../src/lib/arcade/order-up/engine/save.ts";
+import { buyPantry, openingGifts, pantryCount, stock, SUPPLIER_OFFERS } from "../src/lib/arcade/order-up/engine/pantry.ts";
 
 const onDay = (day) => {
   const c = newCampaign("normal");
@@ -88,4 +93,63 @@ test("opened: day 1 announces nothing; later days list only what the player acts
   }
   assert.ok(newToday(onDay(4)).some((u) => u.kind === "machine"), "the first machines are announced");
   assert.ok(newToday(onDay(12)).some((u) => u.kind === "shop"), "the second shop is announced");
+});
+
+test("opened: a new shop's shelves hold only day 1's ingredients; each later one arrives with its opening crate", () => {
+  const c = newShop("normal");
+  const held = new Set([...c.inventory].map((l) => l.ingredient));
+  assert.deepEqual([...held].sort(), INGREDIENTS.filter((i) => i.day === 1).map((i) => i.id).sort());
+  assert.ok(pantryCount(c) < 100, "no hidden crates fill the shelves");
+  assert.ok(pantryCount(newCampaign("normal")) > pantryCount(c), "the first campaign's own new save still stocks everything");
+  c.day = 2;
+  openingGifts(c);
+  for (const i of INGREDIENTS.filter((x) => x.day === 2)) assert.ok(stock(c, i.id) > 0, `${i.id} arrives on day 2`);
+  // A save that already holds its opening stock gets nothing more.
+  const old = newCampaign("normal");
+  old.day = 2;
+  const before = stock(old, "jasmine");
+  openingGifts(old);
+  assert.equal(stock(old, "jasmine"), before);
+});
+
+test("opened: one supplier, then the bulk and the long-keeping ones", () => {
+  assert.deepEqual(
+    SUPPLIER_OFFERS.map((o) => [o.id, o.day]),
+    [["market", 1], ["wholesaler", 3], ["cooperative", 5]],
+  );
+  const c = newShop("normal");
+  c.cash = 100000;
+  assert.equal(buyPantry(c, "black", "wholesaler"), false, "no night freight on day 1");
+  assert.equal(buyPantry(c, "black", "market"), true);
+  c.day = 3;
+  assert.equal(buyPantry(c, "black", "wholesaler"), true);
+  assert.equal(buyPantry(c, "black", "cooperative"), false, "the co-op opens on day 5");
+});
+
+test("opened: promotions from day 3, contracts by length, the daily shift from day 2", () => {
+  const c = newShop("normal");
+  assert.ok(MARKETING.every((m) => m.day === 3));
+  assert.equal(bookMarketing(c, "flyers"), false);
+  c.day = 3;
+  assert.equal(bookMarketing(c, "flyers"), true);
+
+  assert.deepEqual(GOAL_SCALE_DAYS, { shift: 1, week: 3, job: 5, season: 8 });
+  const d = newShop("normal");
+  const shift = GOALS.find((g) => g.scale === "shift" && g.day <= 1);
+  const season = GOALS.find((g) => g.scale === "season" && g.day <= 1);
+  assert.equal(selectGoal(d, shift.id), true);
+  assert.equal(selectGoal(d, season.id), false, "season contracts wait for day 8");
+  assert.ok(!goalScaleOpen(d, "week") && goalScaleOpen({ ...d, day: 3 }, "week"));
+  d.expansion.selectedGoals.push(season.id); // a save that took one earlier
+  assert.equal(selectGoal(d, season.id), true, "a contract already taken can still be dropped");
+  assert.ok(!d.expansion.selectedGoals.includes(season.id));
+
+  assert.equal(DAILY_DAY, 2);
+});
+
+test("opened: the test kitchen's day jump brings the opening crates of every day it passes", async () => {
+  const { jumpToDay } = await import("../src/lib/arcade/order-up/engine/cheats.ts");
+  const c = newShop("normal");
+  jumpToDay(c, 5);
+  for (const id of ["jasmine", "taro", "oat", "pudding"]) assert.ok(stock(c, id) > 0, id);
 });

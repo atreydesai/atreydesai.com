@@ -26,7 +26,7 @@
     startMusic,
     stopMusic,
   } from "#lib/sfx.ts";
-  import { newCampaign, type Campaign, type CampaignMode } from "#lib/arcade/orders-campaign.ts";
+  import type { Campaign, CampaignMode } from "#lib/arcade/orders-campaign.ts";
   import { money } from "#lib/arcade/orders-display.ts";
   import { beforeImportKey, slotKey, unreadableKey, type SlotId } from "#lib/arcade/order-up/engine/slots.ts";
   import { beltShows } from "#lib/arcade/order-up/engine/opened.ts";
@@ -66,7 +66,7 @@
     type Receipt,
   } from "#lib/arcade/order-up/engine/shift.ts";
   import { rememberUsual, acceptChange, keepOriginal } from "#lib/arcade/order-up/engine/guest-actions.ts";
-  import { loadEnvelope, parseSave, saveEnvelope, type LoadedSave } from "#lib/arcade/order-up/engine/save.ts";
+  import { loadEnvelope, newShop, parseSave, saveEnvelope, type LoadedSave } from "#lib/arcade/order-up/engine/save.ts";
   import { command } from "#lib/arcade/order-up/engine/commands.ts";
   import { calendar } from "#lib/arcade/order-up/engine/calendar.ts";
   import { rankFor } from "#lib/arcade/order-up/engine/management.ts";
@@ -106,7 +106,7 @@
   const keys = ["Q", "W", "E", "R", "T", "Y"];
 
   let mode: CampaignMode = get(arcadeExpert) ? "expert" : "normal";
-  let campaign: Campaign = newCampaign(mode);
+  let campaign: Campaign = newShop(mode);
   let shift: Shift | null = null;
   let carry: Record<string, unknown> = {};
   let ready = false;
@@ -225,7 +225,7 @@
     } catch (error) {
       saveEnabled = false;
       storageWarning = error instanceof Error ? error.message : "The save couldn't be read.";
-      campaign = newCampaign(modeToRead);
+      campaign = newShop(modeToRead);
       shift = null;
       carry = {};
       bookOpen = true;

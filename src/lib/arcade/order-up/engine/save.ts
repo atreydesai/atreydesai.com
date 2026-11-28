@@ -1,5 +1,5 @@
-import { normalizeCampaign, type Campaign, type CampaignMode } from "../../orders-campaign.ts";
-import { RECIPE_BY_ID, GUEST_BY_ID, SHOPS, SKILLS, POWERUPS, EVENTS, HOLIDAYS } from "../content/index.ts";
+import { newCampaign, normalizeCampaign, type Campaign, type CampaignMode } from "../../orders-campaign.ts";
+import { RECIPE_BY_ID, GUEST_BY_ID, SHOPS, SKILLS, POWERUPS, EVENTS, HOLIDAYS, INGREDIENT_BY_ID } from "../content/index.ts";
 import { object, finite, STATIONS } from "./state.ts";
 import type { Shift, Ticket, Cup, Receipt } from "./shift-types.ts";
 import { createRun } from "../skills/index.ts";
@@ -199,10 +199,22 @@ export interface LoadedSave {
   warning: string;
   migrated: boolean;
 }
+/**
+ * A new Order Up shop. It holds only what day 1's menu uses: each later
+ * ingredient's opening crate arrives on the day it opens (openingGifts)
+ * instead of filling the shelves out of sight until then. The first
+ * campaign's own new save, newCampaign, still stocks everything.
+ */
+export function newShop(mode: CampaignMode): Campaign {
+  const c = newCampaign(mode);
+  c.inventory = c.inventory.filter((lot) => (INGREDIENT_BY_ID[lot.ingredient]?.day ?? 1) <= 1);
+  return c;
+}
+
 export function loadEnvelope(value: unknown, mode: CampaignMode): LoadedSave {
   const envelope = object(value),
     raw = object(envelope.campaign),
-    campaign = normalizeCampaign(envelope.campaign, mode),
+    campaign = envelope.campaign ? normalizeCampaign(envelope.campaign, mode) : newShop(mode),
     migrated = raw.version !== 3 && !!envelope.campaign;
   if (envelope.campaign && raw.mode !== mode) throw new Error("That save belongs to the other difficulty.");
   if (envelope.campaign && ![1, 2, 3].includes(Number(raw.version)))

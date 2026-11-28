@@ -24,6 +24,8 @@
   $: known = INGREDIENTS.filter((i) => i.day <= campaign.day);
   $: groups = GROUPS.filter((g) => g === "all" || known.some((i) => i.group === g));
   $: ingredients = known.filter((i) => (group === "all" || i.group === group) && i.name.toLowerCase().includes(query.toLowerCase()));
+  $: offers = SUPPLIER_OFFERS.filter((o) => o.day <= campaign.day);
+  $: if (!offers.some((o) => o.id === supplier)) supplier = "market";
   $: offer = SUPPLIER_OFFERS.find((o) => o.id === supplier)!;
   $: lots = pantryLots(campaign);
   $: full = pantryCount(campaign) + offer.quantity > capacity(campaign);
@@ -46,7 +48,7 @@
 </div>
 
 <div class="lg-chips suppliers" role="group" aria-label="Supplier">
-  {#each SUPPLIER_OFFERS as item (item.id)}
+  {#each offers as item (item.id)}
     <button type="button" class="boba-key order-pixel-paper-key supplier" aria-pressed={supplier === item.id} onclick={() => (supplier = item.id)}
       ><strong>{item.name}</strong><span>{when(item.delay)}, {item.quantity} a crate</span></button
     >

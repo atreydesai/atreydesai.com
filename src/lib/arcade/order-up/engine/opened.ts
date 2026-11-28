@@ -19,6 +19,15 @@ export const CHAPTER_DAYS: Readonly<Record<string, number>> = {
   map: [...SHOPS.map((s) => s.day)].sort((a, b) => a - b)[1] ?? 1,
 };
 
+/** Contracts by length, from the day each opens: one shift's first, a season's once a week has passed. */
+export const GOAL_SCALE_DAYS: Readonly<Record<string, number>> = { shift: 1, week: 3, job: 5, season: 8 };
+/** The daily shift, a scored challenge, opens once the first real shift is done. */
+export const DAILY_DAY = 2;
+
+export function goalScaleOpen(c: Campaign, scale: string) {
+  return c.day >= (GOAL_SCALE_DAYS[scale] ?? 1);
+}
+
 /** The book's chapters in their order; the test kitchen adds its own after them. */
 export const CHAPTERS = ["today", "pantry", "workshop", "crew", "map", "collection"] as const;
 
