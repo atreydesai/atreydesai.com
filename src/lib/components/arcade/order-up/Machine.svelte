@@ -6,7 +6,9 @@
   export let turn = 0;
   export let working = false;
   export let size = 80;
-  $: sprite = machineSprite(id, tier, turn, working);
+  /** A brew kit fitted at the shop, drawn as its rig beside the machine. */
+  export let kit = "";
+  $: sprite = machineSprite(id, tier, turn, working, kit);
 </script>
 
 <span class="machine" class:working style:width={size + "px"} style:height={size + "px"} aria-hidden="true"

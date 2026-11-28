@@ -26,6 +26,8 @@ export interface WindowSpec {
   frame?: string;
   /** Round-topped, or a porthole. */
   shape?: "square" | "arch" | "round";
+  /** No glass in it: an open doorway (a rolled-up dock door) showing the outside, without the glare. */
+  open?: boolean;
 }
 
 export interface DoorSpec {
@@ -91,6 +93,37 @@ export interface PropSpec {
   flat?: boolean;
   /** The shadow it throws on the ground outside: a block (default), a round crown, or none. */
   shadow?: "box" | "round" | "none";
+  /** Added to its depth among the people: a low front wall sorts in front of whoever stands just inside it. */
+  depthBias?: number;
+}
+
+/**
+ * The doorway guests come and go through: the wall it is cut in and its span
+ * along that wall, in tiles. "left" and "right" are the back walls (x = 0 and
+ * y = 0); "front-left" runs along y = rows and "front-right" along x = cols.
+ */
+export interface Doorway {
+  wall: WallSide | "front-left" | "front-right";
+  from: number;
+  to: number;
+}
+
+/**
+ * A place to sit: where the sitter's feet go, the way they face (one step
+ * along x or y: toward their table, out of the window), and how high the
+ * seat is. Seats round one table share `table`, so a couple or a parent and
+ * child sit together; `dog` is where a dog lies beside it. `pieces` are the
+ * keys of the seat's own chair or stool, which only its sitter may walk into.
+ */
+export interface Seat {
+  id: string;
+  x: number;
+  y: number;
+  face: [number, number];
+  height: number;
+  table?: string;
+  dog?: [number, number];
+  pieces: string[];
 }
 
 export interface CounterStyle {
@@ -186,10 +219,18 @@ export interface Venue {
   counter: CounterStyle;
   outside: OutsideSpec;
   front?: FrontWall;
-  /** Where guests come in, wait and leave, in tiles. */
+  /** Where guests come in, wait and leave, in tiles: where they appear and vanish, the spots in line (front first), and where they wait for their cup. */
   entry: [number, number];
   queue: [number, number][];
   pickup: [number, number];
+  /** Where guests sit with their cup: chairs at tables, stools at a window ledge (the furniture is in `props` or `outside.props`). */
+  seats?: Seat[];
+  /** The doorway they use, or null when they stay outside and are served through a hatch. */
+  doorway?: Doorway | null;
+  /** From `entry` to the far end of the queue: the points they walk through, by the door. */
+  way?: [number, number][];
+  /** From pickup back out to `entry`: the points they walk through on the way out (`way` in reverse when not given). */
+  out?: [number, number][];
   /** Paint over the baked layer after the room (a truck's cab, a canopy's poles). */
   backHook?: (p: Painter, g: IsoGrid, light: Light, width: number, height: number) => void;
   /** Extra blocks that throw shadows outside (tiles, pixels high). */

@@ -45,13 +45,13 @@ export function venueFor(id: string, o: VenueOptions): Venue {
 }
 
 /** The five station counters at their places in the layout. */
-export function stationProps(v: Venue, counters: Record<string, readonly [number, number] | number[]>, shop: string): PropSpec[] {
+export function stationProps(v: Venue, counters: Record<string, readonly [number, number] | number[]>, shop: string, kit = ""): PropSpec[] {
   void shop;
   const share = v.indoorSun ?? 0.4;
   return (["brew", "prep", "build", "serve", "stock"] as StationId[])
     .filter((id) => counters[id])
     .map((id) => {
       const [x, y] = counters[id];
-      return stationProp(id, x, y, v.counter, share);
+      return stationProp(id, x, y, v.counter, share, { kit });
     });
 }

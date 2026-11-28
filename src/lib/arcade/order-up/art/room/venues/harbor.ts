@@ -14,6 +14,7 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { planks, shiplap, boards } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, WindowSpec, WallSide, FrontBox } from "../types.ts";
+import { cafeTable, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import { INK } from "../props.ts";
 import { word, bigWord, bigWidth } from "../font.ts";
@@ -532,45 +533,6 @@ function hydrangeaProp(key: string, x: number, y: number): PropSpec {
   };
 }
 
-/** A round tea table with two stools, a teapot and cups set out. */
-function teaTableProp(key: string, x: number, y: number): PropSpec {
-  return {
-    key,
-    x,
-    y,
-    height: 26,
-    draw(p, g, light) {
-      const f = faceLight(light, 0.45);
-      const wood = "#a47c58";
-      const stool = (u: number, v: number) => {
-        const c = project(g, u, v, 0);
-        p.alpha(0.3, () => p.oval(INK, c.x, c.y, 5, 2));
-        p.rect(lit(light, mixHex(wood, INK, 0.4), 0.1), c.x - 3, c.y - 8, 1, 8);
-        p.rect(lit(light, mixHex(wood, INK, 0.4), 0.1), c.x + 3, c.y - 8, 1, 8);
-        p.oval(lit(light, INK, 0), c.x, c.y - 9, 5, 3);
-        p.oval(lit(light, TEAL, f.top + 0.1), c.x, c.y - 10, 4, 2);
-      };
-      stool(0.2, 0.55);
-      const c = project(g, 0.55, 0.5, 0);
-      p.alpha(0.3, () => p.oval(INK, c.x, c.y, 7, 2));
-      p.rect(lit(light, mixHex(wood, INK, 0.4), 0.1), c.x - 1, c.y - 13, 3, 13);
-      p.rect(lit(light, mixHex(wood, INK, 0.4), 0.1), c.x - 4, c.y - 2, 9, 2);
-      p.oval(lit(light, INK, 0), c.x, c.y - 14, 10, 5);
-      p.oval(lit(light, mixHex(wood, INK, 0.2), f.left), c.x, c.y - 14, 9, 4);
-      p.oval(lit(light, wood, f.top + 0.1), c.x, c.y - 15, 9, 4);
-      // A white teapot, two cups.
-      p.rect(lit(light, INK, 0), c.x - 3, c.y - 21, 7, 6);
-      p.rect(lit(light, "#efe9da", f.top + 0.2), c.x - 2, c.y - 20, 5, 4);
-      p.rect(lit(light, "#efe9da", f.top + 0.2), c.x + 3, c.y - 19, 2, 1);
-      p.rect(lit(light, NAVY, 0.3), c.x - 2, c.y - 18, 5, 1);
-      for (const dx of [-7, 6]) {
-        p.rect(lit(light, INK, 0), c.x + dx - 1, c.y - 17, 4, 3);
-        p.rect(lit(light, "#efe9da", 0.5), c.x + dx, c.y - 17, 2, 2);
-      }
-      stool(0.85, 0.85);
-    },
-  };
-}
 
 /** An iron bollard on the pier's edge. */
 function bollardProp(key: string, x: number, y: number): PropSpec {
@@ -1033,6 +995,11 @@ function teaHouseFront(p: Painter, light: Light, box: FrontBox) {
 
 export function harborVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // A table for three on the rag rug, and a small one for two by the portholes.
+  const sit = seating(
+    cafeTable("harbor-table", 2.85, 5.65, ["-x", "-y", "+x"], { wood: "#a47c58", seat: TEAL }),
+    cafeTable("harbor-table2", 1.35, 3.85, ["-x", "-y"], { wood: "#a47c58", seat: RED }),
+  );
   const wallH = 84;
   const port = (wall: WallSide, at: number, sill = 40): WindowSpec => ({ wall, at, width: 1, sill, top: sill + 24, shape: "round" });
   const big: WindowSpec = { wall: "right", at: 5.9, width: 2.9, sill: 28, top: 66, bars: 2, transom: 11, frame: WHITE };
@@ -1068,11 +1035,11 @@ export function harborVenue(o: VenueOptions): Venue {
       wallLantern("left", 6.6, 44),
     ],
     props: [
+      ...sit.props,
       coatStandProp("prop:coats", 0, 0),
       seaChestProp("prop:chest", 2, 0),
       barrelRopeProp("prop:barrel", 0, rows - 1),
       hydrangeaProp("prop:hydrangea", cols - 1, rows - 1),
-      teaTableProp("prop:table", 2.3, 5.3),
     ],
     counter: { top: "#b39a78", front: "#4f8584", side: "#3f6c6b", trim: WHITE, panel: "slats", height: 16 },
     outside: {
@@ -1100,18 +1067,20 @@ export function harborVenue(o: VenueOptions): Venue {
     },
     front: { height: 18, color: TEAL, cap: WHITE, stripe: [WHITE, 2, 4], gapsLeft: [5, 6] },
     // Guests come up the gangway from below the frame, in through the open front and up to the serve counter.
+    // Up the gangway and in through the gap in the low wall; the line runs straight down from the serve counter.
+    seats: sit.seats,
+    doorway: { wall: "front-left", from: 5, to: 7 },
     entry: [6.0, rows + 6.0],
     queue: [
-      [7.5, 2.45],
-      [7.35, 3.4],
-      [7.05, 4.35],
-      [7.0, 5.3],
-      [6.6, 6.3],
-      [6.3, 7.3],
-      [6.2, 8.3],
-      [6.1, 9.3],
+      [6.5, 3.4],
+      [6.4, 4.15],
+      [6.3, 4.9],
+      [6.2, 5.65],
+      [6.1, 6.4],
+      [6.0, rows + 0.75],
     ],
-    pickup: [5.85, 2.35],
+    pickup: [5.75, 3.5],
+    out: [[5.4, 6.2]],
     indoorSun: 0.45,
     facade: { wall: shiplap(TEAL, "#558584", TEAL_D, 6), trim: WHITE, sign: { board: NAVY, ink: "#f1ebdc" }, door: TEAL_D, neighbours: "none", paint: teaHouseFront, queueAt: 0.72 },
   };

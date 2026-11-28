@@ -15,6 +15,7 @@ import { noise } from "../../../../core/painter.ts";
 import { tiles } from "../surfaces.ts";
 import type { Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, WindowSpec, WallSide, FrontBox } from "../types.ts";
+import { cafeTable, windowBar, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import { menuBoard } from "../walls.ts";
 import { standSprite, SPRITES, INK } from "../props.ts";
@@ -1055,6 +1056,11 @@ function kioskFront(hour: () => number) {
 
 export function stationVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // Stools at the low wall onto the concourse, and a table for two.
+  const sit = seating(
+    windowBar("station-bar", "front-left", 1.3, 5.3, 3, { cols, rows, wall: 18 }, { wood: GREEN, seat: MAROON, top: MARBLE, metal: BRASS }),
+    cafeTable("station-table", 1.7, 4.2, ["-x", "-y"], { wood: IRON, seat: MAROON, top: MARBLE, metal: BRASS }),
+  );
   const wallH = 100;
   const arch = (wall: WallSide, at: number): WindowSpec => ({ wall, at, width: 1.6, sill: 34, top: 90, bars: 1, transom: 30, frame: IRON, shape: "arch" });
   const windows = [arch("right", 5.95), arch("right", 8.15), arch("left", 4.05)];
@@ -1073,7 +1079,7 @@ export function stationVenue(o: VenueOptions): Venue {
     doors: [],
     lamps: [
       // Pools only: the globes themselves are drawn by `globes` overhead (a bulbs lamp with no run draws nothing).
-      { kind: "bulbs", x: 3.0, y: 2.7, z: 70, reach: 3.4 },
+      { kind: "bulbs", x: 2.5, y: 4.0, z: 70, reach: 3.4 },
       { kind: "bulbs", x: 7.6, y: 3.1, z: 70, reach: 3.4 },
     ],
     wallItems: [
@@ -1086,6 +1092,7 @@ export function stationVenue(o: VenueOptions): Venue {
       menuBoard("left", 1.85, 44, { w: 38, h: 24, title: "TEA", board: "#24372f", frame: BRASS }),
     ],
     props: [
+      ...sit.props,
       palmProp("prop:palm", 0, 0),
       tinCabinetProp("prop:cabinet", 3, 0),
       newsRackProp("prop:news", 9, 0),
@@ -1119,24 +1126,32 @@ export function stationVenue(o: VenueOptions): Venue {
     },
     front: { height: 18, color: GREEN_TILE, cap: MARBLE, stripe: [BRASS, 2, 12], gapsRight: [3, 4] },
     // Guests come in off the concourse below the frame, queue out through the gap and wait by the serve counter.
-    entry: [cols + 3.8, 5.4],
+    // In off the concourse through the gap in the low wall; the line forms out on the concourse.
+    seats: sit.seats,
+    doorway: { wall: "front-right", from: 3, to: 5 },
+    entry: [cols + 4.2, 4.2],
     queue: [
-      [8.5, 2.45],
-      [9.3, 3.15],
-      [10.15, 3.7],
-      [10.9, 4.25],
-      [11.65, 4.35],
-      [12.4, 4.1],
+      [7.5, 3.4],
+      [8.25, 3.75],
+      [9.0, 4.0],
+      [cols + 0.75, 4.0],
+      [cols + 1.5, 4.0],
+      [cols + 2.25, 4.0],
     ],
-    pickup: [6.9, 2.3],
+    pickup: [6.75, 3.5],
+    out: [
+      [7.0, 4.5],
+      [9.2, 4.4],
+      [cols + 1.0, 4.6],
+    ],
     indoorSun: 0.3,
     overhead: globes([
-      [3.0, 2.7, 70],
+      [2.5, 4.0, 70],
       [7.6, 3.1, 70],
     ], wallH),
     facade: { wall: ashlar(), trim: BRASS, sign: { board: GREEN, ink: "#f1e4c8" }, door: GREEN, neighbours: "none", paint: kioskFront(o.hour), queueAt: 0.8 },
   };
   v.outside.far = shedRoof(v);
-  v.floorItems = [medallion(() => v, 3.5, 2.6)];
+  v.floorItems = [medallion(() => v, 2.5, 4.0)];
   return v;
 }

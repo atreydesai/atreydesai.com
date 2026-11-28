@@ -1,4 +1,7 @@
 import { machineDefinition, machineAt } from "./equipment.ts";
+import { GARDEN_FEATURE, GARDEN_OFFER_WINDOW_SECONDS } from "../content/service-program.ts";
+import { BREW_POWER_BUDGET } from "../content/upgrades.ts";
+import { brewMod, machineWear, operatingStats } from "./upgrades.ts";
 import { recordRentDay } from "../../orders-rent-book.ts";
 import type { Campaign } from "../../orders-campaign.ts";
 import type { SkillId, Station } from "../content/schema.ts";
@@ -11,8 +14,10 @@ import {
   SHOPS,
   INGREDIENTS,
   SPECIAL_GUESTS,
+  CREW_ROLES,
 } from "../content/index.ts";
 import { createRun, stepSkill, actSkill, type SkillAction } from "../skills/index.ts";
+import { canAddTopping, toppingCounts, toppingMistakes } from "../skills/common.ts";
 import { type Shift, type Ticket, type Cup, freshCup } from "./shift-types.ts";
 import { calendar } from "./calendar.ts";
 import { TUNING, shiftDuration, ticketLimit, arrivalInterval, phaseAt } from "./tuning.ts";
@@ -26,6 +31,7 @@ import {
   payroll,
   rentDue,
   MARKETING,
+  hasFinishingCrew,
 } from "./management.ts";
 import {
   expireAndDeliver,
@@ -47,8 +53,12 @@ import {
   updateShopStars,
   grantRankUnlocks,
 } from "./progression.ts";
-import { spawnTicket, availableRecipes, draw, activeCup, selectedTicket } from "./tickets.ts";
+import { spawnTicket, availableRecipes, draw, activeCup, selectedTicket, refillsFor } from "./tickets.ts";
 import { receiptFor } from "./receipts.ts";
+import { canOfferGardenFeature } from "./guest-actions.ts";
+import { hasNode } from "./tree-nodes.ts";
+import { MASTERY_GRADE, recipeSkillOptions, skillMastery } from "./skill-setup.ts";
+export { skillMastery } from "./skill-setup.ts";
 import { growGarden, adoptCat } from "./activities.ts";
 import { hash, dailySeed } from "./random.ts";
 export * from "./shift-types.ts";
@@ -61,10 +71,17 @@ export function startShift(c: Campaign, daily: string | null = null): Shift {
   beginGoals(c);
   const today = calendar(c.day),
     rank = rankFor(c);
+  if (hasNode(c, "event-rush-plan") && today.event.arrival >= 1.2 && c.expansion.marketing === "radio" &&
+      c.cash >= 250 && useStock(c, "pearls", 4)) {
+    c.cash -= 250;
+    c.expansion.pearls += 8;
+    c.expansion.freshness = 1;
+  }
   c.status = "open";
   c.expansion.notice = "";
   const s: Shift = {
     version: 3,
+    skillModel: 1,
     mode: c.mode,
     day: c.day,
     shop: c.expansion.activeShop,
@@ -73,7 +90,7 @@ export function startShift(c: Campaign, daily: string | null = null): Shift {
     elapsed: 0,
     realElapsed: 0,
     status: "open",
-    tickets: Array.from({ length: ticketLimit(c.day) }, () => null),
+    tickets: Array.from({ length: Math.max(3, ticketLimit(c.day) - Number(hasNode(c, "room-utility"))) }, () => null),
     selected: 0,
     nextArrival: arrivalInterval(c.mode, c.day, 0, shiftDuration(rank)),
     rankAtStart: rank,
@@ -126,8 +143,47 @@ export function setStation(c: Campaign, s: Shift, station: Station) {
   s.chefStation = station;
   return true;
 }
+/**
+ * How satisfied a shift's guests were, 0 to 100: the grades of the cups
+ * served, with every cup a guest walked out on counted as nothing. Null until
+ * a cup is served or lost. The points behind it stay stored but unshown.
+ */
+export function satisfaction(points: number, served: number, lost: number) {
+  const cups = served + lost;
+  return cups > 0 ? Math.round(Math.max(0, Math.min(100, points / cups))) : null;
+}
 export function currentSkill(cup: Cup) {
   return RECIPE_BY_ID[cup.recipe]?.steps[cup.step] ?? null;
+}
+/**
+ * Sends the chef to the counter where the picked ticket's cup goes next, so no
+ * press is ever spent walking. A cup that is done, or a guest who first needs
+ * an answer, keeps the chef where they are.
+ */
+export function followTicket(c: Campaign, s: Shift) {
+  const ticket = selectedTicket(s);
+  if (!ticket || ticket.sleeping || ticket.special === "cat" || ticket.changeTo || (ticket.usual && !ticket.revealed))
+    return false;
+  const cup = activeCup(ticket);
+  const skill = cup && !cup.ready ? currentSkill(cup) : null;
+  const station = SKILLS.find((k) => k.id === skill)?.station;
+  if (!station || station === s.chefStation || s.status === "complete") return false;
+  return setStation(c, s, station);
+}
+/** Picks a ticket from the rail or the room, and the chef walks to its next counter. */
+export function pickTicket(c: Campaign, s: Shift, slot: number) {
+  if (!s.tickets[slot]) return false;
+  s.selected = slot;
+  followTicket(c, s);
+  return true;
+}
+/** Picks one cup of a larger order, and the chef walks to its next counter. */
+export function pickCup(c: Campaign, s: Shift, index: number) {
+  const ticket = selectedTicket(s);
+  if (!ticket?.cups[index]) return false;
+  ticket.cupIndex = index;
+  followTicket(c, s);
+  return true;
 }
 export function beginWork(
   c: Campaign,
@@ -176,30 +232,36 @@ export function beginWork(
       source: "prep batch",
     });
     cup.step++;
+    if (ticket === selectedTicket(s) && cup === activeCup(ticket)) followTicket(c, s);
     return true;
   }
-  const tea = RECIPE_BY_ID[cup.recipe].ingredients.find(
-    (i) => INGREDIENTS.find((x) => x.id === i.id)?.group === "tea",
-  )?.id;
+  const recipe = RECIPE_BY_ID[cup.recipe];
+  const staged = (skill === "steep" || skill === "pour") && recipe.sugar === 2 && ticket.cups.length > 1 &&
+    hasNode(c, "menu-batch-base", s.shop);
+  const dosingPreset = skill === "topping-ladle" && recipe.sugar === 2 && hasNode(c, "build-dosing-rail", s.shop);
   cup.run = createRun(skill, c.mode, c.day, {
+    ...recipeSkillOptions(recipe, skill),
     window: effect(s, "windows") ? 1.65 : 1,
-    speed: (automatic?.speed ?? 1) * (1 + Math.min(4, s.flow) * 0.025),
-    tea,
+    speed: (automatic?.speed ?? 1) * (staged ? 1.3 : 1) * (1 + Math.min(4, s.flow) * 0.025),
+    quick: !ticket.special && (skillMastery(c, skill).mastered || dosingPreset),
     automatic: automatic?.grade,
     source: automatic?.source,
   });
   cup.warmup = skill === "steep" ? 2.2 : skill === "pearl-pot" ? 2.8 : skill === "egg-waffle" ? 3.2 : 0;
   if (automatic) cup.warmup /= automatic.speed;
+  if (staged) cup.warmup /= 1.3;
   if ((skill === "topping-ladle" && effect(s, "ladle")) || (skill === "seal" && effect(s, "seal"))) {
     cup.run.automatic = 100;
     cup.run.seconds = 0.35;
     cup.run.source = "powerup";
+    cup.run.variant = "automatic";
     cup.warmup = 0;
     const key = skill === "seal" ? "seal" : "ladle";
     s.effects[key].charges--;
   }
   if (effect(s, "rush") && ["steep", "pearl-pot", "egg-waffle"].includes(skill)) {
     cup.run.automatic = 96;
+    cup.run.variant = "automatic";
     cup.run.seconds = 0.1;
     cup.warmup = 0;
     s.effects.rush.charges--;
@@ -209,8 +271,11 @@ export function beginWork(
 export function finishSkill(c: Campaign, s: Shift, ticket: Ticket, cup: Cup) {
   const run = cup.run;
   if (!run?.finished) return;
+  const followed = ticket === selectedTicket(s) && cup === activeCup(ticket);
   let grade = run.grade;
   if (run.source === "powerup") grade = 100;
+  if (s.elapsed >= 65 && (run.id === "steep" || run.id === "pour") && RECIPE_BY_ID[cup.recipe].sugar === 2 &&
+      ticket.cups.length > 1 && hasNode(c, "menu-batch-base", s.shop)) grade = Math.max(0, grade - 7);
   cup.grades.push({ skill: run.id, grade, result: run.result, source: run.source });
   cup.step++;
   cup.run = null;
@@ -218,6 +283,12 @@ export function finishSkill(c: Campaign, s: Shift, ticket: Ticket, cup: Cup) {
   s.lastMark = { skill: run.id, grade, time: s.realElapsed };
   metric(c, "skills");
   metric(c, run.id);
+  if (run.variant === "hand" && run.automatic === null && !run.source && grade >= MASTERY_GRADE)
+    metric(c, `hand-good:${run.id}`);
+  if (run.id === "topping-ladle" && run.variant === "hand") {
+    const { missing } = toppingMistakes(run);
+    if (missing) metric(c, "waste", missing);
+  }
   if (grade >= 98) {
     s.flow = Math.min(5, s.flow + 1);
     metric(c, "perfect-skills");
@@ -253,9 +324,11 @@ export function finishSkill(c: Campaign, s: Shift, ticket: Ticket, cup: Cup) {
       if (next >= 0) ticket.cupIndex = next;
     }
   }
+  // When the cup in hand moves on, so does the chef, whoever worked the step; other cups never move them.
+  if (followed) followTicket(c, s);
   if (run.source && c.expansion.machines[run.source]) {
     const machine = c.expansion.machines[run.source];
-    machine.condition = Math.max(0, machine.condition - TUNING[c.mode].wear / machine.tier);
+    machine.condition = Math.max(0, machine.condition - machineWear(c, s.shop, run.source, machine));
     if (machine.condition < 18 && draw(s) < 0.04 / machine.tier) {
       machine.broken = true;
       s.notice = "A machine broke down. Clean it in closing chores.";
@@ -267,6 +340,16 @@ export function skillAction(c: Campaign, s: Shift, action: SkillAction, slot = s
   const ticket = s.tickets[slot],
     cup = ticket ? activeCup(ticket) : null;
   if (!cup?.run || cup.warmup > 0) return false;
+  if (action.type === "add") {
+    if (!canAddTopping(cup.run, action.id)) return false;
+    const { wanted, added } = toppingCounts(cup.run, action.id);
+    // The ordered portions were spent when this cup started. Extra scoops
+    // come out of the pantry immediately, including a second unwanted scoop.
+    if (added >= wanted) {
+      if (!useStock(c, action.id, 1)) return false;
+      metric(c, "waste");
+    }
+  }
   actSkill(cup.run, action);
   if (cup.run.finished) finishSkill(c, s, ticket!, cup);
   return true;
@@ -291,6 +374,7 @@ export function feedCat(c: Campaign, s: Shift, slot = s.selected) {
   if (ticket?.special !== "cat" || !adoptCat(c)) return false;
   s.tickets[slot] = null;
   reselect(s);
+  followTicket(c, s);
   s.notice = "The cat has a home here.";
   s.noticeAt = s.realElapsed;
   return true;
@@ -307,6 +391,11 @@ export function handoff(c: Campaign, s: Shift, slot = s.selected) {
     return false;
   if (ticket.pickupAt && s.elapsed < ticket.pickupAt) {
     s.notice = "The courier arrives in " + Math.ceil(ticket.pickupAt - s.elapsed) + " seconds.";
+    s.noticeAt = s.realElapsed;
+    return false;
+  }
+  if (hasFinishingCrew(c, s.shop) && ticket.cups.some((cup) => s.elapsed - cup.readyAt < 1.5)) {
+    s.notice = "The bench is still finishing this order.";
     s.noticeAt = s.realElapsed;
     return false;
   }
@@ -386,7 +475,7 @@ export function handoff(c: Campaign, s: Shift, slot = s.selected) {
     s.lastGift = giftPower(c, s.seed + Math.floor(s.tips));
   }
   delete s.effects.cat;
-  if (ticket.special === "crammer" && (ticket.refills ?? 0) < 2 && s.elapsed < s.duration - 15) {
+  if ((ticket.refills ?? 0) < refillsFor(ticket) && s.elapsed < s.duration - 15) {
     ticket.refills = (ticket.refills ?? 0) + 1;
     ticket.cups = [freshCup(ticket.recipe)];
     ticket.cupIndex = 0;
@@ -400,6 +489,7 @@ export function handoff(c: Campaign, s: Shift, slot = s.selected) {
   }
   s.tickets[slot] = null;
   reselect(s);
+  followTicket(c, s);
   return true;
 }
 export function shooGull(c: Campaign, s: Shift) {
@@ -419,55 +509,116 @@ export function repairMachine(c: Campaign, s: Shift, id: string, grade: number) 
 }
 function automation(c: Campaign, s: Shift) {
   const staff = staffOnDuty(c),
-    powerCut = calendar(c.day).event.effect === "power-cut" && !effect(s, "weather");
-  const machines = Object.entries(c.expansion.machines).filter(
-    ([, m]) => m.shop === s.shop && m.automatic && !m.broken && m.condition > 0,
-  );
-  const busy = new Set(
-    s.tickets.flatMap((t) => (t ? t.cups.flatMap((cup) => (cup.run?.source ? [cup.run.source] : [])) : [])),
-  );
+    powerCut = calendar(c.day).event.effect === "power-cut" && !effect(s, "weather"),
+    mod = brewMod(c, s.shop);
+  const calibratedId = s.shop === GARDEN_FEATURE.shop && mod?.id === GARDEN_FEATURE.kit
+    ? c.expansion.gardenFeature.calibratedMachine : null;
+  const machines: (ReturnType<typeof operatingStats> & { id: string; onBrewRail: boolean })[] = [];
+  const brewSources = new Set<string>();
+  for (const [id, machine] of Object.entries(c.expansion.machines)) {
+    if (machine.shop !== s.shop) continue;
+    const definition = machineDefinition(id);
+    if (!definition) continue;
+    const onBrewRail = !!mod && definition.station === "brew";
+    if (onBrewRail) brewSources.add(id);
+    if (machine.automatic && !machine.broken && machine.condition > 0)
+      machines.push({ id, onBrewRail, ...operatingStats(definition, machine, mod) });
+  }
+  const busy = new Map<string, number>();
+  let brewPower = 0;
+  for (const ticket of s.tickets) {
+    if (!ticket) continue;
+    for (const cup of ticket.cups) {
+      const source = cup.run?.source;
+      if (!source) continue;
+      busy.set(source, (busy.get(source) ?? 0) + 1);
+      if (mod && brewSources.has(source)) brewPower += mod.effects.power;
+    }
+  }
+  const canRun = (machine: (typeof machines)[number], skill: SkillId) =>
+    (!powerCut || machine.power === 0) &&
+    (busy.get(machine.id) ?? 0) < machine.capacity &&
+    (!machine.onBrewRail || brewPower + machine.power <= BREW_POWER_BUDGET) &&
+    machine.skills.includes(skill);
+  const lockers = hasNode(c, "serve-locker-bank", s.shop);
+  const flex = hasNode(c, "build-flex-nozzle", s.shop);
+  const fixed = hasNode(c, "build-fixed-doser", s.shop);
+  const floater = hasNode(c, "crew-floater", s.shop);
+  const wash = hasNode(c, "back-wash-station", s.shop);
   for (const ticket of s.tickets) {
     if (!ticket || ticket.sleeping) continue;
+    if (lockers && (ticket.special === "courier" || (!ticket.special && ticket.packed)) &&
+        !ticket.changeTo && (!ticket.usual || ticket.revealed) && (ticket.pickupAt ?? 0) <= s.elapsed &&
+        ticket.cups.every((cup) => cup.ready)) {
+      for (const cup of ticket.cups) cup.damage = Math.min(100, cup.damage + 3);
+      handoff(c, s, ticket.slot);
+      continue;
+    }
     if (ticket.cups.every((cup) => cup.ready) && staff.some((p) => p.role === "runner" || p.role === "courier")) {
       handoff(c, s, ticket.slot);
       continue;
     }
+    if (s.elapsed - ticket.arrived < GARDEN_OFFER_WINDOW_SECONDS && canOfferGardenFeature(c, s, ticket.slot)) continue;
     for (let index = 0; index < ticket.cups.length; index++) {
       const cup = ticket.cups[index],
         skill = currentSkill(cup);
       if (cup.ready || cup.run || !skill) continue;
       const station = SKILLS.find((k) => k.id === skill)!.station;
-      const person = staff.find(
+      const calibrated = calibratedId && ticket.featured && skill === "steep"
+        ? machines.find((machine) => machine.id === calibratedId && canRun(machine, skill))
+        : undefined;
+      const person = calibrated ? undefined : staff.find(
         (p) =>
           p.station === station &&
           !busy.has(p.id) &&
           !["host", "cashier", "runner", "manager", "courier"].includes(p.role),
-      );
+      ) ?? (floater ? staff.find((p) =>
+        p.station && !busy.has(p.id) && p.skills[station] >= 2 &&
+        ["barista", "prep", "baker", "trainer"].includes(p.role) &&
+        CREW_ROLES.some((role) => role.id === p.role && role.stations.includes(station)) &&
+        !s.tickets.some((order) => order?.cups.some((other) => {
+          const needed = currentSkill(other);
+          return !other.ready && !other.run && !!needed && SKILLS.some((def) => def.id === needed && def.station === p.station);
+        })),
+      ) : undefined);
       if (person) {
+        const offStation = person.station !== station;
+        const lead = person.role === "barista" && hasNode(c, "crew-station-lead", s.shop);
         if (
           beginWork(c, s, ticket.slot, index, {
-            grade: staffGrade(person, station),
-            speed: staffSpeed(person) * 0.83,
+            grade: Math.min(96, staffGrade(person, station) + (lead && station === "brew" ? 7 : 0) - (offStation ? 4 : 0)),
+            speed: staffSpeed(person) * 0.83 * (offStation || (lead && station !== "brew") ? 0.8 : 1),
             source: person.id,
           })
         )
-          busy.add(person.id);
+          busy.set(person.id, 1);
         continue;
       }
-      if (powerCut) continue;
-      const found = machines.find(([id, m]) => !busy.has(id) && machineDefinition(id)?.skills.includes(skill));
+      if (!powerCut && skill === "topping-ladle" && !busy.has("dosing-rail") &&
+          (flex || (fixed && RECIPE_BY_ID[cup.recipe].sugar === 2))) {
+        const family = RECIPE_BY_ID[cup.recipe].family;
+        const rinse = flex && s.lastDoseFamily !== undefined && s.lastDoseFamily !== family;
+        const cleaner = rinse && wash ? staff.find((p) => p.role === "cleaner" && p.station === "stock" && p.energy >= 14) : undefined;
+        if (beginWork(c, s, ticket.slot, index, { source: "dosing-rail", grade: flex ? 91 : 86,
+          speed: flex ? rinse && !cleaner ? 0.65 : 1.25 : 2 })) {
+          if (cleaner) cleaner.energy -= 8;
+          busy.set("dosing-rail", 1);
+          s.lastDoseFamily = family;
+          continue;
+        }
+      }
+      const found = calibrated ?? machines.find((machine) => canRun(machine, skill));
       if (found) {
-        const [id, m] = found,
-          definition = machineDefinition(id)!,
-          tier = definition.tiers[m.tier - 1];
         if (
           beginWork(c, s, ticket.slot, index, {
-            grade: tier.grade - Math.max(0, 65 - m.condition) * 0.25,
-            speed: tier.speed * TUNING[c.mode].machineSpeed * 0.8,
-            source: id,
+            grade: found.grade,
+            speed: found.speed * TUNING[c.mode].machineSpeed * 0.8,
+            source: found.id,
           })
-        )
-          busy.add(id);
+        ) {
+          busy.set(found.id, (busy.get(found.id) ?? 0) + 1);
+          if (found.onBrewRail) brewPower += found.power;
+        }
       }
     }
   }
@@ -475,6 +626,7 @@ function automation(c: Campaign, s: Shift) {
 export function tickShift(c: Campaign, s: Shift, realDt: number) {
   if (s.status === "complete" || s.settled || !Number.isFinite(realDt) || realDt <= 0) return s;
   realDt = Math.min(0.1, realDt);
+  const picked = selectedTicket(s);
   s.realElapsed += realDt;
   c.expansion.totalPlaySeconds += realDt;
   for (const [id, value] of Object.entries(s.effects))
@@ -487,6 +639,8 @@ export function tickShift(c: Campaign, s: Shift, realDt: number) {
     quiet = effect(s, "quiet") || effect(s, "cat");
   c.expansion.freshness = Math.max(0, c.expansion.freshness - dt / 180);
   const active = selectedTicket(s);
+  const stagedCup = hasNode(c, "serve-handoff-rack", s.shop)
+    ? s.tickets.find((ticket) => ticket?.cups.some((cup) => cup.ready))?.cups.find((cup) => cup.ready) : undefined;
   for (const ticket of s.tickets) {
     if (!ticket) continue;
     if (!ticket.sleeping && !quiet) {
@@ -522,7 +676,7 @@ export function tickShift(c: Campaign, s: Shift, realDt: number) {
           if (cup.run.finished) finishSkill(c, s, ticket, cup);
         }
       }
-      if (cup.ready && !RECIPE_BY_ID[cup.recipe].hot && s.elapsed - cup.readyAt > 18 && !effect(s, "ice"))
+      if (cup.ready && !RECIPE_BY_ID[cup.recipe].hot && s.elapsed - cup.readyAt > (cup === stagedCup ? 28 : 18) && !effect(s, "ice"))
         cup.damage = Math.min(
           25,
           cup.damage + dt * (s.shop === "boardwalk" || today.event.effect === "melt" ? 0.4 : 0.1),
@@ -534,6 +688,9 @@ export function tickShift(c: Campaign, s: Shift, realDt: number) {
       spawnTicket(c, s);
       const marketing = MARKETING.find((m) => m.id === c.expansion.marketing);
       let rate = today.event.arrival * (marketing?.arrivals ?? 1) * (effect(s, "happy") ? 2 : 1);
+      if (marketing?.id === "radio" && hasNode(c, "promo-radio-window", s.shop) &&
+          phaseAt(s.elapsed, s.duration).includes("rush")) rate *= 1.12;
+      if (today.event.arrival <= 0.9 && hasNode(c, "event-quiet-plan", s.shop)) rate *= 0.86;
       if (s.shop === "campus" && phaseAt(s.elapsed, s.duration).includes("rush")) rate *= 1.25;
       if (s.shop === "night") rate *= 1.2;
       if (s.shop === "harbor" && Math.floor(s.elapsed / 28) % 2 === 0) rate *= 1.4;
@@ -563,6 +720,8 @@ export function tickShift(c: Campaign, s: Shift, realDt: number) {
     s.autoClock = 0;
     automation(c, s);
   }
+  // A new ticket picked for the chef (the first to arrive, or the next after one leaves) walks them to it.
+  if (selectedTicket(s) !== picked) followTicket(c, s);
   return s;
 }
 export function usePowerup(c: Campaign, s: Shift, id: string) {

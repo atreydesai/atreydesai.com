@@ -8,6 +8,7 @@
 
 import type { Campaign } from "../../orders-campaign.ts";
 import { BADGES, CREW_ROLES, DECOR, GUESTS, MACHINES, POWERUPS, RECIPES, SHOPS } from "../content/index.ts";
+import { TREE_NODES, type TreeNodeId } from "../content/progression-trees.ts";
 import { unlocks } from "./calendar.ts";
 
 const earliest = (days: number[]) => Math.min(...days);
@@ -23,6 +24,14 @@ export const CHAPTER_DAYS: Readonly<Record<string, number>> = {
 export const GOAL_SCALE_DAYS: Readonly<Record<string, number>> = { shift: 1, week: 3, job: 5, season: 8 };
 /** The daily shift, a scored challenge, opens once the first real shift is done. */
 export const DAILY_DAY = 2;
+
+export function treeChoiceOpen(c: Campaign, id: TreeNodeId) {
+  return TREE_NODES.some((node) => node.id === id && node.day <= c.day);
+}
+
+export function newTreeChoices(c: Campaign) {
+  return TREE_NODES.filter((node) => node.day === c.day && node.delivered === "live");
+}
 
 export function goalScaleOpen(c: Campaign, scale: string) {
   return c.day >= (GOAL_SCALE_DAYS[scale] ?? 1);

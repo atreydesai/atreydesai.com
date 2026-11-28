@@ -11,6 +11,7 @@ import type { Painter } from "../../../../core/painter.ts";
 import type { Surface } from "../surfaces.ts";
 import type { PropSpec, WallPlace } from "../types.ts";
 import { word, wordWidth } from "../font.ts";
+import { FRONT_WALL_BIAS } from "../scene.ts";
 
 /**
  * A surface with extra colour slots painted over it: `pick` returns an index
@@ -172,6 +173,7 @@ export function frontWalls(cols: number, rows: number, f: FrontSpec): PropSpec[]
       w: t,
       d: 1,
       height: f.height + 4,
+      depthBias: FRONT_WALL_BIAS,
       draw(p, g, light) {
         isoBox(p, g, light, 0, 0, t, 1, f.height, { top: f.top, left: f.face, right: f.face }, 0, 0.6);
         f.draw?.(p, g, light, "right", box, k);
@@ -188,6 +190,7 @@ export function frontWalls(cols: number, rows: number, f: FrontSpec): PropSpec[]
       w: 1,
       d: t,
       height: f.height + 4,
+      depthBias: FRONT_WALL_BIAS,
       draw(p, g, light) {
         isoBox(p, g, light, 0, 0, 1, t, f.height, { top: f.top, left: f.face, right: f.face }, 0, 0.6);
         f.draw?.(p, g, light, "left", box, k);

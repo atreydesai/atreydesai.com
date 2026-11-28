@@ -37,6 +37,7 @@
 .ou-keys {
   display: flex;
   flex: none;
+  min-height: 60px;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: safe center;

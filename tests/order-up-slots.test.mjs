@@ -164,6 +164,8 @@ test("cheats: a live shift can have its cups made, its guests calmed and its clo
   }
   assert.equal(endShiftNow(s).ok, true);
   assert.ok(s.elapsed >= s.duration);
+  assert.equal(s.status, "complete", "the day can be settled straight away");
+  assert.ok(s.tickets.every((t) => !t), "guests still waiting have left");
 });
 
 test("two loads to one shop: the courier delivers the one the pantry can fill, and is paid only when it goes", async () => {

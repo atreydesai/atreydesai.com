@@ -28,8 +28,8 @@
   <div class="ou-stage">
     <div class="ou-frame">
       <PixelScene width={PLACE_W} height={PLACE_H} draw={() => {}} bake={(p) => drawOffice(p, light, { day: cal.seasonDay })} bakeKey={key} version={key} label="The office desk" />
-      <button type="button" class="ou-hot" style={spot(OFFICE_SPOTS.book)} onclick={() => openBook("today")} aria-label="Open the shop book"
-        ><span class="ou-caption">Shop book</span></button
+      <button type="button" class="ou-hot" style={spot(OFFICE_SPOTS.book)} onclick={() => openBook("today")} aria-label="Open the ledger"
+        ><span class="ou-caption">Ledger</span></button
       >
       <button type="button" class="ou-hot" style={spot(OFFICE_SPOTS.calendar)} onclick={() => openBook("today")} aria-label="Open the calendar"
         ><span class="ou-caption">Calendar</span></button

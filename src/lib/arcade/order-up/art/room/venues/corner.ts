@@ -12,12 +12,13 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { checker, brick, tiles, stone, ground } from "../surfaces.ts";
 import type { Venue, WallItem, FrontBox } from "../types.ts";
+import { cafeTable, windowBar, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import { word, wordWidth, bigWord, bigWidth } from "../font.ts";
 import type { VenueOptions } from "./index.ts";
 import { shelf, clock, framed, rail } from "../walls.ts";
 import { lampPostProp, benchProp, aFrameProp, SPRITES, litPalette } from "../props.ts";
-import { litSet, wallQuad, wallLine, wallWord, wallDot, plantProp, matItem, bikeRackProp, facadeRow, frontWallProps, INK, CREAM, seasonTreeProp, frontFace, brickFront, glassFront, awningFront } from "./_corner-kit.ts";
+import { litSet, wallQuad, wallLine, wallWord, wallDot, plantProp, matItem, bikeRackProp, facadeRow, frontWallProps, cornerDoorRoute, INK, CREAM, seasonTreeProp, frontFace, brickFront, glassFront, awningFront } from "./_corner-kit.ts";
 
 const BRICK = "#b4664e";
 const SAGE = "#86a084";
@@ -390,6 +391,11 @@ function cornerFront(p: Painter, light: Light, box: FrontBox) {
 
 export function cornerVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // A table for three by the side window, and stools at the front window looking out on the street.
+  const sit = seating(
+    cafeTable("corner-table", 1.9, 4.2, ["-x", "-y", "+x"], { wood: WOOD, seat: SAGE, top: "#c99a6a" }),
+    windowBar("corner-bar", "front-left", 1.15, 4.6, 3, { cols, rows, wall: 14 }, { wood: WOOD, seat: "#c65f4a", top: "#c99a6a" }),
+  );
   const shops = facadeRow(
     "out:shops",
     -3,
@@ -455,6 +461,7 @@ export function cornerVenue(o: VenueOptions): Venue {
       shelf("left", 2.95, 56, 26, ["jar", "bottle", "jar"], WOOD),
     ],
     props: [
+      ...sit.props,
       plantProp("prop:monstera", 0, rows - 1, "monstera", "#c47c5b", 0.4, 2),
       ...frontWallProps("prop:front", cols, rows, { height: 14, kind: "brick", color: BRICK, line: "#c9a48a", cap: "#d4c3a8", base: [SAGE, 4], gapsRight: [rows - 1], post: "#a65a44" }),
     ],
@@ -476,14 +483,8 @@ export function cornerVenue(o: VenueOptions): Venue {
         { ...aFrameProp("out:aframe", cols + 0.5, rows - 3.0, "TEA"), shadow: "none" as const },
       ],
     },
-    entry: [cols + 1.4, rows - 0.5],
-    queue: [
-      [cols - 0.6, 1.6],
-      [cols - 0.6, 2.7],
-      [cols - 0.6, 3.8],
-      [cols - 0.6, 4.9],
-    ],
-    pickup: [cols - 1.6, 2.5],
+    seats: sit.seats,
+    ...cornerDoorRoute(cols, rows),
     indoorSun: 0.4,
     facade: {
       wall: brick(BRICK, "#a65a44", "#cdb59c", 8, 4),

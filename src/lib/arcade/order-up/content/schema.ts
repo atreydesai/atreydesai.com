@@ -79,7 +79,8 @@ export interface Recipe extends Entry {
 }
 export interface Skill extends Entry {
   station: Station;
-  input: "press" | "hold" | "rhythm" | "drag" | "sequence" | "knob";
+  input: "press" | "hold" | "rhythm" | "drag" | "sequence" | "knob" | "pick";
+  choices?: readonly string[];
   seconds: number;
   target: number;
   verb: string;

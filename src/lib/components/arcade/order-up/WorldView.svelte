@@ -122,7 +122,6 @@
           {/if}
         </div>
         <div class="ou-keys crew" role="group" aria-label="Crew on duty">
-          {#if !crew.length}<p class="ou-note">{views.find((v) => v.id === "room")?.decision ?? ""}</p>{/if}
             {#each crew as person (person.id)}
               <button
                 type="button"

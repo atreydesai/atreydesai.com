@@ -225,11 +225,18 @@ export type StationId = "brew" | "prep" | "build" | "serve" | "stock";
  * A station's counter with its tools set on its top, back to front. `w`, `d`
  * give a two-tile run where the layout leaves room.
  */
-export function stationProp(station: StationId, x: number, y: number, style: CounterStyle, share: number, extras: { sign?: boolean } = {}): PropSpec {
+export function stationProp(
+  station: StationId,
+  x: number,
+  y: number,
+  style: CounterStyle,
+  share: number,
+  extras: { sign?: boolean; kit?: string } = {},
+): PropSpec {
   if (station === "stock") return shelfProp("station:stock", x, y, style, share);
   const h = style.height ?? 15;
   return {
-    key: "station:" + station,
+    key: "station:" + station + (station === "brew" && extras.kit ? ":" + extras.kit : ""),
     x,
     y,
     height: h + 18,
@@ -241,6 +248,7 @@ export function stationProp(station: StationId, x: number, y: number, style: Cou
         onTop(p, g, light, "kettle", 0.32, 0.3, z + 1, share);
         onTop(p, g, light, "teapot", 0.72, 0.36, z, share, TEA_COLORS.jasmine);
         onTop(p, g, light, "teapot", 0.5, 0.72, z, share, TEA_COLORS.black);
+        if (extras.kit) brewKit(p, g, light, extras.kit, z, share);
       } else if (station === "prep") {
         onTop(p, g, light, "pot", 0.32, 0.36, z, share);
         onTop(p, g, light, "board", 0.66, 0.62, z, share);
@@ -262,6 +270,60 @@ export function stationProp(station: StationId, x: number, y: number, style: Cou
       }
     },
   };
+}
+
+/**
+ * The brew kit fitted at the shop, on the brew counter as in the Workshop:
+ * the manifold's brass header on two posts along the back with three drops,
+ * the precision head's gauge on a post at the front corner, the gravity
+ * feed's glass bottle raised on a post at the back.
+ */
+function brewKit(p: Painter, g: IsoGrid, light: Light, kit: string, z: number, share: number) {
+  const f = faceLight(light, share);
+  const brass = light.lit("#dba84d", f.top),
+    brassDark = light.lit("#9c7a35", f.right),
+    steel = light.lit("#8d8f94", f.left),
+    ink = light.lit("#2f2427", 0.2);
+  const post = (u: number, v: number, h: number, color: string) => {
+    const a = project(g, u, v, z),
+      b = project(g, u, v, z + h);
+    p.rect(ink, a.x - 1, b.y - 1, 3, a.y - b.y + 2);
+    p.rect(color, a.x, b.y, 1, a.y - b.y);
+  };
+  if (kit === "brew-manifold") {
+    post(0.08, 0.12, 16, steel);
+    post(0.92, 0.12, 16, steel);
+    const a = project(g, 0.08, 0.12, z + 15),
+      b = project(g, 0.92, 0.12, z + 15);
+    const steps = Math.max(1, Math.abs(b.x - a.x));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps,
+        x = Math.round(a.x + (b.x - a.x) * t),
+        y = Math.round(a.y + (b.y - a.y) * t);
+      p.rect(ink, x, y - 2, 1, 4);
+      p.rect(brass, x, y - 1, 1, 1);
+      p.rect(brassDark, x, y, 1, 1);
+    }
+    for (const t of [0.25, 0.5, 0.75]) {
+      const d = project(g, 0.08 + 0.84 * t, 0.12, z + 14);
+      p.rect(brassDark, d.x, d.y, 1, 3);
+      p.rect(light.lit("#6a8fb0", 0.6), d.x, d.y + 3, 1, 1);
+    }
+  } else if (kit === "brew-precision") {
+    post(0.88, 0.88, 7, steel);
+    const c = project(g, 0.88, 0.88, z + 9);
+    p.rect(ink, c.x - 3, c.y - 3, 7, 7);
+    p.rect(light.lit("#fbf8f1", f.top), c.x - 2, c.y - 2, 5, 5);
+    p.rect(light.lit("#c9462f", 0.8), c.x, c.y - 2, 1, 2);
+    p.rect(ink, c.x, c.y, 1, 1);
+  } else if (kit === "brew-gravity") {
+    post(0.15, 0.15, 11, steel);
+    const c = project(g, 0.15, 0.15, z + 11);
+    p.rect(ink, c.x - 3, c.y - 8, 7, 9);
+    p.rect(light.lit("#cfe3e0", f.top), c.x - 2, c.y - 7, 5, 7);
+    p.rect(light.lit("#6a8fb0", f.left), c.x - 2, c.y - 3, 5, 3);
+    p.rect(ink, c.x - 1, c.y - 9, 3, 1);
+  }
 }
 
 /** Tall shelving, stocked with tins, jars and sacks. */

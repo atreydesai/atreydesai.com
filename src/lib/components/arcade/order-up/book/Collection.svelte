@@ -1,10 +1,13 @@
 <script lang="ts">
-  // The album: recipes served, regulars met, badges earned and decor kept,
-  // as pages of tiles with the picked one written up beside them.
+  // The album: recipes served, regulars met, badges earned and decor kept, as
+  // pages of tiles with the picked one written up beside them. Every page of
+  // tiles keeps the size of a full one, and the filter row keeps its place on
+  // every album page, so nothing moves as pages turn.
   import type { Campaign } from "#lib/arcade/orders-campaign.ts";
   import { FAMILIES, GUESTS, DECOR, BADGES, INGREDIENT_BY_ID, RECIPE_BY_ID } from "#lib/arcade/order-up/content/index.ts";
   import { money } from "#lib/arcade/orders-display.ts";
   import { albumRecipes, albumRegulars, albumBadges, albumDecor } from "#lib/arcade/order-up/engine/opened.ts";
+  import OrderPixelWord from "../../OrderPixelWord.svelte";
   import Icon from "../Icon.svelte";
   import Portrait from "../Portrait.svelte";
   import Cup from "../Cup.svelte";
@@ -26,6 +29,7 @@
   ];
   const KINDS = ["decor", "paint", "print", "apron", "keepsake", "cat"];
   const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+  const marks = (n: number, of: number) => Array.from({ length: 10 }, (_, i) => i < Math.round((Math.min(n, of) / of) * 10));
   $: q = query.toLowerCase();
   // Each page holds what is open so far (engine/opened.ts), so the album grows with the shop.
   $: entries = {
@@ -76,207 +80,320 @@
   }
 </script>
 
-<div class="lg-title">
-  <h2>Album</h2>
-  <span>{found} of {total} found</span>
-</div>
+{#snippet chevron(back: boolean)}<svg class="chev" width="8" height="14" viewBox="0 0 4 7" shape-rendering="crispEdges" aria-hidden="true"
+    ><path d={back ? "M3 0h1v1H3zM2 1h2v1H2zM1 2h2v1H1zM0 3h2v1H0zM1 4h2v1H1zM2 5h2v1H2zM3 6h1v1H3z" : "M0 0h1v1H0zM0 1h2v1H0zM1 2h2v1H1zM2 3h2v1H2zM1 4h2v1H1zM0 5h2v1H0zM0 6h1v1H0z"} fill="currentColor" /></svg
+  >{/snippet}
 
-<div class="lg-chips" role="group" aria-label="Album page">
-  {#each PAGES as [id, label] (id)}
-    <button type="button" class="boba-key order-pixel-paper-key" aria-pressed={page === id} onclick={() => change(id)}>{label}</button>
-  {/each}
-  <span class="gap"></span>
-  <input class="lg-find" type="search" placeholder="Find" aria-label={"Find " + page} bind:value={query} oninput={() => (index = 0)} />
-</div>
-
-{#if page === "recipes" || page === "decor"}
-  <div class="lg-chips filters" role="group" aria-label={page === "recipes" ? "Family" : "Kind"}>
-    <button type="button" class="boba-key order-pixel-paper-key" aria-pressed={filter === "all"} onclick={() => ((filter = "all"), (index = 0))}>All</button>
-    {#if page === "recipes"}
-      {#each FAMILIES.filter((f) => f.day <= campaign.day) as f (f.id)}
-        <button type="button" class="boba-key order-pixel-paper-key" aria-pressed={filter === f.id} onclick={() => ((filter = f.id), (index = 0))}>{cap(f.name)}</button>
-      {/each}
-    {:else}
-      {#each KINDS as k (k)}
-        <button type="button" class="boba-key order-pixel-paper-key" aria-pressed={filter === k} onclick={() => ((filter = k), (index = 0))}>{cap(k)}</button>
-      {/each}
-    {/if}
-  </div>
-{/if}
-
-<div class="lg-split">
-  <div>
-    <div class="album">
-      {#each shown as id (id)}
-        <button type="button" class="tile" class:is-picked={pick === id} aria-pressed={pick === id} aria-label={tileName(id)} onclick={() => (picked = id)}>
-          {#if page === "recipes"}
-            {@const r = RECIPE_BY_ID[id]}
-            {@const record = campaign.expansion.recipes[id]}
-            {#if record}<Cup recipe={id} size={40} />{:else}<span class="unknown">?</span>{/if}
-            <span class="tile-name" class:muted={!record}>{record ? r.name : r.day > campaign.day ? "Day " + r.day : ""}</span>
-          {:else if page === "regulars"}
-            {@const g = GUESTS.find((x) => x.id === id)!}
-            {@const visits = campaign.expansion.visits[id] ?? 0}
-            <span class:faded={!visits}><Portrait name={id} size={40} /></span>
-            <span class="tile-name">{visits ? g.name : ""}</span>
-          {:else if page === "badges"}
-            {@const b = BADGES.find((x) => x.id === id)!}
-            {@const earned = campaign.expansion.badges.includes(id)}
-            <span class:faded={!earned}><Icon art={b.art} size={36} /></span>
-            <span class="tile-name">{b.name}</span>
-          {:else}
-            {@const d = DECOR.find((x) => x.id === id)!}
-            <span class:faded={d.day > campaign.day}><Icon art={d.art} size={36} /></span>
-            <span class="tile-name">{d.name}</span>
-          {/if}
-        </button>
-      {:else}
-        <p class="lg-empty">Nothing by that name.</p>
+<section class="bk-section album" aria-label="Album">
+  <!-- The caption, the album's pages and the pager on one line; the filters and the search under them. The
+       pager sits at the right edge with a fixed width, and the filter row keeps its height on every album
+       page, empty where a page has no filter, so nothing moves as pages turn. -->
+  <div class="bar">
+    <div class="bk-cap head"><OrderPixelWord text="Album" cells={2} /></div>
+    <div class="bk-keys pages" role="group" aria-label="Album page">
+      {#each PAGES as [id, label] (id)}
+        <button type="button" class="boba-key key" aria-pressed={page === id} onclick={() => change(id)}>{label}</button>
       {/each}
     </div>
+    <span class="bk-meta count">{found} of {total} found</span>
     <div class="pager">
-      <button type="button" class="boba-key order-pixel-paper-key" disabled={index === 0} aria-label="Previous page" onclick={() => index--}>‹</button>
+      <button type="button" class="boba-key key step" disabled={index === 0} aria-label="Previous page" onclick={() => index--}>{@render chevron(true)}</button>
       <span>Page {index + 1} of {pages}</span>
-      <button type="button" class="boba-key order-pixel-paper-key" disabled={index + 1 >= pages} aria-label="Next page" onclick={() => index++}>›</button>
+      <button type="button" class="boba-key key step" disabled={index + 1 >= pages} aria-label="Next page" onclick={() => index++}>{@render chevron(false)}</button>
     </div>
+    <div class="filters">
+      {#if page === "recipes" || page === "decor"}
+        <div class="bk-keys" role="group" aria-label={page === "recipes" ? "Family" : "Kind"}>
+          <button type="button" class="boba-key is-small" aria-pressed={filter === "all"} onclick={() => ((filter = "all"), (index = 0))}>All</button>
+          {#if page === "recipes"}
+            {#each FAMILIES.filter((f) => f.day <= campaign.day) as f (f.id)}
+              <button type="button" class="boba-key is-small" aria-pressed={filter === f.id} onclick={() => ((filter = f.id), (index = 0))}>{cap(f.name)}</button>
+            {/each}
+          {:else}
+            {#each KINDS as k (k)}
+              <button type="button" class="boba-key is-small" aria-pressed={filter === k} onclick={() => ((filter = k), (index = 0))}>{cap(k)}</button>
+            {/each}
+          {/if}
+        </div>
+      {/if}
+    </div>
+    <input class="find" type="search" placeholder="Find" aria-label={"Find " + page} bind:value={query} oninput={() => (index = 0)} />
   </div>
 
-  <aside class="lg-detail" aria-live="polite">
-    {#if recipe}
-      {@const record = campaign.expansion.recipes[recipe.id]}
-      <div class="art">{#if record}<Cup recipe={recipe.id} size={84} />{:else}<span class="unknown big">?</span>{/if}</div>
-      <h3>{record ? recipe.name : "Not served yet"}</h3>
-      {#if record}
-        <dl class="lg-facts">
-          <dt>Served</dt>
-          <dd>{record.count}</dd>
-          <dt>Best grade</dt>
-          <dd>{record.best}</dd>
-        </dl>
-        <div class="ingredients">
-          {#each recipe.ingredients as item (item.id)}<span title={INGREDIENT_BY_ID[item.id].name}><Icon art={INGREDIENT_BY_ID[item.id].art} size={24} />{item.quantity}</span>{/each}
+  <div class="body">
+    <div class="pick">
+      <div class="grid">
+        {#each shown as id (id)}
+          <button
+            type="button"
+            class="bk-tile tile"
+            class:is-on={pick === id}
+            aria-pressed={pick === id}
+            aria-label={tileName(id)}
+            title={tileName(id)}
+            onclick={() => (picked = id)}
+          >
+            {#if page === "recipes"}
+              {@const r = RECIPE_BY_ID[id]}
+              {@const record = campaign.expansion.recipes[id]}
+              <span class="pic">{#if record}<Cup recipe={id} size={30} />{:else}<span class="unknown">?</span>{/if}</span>
+              <span class="nm">{#if record}<span class="bk-name">{r.name}</span>{:else}<span class="bk-lbl">{r.day > campaign.day ? "Day " + r.day : ""}</span>{/if}</span>
+            {:else if page === "regulars"}
+              {@const g = GUESTS.find((x) => x.id === id)!}
+              {@const visits = campaign.expansion.visits[id] ?? 0}
+              <span class="pic" class:faded={!visits}><Portrait name={id} size={42} /></span>
+              <span class="nm"><span class="bk-name">{visits ? g.name : ""}</span></span>
+            {:else if page === "badges"}
+              {@const b = BADGES.find((x) => x.id === id)!}
+              {@const earned = campaign.expansion.badges.includes(id)}
+              <span class="pic" class:faded={!earned}><Icon art={b.art} size={38} /></span>
+              <span class="nm"><span class="bk-name">{b.name}</span></span>
+            {:else}
+              {@const d = DECOR.find((x) => x.id === id)!}
+              <span class="pic" class:faded={d.day > campaign.day}><Icon art={d.art} size={38} /></span>
+              <span class="nm"><span class="bk-name">{d.name}</span></span>
+            {/if}
+          </button>
+        {:else}
+          <p class="bk-empty none">Nothing by that name.</p>
+        {/each}
+      </div>
+    </div>
+
+    <aside class="panel" aria-live="polite">
+      {#if recipe}
+        {@const record = campaign.expansion.recipes[recipe.id]}
+        <div class="art">{#if record}<Cup recipe={recipe.id} size={60} />{:else}<span class="unknown big">?</span>{/if}</div>
+        <h3 class="title">{record ? recipe.name : "Not served yet"}</h3>
+        <div class="facts">
+          {#if record}
+            <div class="minis">
+              <span class="mini"><span class="bk-mid">{record.count}</span><span class="bk-lbl">served</span></span>
+              <span class="mini"><span class="bk-mid">{record.best}</span><span class="bk-lbl">best grade</span></span>
+            </div>
+            <div class="ingredients">
+              {#each recipe.ingredients as ing (ing.id)}<span title={INGREDIENT_BY_ID[ing.id].name}
+                  ><Icon art={INGREDIENT_BY_ID[ing.id].art} size={24} />{ing.quantity}</span
+                >{/each}
+            </div>
+          {:else}
+            <p class="bk-note">{recipe.day > campaign.day ? "On the menu from day " + recipe.day + "." : "Serve it once to add it here."}</p>
+          {/if}
         </div>
-      {:else}
-        <p>{recipe.day > campaign.day ? "On the menu from day " + recipe.day + "." : "Serve it once to add it here."}</p>
-      {/if}
-    {:else if guest}
-      {@const visits = campaign.expansion.visits[guest.id] ?? 0}
-      <div class="art"><span class:faded={!visits}><Portrait name={guest.id} size={72} /></span></div>
-      <h3>{visits ? guest.name : "Not met yet"}</h3>
-      {#if visits}
-        <dl class="lg-facts">
-          <dt>Visits</dt>
-          <dd>{visits}</dd>
-          <dt>Their usual</dt>
-          <dd>{RECIPE_BY_ID[guest.favorite]?.name ?? ""}</dd>
-        </dl>
-        <div class="story">
-          {#each guest.story as beat, i (i)}<span class:found={visits > i}>{visits > i ? beat.prop.replaceAll("-", " ") : "?"}</span>{/each}
+      {:else if guest}
+        {@const visits = campaign.expansion.visits[guest.id] ?? 0}
+        <div class="art" class:faded={!visits}><Portrait name={guest.id} size={80} /></div>
+        <h3 class="title">{visits ? guest.name : "Not met yet"}</h3>
+        <div class="facts">
+          {#if visits}
+            <div class="minis">
+              <span class="mini"><span class="bk-mid">{visits}</span><span class="bk-lbl">visits</span></span>
+              <span class="mini wide"><span class="bk-name">{RECIPE_BY_ID[guest.favorite]?.name ?? ""}</span><span class="bk-lbl">their usual</span></span>
+            </div>
+            <div class="story">
+              {#each guest.story as beat, i (i)}<span class:found={visits > i}>{visits > i ? beat.prop.replaceAll("-", " ") : "?"}</span>{/each}
+            </div>
+          {/if}
+        </div>
+      {:else if badge}
+        {@const have = campaign.expansion.metrics[badge.metric] ?? 0}
+        <div class="art" class:faded={!campaign.expansion.badges.includes(badge.id)}><Icon art={badge.art} size={64} /></div>
+        <h3 class="title">{badge.name}</h3>
+        <div class="facts">
+          <span class="bk-tally" aria-hidden="true">{#each marks(have, badge.target) as on, k (k)}<i class:on></i>{/each}</span>
+          <span class="bk-lbl">{Math.min(badge.target, have)} of {badge.target}</span>
+        </div>
+      {:else if decor}
+        <div class="art"><Icon art={decor.art} size={64} /></div>
+        <h3 class="title">{decor.name}</h3>
+        <div class="facts">
+          <div class="minis">
+            <span class="mini"><span class="bk-mid">{cap(decor.kind)}</span><span class="bk-lbl">kind</span></span>
+            {#if decor.comfort}<span class="mini"><span class="bk-mid">+{decor.comfort}</span><span class="bk-lbl">comfort</span></span>{/if}
+            {#if decor.style}<span class="mini"><span class="bk-mid">+{decor.style}</span><span class="bk-lbl">style</span></span>{/if}
+          </div>
+        </div>
+        <div class="acts">
+          {#if ownsDecor}
+            <button
+              type="button"
+              class="boba-key is-primary"
+              disabled={live}
+              onclick={() => action(["paint", "apron", "print", "cat"].includes(decor.kind) ? "equip-decor" : "place-from-book", { id: decor.id })}
+              >{decor.kind === "decor" || decor.kind === "keepsake" ? "Place it" : "Use it"}</button
+            >
+          {:else}
+            <button
+              type="button"
+              class="boba-key is-primary"
+              disabled={live || decor.day > campaign.day || decor.kind === "keepsake" || campaign.cash < decor.price}
+              onclick={() => action("buy-decor", { id: decor.id })}
+              >{decor.kind === "keepsake" ? "A regular's gift" : decor.day > campaign.day ? "Day " + decor.day : "Buy it, " + money(decor.price)}</button
+            >
+          {/if}
         </div>
       {/if}
-    {:else if badge}
-      {@const have = campaign.expansion.metrics[badge.metric] ?? 0}
-      <div class="art"><Icon art={badge.art} size={56} /></div>
-      <h3>{badge.name}</h3>
-      <div class="bar" aria-label={Math.min(badge.target, have) + " of " + badge.target}><i style:width="{Math.min(100, (have / badge.target) * 100)}%"></i></div>
-      <p class="lg-num">{Math.min(badge.target, have)} of {badge.target}</p>
-    {:else if decor}
-      <div class="art"><Icon art={decor.art} size={56} /></div>
-      <h3>{decor.name}</h3>
-      <dl class="lg-facts">
-        <dt>Kind</dt>
-        <dd>{cap(decor.kind)}</dd>
-        {#if decor.comfort}<dt>Comfort</dt><dd>+{decor.comfort}</dd>{/if}
-        {#if decor.style}<dt>Style</dt><dd>+{decor.style}</dd>{/if}
-      </dl>
-      {#if ownsDecor}
-        <button
-          type="button"
-          class="boba-key is-primary"
-          disabled={live}
-          onclick={() => action(["paint", "apron", "print", "cat"].includes(decor.kind) ? "equip-decor" : "place-from-book", { id: decor.id })}
-          >{decor.kind === "decor" || decor.kind === "keepsake" ? "Place it" : "Use it"}</button
-        >
-      {:else}
-        <button
-          type="button"
-          class="boba-key is-primary"
-          disabled={live || decor.day > campaign.day || decor.kind === "keepsake" || campaign.cash < decor.price}
-          onclick={() => action("buy-decor", { id: decor.id })}
-          >{decor.kind === "keepsake" ? "A regular's gift" : decor.day > campaign.day ? "Day " + decor.day : "Buy it, " + money(decor.price)}</button
-        >
-      {/if}
-    {/if}
-  </aside>
-</div>
+    </aside>
+  </div>
+</section>
 
 <style>
-  .gap {
-    flex: 1;
-  }
-
-  .filters {
-    max-height: 5.5rem;
-    overflow-y: auto;
-  }
-
-  .album {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
-    gap: 6px;
-    min-height: 22rem;
-    align-content: start;
-  }
-
-  .tile {
-    display: grid;
-    grid-template-rows: 48px auto;
-    justify-items: center;
-    align-items: center;
-    gap: 4px;
-    height: 6.5rem;
-    padding: 8px 6px;
+  .find {
+    height: 28px;
+    padding: 0 10px;
     border: 0;
-    color: var(--bk-text);
-    background: var(--bk-raised);
-    box-shadow: inset 0 0 0 1px var(--bk-rule);
+    color: var(--lg-text);
+    background: var(--lg-chip);
+    box-shadow: inset 0 0 0 1.5px var(--lg-line);
     font: inherit;
-    cursor: pointer;
+    font-size: 13px;
     clip-path: var(--notch);
   }
 
-  .tile.is-picked {
-    background: var(--bk-wash-2);
-    box-shadow:
-      inset 0 0 0 2px var(--b-accent),
-      inset 0 -3px var(--b-accent);
+  .find::placeholder {
+    color: var(--lg-muted);
   }
 
-  .tile:focus-visible {
-    outline: 2px solid var(--b-accent);
-    outline-offset: -2px;
+  .find:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--lg-cream);
   }
 
-  @media (hover: hover) {
-    .tile:not(.is-picked):hover {
-      box-shadow: inset 0 0 0 1.5px var(--bk-ink);
+  .album {
+    container: album / inline-size;
+  }
+
+  .key {
+    min-height: 34px;
+  }
+
+  .bar {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "head pages count pager"
+      "filters filters filters find";
+    gap: 10px 14px;
+    align-items: center;
+  }
+
+  .head {
+    grid-area: head;
+  }
+
+  .pages {
+    grid-area: pages;
+  }
+
+  .count {
+    grid-area: count;
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  .pager {
+    grid-area: pager;
+  }
+
+  .find {
+    grid-area: find;
+    align-self: start;
+    width: 100%;
+  }
+
+  /* Two rows of small keys, always, whatever the page holds. */
+  .filters {
+    grid-area: filters;
+    align-self: start;
+    height: 62px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--lg-line) transparent;
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 18px;
+    align-items: start;
+  }
+
+  .pick {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    container-type: inline-size;
+  }
+
+  /* A full page is 24 tiles; the grid holds that much room on every page, so the pager never moves. */
+  .grid {
+    --cols: 4;
+    --rows: 6;
+    --tile: 100px;
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-auto-rows: var(--tile);
+    gap: 8px;
+    align-content: start;
+    height: calc(var(--rows) * var(--tile) + (var(--rows) - 1) * 8px);
+  }
+
+  @container (min-width: 560px) {
+    .grid {
+      --cols: 6;
+      --rows: 4;
     }
   }
 
-  .tile-name {
-    display: -webkit-box;
+  @container (max-width: 260px) {
+    .grid {
+      --cols: 3;
+      --rows: 8;
+    }
+  }
+
+  /* A tile: its picture in a fixed box, its name on two fixed lines below. */
+  /* Doubled classes: the board's shared rules carry the book's own scope, so these must outweigh them. */
+  .album .tile.bk-tile {
+    grid-template-rows: 52px 28px;
+    align-content: center;
+    gap: 4px;
+    padding: 8px 4px;
+  }
+
+  .pic {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
+    height: 52px;
     overflow: hidden;
-    font-size: 0.75rem;
-    line-height: 1.25;
-    text-align: center;
+  }
+
+  .nm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 28px;
+    overflow: hidden;
+  }
+
+  .nm .bk-name.bk-name,
+  .nm .bk-lbl.bk-lbl {
+    display: -webkit-box;
+    overflow: hidden;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 14px;
+    overflow-wrap: break-word;
     -webkit-line-clamp: 2;
     line-clamp: 2;
     -webkit-box-orient: vertical;
   }
 
-  .muted {
-    color: var(--bk-muted);
+  .none {
+    grid-column: 1 / -1;
   }
 
   .faded {
@@ -288,52 +405,121 @@
     display: grid;
     place-items: center;
     width: 30px;
-    height: 40px;
-    color: var(--bk-muted);
+    height: 44px;
+    color: var(--lg-muted);
     font-weight: 700;
-    box-shadow: inset 0 0 0 1.5px var(--bk-rule-strong);
+    box-shadow: inset 0 0 0 1.5px var(--lg-line);
+  }
+
+  .tile.is-on .unknown {
+    color: #6b5a52;
+    box-shadow: inset 0 0 0 1.5px #c9b48d;
   }
 
   .unknown.big {
     width: 56px;
-    height: 80px;
-    font-size: 1.5rem;
+    height: 84px;
+    font-size: 24px;
   }
 
   .pager {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: var(--space-3);
-    margin-top: var(--space-3);
-    color: var(--bk-muted);
-    font-size: 0.8125rem;
-    font-variant-numeric: tabular-nums;
+    gap: 6px;
+    color: var(--lg-muted);
+    font-size: 13px;
+    white-space: nowrap;
   }
 
   .pager span {
-    min-width: 7rem;
+    width: 6.75rem;
     text-align: center;
   }
 
-  .art {
+  .step {
+    width: 34px;
+    padding: 0 0 4px;
+  }
+
+  .chev {
+    display: block;
+    flex: none;
+  }
+
+  /* The picked entry: a fixed box, as tall as a page of tiles, kept in view while a taller grid scrolls. */
+  .panel {
+    position: sticky;
+    top: 0;
     display: grid;
-    place-items: center;
-    height: 96px;
-    background: var(--bk-wash);
+    grid-template-rows: 110px 46px minmax(0, 1fr) auto;
+    gap: 10px;
+    height: calc(4 * 100px + 3 * 8px);
+    padding: 12px;
+    overflow: hidden;
+    background: var(--lg-chip);
+    clip-path: var(--notch);
+  }
+
+  .art {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 110px;
+    overflow: hidden;
+    background: var(--lg-chip-2);
+  }
+
+  .title {
+    display: -webkit-box;
+    align-self: center;
+    margin: 0;
+    overflow: hidden;
+    color: var(--lg-cream);
+    font: 700 18px/23px var(--font-display);
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .facts {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Figures of any size, their labels on one line. */
+  .minis {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 10px 20px;
+  }
+
+  .mini {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+  }
+
+  .mini.wide {
+    flex: 1;
+    min-width: 0;
   }
 
   .ingredients {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    font-size: 0.75rem;
+    gap: 6px 10px;
+    color: var(--lg-text);
+    font-size: 12px;
   }
 
   .ingredients span {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 3px;
   }
 
   .story {
@@ -343,13 +529,80 @@
   }
 
   .story span {
-    padding: 2px 6px;
-    color: var(--bk-muted);
-    font-size: 0.75rem;
-    box-shadow: inset 0 0 0 1px var(--bk-rule-strong);
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 7px;
+    color: var(--lg-muted);
+    font-size: 12px;
+    box-shadow: inset 0 0 0 1px var(--lg-line);
   }
 
   .story span.found {
-    color: var(--bk-ink);
+    color: var(--lg-cream);
+  }
+
+  .acts {
+    display: grid;
+  }
+
+  .acts .boba-key {
+    min-height: 36px;
+  }
+
+  @media (max-width: 900px) {
+    .body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .panel {
+      position: static;
+      height: 330px;
+    }
+  }
+
+  /* Too narrow for the caption, the pages, the count and the pager on one line: they stack. */
+  @container album (max-width: 719px) {
+    .bar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "head count"
+        "pages pages"
+        "filters filters"
+        "find pager";
+    }
+
+    /* The filters have the full width here, and up to three rows of it. */
+    .filters {
+      height: 96px;
+    }
+  }
+
+  @media (max-width: 760px) {
+
+    /* Narrow tiles: a little more room for a name's longest word. */
+    .album .tile.bk-tile {
+      padding: 8px 2px;
+    }
+
+    .nm .bk-name.bk-name,
+    .nm .bk-lbl.bk-lbl {
+      font-size: 11px;
+    }
+
+    /* One row of filters that scrolls sideways, inside itself. */
+    .filters {
+      height: 34px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .filters .bk-keys.bk-keys {
+      flex-wrap: nowrap;
+    }
+
+    .filters .boba-key {
+      flex: none;
+    }
   }
 </style>

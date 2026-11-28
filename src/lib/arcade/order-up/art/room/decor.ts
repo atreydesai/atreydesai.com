@@ -8,7 +8,8 @@ import { mixHex } from "../../../core/color.ts";
 import { isoBox, isoTile, project } from "../../../core/iso.ts";
 import type { Placement } from "../../engine/state.ts";
 import type { Decor } from "../../content/schema.ts";
-import type { PropSpec, WallItem, WallSide } from "./types.ts";
+import type { PropSpec, Seat, WallItem, WallSide } from "./types.ts";
+import { stoolSeat } from "./seating.ts";
 import { SPRITES, litPalette, INK } from "./props.ts";
 import { wallRect, framed, clock, shelf } from "./walls.ts";
 
@@ -25,10 +26,12 @@ export function decorKind(motif: string): Kind | null {
   return null;
 }
 
-/** Splits placed decor into wall pieces (baked with the walls) and standing props. */
+/** Splits placed decor into wall pieces (baked with the walls), standing props, and the seats its stools give. */
 export function placeDecor(placements: readonly Placement[], catalogue: readonly Decor[], cols: number, rows: number, hour: () => number, wallHeight = 80) {
   const props: PropSpec[] = [];
   const wall: WallItem[] = [];
+  /** Stools set out on the floor are seats too. */
+  const seats: Seat[] = [];
   placements.forEach((pl, i) => {
     const d = catalogue.find((x) => x.id === pl.id);
     if (!d) return;
@@ -40,9 +43,17 @@ export function placeDecor(placements: readonly Placement[], catalogue: readonly
       wall.push(wallPiece(kind, nearWall, at, color, hour, wallHeight));
       return;
     }
-    props.push(standing(kind, "decor:" + i + ":" + d.id, Math.min(cols - 1, Math.max(0, pl.x)), Math.min(rows - 1, Math.max(0, pl.y)), color));
+    const x = Math.min(cols - 1, Math.max(0, pl.x));
+    const y = Math.min(rows - 1, Math.max(0, pl.y));
+    if (kind === "low-stool") {
+      const stool = stoolSeat("decor:" + i + ":" + d.id, x, y, color);
+      props.push(...stool.props);
+      seats.push(...stool.seats);
+      return;
+    }
+    props.push(standing(kind, "decor:" + i + ":" + d.id, x, y, color));
   });
-  return { props, wall };
+  return { props, wall, seats };
 }
 
 function wallPiece(kind: Kind, wall: WallSide, at: number, color: string, hour: () => number, wallHeight: number): WallItem {
@@ -125,9 +136,6 @@ function standing(kind: Kind, key: string, x: number, y: number, color: string):
           isoTile(p, g, 0.1, 0.15, 0.8, 0.7, light.lit(mixHex(color, INK, 0.3), 0.3));
           isoTile(p, g, 0.15, 0.2, 0.7, 0.6, light.lit(color, 0.4));
           isoTile(p, g, 0.3, 0.35, 0.4, 0.3, light.lit(mixHex(color, "#fff1dd", 0.35), 0.4));
-          break;
-        case "low-stool":
-          isoBox(p, g, light, 0.32, 0.32, 0.36, 0.36, 9, { top: color }, 0, 0.4);
           break;
         case "cushion":
           isoBox(p, g, light, 0.25, 0.25, 0.5, 0.5, 4, { top: color, lip: mixHex(color, "#fff1dd", 0.4) }, 0, 0.4);

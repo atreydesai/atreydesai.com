@@ -1,6 +1,6 @@
 import type { Family } from "./schema.ts";
 
-export const FAMILIES: readonly Family[] = [
+const RECIPE_TEMPLATES: readonly Family[] = [
   {
     id: "milk-tea",
     name: "milk tea",
@@ -158,3 +158,12 @@ export const FAMILIES: readonly Family[] = [
     skills: ["blender", "topping-ladle"],
   },
 ];
+
+/** Keep the original template for reindexing cups saved before the skill change. */
+export function legacyFamilySteps(id: string) {
+  return RECIPE_TEMPLATES.find((family) => family.id === id)?.skills ?? [];
+}
+
+export const FAMILIES: readonly Family[] = RECIPE_TEMPLATES.map((family) => ({
+  ...family, skills: family.skills.filter((skill) => skill !== "straw-stab"),
+}));

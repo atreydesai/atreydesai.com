@@ -14,12 +14,13 @@ import { noise } from "../../../../core/painter.ts";
 import { plaster, panels, herringbone, brick as brickSurface } from "../surfaces.ts";
 import type { Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, WallSide, FrontBox } from "../types.ts";
+import { cafeTable, windowBar, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import { word, bigWord, bigWidth } from "../font.ts";
 import type { VenueOptions } from "./index.ts";
 import { menuBoard, clock } from "../walls.ts";
 import { lampPostProp, benchProp, aFrameProp } from "../props.ts";
-import { litSet, wallQuad, wallLine, wallDot, wallPt, matItem, bikeRackProp, frontWallProps, facePt, faceLine, faceQuad, INK, CREAM, seasonTreeProp, lawnAt, frontFace, ashlarFront, glassFront, lampFront } from "./_corner-kit.ts";
+import { litSet, wallQuad, wallLine, wallDot, wallPt, matItem, bikeRackProp, frontWallProps, cornerDoorRoute, facePt, faceLine, faceQuad, INK, CREAM, seasonTreeProp, lawnAt, frontFace, ashlarFront, glassFront, lampFront } from "./_corner-kit.ts";
 
 const NAVY = "#3b4766";
 const GOLD = "#c9a24a";
@@ -541,6 +542,11 @@ function campusFront(p: Painter, light: Light, box: FrontBox) {
 
 export function campusVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // A study table for three, and stools at the front window over the quad.
+  const sit = seating(
+    cafeTable("campus-table", 2.0, 4.25, ["-x", "-y", "+x"], { wood: OAK, seat: NAVY, top: "#c9a878" }),
+    windowBar("campus-bar", "front-left", 1.1, 3.7, 2, { cols, rows, wall: 14 }, { wood: OAK, seat: GOLD, top: "#c9a878" }),
+  );
   const archR = { at: 0.5, width: 1.5 };
   const archL1 = { at: 1.9, width: 1.4 };
   const archL2 = { at: 4.4, width: 1.4 };
@@ -578,6 +584,7 @@ export function campusVenue(o: VenueOptions): Venue {
       corkBoard("left", 0.25, 30, 36, 26, 2),
     ],
     props: [
+      ...sit.props,
       bookcase("prop:books", 0, 3.35, 0.95),
       bins("prop:bins", 0, rows - 1),
       ...frontWallProps("prop:front", cols, rows, { height: 14, kind: "panel", color: CREAM_WALL, line: "#b8ad98", cap: OAK, base: [NAVY, 4], gapsRight: [rows - 1], post: OAK }),
@@ -601,14 +608,8 @@ export function campusVenue(o: VenueOptions): Venue {
         { ...aFrameProp("out:aframe", cols + 0.5, rows - 2.0, "TEA"), shadow: "none" as const },
       ],
     },
-    entry: [cols + 1.4, rows - 0.5],
-    queue: [
-      [cols - 0.6, 1.6],
-      [cols - 0.6, 2.6],
-      [cols - 0.6, 3.6],
-      [cols - 0.6, 4.6],
-    ],
-    pickup: [cols - 1.6, 2.4],
+    seats: sit.seats,
+    ...cornerDoorRoute(cols, rows),
     indoorSun: 0.4,
     facade: {
       wall: plaster("#d8cdb6", "#cfc3aa"),

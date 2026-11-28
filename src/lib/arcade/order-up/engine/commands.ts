@@ -1,7 +1,7 @@
 /** Shop-book commands are rules, not UI event handlers. */
 import type { Campaign } from "../../orders-campaign.ts";
 import type { Shift } from "./shift-types.ts";
-import { MACHINES, DECOR, FAMILIES, GUESTS, RECIPE_BY_ID, INGREDIENT_BY_ID } from "../content/index.ts";
+import { MACHINES, DECOR, FAMILIES, GUESTS, RECIPE_BY_ID, INGREDIENT_BY_ID, SHOPS } from "../content/index.ts";
 import { buyPantry, rotateStock } from "./pantry.ts";
 import {
   buyMachine,
@@ -24,9 +24,13 @@ import {
   bookMarketing,
   setPrice,
 } from "./management.ts";
-import { plant, water, harvest, tasteBlend, planRoute, runnerDelivery, recovery, adoptCat } from "./activities.ts";
+import { plant, water, harvest, tasteBlend, developGardenBlend, planRoute, runnerDelivery, recovery, adoptCat } from "./activities.ts";
 import { machineEntry } from "./equipment.ts";
-import { object, STATIONS } from "./state.ts";
+import { chooseMod, craftPart, respecMod, unlockUpgrade } from "./upgrades.ts";
+import { calibrateGardenBrew, listGardenFeature, trainGardenService } from "./service-program.ts";
+import { giveWaitEstimate, offerGardenFeature } from "./guest-actions.ts";
+import { nodeStatus, unlockNode } from "./tree-nodes.ts";
+import { object, STATIONS, freeDecorTile } from "./state.ts";
 import type { Station } from "../content/schema.ts";
 export interface CommandResult {
   ok: boolean;
@@ -34,7 +38,7 @@ export interface CommandResult {
   taste?: number[];
   view?: string;
 }
-export function command(c: Campaign, name: string, raw: unknown = {}): CommandResult {
+export function command(c: Campaign, name: string, raw: unknown = {}, shift?: Shift): CommandResult {
   const d = object(raw),
     id = typeof d.id === "string" ? d.id : "",
     n = (key: string) => (typeof d[key] === "number" ? (d[key] as number) : 0);
@@ -52,6 +56,26 @@ export function command(c: Campaign, name: string, raw: unknown = {}): CommandRe
     case "buy-machine":
       ok = buyMachine(c, id);
       message = ok ? "The machine is fitted." : "This machine needs more cash, a free slot, or another day.";
+      break;
+    case "unlock-upgrade":
+      ok = unlockUpgrade(c, id);
+      message = ok ? "The upgrade is unlocked." : "Check the upgrade requirements and the till.";
+      break;
+    case "unlock-node":
+      ok = unlockNode(c, id);
+      message = ok ? "The upgrade is installed." : nodeStatus(c, id).reason;
+      break;
+    case "craft-part":
+      ok = craftPart(c, id);
+      message = ok ? "The part is ready." : "Check the tools, parts, and till.";
+      break;
+    case "choose-mod":
+      ok = chooseMod(c, id);
+      message = ok ? "The Brew kit is fitted." : "Check for an unlocked kit, a clear mount, and a compatible machine.";
+      break;
+    case "respec-mod":
+      ok = respecMod(c);
+      message = ok ? "The Brew kit is removed." : "An installed kit and cash are required.";
       break;
     case "buy-shop":
       ok = buyShop(c, id);
@@ -123,8 +147,12 @@ export function command(c: Campaign, name: string, raw: unknown = {}): CommandRe
       break;
     case "place-from-book":
       if (c.expansion.decor.includes(id) || c.expansion.keepsakes.includes(id)) {
-        const state = c.expansion.shops[c.expansion.activeShop];
-        ok = placeDecor(c, id, 2 + (state.decor.length % 3), 2 + (Math.floor(state.decor.length / 3) % 2));
+        const state = c.expansion.shops[c.expansion.activeShop],
+          n = state.decor.length,
+          plan = SHOPS.find((s) => s.id === c.expansion.activeShop)!.layout;
+        // A few tiles near the middle in turn, or the nearest free floor: never on a counter, the guests' way or another piece.
+        const [x, y] = freeDecorTile([2 + (n % 3), 2 + (Math.floor(n / 3) % 2)], state.layout, state.decor.filter((p) => p.id !== id), plan);
+        ok = placeDecor(c, id, x, y);
         if (ok) {
           c.expansion.metrics["arranged-" + c.expansion.activeShop] = 1;
           view = "arrange";
@@ -190,7 +218,35 @@ export function command(c: Campaign, name: string, raw: unknown = {}): CommandRe
       ok = water(c, n("plot"));
       break;
     case "harvest":
-      ok = harvest(c, n("plot"));
+      ok = harvest(c, n("plot"), d.reserveSample === true);
+      break;
+    case "develop-garden-blend": {
+      const taste = developGardenBlend(c);
+      return {
+        ok: !!taste,
+        message: taste ? "The panel tasted the garden blend." : "The panel needs a fresh garden sample and peach.",
+        taste: taste ?? undefined,
+      };
+    }
+    case "calibrate-garden-brew":
+      ok = calibrateGardenBrew(c, id);
+      message = ok ? "The machine is calibrated for the house tea." : "A developed blend and a working precision machine are required.";
+      break;
+    case "train-garden-service":
+      ok = trainGardenService(c, id);
+      message = ok ? "The employee can serve the house tea." : "Check the calibration, employee, and till.";
+      break;
+    case "list-garden-feature":
+      ok = listGardenFeature(c, d.value === true);
+      message = ok ? "The Garden menu is updated." : "The Garden needs its trained employee and calibrated machine.";
+      break;
+    case "offer-garden-feature":
+      ok = !!shift && offerGardenFeature(c, shift, typeof d.slot === "number" ? d.slot : shift.selected);
+      message = ok ? "The guest chose the house tea." : "This guest can't order the house tea right now.";
+      break;
+    case "give-wait-estimate":
+      ok = !!shift && giveWaitEstimate(c, shift, typeof d.slot === "number" ? d.slot : shift.selected);
+      message = ok ? "The guest will wait a little longer." : "This guest can't get a wait estimate right now.";
       break;
     case "blend": {
       const taste = Array.isArray(d.ingredients)

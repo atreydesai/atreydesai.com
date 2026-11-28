@@ -14,6 +14,7 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { concrete, corrugated, brick, ground as groundSurface, type Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, FrontBox } from "../types.ts";
+import { cafeTable } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import type { VenueOptions } from "./index.ts";
 import { clock } from "../walls.ts";
@@ -877,8 +878,13 @@ function tubeChains(p: Painter, g: IsoGrid, light: Light) {
 
 const TUBES: [number, number][] = [[2.5, 2.5], [6.2, 2.4], [9.4, 3.6], [3.2, 6.0], [7.0, 6.0]];
 
+/** How far the dock door is rolled up, in pixels: high enough to walk under. */
+const DOCK_OPEN = 54;
+
 export function commissaryVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // A break table for two by the racks.
+  const sit = cafeTable("commissary-table", 2.1, 5.55, ["-x", "-y"], { wood: METAL_D, seat: TEAL, top: METAL_L, metal: METAL_D });
   const share = 0.3;
   const doorAt = 6.2;
   const doorW = 2.4;
@@ -895,8 +901,8 @@ export function commissaryVenue(o: VenueOptions): Venue {
     windows: [
       { wall: "left", at: 3.2, width: 3.4, sill: 50, top: 72, bars: 5, transom: 11, frame: "#4f5856" },
       { wall: "right", at: 9.1, width: 1.8, sill: 44, top: 70, bars: 2, transom: 13, frame: "#4f5856" },
-      // The gap under the half-open roll-up door.
-      { wall: "right", at: doorAt + 0.05, width: doorW - 0.1, sill: 0.5, top: 9, frame: "#3f4442" },
+      // The yard through the rolled-up door: the way guests come and go.
+      { wall: "right", at: doorAt + 0.05, width: doorW - 0.1, sill: 0.5, top: DOCK_OPEN, frame: "#3f4442", open: true },
     ],
     doors: [{ wall: "right", at: 2.2, width: 1.5, height: 60, color: "#c3c8c6" }],
     lamps: TUBES.map(([x, y]) => ({ kind: "tube" as const, x, y, z: 76, reach: 3 })),
@@ -909,10 +915,11 @@ export function commissaryVenue(o: VenueOptions): Venue {
       extinguisher("right", 1.6, 4),
       coolerTrim("right", 2.2, 0, 1.5),
       punchClock("right", 4.0, 26),
-      rollUpDoor("right", doorAt, 9, doorW),
+      rollUpDoor("right", doorAt, DOCK_OPEN, doorW),
       ticketWire("right", 9.0, 34, 1.9),
     ],
     props: [
+      ...sit.props,
       rackProp("prop:rack0", 0, 3, 0, share),
       rackProp("prop:rack1", 0, 4, 1, share),
       rackProp("prop:rack2", 0, 5, 2, share),
@@ -967,14 +974,24 @@ export function commissaryVenue(o: VenueOptions): Venue {
       neighbours: "none",
       queueAt: 0.98,
     },
-    entry: [7.4, 0.45],
+    // In from the yard under the rolled-up dock door, the line back up toward it, out down its other side.
+    seats: sit.seats,
+    doorway: { wall: "right", from: doorAt + 0.2, to: doorAt + doorW - 0.2 },
+    entry: [7.9, 0.45],
     queue: [
-      [9.5, 2.45],
-      [9.4, 3.4],
-      [9.3, 4.35],
-      [9.2, 5.3],
+      [5.5, 3.4],
+      [6.25, 3.55],
+      [6.95, 3.3],
+      [7.0, 2.55],
+      [7.0, 1.8],
+      [7.0, 1.05],
     ],
-    pickup: [8.4, 2.3],
+    pickup: [4.75, 3.5],
+    out: [
+      [4.9, 4.6],
+      [8.1, 4.3],
+      [8.1, 0.95],
+    ],
     indoorSun: share,
   };
 }

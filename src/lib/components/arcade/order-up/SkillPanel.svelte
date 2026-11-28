@@ -1,16 +1,19 @@
 <script lang="ts">
   // The counter the chef stands at: its painted close-up with the drink on
-  // the mat, what the ticket asks for, the skill being worked, and the one
-  // primary key that does the next thing.
+  // the mat, the order slip, the skill being worked, and the one primary key
+  // that does the next thing. Nothing here explains the game; the slip and
+  // the key say what is next.
   import type { Campaign } from "#lib/arcade/orders-campaign.ts";
   import type { Shift } from "#lib/arcade/order-up/engine/shift-types.ts";
   import type { Station } from "#lib/arcade/order-up/content/schema.ts";
   import { selectedTicket, activeCup, currentSkill } from "#lib/arcade/order-up/engine/shift.ts";
-  import { SKILLS, RECIPE_BY_ID, INGREDIENT_BY_ID, GUEST_BY_ID } from "#lib/arcade/order-up/content/index.ts";
+  import { SKILLS, RECIPE_BY_ID, INGREDIENT_BY_ID, INGREDIENTS, GUEST_BY_ID } from "#lib/arcade/order-up/content/index.ts";
+  import { skillMastery } from "#lib/arcade/order-up/engine/skill-setup.ts";
+  import { stock } from "#lib/arcade/order-up/engine/pantry.ts";
   import { BEHAVIORS, type SkillAction } from "#lib/arcade/order-up/skills/index.ts";
   import { calendar } from "#lib/arcade/order-up/engine/calendar.ts";
   import type { Lesson } from "#lib/arcade/core/coach.ts";
-  import { memoryChoices } from "#lib/arcade/order-up/engine/guest-actions.ts";
+  import { memoryChoices, canOfferGardenFeature } from "#lib/arcade/order-up/engine/guest-actions.ts";
   import OrderStationArt from "../OrderStationArt.svelte";
   import OrderKitchenItem from "../OrderKitchenItem.svelte";
   import OrderPixelWord from "../OrderPixelWord.svelte";
@@ -19,6 +22,7 @@
   import Icon from "./Icon.svelte";
   import Ingredient from "./Ingredient.svelte";
   import Mark from "./Mark.svelte";
+  import OrderSlip from "./OrderSlip.svelte";
 
   export let campaign: Campaign;
   export let shift: Shift | null;
@@ -65,16 +69,19 @@
   let finish: "shake" | "seal" | "foam" | null = null;
   $: finish = working === "shake" ? "shake" : working === "seal" ? "seal" : working === "cheese-foam" ? "foam" : null;
   $: ready = !!ticket && ticket.cups.every((c) => c.ready);
+  // The house tea can be offered to one fresh, single-cup guest a shift where it is listed (the engine's own check).
+  $: offerSlot = shift ? shift.tickets.findIndex((t) => !!t && canOfferGardenFeature(campaign, shift!, t.slot)) : -1;
+  $: offerTo = offerSlot >= 0 ? shift!.tickets[offerSlot] : null;
   $: waitingForCourier = ready && !!ticket?.pickupAt && !!shift && shift.elapsed < ticket.pickupAt;
 
   $: label = (() => {
     if (!shift) return "Open the shop";
-    if (!ticket) return "Next guest";
+    if (!ticket) return "Waiting for a guest";
     if (ticket.sleeping) return "Wake them";
     if (ticket.special === "cat") return "Pour some milk";
     if (ticket.changeTo) return "Make the new drink";
     if (hidden) return "Check the album";
-    if (waitingForCourier) return "Courier on the way";
+    if (waitingForCourier) return "Courier in " + Math.ceil(ticket.pickupAt! - shift.elapsed) + " seconds";
     if (ready) return ticket.packed ? "Pack and send" : "Hand off";
     if (elsewhere) return "Go to " + skill!.station;
     if (shift.walking > 0) return "Walking";
@@ -82,24 +89,27 @@
     if (!run) return "Start";
     if (skill?.input === "hold") return run.held ? "Let go" : "Hold";
     if (skill?.input === "drag") return "Done drawing";
-    if (skill?.input === "knob") return "Set the heat";
+    if (run.variant === "quick") return cap(skill?.steps[0] ?? "Press");
+    if (skill?.input === "pick") return "Done";
+    if (skill?.input === "knob") return "Choose one";
     if (skill?.input === "sequence") return cap(skill.steps[run.hits.length] ?? "Press");
     return cap(skill?.steps[0] ?? "Press");
   })();
-  $: disabled = paused || (!!shift && (!ticket || shift.walking > 0 || !!cup?.warmup || waitingForCourier));
-  $: line = (() => {
-    if (!shift) return "";
-    if (!ticket) return shift.tickets.some(Boolean) ? "Choose a ticket from the rail." : "";
-    if (ticket.sleeping) return "This guest dozed off in line.";
-    if (ticket.special === "cat") return "A cat is waiting by the door.";
-    if (waitingForCourier) return "The courier collects this order at its pickup time.";
-    if (ready) return ticket.cups.length > 1 ? "The whole order is ready." : "The drink is ready.";
-    if (cup?.ready) return "This cup is done. The next one is waiting.";
-    if (!skill) return "";
-    if (elsewhere) return `This step is at the ${skill.station} counter.`;
-    if (cup?.warmup) return "It keeps cooking while you take another ticket.";
-    return skill.lesson;
-  })();
+  $: disabled =
+    paused ||
+    (!!shift && (!ticket || shift.walking > 0 || !!cup?.warmup || waitingForCourier)) ||
+    (!!run && run.variant === "hand" && skill?.input === "knob");
+  // How close the step in hand is to being one press, from good hand runs.
+  $: mastery = skill ? skillMastery(campaign, skill.id as Parameters<typeof skillMastery>[1]) : null;
+  // Toppings the shop knows, for the build counter's keys.
+  $: toppings = INGREDIENTS.filter((i) => i.group === "topping" && i.day <= campaign.day);
+  $: wantedIds = run ? [...new Set(run.wanted)] : [];
+  const count = (list: readonly string[], id: string) => list.filter((x) => x === id).length;
+  // How far a warming step has come, from the longest wait it showed.
+  const warmups = new WeakMap<object, number>();
+  $: warm = cup?.warmup ?? 0;
+  $: if (cup && warm > (warmups.get(cup) ?? 0)) warmups.set(cup, warm);
+  $: warmth = cup && warm > 0 ? 1 - warm / (warmups.get(cup) || warm) : 0;
 
   function cap(text: string) {
     return text.charAt(0).toUpperCase() + text.slice(1);
@@ -136,9 +146,6 @@
       <span class="sr-only">{benches[station]}</span>
       <OrderPixelWord text={benches[station]} cells={1} />
     </h2>
-    {#if hidden}<span class="recipe-name">the usual</span>{:else if recipe}<span class="recipe-name" title={recipe.name}
-        >{recipe.name}</span
-      >{/if}
   </header>
 
   <div class="bench">
@@ -154,10 +161,10 @@
       milkUnlocked={unlocked.filter((id) => id === "milk" || id === "oat")}
       stockUnlocked={campaign.day >= 3}
       pearlCooking={working === "pearl-pot"}
-      pearlProgress={working === "pearl-pot" ? (run?.position ?? 0) : 0}
+      pearlProgress={working === "pearl-pot" ? (warm > 0 ? warmth : (run?.position ?? 0)) : 0}
       waffleAvailable={campaign.day >= 13}
       waffleCooking={working === "egg-waffle"}
-      waffleProgress={working === "egg-waffle" ? (run?.position ?? 0) : 0}
+      waffleProgress={working === "egg-waffle" ? (warm > 0 ? warmth : (run?.position ?? 0)) : 0}
       {finish}
     />
     {#if recipe && cup}
@@ -193,32 +200,15 @@
     {/if}
   </div>
 
-  {#if ticket && recipe && cup && !hidden && !ticket.changeTo}
-    <div class="order-strip">
-      <ul class="portions" aria-label="What goes in">
-        {#each recipe.ingredients as item (item.id)}
-          <li title={INGREDIENT_BY_ID[item.id].name}>
-            <Ingredient id={item.id} size={24} />{#if item.quantity > 1}<small>×{item.quantity}</small>{/if}
-          </li>
-        {/each}
-        <li class="levels">
-          <span>{recipe.sugar * 25}% sugar</span>
-          <span>{recipe.hot ? "hot" : ["no ice", "less ice", "ice", "extra ice"][recipe.ice]}</span>
-        </li>
-      </ul>
-      <ol class="steps" aria-label="Steps">
-        {#each recipe.steps as id, i (i)}
-          {@const step = SKILLS.find((x) => x.id === id)!}
-          <li class:is-done={i < cup.step} class:is-now={i === cup.step} title={step.name}>
-            <Icon art={step.art} size={20} />
-            {#if cup.grades[i]}<b>{cup.grades[i].grade}</b>{/if}
-          </li>
-        {/each}
-      </ol>
-    </div>
-  {/if}
+  <!-- A first-use tip opens just above the slip, over the painting, so the order and the meter stay in view. -->
+  <div class="slip-row" data-lesson-anchor><OrderSlip {ticket} {cup} {hidden} /></div>
 
-  <div class="skill-area" data-lesson-anchor>
+  <div class="skill-area">
+    {#if offerTo}
+      <button type="button" class="boba-key offer" disabled={paused || !!lesson} onclick={() => guestAction("offer", String(offerSlot))}
+        >Offer {offerTo.name} the house tea</button
+      >
+    {/if}
     {#if ticket && cup && ticket.changeTo}
       <p>{ticket.name} would like a {RECIPE_BY_ID[ticket.changeTo].name} instead.</p>
       <div class="choices">
@@ -249,15 +239,51 @@
         >Check the album (costs 3 seconds of patience)</button
       >
     {:else if ticket && cup && run && !cup.warmup && skill && !elsewhere}
-      {#if skill.input === "knob"}
-        <div class="knob" role="group" aria-label="Kettle heat">
-          {#each ["80°", "90°", "100°"] as heat, i (heat)}
+      {#if run.variant === "quick"}
+        <!-- A mastered step is one press; the player may still time it for the top grade. -->
+        <div class="quick">
+          <span class="mastered"><Mark kind="check" size={12} />Mastered</span>
+          <button type="button" class="boba-key is-small" disabled={paused || !!lesson} onclick={() => action({ type: "precision" })}
+            >Time it for top grade</button
+          >
+        </div>
+      {:else if skill.input === "pick"}
+        <div class="pick">
+          <ul class="wanted" aria-label="Toppings in this cup">
+            {#each wantedIds as id (id)}
+              {@const want = count(run.wanted, id)}
+              {@const got = count(run.added, id)}
+              <li data-id={id} data-left={want - got} class:is-done={got >= want} class:is-over={got > want}>
+                <Ingredient {id} size={22} /><span>{got}/{want}</span>
+              </li>
+            {/each}
+          </ul>
+          <div class="topping-keys" role="group" aria-label="Add a topping">
+            {#each toppings as t (t.id)}
+              <button
+                type="button"
+                class="boba-key is-small"
+                data-id={t.id}
+                class:is-wanted={count(run.wanted, t.id) > count(run.added, t.id)}
+                disabled={paused || !!lesson}
+                aria-label={"Add " + t.name + ", " + stock(campaign, t.id) + " in stock"}
+                onclick={() => action({ type: "add", id: t.id })}
+                ><Ingredient id={t.id} size={18} /><span>{t.name}</span></button
+              >
+            {/each}
+          </div>
+        </div>
+      {:else if skill.input === "knob"}
+        {@const options = run.choices.length ? run.choices : ["80°", "90°", "100°"]}
+        <div class="knob" role="group" aria-label={skill.name}>
+          {#each options as option, i (option)}
             <button
               type="button"
               class="boba-key"
-              class:is-target={!!lesson && run.knobTarget === i}
+              class:is-target={run.knobTarget === i}
               aria-pressed={run.knob === i}
-              onclick={() => action({ type: "knob", value: i })}>{heat}</button
+              disabled={paused || !!lesson && run.knobTarget !== i}
+              onclick={() => action({ type: "choose", index: i })}>{option}</button
             >
           {/each}
         </div>
@@ -351,15 +377,24 @@
           </ol>
         {/if}
       {/if}
-    {:else}
-      <p class="line">{line}</p>
+    {:else if ticket && cup && skill && !cup.ready}
+      <!-- Before a step starts, and while it warms, its meter waits empty, so nothing moves when it begins. -->
+      <svg class="meter is-idle" viewBox="0 0 96 24" aria-hidden="true" shape-rendering="crispEdges">
+        <rect x="0" y="6" width="96" height="14" fill="#1f191c" />
+        <rect x="2" y="8" width="92" height="10" fill="#3a2f2e" />
+        {#if warmth > 0}<rect x="2" y="8" width={Math.round(92 * warmth)} height="10" fill="#6e5848" />{/if}
+      </svg>
+    {/if}
+    {#if run && run.variant === "hand" && mastery && !mastery.mastered && !cup?.warmup && !elsewhere}
+      <span class="mastery" role="img" aria-label={mastery.goodRuns + " of " + mastery.required + " good runs to make this step one press"}
+        >{#each Array.from({ length: mastery.required }) as _, i (i)}<i class:is-on={i < mastery.goodRuns}></i>{/each}</span
+      >
     {/if}
     <span class="result" aria-live="polite">
       {#if !lesson && shift?.lastMark && shift.realElapsed - shift.lastMark.time < 1.6}
-        <b class:is-perfect={shift.lastMark.grade >= 98}
-          >{shift.lastMark.grade >= 98 ? "Perfect" : shift.lastMark.grade < 60 ? "Off" : "Good"}
-          {shift.lastMark.grade}</b
-        >
+        {#key shift.lastMark.time}<b class="ou-arrive" class:is-perfect={shift.lastMark.grade >= 98}
+            >{shift.lastMark.grade >= 98 ? "Perfect" : shift.lastMark.grade < 60 ? "Off" : "Good"}</b
+          >{/key}
       {/if}
     </span>
   </div>
@@ -380,7 +415,10 @@
       onpointerdown={keyDown}
       onpointerup={keyUp}
       onpointercancel={keyUp}
-      onkeyup={(e) => e.key === " " && e.preventDefault()}>{label}<kbd aria-hidden="true">Space</kbd></button
+      onkeyup={(e) => e.key === " " && e.preventDefault()}
+      >{#if warmth > 0}<i class="warming" style:width="{warmth * 100}%" aria-hidden="true"></i>{/if}<span>{label}</span><kbd
+        aria-hidden="true">Space</kbd
+      ></button
     >
   </footer>
 </section>
@@ -405,8 +443,8 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    min-height: 44px;
-    padding: 6px var(--space-3);
+    min-height: 38px;
+    padding: 4px var(--space-3);
   }
 
   .counter-plaque h2 {
@@ -419,17 +457,11 @@
     line-height: 1;
   }
 
-  .recipe-name {
-    overflow: hidden;
-    color: #e7c9a8;
-    font-size: 0.8125rem;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
+  /* On a short window the painting gives up height first, so the slip and the key always show. */
   .bench {
     position: relative;
-    flex: none;
+    flex: 0 1 auto;
+    min-height: 7rem;
     aspect-ratio: 900 / 344;
     margin: 0 6px;
     overflow: hidden;
@@ -489,18 +521,6 @@
     transform: rotate(-6deg);
   }
 
-  .order-strip {
-    display: flex;
-    flex: none;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px var(--space-3);
-    padding: 8px var(--space-3) 4px;
-  }
-
-  .portions,
-  .steps,
   .sequence {
     display: flex;
     flex-wrap: wrap;
@@ -511,56 +531,13 @@
     list-style: none;
   }
 
-  .portions li {
-    display: flex;
-    align-items: end;
-    gap: 1px;
-  }
-
-  .portions small {
-    color: #e7c9a8;
-    font-size: 0.6875rem;
-  }
-
-  .levels {
-    display: grid !important;
-    gap: 0 !important;
-    padding-inline-start: 6px;
-    color: #e7c9a8;
-    font-size: 0.75rem;
-    line-height: 1.25;
-  }
-
-  .steps li {
-    display: grid;
-    justify-items: center;
-    min-width: 22px;
-    padding-bottom: 2px;
-    opacity: 0.45;
-  }
-
-  .steps li.is-done,
-  .steps li.is-now {
-    opacity: 1;
-  }
-
-  .steps li.is-now {
-    box-shadow: inset 0 -2px #f0c482;
-  }
-
-  .steps b {
-    color: #e7c9a8;
-    font-size: 0.6875rem;
-    font-weight: 500;
-  }
-
   .skill-area {
     position: relative;
     display: grid;
     flex: 1;
     align-content: center;
     gap: var(--space-2);
-    min-height: 6.5rem;
+    min-height: 4.5rem;
     padding: var(--space-2) var(--space-3);
   }
 
@@ -569,10 +546,6 @@
     color: #fff0d6;
     font-size: 0.875rem;
     line-height: 1.4;
-  }
-
-  .skill-area p.line {
-    color: #e7c9a8;
   }
 
   .meter,
@@ -584,6 +557,113 @@
 
   .meter {
     max-height: 4.5rem;
+  }
+
+  /* Every key in the skill area stands at a hand's height, whatever row it sits in. */
+  .skill-area .boba-key {
+    min-height: 36px;
+    padding-inline: 12px;
+  }
+
+  .quick {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+  }
+
+  .mastered {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #c7d39a;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .pick {
+    display: grid;
+    gap: 10px;
+  }
+
+  .wanted {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .wanted li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    color: #e7c9a8;
+    background: #2a2123;
+    font-size: 0.8125rem;
+    clip-path: var(--notch);
+  }
+
+  .wanted li.is-done {
+    color: #e5efcf;
+    background: #4c5d47;
+  }
+
+  .wanted li.is-over {
+    background: #7a3a2e;
+  }
+
+  .topping-keys {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    gap: 6px;
+  }
+
+  .topping-keys .boba-key {
+    justify-content: flex-start;
+    min-height: 36px;
+    font-size: 0.75rem;
+  }
+
+  /* What the cup still wants is outlined, so the task reads at a glance. */
+  .topping-keys .boba-key.is-wanted {
+    --key-rule: #f0c482;
+    box-shadow:
+      inset 0 0 0 2px #f0c482,
+      inset 0 -4px 0 var(--key-foot);
+  }
+
+  .topping-keys .boba-key span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .mastery {
+    display: flex;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .mastery i {
+    width: 8px;
+    height: 4px;
+    background: #4b3a36;
+  }
+
+  .mastery i.is-on {
+    background: #c7d39a;
+  }
+
+  .meter.is-idle {
+    opacity: 0.7;
+  }
+
+  .offer {
+    justify-self: center;
+    min-height: 40px;
   }
 
   .draw-board {
@@ -617,8 +697,13 @@
     gap: 6px;
   }
 
+  .knob {
+    justify-content: center;
+  }
+
   .knob .boba-key {
-    min-width: 4rem;
+    min-width: 5.5rem;
+    min-height: 40px;
   }
 
   .knob .boba-key[aria-pressed="true"] {
@@ -706,9 +791,24 @@
   }
 
   .primary-key {
+    position: relative;
     flex: 0 1 15rem;
     justify-content: space-between;
     min-height: 48px;
+    overflow: hidden;
+  }
+
+  /* A warming step fills the key's foot as it comes up to heat. */
+  .warming {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    background: #f0c482;
+  }
+
+  .slip-row {
+    flex: none;
   }
 
   .sr-only {
@@ -754,11 +854,13 @@
     }
 
     .bench {
+      min-height: 0;
       aspect-ratio: auto;
       height: 18vh;
     }
 
-    .order-strip {
+    /* A phone on its side has room for the key, not the slip; the rail's ticket still shows the order. */
+    .slip-row {
       display: none;
     }
 

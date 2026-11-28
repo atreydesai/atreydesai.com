@@ -143,7 +143,11 @@ export function addShiftTime(s: Shift, seconds = 60): CheatResult {
 }
 
 /** Runs the shift's clock out, so it closes once the guests still in are served. */
+/** Closes the shop now: guests still waiting leave without a drink, and the day can be settled. */
 export function endShiftNow(s: Shift): CheatResult {
   s.elapsed = Math.max(s.elapsed, s.duration);
-  return done("The doors are closing.");
+  for (const t of s.tickets) if (t) s.lost += t.cups.length;
+  s.tickets = s.tickets.map(() => null);
+  s.status = "complete";
+  return done("The shop is closed for the day.");
 }

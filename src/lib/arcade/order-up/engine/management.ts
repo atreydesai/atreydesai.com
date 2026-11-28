@@ -17,13 +17,15 @@ import { TUNING } from "./tuning.ts";
 import { calendar } from "./calendar.ts";
 import { machineEntry, machineModel, instanceKey } from "./equipment.ts";
 import { goalScaleOpen } from "./opened.ts";
+import { facilitySlots, hasNode } from "./tree-nodes.ts";
 export { machineEntry, machineAt, machineModel, machineDefinition } from "./equipment.ts";
 export function rankFor(c: Campaign) {
   return Math.min(60, Math.max(1, Math.min(Math.floor(c.day / 2) + 1, RANKS.filter((r) => r.xp <= c.xp).length)));
 }
 export function machineSlots(c: Campaign, shop = c.expansion.activeShop) {
   const definition = SHOPS.find((s) => s.id === shop)!;
-  return definition.slots + (c.expansion.shops[shop]?.expansion ?? 0) * 2;
+  return definition.slots + (c.expansion.shops[shop]?.expansion ?? 0) * 2 - facilitySlots(c, shop) +
+    Number(hasNode(c, "back-service-rack", shop)) + Number(hasNode(c, "room-utility", shop));
 }
 export function installed(c: Campaign, shop = c.expansion.activeShop) {
   return Object.entries(c.expansion.machines).filter(([, m]) => m.shop === shop);
@@ -136,6 +138,11 @@ export function walkSeconds(c: Campaign, from: Station, to: Station) {
 export function staffOnDuty(c: Campaign, shop = c.expansion.activeShop) {
   return c.expansion.staff.filter((s) => s.shop === shop && s.rota[(c.day - 1) % 7] && s.energy > 5);
 }
+export function hasFinishingCrew(c: Campaign, shop = c.expansion.activeShop) {
+  return hasNode(c, "serve-finish-bench", shop) && staffOnDuty(c, shop).some((person) =>
+    person.station === "serve" && ["cashier", "trainer"].includes(person.role),
+  );
+}
 export function staffGrade(staff: StaffState, station: Station) {
   const traits = TRAITS.filter((t) => staff.traits.includes(t.id));
   return Math.min(
@@ -214,10 +221,10 @@ export function wage(person: StaffState) {
   return Math.round(role.wage * (1 + (Math.max(...Object.values(person.skills)) - 1) * 0.12));
 }
 export function payroll(c: Campaign) {
-  let amount = 0;
+  let amount = hasNode(c, "decor-display-rails") && c.expansion.shops[c.expansion.activeShop].decor.length ? 60 : 0;
   for (const person of c.expansion.staff) {
     if (person.rota[(c.day - 1) % 7]) {
-      amount += wage(person);
+      amount += wage(person) + (person.role === "host" && hasNode(c, "crew-hospitality", person.shop) ? 80 : 0);
       person.energy = Math.max(0, person.energy - 12);
       person.shifts++;
       person.paidDays.push(c.day);
@@ -238,7 +245,8 @@ export function rentDue(c: Campaign) {
   return Math.round(
     (base +
       Object.entries(c.expansion.shops).reduce(
-        (sum, [id, state]) => sum + (SHOPS.find((s) => s.id === id)?.rent ?? 0) * (1 + state.expansion * 0.12),
+        (sum, [id, state]) => sum + (SHOPS.find((s) => s.id === id)?.rent ?? 0) * (1 + state.expansion * 0.12) +
+          (hasNode(c, "room-utility", id) ? 500 : 0),
         0,
       )) *
       TUNING[c.mode].rent,
@@ -301,6 +309,7 @@ export function comfort(c: Campaign) {
 export function style(c: Campaign) {
   return Math.min(
     0.6,
+    (hasNode(c, "decor-display-rails") && c.expansion.shops[c.expansion.activeShop].decor.length ? 0.04 : 0) +
     c.expansion.shops[c.expansion.activeShop].decor.reduce(
       (n, p) => n + (DECOR.find((d) => d.id === p.id)?.style ?? 0) * 0.008,
       0,

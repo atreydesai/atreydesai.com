@@ -1,15 +1,20 @@
 <script lang="ts">
-  // The shop book, kept like a ledger: the day and its headline across the
-  // top, the chapters down the side as index tabs, ruled rows with their
-  // column headings written once, and one primary action at the foot. Every
-  // part keeps its place as pages change, so nothing jumps under the hand.
+  // The shop book, kept as a ledger: a wood-framed board of dark tiles with
+  // coloured bookmarks along its top, one per chapter, and the shop's receipt
+  // tucked against its left edge where a page has one (yesterday's close on
+  // Today, what's on the way on the Pantry). The day, the till and Close sit
+  // across the top of the board; files, the status line and the primary key
+  // along its foot. Every part keeps its place as chapters change, so nothing
+  // jumps under the hand. Its colours are its own, the same in either theme.
   import { onMount } from "svelte";
   import type { Campaign } from "#lib/arcade/orders-campaign.ts";
   import { money } from "#lib/arcade/orders-display.ts";
   import { calendar } from "#lib/arcade/order-up/engine/calendar.ts";
-  import { chapters, chapterIsNew } from "#lib/arcade/order-up/engine/opened.ts";
+  import { chapters, chapterIsNew, DAILY_DAY } from "#lib/arcade/order-up/engine/opened.ts";
   import { bookIcon } from "#lib/arcade/order-up/art/view-icons.ts";
   import PixelIcon from "#lib/components/PixelIcon.svelte";
+  import "./slip.css";
+  import "./motion.css";
   import OrderPixelWord from "../OrderPixelWord.svelte";
   import Today from "./book/Today.svelte";
   import Pantry from "./book/Pantry.svelte";
@@ -18,6 +23,7 @@
   import Map from "./book/Map.svelte";
   import Collection from "./book/Collection.svelte";
   import TestKitchen from "./book/TestKitchen.svelte";
+  import Receipt from "./book/Receipt.svelte";
   export let campaign: Campaign;
   export let tab = "today";
   export let live = false;
@@ -35,13 +41,25 @@
     collection: "Album",
     test: "Testing",
   };
+  /** Each chapter's bookmark colour, from the game's palette. */
+  const COLORS: Record<string, string> = {
+    today: "#c9462f",
+    pantry: "#b7832f",
+    workshop: "#4f7f78",
+    crew: "#5e8a4f",
+    map: "#4a6a9a",
+    collection: "#7a5a8e",
+    test: "#6b5a52",
+  };
   // Chapters appear as their first content opens (engine/opened.ts); a
   // chapter asked for before then opens Today instead.
   $: tabs = [...chapters(campaign), ...(cheats ? ["test"] : [])];
   $: if (!tabs.includes(tab)) tab = "today";
+  $: today = calendar(campaign.day);
+  $: dailyOpen = campaign.day >= DAILY_DAY || Object.keys(campaign.expansion.dailyBests).length > 0;
+  $: slip = tab === "today" || tab === "pantry" ? tab : "";
   let heading: HTMLHeadingElement;
   let paper: HTMLElement;
-  $: today = calendar(campaign.day);
   onMount(() => {
     heading?.focus({ preventScroll: true });
   });
@@ -60,298 +78,336 @@
 </script>
 
 <div class="boba-scrim boba-ui book-scrim">
-  <div class="shop-book order-pixel-sheet" role="dialog" aria-modal="true" aria-labelledby="book-title">
-    <header class="book-header">
-      <div class="book-title">
-        <span class="book-day" aria-hidden="true"><OrderPixelWord text={"Day " + campaign.day} cells={2} /></span>
-        <h1 id="book-title" tabindex="-1" bind:this={heading}><span class="sr-only">Day {campaign.day}, </span>{today.event.name}</h1>
-        <p class="book-lede">{today.event.description}</p>
-      </div>
-      <div class="book-till">
-        <span>In the till</span>
-        <strong>{money(campaign.cash)}</strong>
-      </div>
-      <button type="button" class="boba-key order-pixel-paper-key close-book" onclick={close}>Close<kbd>Esc</kbd></button>
-    </header>
-    <div class="book-body">
-      <nav class="book-index" aria-label="Shop book">
+  <div class="shop-book" role="dialog" aria-modal="true" aria-labelledby="book-title">
+    <!-- The receipt's column is kept on every page, so the book never moves sideways. -->
+    <aside class="book-tuck" aria-label="Receipt">
+      {#if slip}<div class="tucked"><Receipt {campaign} kind={slip} /></div>{/if}
+    </aside>
+    <div class="book-main">
+      <nav class="book-tabs" aria-label="Ledger">
         {#each tabs as id, i (id)}
           {@const icon = bookIcon(id)}
           <button
             type="button"
             class="index-tab"
             class:is-current={tab === id}
+            style:--tab={COLORS[id]}
             data-book-tab={id}
             aria-current={tab === id ? "page" : undefined}
             onclick={() => setTab(id)}
             onkeydown={(e) => onTabKey(e, i)}
-            ><PixelIcon grid={icon.grid} palette={icon.palette} px={2} /><span>{NAMES[id]}</span>{#if chapterIsNew(campaign, id)}<b class="tab-new">New</b>{/if}</button
+            ><PixelIcon grid={icon.grid} palette={icon.palette} px={2} /><OrderPixelWord text={NAMES[id]} cells={2} /><span class="sr-only"
+              >{NAMES[id]}</span
+            >{#if chapterIsNew(campaign, id)}<b class="tab-new">New</b>{/if}</button
           >
         {/each}
       </nav>
-      <main class="book-paper" bind:this={paper}>
-        {#if tab === "today"}<Today {campaign} {live} {action} />{:else if tab === "pantry"}<Pantry
-            {campaign}
-            {live}
-            {action}
-          />{:else if tab === "workshop"}<Workshop {campaign} {live} {action} />{:else if tab === "crew"}<Crew
-            {campaign}
-            {live}
-            {action}
-          />{:else if tab === "map"}<Map {campaign} {live} {action} />{:else if tab === "test" && cheats}<TestKitchen
-            {campaign}
-            {live}
-            {action}
-          />{:else}<Collection {campaign} {live} {action} />{/if}
-      </main>
-    </div>
-    <footer class="book-footer">
-      <span class="book-notice" role="status">{notice}</span>
-      <div class="book-files">
-        <button type="button" class="text-key" onclick={() => action("saves")}>Saves</button>
-        <button type="button" class="text-key" onclick={() => action("export")}>Export</button>
-        <button type="button" class="text-key" disabled={live} onclick={() => action("import")}>Import</button>
+      <div class="book-frame">
+        <div class="book-board">
+          <header class="book-header">
+            <span class="book-day" aria-hidden="true">{campaign.day}</span>
+            <div class="book-title">
+              <h1 id="book-title" tabindex="-1" bind:this={heading}><span class="sr-only">Day {campaign.day}, </span>{today.event.name}</h1>
+              <p class="book-lede">{today.event.description}</p>
+            </div>
+            <div class="book-till"><span class="sr-only">In the till </span><strong>{money(campaign.cash)}</strong></div>
+            <button type="button" class="boba-key close-book" onclick={close}>Close<kbd>Esc</kbd></button>
+          </header>
+          <main class="book-paper" bind:this={paper}>
+            {#if slip}<div class="tuck-inline"><Receipt {campaign} kind={slip} /></div>{/if}
+            {#key tab}<div class="chapter ou-arrive">{#if tab === "today"}<Today {campaign} {live} {action} />{:else if tab === "pantry"}<Pantry
+                {campaign}
+                {live}
+                {action}
+              />{:else if tab === "workshop"}<Workshop {campaign} {live} {action} />{:else if tab === "crew"}<Crew
+                {campaign}
+                {live}
+                {action}
+              />{:else if tab === "map"}<Map {campaign} {live} {action} />{:else if tab === "test" && cheats}<TestKitchen
+                {campaign}
+                {live}
+                {action}
+              />{:else}<Collection {campaign} {live} {action} />{/if}</div>{/key}
+          </main>
+          <footer class="book-footer">
+            <div class="book-files">
+              <button type="button" class="boba-key is-small" onclick={() => action("saves")}>Saves</button>
+              <button type="button" class="boba-key is-small" onclick={() => action("export")}>Export</button>
+              <button type="button" class="boba-key is-small" disabled={live} onclick={() => action("import")}>Import</button>
+            </div>
+            <span class="book-notice" role="status">{notice}</span>
+            <button
+              type="button"
+              class="boba-key daily"
+              class:is-gone={!dailyOpen}
+              disabled={!dailyOpen || live || campaign.status === "closed"}
+              onclick={() => action("daily")}>Daily shift</button
+            >
+            <button
+              type="button"
+              class="boba-key is-primary open-shop"
+              onclick={() => (live ? action("resume") : action("open"))}
+              disabled={campaign.status === "closed"}>{live ? "Back to the shift" : "Open the shop"}</button
+            >
+          </footer>
+        </div>
       </div>
-      <button
-        type="button"
-        class="boba-key is-primary open-shop"
-        onclick={() => (live ? action("resume") : action("open"))}
-        disabled={campaign.status === "closed"}>{live ? "Back to the shift" : "Open the shop"}</button
-      >
-    </footer>
+    </div>
   </div>
 </div>
 
 <style>
   .book-scrim {
     z-index: 4;
-    padding: max(var(--space-4), env(safe-area-inset-top)) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+    padding: max(var(--space-3), env(safe-area-inset-top)) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom));
   }
 
+  /* The ledger's own colours, the same in either theme. */
   .shop-book {
-    --bk-paper: var(--b-paper);
-    --bk-raised: var(--b-raised);
-    --bk-ink: var(--b-strong);
-    --bk-text: var(--b-text);
-    --bk-muted: var(--b-muted);
-    --bk-rule: color-mix(in srgb, var(--b-line) 16%, var(--b-paper));
-    --bk-rule-strong: color-mix(in srgb, var(--b-line) 34%, var(--b-paper));
-    --bk-wash: color-mix(in srgb, var(--b-line) 4%, var(--b-paper));
-    --bk-wash-2: color-mix(in srgb, var(--b-gold) 12%, var(--b-paper));
-    --bk-margin: color-mix(in srgb, var(--b-accent) 40%, var(--b-paper));
-    display: flex;
-    flex-direction: column;
-    width: min(68rem, 100%);
-    height: min(52rem, 100%);
+    --lg-board: #241d1f;
+    --lg-chip: #332a2c;
+    --lg-chip-2: #3d3335;
+    --lg-chip-3: #4a3e40;
+    --lg-line: #4d4144;
+    --lg-cream: #ffe7b8;
+    --lg-text: #e9dccb;
+    --lg-muted: #a8968a;
+    --lg-orange: #c9462f;
+    --lg-orange-foot: #7f2a1c;
+    --lg-orange-hi: #e0664d;
+    --lg-wood: #7a4b35;
+    --lg-wood-hi: #9b6448;
+    --lg-wood-lo: #55311f;
+    --lg-slip: #fbf8f1;
+    --lg-slip-ink: #232020;
+    --lg-slip-muted: #857c74;
+    --lg-slip-rule: #cfc7bc;
+    --lg-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    display: grid;
+    grid-template-columns: 196px minmax(0, 1fr);
+    width: min(1240px, 100%);
+    /* Tied to the window, so a long page scrolls inside the board instead of growing the book. */
+    height: min(820px, calc(100dvh - 2 * var(--space-3)));
     max-height: 100%;
-    overflow: hidden;
-    color: var(--bk-text);
+    color: var(--lg-text);
+    font-family: var(--font-ui);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .book-tuck {
+    position: relative;
+    min-width: 0;
+  }
+
+  .tucked {
+    position: absolute;
+    top: 100px;
+    right: -14px;
+    left: 8px;
+    z-index: 2;
+    transform: rotate(-2.2deg);
+  }
+
+  .tuck-inline {
+    display: none;
+  }
+
+  .book-main {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* Bookmarks along the top: the current one stands taller, joined to the board. */
+  .book-tabs {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 58px;
+    padding: 0 28px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .index-tab {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    height: 44px;
+    padding: 0 12px 6px;
+    border: 0;
+    color: var(--lg-cream);
+    background: var(--tab);
+    box-shadow:
+      inset 0 3px rgb(255 255 255 / 0.22),
+      inset 0 -3px rgb(0 0 0 / 0.25);
+    clip-path: var(--notch);
+    cursor: pointer;
+  }
+
+  .index-tab.is-current {
+    height: 56px;
+    padding-bottom: 12px;
+  }
+
+  @media (hover: hover) {
+    .index-tab:not(.is-current):hover {
+      filter: brightness(1.12);
+    }
+  }
+
+  .index-tab:focus-visible {
+    outline: 2px solid var(--lg-cream);
+    outline-offset: -4px;
+  }
+
+  .index-tab :global(.pixel-icon) {
+    flex: none;
+  }
+
+  .tab-new {
+    position: absolute;
+    top: -2px;
+    right: 6px;
+    padding: 2px 4px;
+    color: #fff;
+    background: var(--lg-orange);
+    font: 600 9px/1 var(--font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .book-frame {
+    position: relative;
+    display: grid;
+    min-height: 0;
+    padding: 12px;
+    background: var(--lg-wood);
+    box-shadow:
+      inset 0 3px var(--lg-wood-hi),
+      inset 0 -6px var(--lg-wood-lo),
+      inset 3px 0 var(--lg-wood-hi),
+      inset -3px 0 var(--lg-wood-lo);
+    clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px, 100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px), 0 6px, 3px 6px, 3px 3px, 6px 3px);
+  }
+
+  .book-board {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    min-height: 0;
+    padding: 14px 18px 12px;
+    background: var(--lg-board);
+    box-shadow: inset 0 0 0 2px var(--lg-line);
   }
 
   .book-header {
     display: grid;
-    grid-template-columns: 1fr auto auto;
-    flex-shrink: 0;
-    align-items: start;
-    gap: var(--space-5);
-    padding: var(--space-4) var(--space-6) var(--space-3);
-    border-bottom: 2px solid var(--bk-rule-strong);
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .book-day {
+    color: var(--lg-cream);
+    font: 700 34px/1 var(--font-display);
+    letter-spacing: -0.02em;
   }
 
   .book-title {
     min-width: 0;
   }
 
-  .book-day {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--b-gold);
-  }
-
   .book-header h1 {
     margin: 0;
     overflow: hidden;
-    color: var(--bk-ink);
-    font-family: var(--font-display);
-    font-size: clamp(1.625rem, 3vw, 2.25rem);
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.03em;
+    color: var(--lg-text);
+    font: 500 15px/1.25 var(--font-ui);
     white-space: nowrap;
     text-overflow: ellipsis;
     outline: none;
   }
 
   .book-lede {
-    margin: 6px 0 0;
+    margin: 2px 0 0;
     overflow: hidden;
-    color: var(--bk-muted);
-    font-size: 0.875rem;
+    color: var(--lg-muted);
+    font-size: 14px;
+    line-height: 1.3;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
-  .book-till {
-    display: grid;
-    justify-items: end;
-    gap: 2px;
-    padding-top: 4px;
-  }
-
-  .book-till span {
-    color: var(--bk-muted);
-    font-size: 0.75rem;
-  }
-
   .book-till strong {
-    color: var(--bk-ink);
-    font-family: var(--font-display);
-    font-size: 1.375rem;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
+    color: var(--lg-cream);
+    font: 700 30px/1 var(--font-display);
+    letter-spacing: -0.015em;
   }
 
   .close-book {
-    min-height: 40px;
+    min-height: 36px;
   }
 
-  .close-book kbd {
-    padding: 0 4px;
-    color: var(--bk-muted);
-    font: 500 0.6875rem/1.4 var(--font-ui);
-    box-shadow: inset 0 0 0 1px var(--bk-rule-strong);
-  }
-
-  .book-body {
-    display: grid;
-    grid-template-columns: 9.5rem 1fr;
-    flex: 1;
-    min-height: 0;
-  }
-
-  /* Index tabs down the margin: the current one pulled out onto the page. */
-  .book-index {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-4) 0 var(--space-4) var(--space-4);
-    border-right: 2px solid var(--bk-rule-strong);
-    overflow-y: auto;
-  }
-
-  .index-tab {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 40px;
-    padding: 0 12px;
-    border: 0;
-    color: var(--bk-muted);
-    background: none;
-    font: 500 0.875rem/1 var(--font-ui);
-    text-align: left;
-    cursor: pointer;
-    clip-path: var(--notch);
-  }
-
-  .tab-new {
-    margin-left: auto;
-    color: var(--b-accent);
-    font: 600 0.625rem/1 var(--font-ui);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .index-tab :global(svg) {
-    flex: none;
-    width: 22px;
-    height: 22px;
+  .book-header kbd {
+    padding: 1px 4px;
+    font: 500 10px/1.2 var(--font-ui);
     opacity: 0.7;
-  }
-
-  .index-tab.is-current {
-    color: var(--bk-ink);
-    background: var(--bk-wash-2);
-    box-shadow: inset 3px 0 var(--b-accent);
-  }
-
-  .index-tab.is-current :global(svg) {
-    opacity: 1;
-  }
-
-  @media (hover: hover) {
-    .index-tab:not(.is-current):hover {
-      color: var(--bk-ink);
-      background: var(--bk-wash);
-    }
-  }
-
-  .index-tab:focus-visible {
-    outline: 2px solid var(--b-accent);
-    outline-offset: -2px;
+    box-shadow: inset 0 0 0 1px currentColor;
   }
 
   .book-paper {
     min-width: 0;
     min-height: 0;
-    padding: var(--space-5) var(--space-6) var(--space-6);
+    padding-right: 4px;
     overflow-y: auto;
     scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--lg-line) transparent;
   }
 
   .book-footer {
     display: grid;
-    grid-template-columns: 1fr auto auto;
-    flex-shrink: 0;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
-    gap: var(--space-4);
-    min-height: 64px;
-    padding: var(--space-3) var(--space-6);
-    border-top: 2px solid var(--bk-rule-strong);
+    gap: 12px;
+    min-height: 44px;
+  }
+
+  .book-files {
+    display: flex;
+    gap: 6px;
+  }
+
+  .book-files .boba-key {
+    min-height: 32px;
   }
 
   .book-notice {
     min-width: 0;
     overflow: hidden;
-    color: var(--bk-muted);
-    font-size: 0.8125rem;
+    color: var(--lg-muted);
+    font-size: 13px;
+    text-align: right;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
-  .book-files {
-    display: flex;
-    gap: var(--space-3);
-  }
-
-  .text-key {
+  .daily {
     min-height: 36px;
-    padding: 0 4px;
-    border: 0;
-    color: var(--bk-muted);
-    background: none;
-    font: 500 0.8125rem/1 var(--font-ui);
-    text-decoration: underline;
-    text-decoration-color: var(--bk-rule-strong);
-    text-underline-offset: 3px;
-    cursor: pointer;
   }
 
-  .text-key:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  @media (hover: hover) {
-    .text-key:not(:disabled):hover {
-      color: var(--bk-ink);
-    }
+  .daily.is-gone {
+    visibility: hidden;
   }
 
   .open-shop {
-    min-width: 12rem;
-    min-height: 44px;
-    font-size: 0.9375rem;
+    min-width: 11rem;
+    min-height: 42px;
+    font-size: 15px;
   }
 
   .sr-only {
@@ -363,397 +419,276 @@
     white-space: nowrap;
   }
 
+  /* Narrower windows: a slimmer receipt column. */
+  @media (max-width: 1100px) {
+    .shop-book {
+      grid-template-columns: 160px minmax(0, 1fr);
+    }
+
+    .tucked {
+      top: 92px;
+      left: 4px;
+    }
+  }
+
+  /* A phone: the book fills the screen, the bookmarks scroll, and the receipt sits at the top of the page. */
   @media (max-width: 760px) {
     .book-scrim {
       padding: 0;
     }
 
     .shop-book {
-      height: 100%;
+      grid-template-columns: minmax(0, 1fr);
+      width: 100%;
+      height: 100dvh;
+    }
+
+    .book-tuck {
+      display: none;
+    }
+
+    .tuck-inline {
+      display: block;
+      max-width: 320px;
+      margin: 4px auto 14px;
+    }
+
+    .book-tabs {
+      height: 50px;
+      padding: 0 10px;
+    }
+
+    .index-tab {
+      height: 38px;
+    }
+
+    .index-tab.is-current {
+      height: 48px;
+    }
+
+    .book-frame {
+      padding: 6px;
+    }
+
+    .book-board {
+      padding: 10px 10px 8px;
     }
 
     .book-header {
-      grid-template-columns: 1fr auto;
-      padding: var(--space-4);
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 10px;
     }
 
     .book-till {
       display: none;
     }
 
-    .book-body {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
+    .book-day {
+      font-size: 28px;
     }
 
-    .book-index {
-      flex-direction: row;
-      padding: var(--space-2) var(--space-4) 0;
-      border-right: 0;
-      border-bottom: 2px solid var(--bk-rule-strong);
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    .index-tab {
-      flex: none;
-      padding: 0 10px;
-    }
-
-    .index-tab.is-current {
-      box-shadow: inset 0 -3px var(--b-accent);
-    }
-
-    .index-tab span {
-      font-size: 0.8125rem;
-    }
-
-    .book-paper {
-      padding: var(--space-4);
-    }
-
+    /* Two rows on a phone: the files and the daily shift, then the primary key across the width. */
     .book-footer {
-      grid-template-columns: 1fr auto;
-      padding: var(--space-3) var(--space-4);
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 8px;
     }
 
     .book-notice {
       display: none;
     }
 
+    .daily {
+      grid-column: 3;
+      min-height: 32px;
+    }
+
     .open-shop {
+      grid-column: 1 / -1;
       min-width: 0;
     }
   }
 
-  /* ---- The ledger: shared by every page ---------------------------------- */
+  /* ---- The board's vocabulary: shared by every page ---------------------- */
 
-  /* A page's own title line: the chapter's name, and one fact on the right. */
-  .shop-book :global(.lg-title) {
+  /* Keys on the board are the game's own dark keys; a chosen one turns cream. */
+  .shop-book :global(.boba-key[aria-pressed="true"]) {
+    --key-face: var(--lg-cream);
+    --key-foot: #c9b48d;
+    --key-rule: transparent;
+    color: #2b1f20;
+  }
+
+  .shop-book :global(.boba-key.is-small) {
+    min-height: 28px;
+    padding: 0 9px 3px;
+    font-size: 12px;
+  }
+
+  .shop-book :global(.boba-key:disabled) {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  /* A section: a pixel-lettered cap over its tiles. */
+  .shop-book :global(.bk-section) {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+  }
+
+  .shop-book :global(.bk-cap) {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-4);
-    margin: 0 0 var(--space-4);
+    align-items: center;
+    gap: 10px;
+    min-height: 14px;
+    color: var(--lg-muted);
   }
 
-  .shop-book :global(.lg-title h2) {
-    margin: 0;
-    color: var(--bk-ink);
-    font-family: var(--font-display);
-    font-size: 1.625rem;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
+  .shop-book :global(.bk-cap .order-pixel-word) {
+    color: var(--lg-muted);
   }
 
-  .shop-book :global(.lg-title > span),
-  .shop-book :global(.lg-meta) {
-    color: var(--bk-muted);
-    font-size: 0.8125rem;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+  .shop-book :global(.bk-meta) {
+    color: var(--lg-muted);
+    font: 500 12px/1 var(--font-ui);
   }
 
-  /* A rubric over a section: small capitals over a rule. */
-  .shop-book :global(.lg-rubric) {
+  .shop-book :global(.bk-grow) {
+    flex: 1;
+  }
+
+  .shop-book :global(.bk-keys) {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin: var(--space-6) 0 var(--space-2);
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--bk-rule-strong);
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
-  .shop-book :global(.lg-rubric h3) {
-    margin: 0;
-    color: var(--bk-ink);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .shop-book :global(.lg-rubric:first-child) {
-    margin-top: 0;
-  }
-
-  /* Two columns: the ledger, and the picked entry beside it. */
-  .shop-book :global(.lg-split) {
+  .shop-book :global(.bk-tiles) {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 17rem;
-    gap: var(--space-6);
-    align-items: start;
+    grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr));
+    gap: 8px;
   }
 
-  @media (max-width: 960px) {
-    .shop-book :global(.lg-split) {
-      grid-template-columns: 1fr;
-    }
+  .shop-book :global(.bk-tiles.is-fill) {
+    grid-template-columns: repeat(auto-fill, minmax(var(--min, 112px), 1fr));
   }
 
-  /* On a phone a ledger keeps its columns and scrolls sideways within the page. */
-  @media (max-width: 760px) {
-    .shop-book :global(.lg-table) {
-      overflow-x: auto;
-      overscroll-behavior-x: contain;
-    }
-
-    .shop-book :global(.lg-detail) {
-      position: static;
-      min-height: 0;
-    }
-  }
-
-  /* Rows on a grid the page sets with --cols; headings written once. */
-  .shop-book :global(.lg-table) {
+  /* A tile: a notched dark chip, its picture above its words. */
+  .shop-book :global(.bk-tile) {
+    position: relative;
     display: grid;
-    grid-template-columns: var(--cols);
-    align-items: center;
-  }
-
-  .shop-book :global(.lg-head),
-  .shop-book :global(.lg-row) {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    align-items: center;
-    column-gap: var(--space-3);
-  }
-
-  .shop-book :global(.lg-head) {
-    padding: 0 8px 6px;
-    color: var(--bk-muted);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--bk-rule-strong);
-  }
-
-  .shop-book :global(.lg-row) {
-    min-height: 46px;
-    padding: 4px 8px;
+    align-content: center;
+    justify-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 10px 8px;
     border: 0;
-    border-bottom: 1px solid var(--bk-rule);
-    color: var(--bk-text);
-    background: none;
+    color: var(--lg-text);
+    background: var(--lg-chip);
     font: inherit;
-    font-size: 0.875rem;
-    text-align: left;
+    text-align: center;
+    clip-path: var(--notch);
   }
 
-  .shop-book :global(button.lg-row) {
+  .shop-book :global(button.bk-tile) {
     cursor: pointer;
   }
 
   @media (hover: hover) {
-    .shop-book :global(button.lg-row:hover) {
-      background: var(--bk-wash);
+    .shop-book :global(button.bk-tile:hover:not(:disabled)) {
+      background: var(--lg-chip-2);
     }
   }
 
-  .shop-book :global(.lg-row.is-picked) {
-    background: var(--bk-wash-2);
-    box-shadow: inset 3px 0 var(--b-accent);
+  /* Pressed, a tile sinks a pixel, as the game's keys sink into their foot. */
+  .shop-book :global(button.bk-tile:active:not(:disabled)) {
+    transform: translateY(2px);
+    filter: brightness(0.94);
   }
 
-  .shop-book :global(.lg-row.is-dim) {
-    color: var(--bk-muted);
-  }
-
-  .shop-book :global(.lg-row:focus-visible) {
-    outline: 2px solid var(--b-accent);
+  .shop-book :global(button.bk-tile:focus-visible) {
+    outline: 2px solid var(--lg-cream);
     outline-offset: -2px;
   }
 
-  .shop-book :global(.lg-name) {
+  /* A tile that can't be picked keeps its box and dims what's on it. */
+  .shop-book :global(.bk-tile:disabled) {
+    cursor: default;
+  }
+
+  .shop-book :global(.bk-tile:disabled > *) {
+    opacity: 0.42;
+  }
+
+  .shop-book :global(.bk-big) {
+    color: var(--lg-cream);
+    font: 700 24px/1 var(--font-display);
+  }
+
+  .shop-book :global(.bk-mid) {
+    color: var(--lg-cream);
+    font: 700 18px/1 var(--font-display);
+  }
+
+  .shop-book :global(.bk-name) {
+    max-width: 100%;
+    color: var(--lg-text);
+    font: 500 13px/1.15 var(--font-ui);
+  }
+
+  .shop-book :global(.bk-lbl) {
+    color: var(--lg-muted);
+    font: 400 12px/1.15 var(--font-ui);
+  }
+
+  /* Chosen: cream. Needs you: an orange edge. The day's one or two main things: orange. */
+  .shop-book :global(.bk-tile.is-on) {
+    background: var(--lg-cream);
+  }
+
+  .shop-book :global(.bk-tile.is-on :is(.bk-big, .bk-mid, .bk-name, .bk-lbl)) {
+    color: #2b1f20;
+  }
+
+  .shop-book :global(.bk-tile.is-hot) {
+    box-shadow: inset 0 0 0 2px var(--lg-orange);
+  }
+
+  .shop-book :global(.bk-tile.is-fill) {
+    background: var(--lg-orange);
+    box-shadow: inset 0 -3px var(--lg-orange-foot);
+  }
+
+  .shop-book :global(.bk-tile.is-fill :is(.bk-big, .bk-mid, .bk-name, .bk-lbl)) {
+    color: #fff;
+  }
+
+  .shop-book :global(.bk-tally) {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-    color: var(--bk-ink);
-    font-weight: 500;
-  }
-
-  .shop-book :global(.lg-name > span) {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .shop-book :global(.lg-num) {
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .shop-book :global(.lg-mark) {
-    color: var(--bk-muted);
-    font-size: 0.75rem;
-    white-space: nowrap;
-  }
-
-  .shop-book :global(.lg-mark.is-warn) {
-    color: var(--b-accent);
-    font-weight: 600;
-  }
-
-  .shop-book :global(.lg-mark.is-good) {
-    color: var(--b-gold);
-    font-weight: 600;
-  }
-
-  /* The picked entry. */
-  .shop-book :global(.lg-detail) {
-    position: sticky;
-    top: 0;
-    display: grid;
-    gap: var(--space-3);
-    min-height: 16rem;
-    padding: var(--space-4);
-    background: var(--bk-raised);
-    box-shadow: inset 0 0 0 1.5px var(--bk-rule-strong);
-    clip-path: var(--notch);
-  }
-
-  .shop-book :global(.lg-detail h3) {
-    margin: 0;
-    color: var(--bk-ink);
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.01em;
-  }
-
-  .shop-book :global(.lg-detail p) {
-    margin: 0;
-    color: var(--bk-text);
-    font-size: 0.875rem;
-    line-height: 1.45;
-  }
-
-  .shop-book :global(.lg-facts) {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 6px var(--space-3);
-    margin: 0;
-    font-size: 0.8125rem;
-  }
-
-  .shop-book :global(.lg-facts dt) {
-    color: var(--bk-muted);
-  }
-
-  .shop-book :global(.lg-facts dd) {
-    margin: 0;
-    color: var(--bk-ink);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-
-  .shop-book :global(.lg-actions) {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .shop-book :global(.lg-actions .boba-key),
-  .shop-book :global(.lg-row .boba-key),
-  .shop-book :global(.lg-chips .boba-key) {
-    min-height: 34px;
-  }
-
-  /* Choice chips: short rows of paper keys, the chosen one pressed. */
-  .shop-book :global(.lg-chips) {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 0 0 var(--space-3);
-  }
-
-  .shop-book :global(.lg-chips .boba-key[aria-pressed="true"]) {
-    --key-face: var(--bk-ink);
-    --key-foot: color-mix(in srgb, var(--bk-ink) 60%, #000);
-    --key-rule: var(--bk-ink);
-    color: var(--bk-paper);
-  }
-
-  .shop-book :global(.lg-find) {
-    min-height: 34px;
-    padding: 0 10px;
-    border: 0;
-    color: var(--bk-ink);
-    background: var(--bk-raised);
-    box-shadow: inset 0 0 0 1.5px var(--bk-rule-strong);
-    font: inherit;
-    font-size: 0.8125rem;
-    clip-path: var(--notch);
-  }
-
-  .shop-book :global(.lg-find:focus-visible) {
-    outline: 2px solid var(--b-accent);
-    outline-offset: -2px;
-  }
-
-  .shop-book :global(.lg-note) {
-    margin: var(--space-2) 0 0;
-    color: var(--bk-muted);
-    font-size: 0.8125rem;
-  }
-
-  .shop-book :global(.lg-empty) {
-    padding: var(--space-6) 0;
-    color: var(--bk-muted);
-    font-size: 0.875rem;
-    text-align: center;
-  }
-
-  /* A rubber stamp on an entry: booked, new, in season. */
-  .shop-book :global(.stamp) {
-    display: inline-block;
-    padding: 2px 6px;
-    color: var(--b-accent);
-    font-size: 0.625rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    box-shadow: inset 0 0 0 1.5px currentColor;
-    transform: rotate(-4deg);
-  }
-
-  .shop-book :global(.stamp.is-gold) {
-    color: var(--b-gold);
-  }
-
-  .shop-book :global(.tally) {
-    display: inline-flex;
     gap: 2px;
-    vertical-align: middle;
   }
 
-  .shop-book :global(.tally i) {
-    width: 3px;
-    height: 11px;
-    background: var(--bk-rule-strong);
+  .shop-book :global(.bk-tally i) {
+    width: 7px;
+    height: 5px;
+    background: var(--lg-line);
   }
 
-  .shop-book :global(.tally i.on) {
-    background: var(--bk-ink);
+  .shop-book :global(.bk-tally i.on) {
+    background: var(--lg-cream);
   }
 
-  .shop-book :global(.bar) {
-    position: relative;
-    height: 6px;
-    background: var(--bk-rule);
+  .shop-book :global(.bk-note) {
+    margin: 0;
+    color: var(--lg-muted);
+    font-size: 13px;
   }
 
-  .shop-book :global(.bar > i) {
-    position: absolute;
-    inset: 0 auto 0 0;
-    background: var(--b-gold);
+  .shop-book :global(.bk-empty) {
+    padding: 16px 0;
+    color: var(--lg-muted);
+    font-size: 14px;
+    text-align: center;
   }
 
   .shop-book :global(.sr-only) {
@@ -767,8 +702,8 @@
 
   .shop-book :global(.book-paper kbd) {
     padding: 0 3px;
-    color: var(--bk-muted);
-    font: 500 0.6875rem/1 var(--font-ui);
-    box-shadow: inset 0 0 0 1px var(--bk-rule-strong);
+    color: var(--lg-muted);
+    font: 500 11px/1 var(--font-ui);
+    box-shadow: inset 0 0 0 1px var(--lg-line);
   }
 </style>

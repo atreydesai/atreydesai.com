@@ -1,9 +1,10 @@
 /** Hand-drawn cell motifs and orthographic parts. Static turns are cached. */
 import { stackGrid, quantizeTurn, latheSlices, type LatheLayer } from "../../core/sprite-stack.ts";
 import { mixHex } from "../../core/color.ts";
-import { model, block, cut, ellipse, within } from "../../scenery/stacks/orthographic.ts";
+import { model } from "../../scenery/stacks/orthographic.ts";
 import type { ArtRef } from "../content/schema.ts";
 import { INGREDIENT_BY_ID, FAMILIES, MACHINES, RECIPE_BY_ID } from "../content/index.ts";
+import { machineDesign, MODEL_SIZE, SQUASH } from "./machines.ts";
 export const INK = "#302b29",
   PAPER = "#f3e6cb",
   SHADOW = "#65544b";
@@ -282,71 +283,16 @@ export function iconSprite(art: ArtRef) {
 }
 const modelCache = new Map<string, ReturnType<typeof model>>(),
   stackCache = new Map<string, ReturnType<typeof stackGrid> & { palette: Record<string, string> }>();
-export function machineSprite(id: string, tier = 1, turn = 0, working = false) {
+export function machineSprite(id: string, tier = 1, turn = 0, working = false, kit = "") {
   const definition = MACHINES.find((m) => m.id === id) ?? MACHINES[0],
     t = Math.max(1, Math.min(3, tier)),
-    key = id + ":" + t;
+    key = id + ":" + t + ":" + kit;
   let shape = modelCache.get(key);
   if (!shape) {
-    const palette = {
-      a: t === 1 ? "#aa7d68" : t === 2 ? "#a9bab4" : "#c6a15e",
-      b: t === 1 ? "#7d5c50" : t === 2 ? "#6e8c87" : "#8c7149",
-      c: PAPER,
-      d: "#85a6a1",
-      e: INK,
-      g: definition.art.color,
-      r: "#be755e",
-    };
-    const parts = [block(0, 0, 0, 6, 5, 2, ["a", "b"], 1), block(0, 1, 2, 5, 4, 6, ["a", "b", "a"], 1)];
-    if (definition.station === "brew" || id.includes("pot") || id.includes("cooker")) {
-      parts.push(
-        cut(
-          (x, y) => (ellipse(x, y, 4, 4) ? "c" : ""),
-          (y, z) => (Math.abs(y) <= 4 && within(z, 8, 13) ? "a" : ""),
-          (x, z) => (Math.abs(x) <= 4 && within(z, 8, 13) ? "a" : ""),
-          (x, z) => (Math.abs(x) <= 4 && within(z, 8, 13) ? "b" : ""),
-        ),
-      );
-      parts.push(
-        block(0, 0, 14, 4, 4, 1, ["c", "a"], 1),
-        block(0, 0, 15, 1, 1, 2, ["e", "e"]),
-        block(5, 0, 10, 2, 1, 2, ["a", "b"]),
-      );
-    } else if (id.includes("blender") || id.includes("whip") || id.includes("shak")) {
-      parts.push(
-        block(0, 0, 8, 3, 3, 9, ["c", "d"], 1),
-        block(0, 0, 17, 4, 4, 1, ["a", "b"], 1),
-        block(0, 0, 18, 1, 1, 1, ["c", "c"]),
-      );
-    } else if (definition.station === "serve") {
-      parts.push(
-        block(-4, -2, 8, 1, 2, 9, ["a", "b"]),
-        block(0, -2, 17, 6, 3, 2, ["a", "b"]),
-        block(2, 1, 8, 2, 2, 4, ["c", "d"], 1),
-      );
-    } else if (definition.station === "front") {
-      parts.push(
-        block(0, 0, 8, 6, 2, 9, ["a", "b"]),
-        block(0, 3, 10, 5, 1, 5, ["d", "d"]),
-        block(0, 4, 16, 4, 1, 1, ["c", "c"]),
-      );
-    } else if (definition.station === "back") {
-      parts.push(
-        block(0, -3, 8, 6, 1, 11, ["a", "b"]),
-        block(0, 0, 12, 6, 4, 1, ["c", "b"]),
-        block(0, 0, 18, 6, 4, 1, ["c", "b"]),
-      );
-    } else {
-      parts.push(
-        block(0, 0, 8, 5, 4, 3, ["c", "a"], 1),
-        block(0, -3, 11, 5, 1, 5, ["a", "b"]),
-        block(0, 2, 11, 3, 2, 1, ["r", "r"]),
-      );
-    }
-    // Tiers add knobs and a second brass rail instead of just recolouring.
-    for (let i = 0; i < t; i++) parts.push(block(-3 + i * 3, 5, 4, 1, 0, 2, ["e", i === t - 1 ? "g" : "c"]));
-    if (t === 3) parts.push(block(0, -4, 18, 6, 1, 1, ["a", "b"]));
-    shape = model(19, 17, 21, palette, parts);
+    // Each machine's own model (art/machines.ts); its mark is picked by its place among its counter's machines.
+    const index = MACHINES.filter((m) => m.station === definition.station).findIndex((m) => m.id === definition.id);
+    const { parts, palette } = machineDesign(definition.id, t, Math.max(0, index), kit);
+    shape = model(MODEL_SIZE[0], MODEL_SIZE[1], MODEL_SIZE[2], palette, parts);
     modelCache.set(key, shape);
     if (modelCache.size > 192) modelCache.delete(modelCache.keys().next().value!);
   }
@@ -354,7 +300,7 @@ export function machineSprite(id: string, tier = 1, turn = 0, working = false) {
     cacheKey = key + ":" + angle;
   let sprite = stackCache.get(cacheKey);
   if (!sprite) {
-    sprite = { ...stackGrid(shape.slices, { turn: angle, squash: 0.65, outline: "O" }), palette: shape.palette };
+    sprite = { ...stackGrid(shape.slices, { turn: angle, squash: SQUASH, outline: "O" }), palette: shape.palette };
     stackCache.set(cacheKey, sprite);
     if (stackCache.size > 512) stackCache.delete(stackCache.keys().next().value!);
   }

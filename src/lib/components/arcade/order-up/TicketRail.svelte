@@ -1,6 +1,8 @@
 <script lang="ts">
   // The ticket rail: a fixed peg for every ticket the shop can hold, so a
-  // guest arriving never moves the ticket the player is about to press.
+  // guest arriving never moves the ticket the player is about to press. It
+  // stands as a column between the room and the counter, beside the order
+  // slip, where the eye already is during a shift.
   import PixelIcon from "#lib/components/PixelIcon.svelte";
   import { figure } from "#lib/arcade/orders-guests.js";
   import type { Shift, Ticket } from "#lib/arcade/order-up/engine/shift-types.ts";
@@ -49,7 +51,7 @@
         {@const portrait = face(ticket)}
         <button
           type="button"
-          class="guest-ticket"
+          class="guest-ticket ou-arrive"
           class:is-active={shift?.selected === i}
           class:is-leaving={left < 0.3}
           class:is-ready={ticket.cups.every((cup) => cup.ready)}
@@ -71,7 +73,7 @@
                 {#if ticket.cups.every((cup) => cup.ready)}<span class="ready-mark"><Mark kind="check" size={14} /></span>{/if}
               {/if}
             </span>
-            <span class="patience" class:is-quiet={ticket.sleeping} aria-hidden="true"><i style:width={left * 100 + "%"}></i></span>
+            <span class="patience" class:is-quiet={ticket.sleeping} class:ou-urgent={left < 0.25 && !ticket.sleeping && !ticket.cups.every((cup) => cup.ready)} aria-hidden="true"><i style:width={left * 100 + "%"}></i></span>
           </span>
         </button>
       {:else}
@@ -84,10 +86,12 @@
 <style>
   .ticket-wall {
     display: flex;
-    align-items: center;
-    gap: var(--space-3);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     min-width: 0;
-    padding: 6px var(--space-3);
+    min-height: 0;
+    padding: 10px 8px;
     color: #fff0d6;
     background: #392b2b;
     box-shadow: inset 0 3px #966754, inset 0 -4px #211c21, 0 4px #252226;
@@ -103,14 +107,20 @@
 
   .ticket-list {
     display: grid;
-    grid-template-columns: repeat(var(--pegs, 6), minmax(7.5rem, 1fr));
-    grid-auto-flow: column;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: 3.35rem;
+    align-content: start;
     flex: 1 1 auto;
-    gap: var(--space-2);
+    gap: 8px;
     min-width: 0;
-    overflow-x: auto;
-    padding: 4px 2px 6px;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 2px;
     scrollbar-width: none;
+  }
+
+  .rail-label {
+    padding-left: 4px;
   }
 
   .guest-ticket,

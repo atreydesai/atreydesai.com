@@ -13,6 +13,7 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { planks, type Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, FrontBox } from "../types.ts";
+import { cafeTable, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import type { VenueOptions } from "./index.ts";
 import { menuBoard, rail, clock } from "../walls.ts";
@@ -1019,6 +1020,14 @@ function logEnds(cols: number, rows: number, wallH: number) {
 
 export function lodgeVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // The armchair by the stump, and log stools round a table.
+  const sit = seating(
+    {
+      props: [],
+      seats: [{ id: "lodge-armchair", x: 2.8, y: 6.75, face: [0, 1] as [number, number], height: 7, dog: [2.15, 7.1] as [number, number], pieces: ["prop:armchair"] }],
+    },
+    cafeTable("lodge-table", 2.6, 4.3, ["-x", "-y", "+x"], { wood: LOG_D, seat: LOG_L, top: LOG_L, chair: "stump" }),
+  );
   const share = 0.35;
   const wallH = 80;
   return {
@@ -1054,6 +1063,7 @@ export function lodgeVenue(o: VenueOptions): Venue {
       pegs("left", rows - 1.4, 50),
     ],
     props: [
+      ...sit.props,
       fireplaceProp(cols, share),
       urnProp(3.0, 0.05, share),
       logBasketProp(cols - 3, 0.05, share),
@@ -1096,17 +1106,24 @@ export function lodgeVenue(o: VenueOptions): Venue {
         lanternPostProp("out:lamp", cols + 0.9, 4.4),
       ],
     },
-    entry: [cols + 1.5, 6.9],
-    // From the door to the serve counter; a long line waits out in the snow.
+    // Up the trodden path and in at the door over the mat; the line runs down from the serve counter to it.
+    seats: sit.seats,
+    doorway: { wall: "front-right", from: 5, to: 7 },
+    entry: [cols + 3.6, 6.95],
     queue: [
-      [7.5, 3.45],
-      [8.1, 4.3],
-      [8.4, 5.3],
-      [8.6, 6.3],
-      [9.7, 6.5],
-      [10.4, 6.9],
+      [7.5, 3.4],
+      [7.55, 4.15],
+      [7.6, 4.9],
+      [7.65, 5.65],
+      [cols - 0.65, 6.0],
+      [cols + 0.75, 6.35],
     ],
-    pickup: [6.6, 3.2],
+    pickup: [6.75, 3.5],
+    out: [
+      [6.8, 5.2],
+      [cols - 0.7, 6.4],
+      [cols + 0.8, 6.5],
+    ],
     indoorSun: share,
     backHook: logEnds(cols, rows, wallH),
     facade: {

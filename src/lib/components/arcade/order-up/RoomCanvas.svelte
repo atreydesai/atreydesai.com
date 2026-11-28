@@ -7,23 +7,26 @@
   // at full rate only while someone walks and at a dozen frames a second
   // otherwise, and stops when it is off screen or the tab is hidden.
   // Counters are real buttons laid over the art; guests can be clicked too.
+  // Guests who sit down, and the children, friends and dogs with them, idle
+  // (a sip, a turn to a table-mate, a wagging tail) at the slow idle redraw.
   import { onMount } from "svelte";
   import type { Campaign } from "#lib/arcade/orders-campaign.ts";
   import type { Shift } from "#lib/arcade/order-up/engine/shift-types.ts";
   import type { Station } from "#lib/arcade/order-up/content/schema.ts";
-  import { SHOPS, SKILLS } from "#lib/arcade/order-up/content/index.ts";
+  import { SHOPS, SKILLS, DECOR } from "#lib/arcade/order-up/content/index.ts";
   import { calendar } from "#lib/arcade/order-up/engine/calendar.ts";
   import { lightAt, shiftHour, PLANNING_HOUR, type Light } from "#lib/arcade/core/light.ts";
   import { project, unproject } from "#lib/arcade/core/iso.ts";
   import { blit } from "#lib/arcade/core/atlas.ts";
   import { DynamicAtlas } from "#lib/arcade/core/dynamic-atlas.ts";
   import type { AtlasFrame } from "#lib/arcade/core/atlas.ts";
-  import { roomHeight, groundGrid, paintPerson, type PlacedSprite } from "#lib/arcade/order-up/art/room/scene.ts";
+  import { roomHeight, groundGrid, type PlacedSprite } from "#lib/arcade/order-up/art/room/scene.ts";
   import { venueFor } from "#lib/arcade/order-up/art/room/venues/index.ts";
   import { bake, pixelsToCanvas } from "#lib/arcade/order-up/art/room/bake-client.ts";
   import type { BakeJob } from "#lib/arcade/order-up/art/room/bake-job.ts";
   import { createCast, type Walker } from "#lib/arcade/order-up/art/room/actors.ts";
-  import { chefSprite, guestSprite, CARRY } from "#lib/arcade/order-up/art/room/people.ts";
+  import { lookOf, paintLook, leadOf } from "#lib/arcade/order-up/art/room/cast-draw.ts";
+  import { placeDecor } from "#lib/arcade/order-up/art/room/decor.ts";
   import { createFloor } from "#lib/arcade/order-up/art/floor.ts";
   import type { Venue } from "#lib/arcade/order-up/art/room/types.ts";
   import OrderPixelWord from "../OrderPixelWord.svelte";
@@ -59,9 +62,14 @@
   function liveLayout(): Record<string, [number, number]> {
     return (campaign.expansion.shops[shop.id]?.layout ?? shop.layout.counters) as Record<string, [number, number]>;
   }
+  /** The brew kit fitted at this shop, if any. */
+  function kit() {
+    return campaign.expansion.workshop?.brew[shop.id]?.active ?? "";
+  }
+
   function layoutSig() {
     const l = liveLayout();
-    return STATIONS.map((s) => l[s]?.join(",")).join(";") + "|" + JSON.stringify(campaign.expansion.shops[shop.id]?.decor ?? []);
+    return STATIONS.map((s) => l[s]?.join(",")).join(";") + "|" + JSON.stringify(campaign.expansion.shops[shop.id]?.decor ?? []) + "|" + kit();
   }
   const season = $derived(calendar(campaign.day).season.id);
 
@@ -132,6 +140,7 @@
       rows: shop.layout.height,
       layout: Object.fromEntries(STATIONS.filter((s) => liveLayout()[s]).map((s) => [s, [liveLayout()[s][0], liveLayout()[s][1]]])) as Record<string, [number, number]>,
       decor: (campaign.expansion.shops[shop.id]?.decor ?? []).map((d) => ({ ...d })),
+      kit: kit(),
       hour: light.hour,
       season,
       weather,
@@ -234,17 +243,25 @@
   const floor = createFloor();
   let planned = false;
 
+  // The shop's own decor where guests walk: its stools are seats, the rest is in the way. Placed again only when it moves.
+  let decorKey = "";
+  let decorPieces: ReturnType<typeof placeDecor> = { props: [], wall: [], seats: [] };
+  function decorAround() {
+    const placed = campaign.expansion.shops[shop.id]?.decor ?? [];
+    const key = shop.id + JSON.stringify(placed);
+    if (key !== decorKey) {
+      decorKey = key;
+      decorPieces = placeDecor(placed, DECOR, venue.cols, venue.rows, () => hourNow, venue.wallHeight);
+    }
+    return decorPieces;
+  }
+
   function replan() {
     const crew = campaign.expansion.staff
       .filter((p) => p.shop === shop.id && p.rota[(campaign.day - 1) % 7])
       .map((p) => ({ id: p.id, name: p.portrait || p.name, station: p.station }));
-    cast.plan(venue, liveLayout(), station, shift ? floor(shift) : null, crew, !planned || reduced, shop.layout.counters.serve);
+    cast.plan(venue, liveLayout(), station, shift ? floor(shift) : null, crew, !planned || reduced, shop.layout.counters.serve, decorAround());
     planned = true;
-  }
-
-  function spriteFor(w: Walker, step: number) {
-    if (w.role === "chef") return chefSprite(step);
-    return guestSprite(w.name, w.face, step);
   }
 
   // Draw list, reused frame to frame.
@@ -318,19 +335,29 @@
       }
       const w = it.w!;
       const step = reduced ? 0 : cast.frame(w);
-      const sprite = spriteFor(w, step);
-      const key = w.role + "|" + w.name + "|" + w.face + "|" + step + "|" + (w.carrying ? 1 : 0);
+      const look = lookOf(w, step, cast.seatOf(w), cast.people.values(), now / 1000, reduced);
       const share = venue.indoorSun ?? 0.4;
-      const f = people.get(key, 24, 30, 12, 28, (p) =>
-        paintPerson(p, light, { sprite, x: 0, y: 0, carry: w.carrying ? CARRY : undefined }, 12, 28, w.outside ? 1 : share),
-      );
+      const lit = w.outside ? 1 : share;
+      // Drawn unflipped into the cache; the blit mirrors it.
+      const f = people.get(look.key + "|" + lit, 26, 44, 13, 42, (p) => paintLook(p, light, { ...look, flip: false }, 13, 42, lit));
       // Ease the step down onto the ground outside rather than jumping.
       const out = Math.max(0, Math.min(1, Math.max(w.y - venue.rows, w.x - venue.cols, -w.x, -w.y) / 0.6));
       const at = project(room.grid, w.x, w.y);
-      if (f) blit(ctx, people.canvas, f, at.x, at.y + slab * out, w.flip);
+      if (f) blit(ctx, people.canvas, f, at.x, at.y + slab * out, look.flip);
+      // A dog's lead, back to its guest's hand.
+      const owner = w.role === "dog" ? cast.people.get(w.owner) : undefined;
+      if (owner && owner.pose !== "sit") {
+        const ot = project(room.grid, owner.x, owner.y);
+        const oo = Math.max(0, Math.min(1, Math.max(owner.y - venue.rows, owner.x - venue.cols, -owner.x, -owner.y) / 0.6));
+        const [x0, y0, x1, y1] = leadOf({ x: at.x, y: at.y + slab * out, flip: look.flip }, { x: ot.x, y: ot.y + slab * oo, flip: owner.flip, lift: 0 });
+        ctx.fillStyle = "#3a2c2c";
+        const n = Math.max(1, Math.round(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))));
+        // It sags a little between the two.
+        for (let k = 0; k <= n; k++) ctx.fillRect(Math.round(x0 + ((x1 - x0) * k) / n), Math.round(y0 + ((y1 - y0) * k) / n + Math.sin((k / n) * Math.PI) * 2), 1, 1);
+      }
       if (w.slot >= 0 && w.slot === selected) {
         ctx.fillStyle = "#ffe3a5";
-        const bob = reduced ? 0 : Math.round(Math.sin(now / 220));
+        const bob = (reduced ? 0 : Math.round(Math.sin(now / 220))) - look.lift;
         ctx.fillRect(Math.round(at.x) - 2, Math.round(at.y + slab * out) - 31 + bob, 5, 1);
         ctx.fillRect(Math.round(at.x) - 1, Math.round(at.y + slab * out) - 30 + bob, 3, 1);
         ctx.fillRect(Math.round(at.x), Math.round(at.y + slab * out) - 29 + bob, 1, 1);
@@ -373,8 +400,9 @@
     }
   }
 
-  function onClick(event: MouseEvent) {
-    if (!canvas || !layers || paused) return;
+  /** The ticket slot of the guest drawn under a click, front-most first, or -1. */
+  function guestAt(event: MouseEvent) {
+    if (!canvas || !layers) return -1;
     const r = canvas.getBoundingClientRect();
     const x = ((event.clientX - r.left) / r.width) * layers.room.width;
     const y = ((event.clientY - r.top) / r.height) * layers.room.height;
@@ -384,11 +412,18 @@
       const out = Math.max(0, Math.min(1, Math.max(w.y - venue.rows, w.x - venue.cols, -w.x, -w.y) / 0.6));
       const at = project(layers.room.grid, w.x, w.y);
       at.y += slab * out;
-      if (Math.abs(x - at.x) < 7 && y < at.y + 2 && y > at.y - 26) {
-        chooseTicket(w.slot);
-        return;
-      }
+      if (Math.abs(x - at.x) < 7 && y < at.y + 2 && y > at.y - 26) return w.slot;
     }
+    return -1;
+  }
+
+  function onClick(event: MouseEvent) {
+    if (!canvas || !layers || paused) return;
+    const slot = guestAt(event);
+    if (slot >= 0) return chooseTicket(slot);
+    const r = canvas.getBoundingClientRect();
+    const x = ((event.clientX - r.left) / r.width) * layers.room.width;
+    const y = ((event.clientY - r.top) / r.height) * layers.room.height;
     const q = unproject(layers.room.grid, x, y + (venue.counter.height ?? 15) / 2);
     const layout = liveLayout();
     for (const s of STATIONS) {
@@ -504,7 +539,12 @@
         style:height="{sign.h}%"
         style:clip-path={sign.clip}
         style:z-index={1 + Math.round(sign.depth)}
-        onclick={() => choose(sign.id)}
+        onclick={(event) => {
+          // A guest standing in front of a counter is picked before the counter behind them.
+          const slot = paused ? -1 : guestAt(event);
+          if (slot >= 0) chooseTicket(slot);
+          else choose(sign.id);
+        }}
       ></button>
       <span class="sign" class:is-here={station === sign.id} aria-hidden="true" style:left="{sign.lx}%" style:top="{sign.ly}%">
         <OrderPixelWord text={NAMES[sign.id]} cells={1} />

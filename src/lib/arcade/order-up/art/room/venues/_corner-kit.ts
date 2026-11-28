@@ -10,10 +10,11 @@ import { mixHex } from "../../../../core/color.ts";
 import { isoBox, project, faceLight, type IsoGrid } from "../../../../core/iso.ts";
 import type { Light } from "../../../../core/light.ts";
 import { Painter, noise } from "../../../../core/painter.ts";
-import type { PropSpec, WallPlace } from "../types.ts";
+import type { PropSpec, WallPlace, Venue } from "../types.ts";
 import { ground as groundSurface } from "../surfaces.ts";
 import { word, wordWidth, bigWord, bigWidth } from "../font.ts";
 import { INK, treeProp } from "../props.ts";
+import { FRONT_WALL_BIAS } from "../scene.ts";
 
 export { INK };
 export const CREAM = "#fff1dd";
@@ -558,17 +559,18 @@ export function frontWallProps(prefix: string, cols: number, rows: number, s: Fr
     w: 0.24,
     d: 0.24,
     height: s.height + 6,
+    depthBias: FRONT_WALL_BIAS,
     draw(p, g, light) {
       isoBox(p, g, light, 0.02, 0.02, 0.2, 0.2, s.height + 3, { top: s.cap, left: s.post ?? s.color, right: mixHex(s.post ?? s.color, INK, 0.2) }, 0, 0.6);
     },
   });
   for (let k = 0; k < rows; k++) {
     if (s.gapsRight?.includes(k)) continue;
-    out.push({ key: prefix + ":fr", x: cols - t, y: k, w: t, d: 1, height: s.height + 4, draw: seg("x") });
+    out.push({ key: prefix + ":fr", x: cols - t, y: k, w: t, d: 1, height: s.height + 4, depthBias: FRONT_WALL_BIAS, draw: seg("x") });
   }
   for (let k = 0; k < cols; k++) {
     if (s.gapsLeft?.includes(k)) continue;
-    out.push({ key: prefix + ":fl", x: k, y: rows - t, w: 1, d: t, height: s.height + 4, draw: seg("y") });
+    out.push({ key: prefix + ":fl", x: k, y: rows - t, w: 1, d: t, height: s.height + 4, depthBias: FRONT_WALL_BIAS, draw: seg("y") });
   }
   if (s.post) {
     const posts = new Set<string>();
@@ -590,6 +592,35 @@ export function frontWallProps(prefix: string, cols: number, rows: number, s: Fr
     }
   }
   return out;
+}
+
+/**
+ * How guests use a shop whose door is the gap at the near corner of its
+ * right front wall, with the serve counter at (cols - 2, 2) at the end of a
+ * line of counters along the back: in through the gap, up a line straight
+ * down from the counter (spilling out of the door when the room is short),
+ * pickup in front of the counter beside it, and out past the line.
+ */
+export function cornerDoorRoute(cols: number, rows: number): Pick<Venue, "doorway" | "entry" | "way" | "queue" | "pickup" | "out"> {
+  const x = cols - 1.5;
+  const queue: [number, number][] = [];
+  for (let y = 3.4; y <= rows - 0.6 + 1e-9 && queue.length < 5; y += 0.75) queue.push([x, y]);
+  // The last place indoors is in the doorway itself, then the pavement.
+  queue.push([cols - 0.65, rows - 0.55]);
+  for (let k = 0; queue.length < 6; k++) queue.push([cols + 0.75 + 0.8 * k, rows - 0.5]);
+  const outside = queue[queue.length - 1][0] > cols;
+  return {
+    doorway: { wall: "front-right", from: rows - 1, to: rows },
+    entry: [cols + 2.4, rows - 0.5],
+    way: outside ? [] : [[cols + 0.7, rows - 0.5]],
+    queue,
+    pickup: [cols - 2.25, 3.5],
+    out: [
+      [cols - 2.25, rows - 0.95],
+      [cols - 0.7, rows - 0.5],
+      [cols + 0.7, rows - 0.5],
+    ],
+  };
 }
 
 /**

@@ -401,7 +401,7 @@ function bakeBackground(v: Venue, light: Light, outdoor: Light, width: number, g
           }
           const view = v.outside.view(t * HW + (wall === "left" ? 1000 : 0), fromSill / (win.top - win.sill), outdoor, wall, win.top - win.sill);
           const glare = (along + fromSill * 1.4) % 46;
-          const c = glare < 5 && b < 0.5 ? mixHex(view, "#ffffff", 0.22 * (1 - outdoor.night * 0.7)) : view;
+          const c = glare < 5 && b < 0.5 && !win.open ? mixHex(view, "#ffffff", 0.22 * (1 - outdoor.night * 0.7)) : view;
           buf.set(sx, sy, packColor(c));
           continue;
         }
@@ -536,7 +536,7 @@ export function bakeRoom({ venue, light, outdoor, width, props }: BakeInput): Ba
     const at = project(outsideKeys.has(spec.key) ? gg : g, spec.x, spec.y);
     const w = spec.w ?? 1;
     const d = spec.d ?? 1;
-    return { key: spec.key, x: at.x, y: at.y, depth: spec.flat ? -1e6 + spec.x + spec.y : spec.x + w - 0.5 + (spec.y + d - 0.5), flat: spec.flat };
+    return { key: spec.key, x: at.x, y: at.y, depth: spec.flat ? -1e6 + spec.x + spec.y : spec.x + w - 0.5 + (spec.y + d - 0.5) + (spec.depthBias ?? 0), flat: spec.flat };
   });
 
   const height = roomHeight(venue);
@@ -557,8 +557,15 @@ export function bakeRoom({ venue, light, outdoor, width, props }: BakeInput): Ba
   return { width, height, grid: g, light, background: buffer, overhead, atlas, frames, sprites, silhouette, horizon };
 }
 
+/**
+ * How much later than its footprint a low front wall sorts among the people:
+ * half a tile, so someone standing just inside it is drawn behind it and
+ * someone just outside in front.
+ */
+export const FRONT_WALL_BIAS = 0.5;
+
 /** Low cut-away walls along the room's two open edges, one sprite a tile, gaps left open. */
-function frontWalls(v: Venue): PropSpec[] {
+export function frontWalls(v: Venue): PropSpec[] {
   const f = v.front;
   if (!f) return [];
   const out: PropSpec[] = [];
@@ -572,6 +579,7 @@ function frontWalls(v: Venue): PropSpec[] {
       w: t,
       d: 1,
       height: f.height + 4,
+      depthBias: FRONT_WALL_BIAS,
       draw(p, g, light) {
         isoBox(p, g, light, 0, 0, t, 1, f.height, { top: f.cap, left: f.color, right: f.color }, 0, 0.6);
         if (f.stripe) isoBox(p, g, light, t, 0, 0.001, 1, f.stripe[1], { top: f.stripe[0], left: f.stripe[0], right: f.stripe[0], ink: "", lip: false }, f.stripe[2], 0.6);
@@ -587,6 +595,7 @@ function frontWalls(v: Venue): PropSpec[] {
       w: 1,
       d: t,
       height: f.height + 4,
+      depthBias: FRONT_WALL_BIAS,
       draw(p, g, light) {
         isoBox(p, g, light, 0, 0, 1, t, f.height, { top: f.cap, left: f.color, right: f.color }, 0, 0.6);
         if (f.stripe) isoBox(p, g, light, 0, t, 1, 0.001, f.stripe[1], { top: f.stripe[0], left: f.stripe[0], right: f.stripe[0], ink: "", lip: false }, f.stripe[2], 0.6);

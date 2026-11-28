@@ -28,7 +28,7 @@
   } from "#lib/sfx.ts";
   import type { Campaign, CampaignMode } from "#lib/arcade/orders-campaign.ts";
   import { money } from "#lib/arcade/orders-display.ts";
-  import { beforeImportKey, slotKey, unreadableKey, type SlotId } from "#lib/arcade/order-up/engine/slots.ts";
+  import { beforeImportKey, clearSlot, slotKey, unreadableKey, type SlotId } from "#lib/arcade/order-up/engine/slots.ts";
   import { beltShows } from "#lib/arcade/order-up/engine/opened.ts";
   import {
     addCash,
@@ -58,6 +58,10 @@
     selectedTicket,
     activeCup,
     selectTicket,
+    followTicket,
+    pickTicket,
+    pickCup,
+    satisfaction,
     inspectUsual,
     wakeGuest,
     feedCat,
@@ -65,7 +69,7 @@
     type Shift,
     type Receipt,
   } from "#lib/arcade/order-up/engine/shift.ts";
-  import { rememberUsual, acceptChange, keepOriginal } from "#lib/arcade/order-up/engine/guest-actions.ts";
+  import { rememberUsual, acceptChange, keepOriginal, offerGardenFeature } from "#lib/arcade/order-up/engine/guest-actions.ts";
   import { loadEnvelope, newShop, parseSave, saveEnvelope, type LoadedSave } from "#lib/arcade/order-up/engine/save.ts";
   import { command } from "#lib/arcade/order-up/engine/commands.ts";
   import { calendar } from "#lib/arcade/order-up/engine/calendar.ts";
@@ -151,6 +155,12 @@
 
   $: today = calendar(campaign.day);
   $: active = shift ? selectedTicket(shift) : null;
+  $: report = campaign.expansion.lastReport;
+  $: happy = shift
+    ? satisfaction(shift.points, shift.receipts.length, shift.lost)
+    : report
+      ? satisfaction(report.points, report.served, report.lost)
+      : null;
   $: cup = active ? activeCup(active) : null;
   $: remaining = shift ? Math.max(0, Math.ceil(shift.duration - shift.elapsed)) : 0;
   $: clock = Math.floor(remaining / 60) + ":" + String(remaining % 60).padStart(2, "0");
@@ -171,6 +181,8 @@
   $: pegs = shift?.tickets.length ?? ticketLimit(campaign.day);
 
   function refresh() {
+    // The counter shown is always the one the chef stands at; the engine walks them on its own.
+    if (shift) station = shift.chefStation;
     campaign = campaign;
     shift = shift;
     activity = activity;
@@ -418,7 +430,7 @@
     if (!ticket) return;
     if (ticket.sleeping) {
       wakeGuest(shift);
-      say(shift.notice);
+      followTicket(campaign, shift);
       refresh();
       return;
     }
@@ -459,7 +471,11 @@
       if (item.run && !lesson && definition.input === "hold" && item.warmup <= 0 && hold) runAction({ type: "down" });
       return;
     }
-    if (definition.input === "hold" && hold) runAction({ type: "down" });
+    // A mastered step finishes in one press; the toppings' Done closes the pick; a choice is made on its own keys.
+    if (item.run.variant === "quick") runAction({ type: "quick" });
+    else if (definition.input === "pick") runAction({ type: "done" });
+    else if (definition.input === "knob") return;
+    else if (definition.input === "hold" && hold) runAction({ type: "down" });
     else if (definition.input !== "hold") runAction({ type: "press" });
   }
 
@@ -473,6 +489,13 @@
     if (name === "remember") rememberUsual(campaign, shift, id);
     else if (name === "accept") acceptChange(campaign, shift);
     else if (name === "keep") keepOriginal(campaign, shift);
+    else if (name === "offer") {
+      const slot = Number(id);
+      const at = Number.isInteger(slot) && id !== "" ? slot : shift.selected;
+      // The guest who said yes comes up at the counter, so the slip shows their house tea.
+      if (offerGardenFeature(campaign, shift, at)) pickTicket(campaign, shift, at);
+    }
+    followTicket(campaign, shift);
     say(shift.notice);
     refresh();
     save();
@@ -492,9 +515,8 @@
   }
 
   function receiptLine(name: string, got: Receipt[]) {
-    const grade = Math.round(got.reduce((n, r) => n + r.grade, 0) / got.length);
     const paid = got.reduce((n, r) => n + r.price + r.tip, 0);
-    return `${name} paid ${money(paid)} for a ${grade}-point ${got.length > 1 ? "order" : "drink"}.`;
+    return `${name} paid ${money(paid)}.`;
   }
 
   function chooseStation(id: string) {
@@ -505,8 +527,7 @@
   }
 
   function chooseTicket(slot: number) {
-    if (!shift || !shift.tickets[slot]) return;
-    shift.selected = slot;
+    if (!shift || blocking || !pickTicket(campaign, shift, slot)) return;
     refresh();
   }
 
@@ -822,8 +843,24 @@
         if (shift) result = addShiftTime(shift);
         break;
       case "end":
-        if (shift) result = endShiftNow(shift);
+        // Closes the day straight away, as the clock running out and the last guest leaving would.
+        if (shift) {
+          result = endShiftNow(shift);
+          closeDay();
+        }
         break;
+      case "reset":
+        // The test kitchen starts over: its save is cleared and a new shop opens on day 1.
+        clearSlot(window.localStorage, slot, mode);
+        shift = null;
+        activity = null;
+        view = "room";
+        read(mode);
+        bookOpen = true;
+        bookTab = "test";
+        say("The test kitchen starts over on day 1.");
+        refresh();
+        return;
       case "view": {
         // Straight there, whatever day it would open on.
         const definition = VIEWS.find((v) => v.id === data.value);
@@ -894,7 +931,10 @@
     }
     if (event.key === "[" || event.key === "]") {
       event.preventDefault();
-      if (shift && selectTicket(shift, event.key === "[" ? -1 : 1)) refresh();
+      if (shift && selectTicket(shift, event.key === "[" ? -1 : 1)) {
+        followTicket(campaign, shift);
+        refresh();
+      }
       return;
     }
     if (/^[1-5]$/.test(key)) {
@@ -1084,11 +1124,14 @@
           >Till <strong><span class="sr-only">{money(campaign.cash)}</span><OrderPixelWord text={money(campaign.cash)} cells={1.5} /></strong
           ></span
         >
-        <button type="button" class="shop-points" onclick={openReceipts} aria-label="Points and receipts">
-          <span>Points</span>
-          <strong
-            ><OrderPixelWord text={String(shift?.points ?? campaign.expansion.lastReport?.points ?? 0)} cells={1.5} /></strong
-          >
+        <button type="button" class="shop-points" onclick={openReceipts} aria-label="Satisfaction and receipts">
+          <span>Satisfied</span>
+          {#key happy}<strong class:ou-gain={happy !== null}
+              ><span class="sr-only">{happy === null ? "no guests yet" : happy + " percent"}</span><OrderPixelWord
+                text={happy === null ? "-" : happy + "%"}
+                cells={1.5}
+              /></strong
+            >{/key}
         </button>
       </div>
       <div class="shop-controls">
@@ -1109,7 +1152,6 @@
     </header>
 
     <main class="shop-content">
-      <TicketRail {shift} {pegs} {mode} select={chooseTicket} />
       <div class="play-area">
         <WorldView
           {campaign}
@@ -1128,6 +1170,7 @@
           action={doAction}
           {arrangeFocus}
         />
+        <TicketRail {shift} {pegs} {mode} select={chooseTicket} />
         <SkillPanel
           {campaign}
           {shift}
@@ -1140,16 +1183,13 @@
           {guestAction}
           inspect={() => doAction("inspect")}
           cupSelect={(index) => {
-            if (active) {
-              active.cupIndex = index;
-              refresh();
-            }
+            if (shift && !blocking && pickCup(campaign, shift, index)) refresh();
           }}
         />
       </div>
       <footer class="tool-belt" aria-label="Tool belt">
         <button type="button" class="boba-key belt-book" onclick={() => showBook("today")}>
-          Book
+          Ledger
         </button>
         <div class="power-keys">
           {#each belt as power, i (i)}
@@ -1180,7 +1220,7 @@
   </div>
 
   {#if notice && noticeAge < 4 && !bookOpen && !paused}
-    <p class="toast boba-chip" aria-hidden="true">{notice}</p>
+    {#key notice}<p class="toast boba-chip ou-arrive" aria-hidden="true">{notice}</p>{/key}
   {/if}
   {#if storageWarning}
     <button type="button" class="storage-warning boba-key" onclick={exportSave}>{storageWarning}</button>
@@ -1203,7 +1243,7 @@
       bind:this={pauseCard}
       pixel
       resumeLabel="Resume shift"
-      menuLabel="Shop book"
+      menuLabel="Ledger"
       on:resume={() => void resume()}
       on:menu={() => showBook("today")}
       on:exit={() => exit()}
@@ -1476,16 +1516,17 @@
 
   .shop-content {
     display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: var(--space-3);
     width: min(calc(100% - 2rem), 92rem);
     min-height: 0;
     margin: var(--space-3) auto max(var(--space-3), env(safe-area-inset-bottom));
   }
 
+  /* The room, the tickets beside the counter, and the counter. */
   .play-area {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(19rem, 1fr);
+    grid-template-columns: minmax(0, 1.75fr) 11rem minmax(19rem, 1fr);
     gap: var(--space-3);
     min-height: 0;
   }
@@ -1702,7 +1743,7 @@
     }
 
     .play-area {
-      grid-template-columns: minmax(0, 1.25fr) minmax(17rem, 1fr);
+      grid-template-columns: minmax(0, 1.5fr) 10rem minmax(17rem, 1fr);
     }
   }
 

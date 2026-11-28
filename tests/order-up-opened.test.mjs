@@ -153,3 +153,15 @@ test("opened: the test kitchen's day jump brings the opening crates of every day
   jumpToDay(c, 5);
   for (const id of ["jasmine", "taro", "oat", "pudding"]) assert.ok(stock(c, id) > 0, id);
 });
+
+test("suppliers: the night freight wins for what sells fast, the co-op for what sells steadily, neither for everything", () => {
+  // Cost of each unit actually used before it spoils, in units of the base price.
+  const cost = (offer, life, perDay) => (offer.quantity * offer.factor) / Math.min(offer.quantity, perDay * (life + offer.life));
+  const best = (life, perDay) => [...SUPPLIER_OFFERS].sort((a, b) => cost(a, life, perDay) - cost(b, life, perDay))[0].id;
+  assert.equal(best(3, 8), "wholesaler", "a fast seller that spoils quickly");
+  assert.equal(best(7, 2), "cooperative", "a steady seller that keeps a week");
+  assert.equal(best(3, 4), "cooperative", "a middling seller that spoils quickly");
+  assert.equal(best(3, 1), "market", "a slow seller that spoils quickly");
+  const co = SUPPLIER_OFFERS.find((o) => o.id === "cooperative");
+  assert.ok(co.quantity > SUPPLIER_OFFERS.find((o) => o.id === "wholesaler").quantity && co.life >= 5, "bigger crates that keep longer");
+});

@@ -15,6 +15,7 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { panels, grating, type Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, FrontBox } from "../types.ts";
+import { cafeTable, windowBar, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import type { VenueOptions } from "./index.ts";
 import { menuBoard, clock } from "../walls.ts";
@@ -785,6 +786,11 @@ function adrift(p: Painter, g: IsoGrid, light: Light) {
 
 export function moonVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // A round table for three, and stools at the window onto the plain.
+  const sit = seating(
+    cafeTable("moon-table", 2.2, 4.6, ["-x", "-y", "+x"], { wood: BLUE, seat: TRIM, top: PANEL, metal: "#8d929a" }),
+    windowBar("moon-bar", "front-left", 1.2, 4.2, 2, { cols, rows, wall: 18 }, { wood: BLUE, seat: PINK, top: PANEL, metal: "#8d929a" }),
+  );
   const share = 0.3;
   const port = { sill: 30, top: 59, width: 1.2 };
   const holes = [
@@ -822,6 +828,7 @@ export function moonVenue(o: VenueOptions): Venue {
       handhold("right", 1.05, 26),
     ],
     props: [
+      ...sit.props,
       airlockProp(cols, share),
       tanksProp(share),
       hydroProp(share),
@@ -861,17 +868,24 @@ export function moonVenue(o: VenueOptions): Venue {
       ],
     },
     // In through the airlock and down the serve counter's open side, clear of it both ways.
-    entry: [cols - 0.7, 0.8],
+    // Out of the airlock's door, the line back up toward it; out again down the far side of the line.
+    seats: sit.seats,
+    doorway: { wall: "right", from: cols - 1.55, to: cols - 0.45 },
+    entry: [cols - 1.0, 0.8],
     queue: [
-      [7.45, 2.5],
-      [7.4, 3.4],
-      [7.3, 4.3],
-      [7.2, 5.2],
-      [7.6, 5.95],
-      [6.9, 6.4],
+      [5.5, 3.4],
+      [6.2, 3.55],
+      [6.85, 3.25],
+      [6.85, 2.5],
+      [6.85, 1.75],
+      [6.85, 1.05],
     ],
-    // Ready guests fan out toward +x from here; the right wall stops the fan at three.
-    pickup: [7.0, 1.4],
+    pickup: [4.75, 3.5],
+    out: [
+      [5.2, 4.4],
+      [7.45, 4.2],
+      [7.45, 1.2],
+    ],
     indoorSun: share,
     overhead: adrift,
     facade: {

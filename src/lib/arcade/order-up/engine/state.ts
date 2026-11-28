@@ -12,6 +12,10 @@ import {
   BADGES,
   GOALS,
 } from "../content/index.ts";
+import { BREW_MODS, WORKSHOP_PARTS, type BrewModId, type WorkshopParts } from "../content/upgrades.ts";
+import type { TreeNodeId } from "../content/progression-trees.ts";
+import { genericNode } from "./tree-nodes.ts";
+import { TREE_NODES } from "../content/progression-trees.ts";
 export const STATIONS: readonly Station[] = ["brew", "prep", "build", "serve", "stock"];
 export interface ExtraLot {
   id: number;
@@ -28,6 +32,19 @@ export interface MachineState {
   rotation: number;
   automatic: boolean;
   broken: boolean;
+}
+export interface WorkshopState {
+  brewBench: boolean;
+  parts: WorkshopParts;
+  brew: Record<string, { unlocked: BrewModId[]; active: BrewModId | null } | undefined>;
+}
+export interface GardenFeatureState {
+  sampleUntil: number;
+  developed: boolean;
+  calibratedMachine: string | null;
+  trainedStaff: string | null;
+  listed: boolean;
+  lastOfferDay: number;
 }
 export interface StaffState {
   id: string;
@@ -74,6 +91,7 @@ export interface Shipment {
   expiresOn: number;
 }
 export interface Route {
+  priority?: true;
   to: string;
   ingredient: string;
   quantity: number;
@@ -88,6 +106,9 @@ export interface ExpansionState {
   shops: Record<string, ShopState>;
   extraInventory: ExtraLot[];
   machines: Record<string, MachineState>;
+  workshop: WorkshopState;
+  treeNodes: Record<string, TreeNodeId[] | undefined>;
+  gardenFeature: GardenFeatureState;
   staff: StaffState[];
   loadout: string[];
   powerups: Record<string, number>;
@@ -188,6 +209,67 @@ const counts = (x: unknown, allowed?: readonly { id: string }[]) =>
       )
       .map(([k, v]) => [k, integer(v)]),
   );
+function normalizeWorkshop(value: unknown, shops: readonly string[]): WorkshopState {
+  const saved = object(value);
+  const workshop: WorkshopState = { brewBench: saved.brewBench === true, parts: {}, brew: {} };
+  if (!workshop.brewBench) return workshop;
+  for (const { id } of WORKSHOP_PARTS) {
+    const quantity = integer(object(saved.parts)[id]);
+    if (quantity) workshop.parts[id] = quantity;
+  }
+  for (const id of shops) {
+    const entry = object(object(saved.brew)[id]);
+    const unlocked = BREW_MODS.filter((mod) => list(entry.unlocked).includes(mod.id)).map((mod) => mod.id);
+    if (unlocked.length)
+      workshop.brew[id] = { unlocked, active: unlocked.find((mod) => mod === entry.active) ?? null };
+  }
+  return workshop;
+}
+
+function normalizeTreeNodes(value: unknown, shops: readonly string[]): ExpansionState["treeNodes"] {
+  const result: ExpansionState["treeNodes"] = {};
+  for (const shop of shops) {
+    const local = list(object(value)[shop]);
+    const groups = new Set<string>();
+    const nodes: TreeNodeId[] = [];
+    for (const id of local.slice(0, TREE_NODES.length)) {
+      const node = TREE_NODES.find((item) => item.id === id);
+      if (!node || !genericNode(node.id) || groups.has(node.group)) continue;
+      groups.add(node.group);
+      nodes.push(node.id);
+    }
+    const qualified = new Set<TreeNodeId>();
+    for (const node of [...TREE_NODES].sort((a, b) => a.day - b.day))
+      if (nodes.includes(node.id) && node.requires.every((id) => !genericNode(id) || qualified.has(id)))
+        qualified.add(node.id);
+    const installed = nodes.filter((id) => qualified.has(id));
+    if (installed.length) result[shop] = installed;
+  }
+  return result;
+}
+function blankGardenFeature(): GardenFeatureState {
+  return { sampleUntil: 0, developed: false, calibratedMachine: null, trainedStaff: null, listed: false, lastOfferDay: 0 };
+}
+
+function normalizeGardenFeature(
+  value: unknown,
+  machines: Record<string, MachineState>,
+  staff: readonly StaffState[],
+  shops: readonly string[],
+): GardenFeatureState {
+  const saved = object(value);
+  const state = blankGardenFeature();
+  if (!shops.includes("garden")) return state;
+  state.sampleUntil = integer(saved.sampleUntil);
+  state.developed = saved.developed === true;
+  if (!state.developed) return state;
+  const key = text(saved.calibratedMachine, "", 120);
+  if (Object.hasOwn(machines, key)) state.calibratedMachine = key;
+  state.trainedStaff = staff.find((person) => person.id === saved.trainedStaff)?.id ?? null;
+  state.listed = saved.listed === true && !!state.calibratedMachine && !!state.trainedStaff;
+  state.lastOfferDay = integer(saved.lastOfferDay);
+  return state;
+}
 export function emptyShop(id: string): ShopState {
   const definition = SHOPS.find((s) => s.id === id) ?? SHOPS[0];
   return {
@@ -252,6 +334,9 @@ export function initialExpansion(legacy: LegacySnapshot = {}): ExpansionState {
     shops: Object.fromEntries(branches.map((id) => [id, emptyShop(id)])),
     extraInventory: [],
     machines,
+    workshop: normalizeWorkshop(null, branches),
+    treeNodes: {},
+    gardenFeature: blankGardenFeature(),
     staff,
     loadout: ["rush", "patience", "quality", "assist", "supplies"],
     powerups: Object.fromEntries(POWERUPS.map((p) => [p.id, integer(object(legacy.powerups)[p.id])])),
@@ -299,6 +384,100 @@ export function initialExpansion(legacy: LegacySnapshot = {}): ExpansionState {
     notice: "",
   };
 }
+/**
+ * Moves any counter a saved layout puts where it can't stand (a doorway, the
+ * guests' way in and out, under something the shop stands on its floor:
+ * the shop's `blocked` tiles) or on another counter: back to its default
+ * place when that is free, otherwise the nearest free floor tile.
+ */
+export function settleLayout(layout: Record<Station, [number, number]>, shop: FloorPlan & { counters: Record<Station, [number, number]> }) {
+  const taken = new Set<number>();
+  const free = (x: number, y: number) => x >= 0 && y >= 0 && x < shop.width && y < shop.height && !shop.blocked.includes(y * shop.width + x) && !taken.has(y * shop.width + x);
+  // Counters already on free floor keep their place; the rest move, in station order.
+  const moving: Station[] = [];
+  for (const station of STATIONS) {
+    const [x, y] = layout[station];
+    if (free(x, y)) taken.add(y * shop.width + x);
+    else moving.push(station);
+  }
+  for (const station of moving) {
+    const [dx, dy] = shop.counters[station];
+    const [x0, y0] = layout[station];
+    let best: [number, number] | null = free(dx, dy) ? [dx, dy] : null;
+    for (let r = 1; !best && r < shop.width + shop.height; r++)
+      for (let y = 0; y < shop.height && !best; y++)
+        for (let x = 0; x < shop.width && !best; x++) if (Math.abs(x - x0) + Math.abs(y - y0) === r && free(x, y)) best = [x, y];
+    if (!best) continue;
+    layout[station] = best;
+    taken.add(best[1] * shop.width + best[0]);
+  }
+  return layout;
+}
+
+type FloorPlan = { width: number; height: number; blocked: readonly number[] };
+
+/**
+ * Each shop's counters as the first release placed them, scattered round the
+ * room. A save that still holds exactly these was never arranged, so it opens
+ * on today's row along the back wall instead.
+ */
+const FORMER_COUNTERS: Record<string, Record<Station, [number, number]>> = {
+  corner: { brew: [1, 1], prep: [1, 5], build: [4, 3], serve: [6, 1], stock: [4, 0] },
+  campus: { brew: [1, 1], prep: [1, 4], build: [3, 3], serve: [5, 1], stock: [3, 0] },
+  garden: { brew: [1, 1], prep: [1, 6], build: [4, 4], serve: [7, 1], stock: [4, 0] },
+  night: { brew: [1, 1], prep: [1, 3], build: [3, 2], serve: [4, 1], stock: [3, 0] },
+  station: { brew: [1, 1], prep: [1, 4], build: [5, 3], serve: [8, 1], stock: [5, 0] },
+  harbor: { brew: [1, 1], prep: [1, 5], build: [4, 3], serve: [7, 1], stock: [4, 0] },
+  loft: { brew: [1, 1], prep: [1, 6], build: [4, 4], serve: [6, 1], stock: [4, 0] },
+  truck: { brew: [1, 1], prep: [1, 2], build: [3, 2], serve: [4, 2], stock: [3, 0] },
+  boardwalk: { brew: [1, 1], prep: [1, 4], build: [4, 3], serve: [6, 1], stock: [4, 0] },
+  lodge: { brew: [2, 2], prep: [1, 5], build: [5, 4], serve: [7, 2], stock: [5, 0] },
+  commissary: { brew: [1, 1], prep: [1, 6], build: [5, 4], serve: [9, 1], stock: [5, 0] },
+  moon: { brew: [2, 1], prep: [1, 4], build: [4, 4], serve: [6, 2], stock: [4, 0] },
+};
+
+/**
+ * A floor tile for a piece of decor: `want` when it is free, otherwise the
+ * nearest free one. Free is on the floor off the back walls' line, off the
+ * shop's blocked tiles (its doorway and the guests' way through it) and its
+ * counters, and, while there is room, off the tiles the counters' workers
+ * stand on (behind a counter, or in front of one against the back wall) and
+ * not under another piece.
+ */
+export function freeDecorTile(want: [number, number], layout: Record<Station, [number, number]>, decor: readonly { x: number; y: number }[], shop: FloorPlan): [number, number] {
+  const w = shop.width;
+  const counters = Object.values(layout);
+  const tiers = [
+    [...shop.blocked, ...counters.map(([x, y]) => y * w + x)],
+    counters.map(([x, y]) => (y >= 1 ? y - 1 : 1) * w + x),
+    decor.map((p) => p.y * w + p.x),
+  ];
+  // Give up the softer rules (another piece's tile, then a worker's) only when the floor is full.
+  for (let keep = tiers.length; keep >= 1; keep--) {
+    const used = new Set(tiers.slice(0, keep).flat());
+    const free = (x: number, y: number) => x >= 1 && y >= 1 && x < w && y < shop.height && !used.has(y * w + x);
+    if (free(want[0], want[1])) return want;
+    for (let r = 1; r < w + shop.height; r++)
+      for (let y = 1; y < shop.height; y++) for (let x = 1; x < w; x++) if (Math.abs(x - want[0]) + Math.abs(y - want[1]) === r && free(x, y)) return [x, y];
+  }
+  return want;
+}
+
+/**
+ * Moves saved decor standing on a counter or a blocked tile to the nearest
+ * free floor. Pieces on the back walls' line are left where they are: those
+ * hang on the wall.
+ */
+export function settleDecor(decor: Placement[], layout: Record<Station, [number, number]>, shop: FloorPlan) {
+  const w = shop.width;
+  const counters = new Set(Object.values(layout).map(([x, y]) => y * w + x));
+  decor.forEach((p, i) => {
+    if (p.x <= 0 || p.y <= 0 || (!shop.blocked.includes(p.y * w + p.x) && !counters.has(p.y * w + p.x))) return;
+    [p.x, p.y] = freeDecorTile([p.x, p.y], layout, decor.filter((_, k) => k !== i), shop);
+  });
+  return decor;
+}
+
 /** Normalization is deliberately bounded. An invalid field never erases the rest of a save. */
 export function normalizeExpansion(value: unknown, legacy: LegacySnapshot = {}): ExpansionState {
   const base = initialExpansion(),
@@ -319,27 +498,33 @@ export function normalizeExpansion(value: unknown, legacy: LegacySnapshot = {}):
           integer(pair[1], layout[station][1], 0, d.layout.height - 1),
         ];
     }
+    const former = FORMER_COUNTERS[id];
+    if (former && STATIONS.every((st) => layout[st][0] === former[st][0] && layout[st][1] === former[st][1]))
+      Object.assign(layout, structuredClone(d.layout.counters));
+    settleLayout(layout, d.layout);
+    const decor: Placement[] = list(r.decor)
+      .slice(0, 200)
+      .flatMap((v) => {
+        const x = object(v);
+        return DECOR.some((i) => i.id === x.id)
+          ? [
+              {
+                id: text(x.id),
+                x: integer(x.x, 0, 0, d.layout.width - 1),
+                y: integer(x.y, 0, 0, d.layout.height - 1),
+                rotation: integer(x.rotation, 0, 0, 3),
+              },
+            ]
+          : [];
+      });
+    settleDecor(decor, layout, d.layout);
     shops[id] = {
       expansion: integer(r.expansion, 0, 0, 3),
       stars: integer(r.stars, 1, 1, 5),
       receipts: integer(r.receipts),
       quality: finite(r.quality),
       layout,
-      decor: list(r.decor)
-        .slice(0, 200)
-        .flatMap((v) => {
-          const x = object(v);
-          return DECOR.some((i) => i.id === x.id)
-            ? [
-                {
-                  id: text(x.id),
-                  x: integer(x.x, 0, 0, d.layout.width - 1),
-                  y: integer(x.y, 0, 0, d.layout.height - 1),
-                  rotation: integer(x.rotation, 0, 0, 3),
-                },
-              ]
-            : [];
-        }),
+      decor,
       paint: text(r.paint, "clay"),
       manager: typeof r.manager === "string" ? r.manager : null,
     };
@@ -460,6 +645,9 @@ export function normalizeExpansion(value: unknown, legacy: LegacySnapshot = {}):
     shops,
     extraInventory,
     machines,
+    workshop: normalizeWorkshop(s.workshop, owned),
+    treeNodes: normalizeTreeNodes(s.treeNodes, owned),
+    gardenFeature: normalizeGardenFeature(s.gardenFeature, machines, staff, owned),
     staff,
     loadout: ids(s.loadout, POWERUPS).slice(0, 6),
     powerups: { ...base.powerups, ...counts(s.powerups, POWERUPS) },
@@ -508,6 +696,7 @@ export function normalizeExpansion(value: unknown, legacy: LegacySnapshot = {}):
                 quantity: integer(r.quantity, 1, 1, 100),
                 day: integer(r.day, 1, 1),
                 progress: finite(r.progress, 0, 0, 1),
+                ...(r.priority === true ? { priority: true as const } : {}),
               },
             ]
           : [];

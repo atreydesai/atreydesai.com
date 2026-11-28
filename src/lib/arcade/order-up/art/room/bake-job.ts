@@ -19,6 +19,8 @@ export interface BakeJob {
   rows: number;
   layout: Record<string, [number, number]>;
   decor: Placement[];
+  /** The brew kit fitted at this shop, drawn on its brew counter. */
+  kit?: string;
   hour: number;
   season: string;
   weather: string;
@@ -48,7 +50,7 @@ export function runBake(job: BakeJob): BakeResult {
   const outdoor = lightAt({ hour: job.hour, season: job.season, weather: job.weather, indoor: false });
   const decor = placeDecor(job.decor, DECOR, venue.cols, venue.rows, () => job.hour, venue.wallHeight);
   const dressed = decor.wall.length ? { ...venue, wallItems: [...venue.wallItems, ...decor.wall] } : venue;
-  const room = bakeRoom({ venue: dressed, light, outdoor, width: job.width, props: [...stationProps(venue, job.layout, job.shop), ...decor.props] });
+  const room = bakeRoom({ venue: dressed, light, outdoor, width: job.width, props: [...stationProps(venue, job.layout, job.shop, job.kit ?? ""), ...decor.props] });
   const background = job.flat ? composeRoom(room, venue, []).data : room.background.data;
   return {
     width: room.width,

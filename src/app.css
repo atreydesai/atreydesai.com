@@ -984,7 +984,9 @@
      --font-prose    Optima (system)        → body and reading text, decks,
                                               blurbs, footnotes, and the
                                               italic .section-heading accent
-   There is no monospace face.
+   There is no monospace face. (The one exception is Order Up's receipts,
+   which set the shop's printed paper in the system monospace; see the arcade
+   style guide.)
    ============================================ */
   :root {
     --font-display:

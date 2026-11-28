@@ -575,51 +575,103 @@ Order up opens on its saves: three shops per difficulty, each in its own
 slot (`order-up/engine/slots.ts`), listed with its day, shop and till, to
 play, start new or delete; the shop played last is the primary key. On a
 development host a fourth slot, the test kitchen, adds a test tab to the
-shop book with cheats (the till, jumping to any day with its rank, every
-shop, a stocked pantry, the whole collection, finishing cups, patience and
-the clock, and going straight to any place), so every part of the game can
+ledger with cheats (the till; the previous, next or any day, with its
+rank; every shop, a stocked pantry, the whole collection; finishing cups,
+patience, the clock and ending the day at once; going straight to any place;
+and starting the test kitchen over on day 1), so every part of the game can
 be reached; it never shows on the live site, and the menu's best never
 counts it. The first campaign's single save is retired the first time the
-saves open. The shop book's Saves key comes back here.
+saves open. The ledger's Saves key comes back here. Order Up is built for a
+desktop for now: on a touch screen without hover, or in a window narrower than
+900px, it shows an under-development card with one key, Back to the arcade,
+and the game never loads (`OrderUpCampaign.svelte`).
 
-A shop opens on the shop book, kept like a ledger over the shop: the day in
-pixel letters, the day's event as its headline with its rule under it, the
-till on the right, and the chapters down the margin as index tabs (Today,
-Pantry, Workshop, Crew, Shops, Album; Testing in the test kitchen). Each
-chapter is a ledger: rows on a grid with their column headings written once,
-a mark only where something is out of the ordinary (out of stock, in season,
-low upkeep), and the picked row written up in a panel beside the list with
-its actions. Choices are pixel keys (suppliers, kinds, price levels, the
-counter a crew member works), never a dropdown. Today leads with the last
-shift's receipt, then what's new, the week as seven columns, money, and the
-promotion; contracts are chits clipped down the right, taken ones stamped.
-The Shops chapter shows every shop by its own room, baked small. One primary
-key sits at the foot (Open the shop, or Back to the shift), with Saves,
-Export and Import as quiet links beside it. The same ingredients, guests,
+A shop opens on its ledger (the HUD's Ledger key, and the pause card's): a
+board of dark tiles in a pixel
+wood frame, its chapters as coloured bookmarks along the top (Today, Pantry,
+Workshop, Crew, Shops, Album; Testing in the test kitchen), each named in the
+HUD's pixel letters with its pixel sign, the open one standing taller. Across
+the top of the board sit the day's number, its event and rule, the till and
+Close; along its foot Saves, Export and Import, the status line, the daily
+shift and the one primary key (Open the shop, or Back to the shift). Its
+colours are its own, the same in either theme.
+
+- **Tiles, not tables.** Each thing is a notched dark tile with its picture
+  above its words: the figure or name, one short fact, its key. Sections are
+  captioned in the HUD's pixel letters; everything read is Neue Haas.
+  Chosen is cream. An orange edge means it needs you (stock that spoils
+  tomorrow, the rent). Solid orange is the page's one or two main things
+  (today on the week, the primary key), never more.
+- **The receipt.** The shop's own thermal paper, torn along its foot and set
+  in the system monospace (the only monospace in the arcade, and only on
+  paper the shop prints), is tucked against the ledger's left edge where a
+  page has one: yesterday's close beside Today, what's on the way beside the
+  Pantry. Its column is kept on every page, so the ledger never moves
+  sideways; on a phone it sits at the top of the page.
+- **Pages in the order a day is planned.** Today: money, then the
+  promotion, then what's new, then the week; contracts down the right as
+  tiles with their reward and a tally. Pantry: the supplier (crate size,
+  when it arrives, how much longer it keeps), the shelves, then a tile for
+  every ingredient with its count, keep-by day and price; menu prices are
+  the last chip. Workshop: the shop's machine slots, then the catalogue by
+  counter, then the belt and the powerups for it. Crew: the picked person's
+  card, the rest of the crew under it, the job board beside. Shops: the ones
+  you run (yours in orange), the ones for sale, the picked one written up
+  beside them, then the truck's stop and the van. Album: recipes, regulars,
+  badges and decor as pages of tiles, the picked one written up beside them.
+  Testing: the day first, then the till, unlocks, the shift, places and
+  starting over. A page keeps its order while open, so buying or taking
+  something never moves a tile under the hand.
+- **Upgrade trees.** The Workshop's Upgrades page has a key for each system
+  opened so far (Brew, Counters, Furniture, Decor, Guests, Crew, Tea,
+  Drinks, Suppliers, Rooms, Promotions, Contracts, Events) and draws its tree
+  like a survival game's tech tree (`book/UpgradeTree.svelte`, laid out by
+  `book/tree-layout.ts`): a column per root, a node under the deepest thing
+  it needs, right-angled wires with a second need on its own dotted line,
+  and needs already implied further up left unwired. Locked tiles carry a
+  lock, owned ones a green edge and tick, parts their count, the fitted kit
+  an orange edge. A fixed panel beside the tree writes up the picked node:
+  its gains (+), its costs (−), what is missing and its one key. Positions
+  come from the tree's shape alone, so buying never moves a tile. Node
+  signs are drawn in `art/upgrade-icons.ts`; a fitted brew kit also shows as
+  its rig on the machine and on the room's brew counter.
+- **House tea.** Where the Garden Tea Room is owned, Today shows its chain as
+  five tiles (keep a sample, taste with peach, calibrate a brew machine,
+  train a prep employee, put it on the menu), the next edged orange, with
+  one line under them holding that step's key or the sentence saying what
+  it needs (`book/HouseTea.svelte`). Once listed, the counter offers it to
+  a fitting guest by name for the first six seconds of their wait.
+- **Suppliers.** The corner market sells four now; the night freight sixteen
+  tomorrow at the lowest unit price, for what sells fast; the orchard co-op
+  twenty-four in two days that keep five days longer, for what sells steadily
+  but slowly. Neither of the last two is best for everything.
+
+The same ingredients, guests,
 machines and places arrive in Normal and Expert; the numbers change, not the
 content. The rules live in `src/lib/arcade/order-up/` (typed content, a
 DOM-free engine and one module per skill); the components in
 `src/lib/components/arcade/order-up/` draw and listen.
 
 - **Five places on screen, fixed.** The header is the arcade's shop header:
-  the sign, Day, Time, Till and Points in pixel letters, and the HUD buttons
+  the sign, Day, Time, Till and Satisfied in pixel letters, and the HUD buttons
   (difficulty keys and Arcade between shifts, pause and sound during one).
   The clock's slot and the buttons' room are kept whether or not a shift is
-  on, so opening the shop moves nothing. Under it the ticket rail has a peg
-  for every ticket the shop can hold. The room fills the left, the counter
-  the right, and the tool belt runs along the foot. Every place keeps one
+  on, so opening the shop moves nothing. The room fills the left and the
+  counter the right, with the ticket rail standing between them as a column
+  of pegs, one for every ticket the shop can hold, beside the order slip
+  where the eye already is; the tool belt runs along the foot. Every place keeps one
   control row of the same height under its picture, so switching places or
   picking options never rescales the picture or moves a key.
 - **A little at a time.** A new shop shows only what day 1 uses, and the
   rest arrives on the day its first content does (`engine/opened.ts`): the
-  book's Workshop on day 4, Crew on day 5 and Shops on day 12, each tab
+  ledger's Workshop on day 4, Crew on day 5 and Shops on day 12, each tab
   marked new on its first day; week contracts, promotions and the second
   supplier on day 3, job contracts and the third supplier on day 5, season
   contracts on day 8, the daily shift once the first shift is done; the
   album's pages, the shops list, the belt's slots and the job board grow
   the same way. A new shop's shelves hold only day 1's ingredients, and each
   later one arrives with its opening crate. Today lists nothing as new on
-  day 1, and later only what the player acts on in the book; skills are
+  day 1, and later only what the player acts on in the ledger; skills are
   taught at the counter on first use and places on first visit. Whatever a
   save already holds is never hidden.
 - **One place strip.** Over the picture a strip of pixel signs (room,
@@ -639,8 +691,26 @@ DOM-free engine and one module per skill); the components in
   and shadows on the ground outside from where it stands, and the lamps
   pool light after dark. The chef walks between counters and guests come in,
   queue, wait at pickup and leave (`art/room/actors.ts`); counters are real
-  buttons over the art, and a guest can be clicked to pick their ticket.
-  Arranging turns the floor's tiles into buttons.
+  buttons over the art, and a guest can be clicked to pick their ticket (a
+  guest standing in front of a counter wins the click). Each shop's counters
+  stand in one row along its back wall with a work aisle behind, and guests
+  walk one route: in through the doorway, up the line, to pickup and out.
+  A save whose counters were never arranged opens on that row. Arranging
+  turns the floor's tiles into buttons, never on the guests' way.
+- **Seats and company.** Each shop has its own tables, window stools and
+  sofas as data (`Venue.seats`, `art/room/seating.ts`); a placed low stool
+  is a seat too. About half of guests sit after pickup, by who they are
+  (students, parents, the grandparent and pairs always), sip and turn to a
+  table-mate, then leave by the route; with no free seat they go. Some
+  stay and fetch a refill. Children walk and sit beside a parent, dogs on
+  a lead wait in line and lie by the table. Under Reduce Motion they hold
+  still, and a settled room never draws at full rate.
+- **The chef walks on their own.** When the cup in hand moves to its next
+  step, whoever worked the last one, and when a ticket, a cup or a guest's
+  answer is picked, the chef walks to the counter that step needs
+  (`followTicket` in `engine/shift.ts`). A machine or crew member finishing
+  another ticket's step never moves them. No press is spent walking; each
+  step still starts with one press.
 - **Drawn once, blitted after.** A room is baked into a background, an
   atlas of everything that stands (one image, `core/atlas.ts`) and an
   overhead layer, in a Web Worker (`art/room/bake.worker.ts`), the next
@@ -648,26 +718,46 @@ DOM-free engine and one module per skill); the components in
   Each frame is a few image blits sorted by depth; people come from an atlas
   filled as they first appear (`core/dynamic-atlas.ts`). Scenes draw at full
   rate only while someone walks, a dozen frames a second otherwise, once a
-  second under the book or a pause, and not at all off screen or in a hidden
+  second under the ledger or a pause, and not at all off screen or in a hidden
   tab. The decor catalogue, badges and machine tiers are made from their
   patterns rather than written out.
 - **The counter** is a dark chip: the station's painted close-up from
-  `OrderStationArt` with the drink on its mat, what the ticket asks for
-  (ingredient pictures, sugar and ice in words, the steps with their grades),
-  the skill being worked, and one primary key (Space) that does the next
-  thing. Meters are pixel art on the chip; nothing on the counter is a glyph.
+  `OrderStationArt` with the drink on its mat, the order slip, the skill
+  being worked, and one primary key (Space) that does the next thing. The
+  slip (`OrderSlip.svelte`) is the ledger's receipt paper: the guest's face,
+  name and patience, the drink with its sugar and ice, its ingredients by
+  name and its steps, the next one underlined. It keeps one height for any
+  recipe. The chip explains nothing: there is no lesson line, and a sentence
+  shows only when something failed. A warming step fills the key's foot.
+  Meters are pixel art on the chip; nothing on the counter is a glyph.
+  When the window is short the painting gives up height first.
 - **The drink** is the first campaign's stacked cup made general
   (`cupSprite` in `art/sprites.ts`): a lathe per cup family (tall, short,
   dome, slush, mug, bottle, bowl), the recipe's own tea, milk, fruit,
   toppings and finish, and a fill that rises with the pouring steps. A
   finished cup turns on the counter.
+- **Mastery.** A step starts timed by hand; six good hand runs make it one
+  press at a steady grade (the counter marks it Mastered, with a smaller key
+  to time it for the top grade), and a machine or crew can then run it.
+  Six pips under a hand-timed step show how close it is. Special guests are
+  always timed. No full-grade window is shorter than 250 ms on Normal, and
+  nothing is held: what was a held bar is a row of labelled choices, the
+  right one outlined. Toppings are a pick: the cup's toppings with a count
+  each, a key for every topping the shop knows (the wanted ones outlined),
+  and Done on the primary key.
+- **Motion.** Stepped and short, from `order-up/motion.css`: a thing
+  arriving (a ticket, a result, a notice, a ledger page) rises into place in
+  three steps; a thing just gained (a slip step, a bought tile, a house tea
+  step, the satisfaction figure) flashes once, only when it changes while on
+  screen; a guest about to give up blinks their patience. All stand still
+  under Reduce Motion.
 - **Skills.** Steep, kettle heat, pour, milk ratio, pearl pot, egg waffle,
-  fruit board, cheese foam, tiger stripes, topping ladle, blender, shake,
-  seal and straw stab, then the torch, layered pour, color change, rosette
+  fruit board, cheese foam, tiger stripes, topping ladle, blender, shake
+  and seal, then the torch, layered pour, color change, rosette
   and packing. Each is a press, hold, beat, sequence, knob or drawn line. A
   skill's first use on a device stops the shift with its line in the
-  arcade's callout over the counter's picture, brackets round the band to
-  hit; Continue (Enter, or Space once it has been read) brings play back and
+  arcade's callout over the counter's picture, just above the slip,
+  brackets round the band to hit; Continue (Enter, or Space once it has been read) brings play back and
   never makes the move.
 - **Places.** The place strip opens the shop's other places. The order
   window and the street are baked like the rooms (`art/room/front.ts`): the
@@ -700,14 +790,18 @@ DOM-free engine and one module per skill); the components in
   steady and rush, and each skill answers with a shop effect. The HUD's mute
   silences it.
 - **Saves.** Normal and Expert keep separate shops on the device, with
-  export and import in the book. A first-campaign save opens in the
+  export and import in the ledger. A first-campaign save opens in the
   expansion; a first-campaign shift that was open finishes in the preserved
   first-campaign counter (`OrderUpLegacy.svelte`) and the next day opens the
   expansion. An unreadable save is kept aside, never overwritten.
 
-Each drink served or packed at the player's counter adds its grade out of
-100 to the shift's points. The book's receipt shows the total, and the
-Arcade menu shows the best completed shift for the current difficulty.
+Each drink served or packed at the player's counter is graded out of 100.
+The shop shows one score, Satisfied: the shift's average grade with every
+cup a guest walked out on counted as nothing (`satisfaction` in
+`engine/shift.ts`), in the header and on the ledger's receipt. A step's
+result says Perfect, Good or Off, without a number. The grades still add up
+to the shift's points, which are stored but never shown in the shop; the
+Arcade menu's best completed shift for the current difficulty reads them.
 
 #### Original Score Attack archive
 

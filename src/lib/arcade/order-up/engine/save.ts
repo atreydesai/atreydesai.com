@@ -1,8 +1,11 @@
 import { newCampaign, normalizeCampaign, type Campaign, type CampaignMode } from "../../orders-campaign.ts";
-import { RECIPE_BY_ID, GUEST_BY_ID, SHOPS, SKILLS, POWERUPS, EVENTS, HOLIDAYS, INGREDIENT_BY_ID } from "../content/index.ts";
+import { RECIPE_BY_ID, GUEST_BY_ID, SHOPS, SKILLS, POWERUPS, EVENTS, HOLIDAYS, INGREDIENT_BY_ID, FAMILIES } from "../content/index.ts";
 import { object, finite, STATIONS } from "./state.ts";
 import type { Shift, Ticket, Cup, Receipt } from "./shift-types.ts";
 import { createRun } from "../skills/index.ts";
+import { MAX_TOPPING_PICKS, timingWindowFloor } from "../skills/common.ts";
+import { LEGACY_RECIPE_STEPS } from "../content/recipes.ts";
+import { recipeSkillOptions } from "./skill-setup.ts";
 import type { SkillId } from "../content/schema.ts";
 export const SAVE_LIMIT = 5_000_000;
 const number = (n: unknown, fallback = 0, min = 0, max = 1e9) => finite(n, fallback, min, max);
@@ -32,6 +35,7 @@ export function restoreExpandedShift(value: unknown, c: Campaign): Shift | null 
   )
     return null;
   const data = structuredClone(s) as unknown as Shift;
+  data.skillModel = 1;
   data.rankAtStart = Math.floor(number(s.rankAtStart, 1, 1, 60));
   data.elapsed = number(s.elapsed);
   data.duration = s.duration;
@@ -50,6 +54,8 @@ export function restoreExpandedShift(value: unknown, c: Campaign): Shift | null 
   data.holiday = HOLIDAYS.some((e) => e.id === s.holiday) ? String(s.holiday) : null;
   data.weather = typeof s.weather === "string" ? s.weather : "clear";
   data.daily = typeof s.daily === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.daily) ? s.daily : null;
+  if (s.hostCheckIn !== true) delete data.hostCheckIn;
+  if (!FAMILIES.some((family) => family.id === s.lastDoseFamily)) delete data.lastDoseFamily;
   data.tickets = s.tickets.map((raw, index) => {
     if (raw === null) return null;
     const t = object(raw);
@@ -82,46 +88,63 @@ export function restoreExpandedShift(value: unknown, c: Campaign): Shift | null 
     ticket.memoryGuest = GUEST_BY_ID[String(t.memoryGuest)] ? String(t.memoryGuest) : null;
     ticket.refills = Math.floor(number(t.refills, 0, 0, 2));
     ticket.pickupAt = typeof t.pickupAt === "number" ? number(t.pickupAt, 0, 0, data.duration + 24) : null;
+    if (t.featured !== true) delete ticket.featured;
+    if (typeof t.expectedAt === "number" && Number.isFinite(t.expectedAt))
+      ticket.expectedAt = number(t.expectedAt, 0, 0, data.duration + 24);
+    else delete ticket.expectedAt;
     ticket.cups = t.cups.map((rawCup) => {
       const u = object(rawCup),
         recipe = RECIPE_BY_ID[String(u.recipe)] ?? RECIPE_BY_ID[String(t.recipe)],
         cup = structuredClone(u) as unknown as Cup;
       cup.recipe = recipe.id;
-      cup.step = Math.floor(number(u.step, 0, 0, recipe.steps.length));
+      const oldSteps = s.skillModel === 1 ? recipe.steps : (LEGACY_RECIPE_STEPS[recipe.id] ?? recipe.steps);
+      const oldStep = Math.floor(number(u.step, 0, 0, oldSteps.length));
+      const kept = oldSteps.slice(0, oldStep).map((skill, i) => recipe.steps.includes(skill) ? i : -1).filter((i) => i >= 0);
+      cup.step = kept.length;
       cup.started = !!u.started;
-      cup.ready = !!u.ready && cup.step === recipe.steps.length;
-      cup.readyAt = number(u.readyAt, 0, 0, data.elapsed);
+      cup.ready = cup.step === recipe.steps.length;
+      cup.readyAt = cup.ready && !u.ready ? data.elapsed : number(u.readyAt, 0, 0, data.elapsed);
       cup.damage = number(u.damage, 0, 0, 100);
       cup.warmup = number(u.warmup, 0, 0, 30);
       cup.preparedPearls = !!u.preparedPearls;
-      cup.grades = Array.isArray(u.grades)
-        ? u.grades.slice(0, cup.step).map((rawGrade, i) => {
-            const g = object(rawGrade);
-            return {
-              skill: recipe.steps[i],
-              grade: number(g.grade, 0, 0, 100),
-              source: typeof g.source === "string" ? g.source : null,
-              result: typeof g.result === "string" ? g.result.slice(0, 80) : "restored",
-            };
-          })
-        : [];
+      const grades = Array.isArray(u.grades) ? u.grades : [];
+      cup.grades = kept.filter((i) => i < grades.length).map((i) => {
+        const grade = object(grades[i]);
+        return {
+          skill: oldSteps[i],
+          grade: number(grade.grade, 0, 0, 100),
+          source: typeof grade.source === "string" ? grade.source : null,
+          result: typeof grade.result === "string" ? grade.result.slice(0, 80) : "restored",
+        };
+      });
       const r = object(u.run),
         expected = recipe.steps[cup.step];
       cup.run = null;
+      if (!expected || r.id !== expected) cup.warmup = 0;
       if (expected && r.id === expected && !cup.ready) {
-        const run = createRun(expected, c.mode, c.day);
+        const run = createRun(expected, c.mode, c.day, recipeSkillOptions(recipe, expected));
         run.seconds = number(r.seconds, run.seconds, 0.1, 10);
         run.elapsed = number(r.elapsed, 0, 0, run.seconds + 1);
         run.position = number(r.position, 0, 0, 1);
         run.target = number(r.target, run.target, 0, 1);
         run.window = number(r.window, run.window, 0.001, 1);
         run.speed = number(r.speed, 1, 0.1, 10);
+        run.window = Math.max(run.window, timingWindowFloor(expected, c.mode, run.seconds, run.speed));
         run.holdSeconds = number(r.holdSeconds);
         run.held = false;
         run.knob = Math.floor(number(r.knob, 1, 0, 2));
-        run.knobTarget = Math.floor(number(r.knobTarget, 1, 0, 2));
+        if (s.skillModel === 1 || !run.choices.length) run.knobTarget = Math.floor(number(r.knobTarget, run.knobTarget, 0, 2));
         run.automatic = typeof r.automatic === "number" ? number(r.automatic, 0, 0, 100) : null;
         run.source = typeof r.source === "string" ? r.source : null;
+        run.variant = run.automatic !== null ? "automatic" : r.variant === "quick" ? "quick" : "hand";
+        if (expected === "topping-ladle" && Array.isArray(r.added))
+          run.added = r.added.slice(0, MAX_TOPPING_PICKS)
+            .filter((id): id is string => typeof id === "string" && INGREDIENT_BY_ID[id]?.group === "topping");
+        if (s.skillModel !== 1 && run.choices.length && run.automatic === null) {
+          run.elapsed = 0;
+          run.position = 0;
+          run.knob = 1;
+        }
         run.hits = Array.isArray(r.hits) ? r.hits.slice(0, 30).map((n) => number(n, 0, 0, 100)) : [];
         run.marks = Array.isArray(r.marks) ? r.marks.slice(0, 30).map((n) => number(n, 0, 0, 1)) : [];
         run.path = Array.isArray(r.path)

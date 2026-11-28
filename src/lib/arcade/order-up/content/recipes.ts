@@ -1,6 +1,6 @@
 import type { Recipe, SkillId } from "./schema.ts";
 import { INGREDIENTS, INGREDIENT_BY_ID } from "./ingredients.ts";
-import { FAMILIES } from "./families.ts";
+import { FAMILIES, legacyFamilySteps } from "./families.ts";
 import { SKILLS } from "./skills.ts";
 import { REGULARS } from "./legacy-menu.ts";
 
@@ -37,6 +37,7 @@ const NOUN: Record<string, string> = {
   slush: "slush", "fresh-milk": "fresh milk", latte: "latte", layered: "layered tea", yogurt: "yogurt drink",
   hot: "tea", snow: "snow bowl",
 };
+export const LEGACY_RECIPE_STEPS: Record<string, readonly SkillId[]> = {};
 const usedNames = new Set<string>();
 
 /** A drink's name as a boba shop's menu would print it: flavors, then the kind of drink, then any side. */
@@ -88,10 +89,10 @@ function recipe(
 ): Recipe {
   const family = FAMILIES.find((f) => f.id === familyId)!;
   const ingredients = [...new Set(ids)].map((id) => ({ id, quantity: ids.filter((x) => x === id).length }));
-  const steps = [...family.skills] as SkillId[];
-  if (ids.includes("pearls")) steps.splice(Math.min(1, steps.length), 0, "pearl-pot");
-  if (ids.some((id) => INGREDIENT_BY_ID[id]?.group === "topping") && !steps.includes("topping-ladle"))
-    steps.splice(Math.max(0, steps.indexOf("shake")), 0, "topping-ladle");
+  const legacy = [...legacyFamilySteps(familyId)];
+  if (ids.includes("pearls")) legacy.splice(Math.min(1, legacy.length), 0, "pearl-pot");
+  if (ids.some((id) => INGREDIENT_BY_ID[id]?.group === "topping") && !legacy.includes("topping-ladle"))
+    legacy.splice(Math.max(0, legacy.indexOf("shake")), 0, "topping-ladle");
   if (
     ids.some((id) =>
       ["waffle", "egg-waffle", "taiyaki", "mochi-donut", "scallion-pancake", "mooncake", "zongzi", "tangyuan"].includes(
@@ -99,10 +100,13 @@ function recipe(
       ),
     )
   )
-    steps.splice(1, 0, "egg-waffle");
-  if (ids.includes("butterfly-pea") && ids.includes("lemon")) steps.splice(steps.length - 2, 0, "colour-change");
-  if (ids.includes("brulee-crust")) steps.splice(steps.length - 2, 0, "torch");
-  if (ids.includes("sea-salt-cream") && familyId === "hot") steps.push("cream-rosette");
+    legacy.splice(1, 0, "egg-waffle");
+  if (ids.includes("butterfly-pea") && ids.includes("lemon")) legacy.splice(legacy.length - 2, 0, "colour-change");
+  if (ids.includes("brulee-crust")) legacy.splice(legacy.length - 2, 0, "torch");
+  if (ids.includes("sea-salt-cream") && familyId === "hot") legacy.push("cream-rosette");
+  LEGACY_RECIPE_STEPS[id] = legacy;
+  const hasToppings = ids.some((id) => INGREDIENT_BY_ID[id]?.group === "topping");
+  const steps = legacy.filter((skill) => skill !== "straw-stab" && (skill !== "topping-ladle" || hasToppings));
   const day = Math.max(
     extraDay,
     family.day,

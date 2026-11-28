@@ -14,6 +14,7 @@ import { noise } from "../../../../core/painter.ts";
 import { planks, shiplap, ground } from "../surfaces.ts";
 import type { Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, WallSide, FrontBox } from "../types.ts";
+import { windowBar } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import { word } from "../font.ts";
 import type { VenueOptions } from "./index.ts";
@@ -612,6 +613,8 @@ function nightFront(p: Painter, light: Light, box: FrontBox) {
 
 export function nightVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // Two stools at the rail along the near side, looking out over the car park.
+  const sit = windowBar("night-bar", "front-left", 0.9, 2.9, 2, { cols, rows, wall: 12 }, { wood: TIMBER, seat: STRIPE_B, top: "#c49a68" });
   const postH = 70;
   return {
     id: "night",
@@ -644,11 +647,12 @@ export function nightVenue(o: VenueOptions): Venue {
       rolledFlap("left", 2.5, 1.4, 42),
     ],
     props: [
+      ...sit.props,
       crateStack("prop:crates", cols - 1, 0),
       stoolsProp("prop:stools", 0, rows - 1),
       postProp("prop:post", cols, 0, postH),
       postProp("prop:post", 0, rows, postH),
-      ...frontWallProps("prop:front", cols, rows, { height: 12, kind: "rail", color: TIMBER, line: "#5a4030", cap: "#8a6448", gapsRight: [1, 2, 3, 4], gapsLeft: [] }),
+      ...frontWallProps("prop:front", cols, rows, { height: 12, kind: "rail", color: TIMBER, line: "#5a4030", cap: "#8a6448", gapsRight: [3, 4], gapsLeft: [] }),
     ],
     counter: { top: "#c49a68", front: "#a87a4c", side: "#8a6240", trim: "#7a5236", panel: "crate", height: 15 },
     outside: {
@@ -663,14 +667,24 @@ export function nightVenue(o: VenueOptions): Venue {
         stoolsProp("out:stools", 1.2, rows + 0.4),
       ],
     },
-    entry: [cols + 1.6, rows - 0.6],
+    // In through the gap in the rail at the near end of the open side, the line out onto the car park.
+    seats: sit.seats,
+    doorway: { wall: "front-right", from: rows - 2, to: rows },
+    entry: [cols + 4.2, rows - 0.7],
     queue: [
-      [cols - 0.6, 1.6],
-      [cols - 0.6, 2.6],
-      [cols - 0.6, 3.6],
-      [cols - 0.5, 4.5],
+      [cols - 1.5, 3.4],
+      [cols - 0.75, 3.6],
+      [cols + 0.75, 3.9],
+      [cols + 1.5, 3.9],
+      [cols + 2.25, 3.9],
+      [cols + 3.0, 3.9],
     ],
-    pickup: [cols - 1.6, 2.5],
+    pickup: [cols - 2.25, 3.5],
+    out: [
+      [cols - 2.0, rows - 0.65],
+      [cols - 0.6, rows - 0.55],
+      [cols + 0.8, rows - 0.55],
+    ],
     indoorSun: 0.9,
     facade: {
       wall: canvas(STRIPE_A, STRIPE_B, TIMBER, mixHex(STRIPE_B, INK, 0.2)),

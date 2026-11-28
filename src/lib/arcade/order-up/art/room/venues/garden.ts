@@ -13,10 +13,11 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { stone, plaster, shiplap, ground } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, WallSide, WindowSpec, FrontBox } from "../types.ts";
+import { cafeTable, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import type { VenueOptions } from "./index.ts";
 import { lampPostProp, benchProp, SPRITES, litPalette } from "../props.ts";
-import { litSet, leafClump, plantProp, matItem, frontWallProps, pot, INK, CREAM, seasonTreeProp, lawnAt, frontFace, glassFront, shrubFront, signFront, lampFront } from "./_corner-kit.ts";
+import { litSet, leafClump, plantProp, matItem, frontWallProps, cornerDoorRoute, pot, INK, CREAM, seasonTreeProp, lawnAt, frontFace, glassFront, shrubFront, signFront, lampFront } from "./_corner-kit.ts";
 
 const WHITE = "#e8e2d4";
 const BAR = "#ebe6d8";
@@ -189,56 +190,6 @@ function hangingFerns(spots: [number, number, number][], wallH: number) {
   };
 }
 
-/** A white iron table for two with wicker tub chairs either side and a pot of tea. */
-function bistroProp(key: string, x: number, y: number, cushion: string): PropSpec {
-  return {
-    key,
-    x,
-    y,
-    height: 26,
-    pad: 10,
-    draw(p, g, light) {
-      const share = 0.5;
-      const f = faceLight(light, share);
-      const wDark = light.lit(mixHex(WICKER, INK, 0.3), f.left * 0.5);
-      const wMid = light.lit(WICKER, f.top * 0.8);
-      const wHi = light.lit(mixHex(WICKER, CREAM, 0.3), f.top);
-      const chair = (u: number, v: number, side: number) => {
-        const c = project(g, u, v, 0);
-        p.alpha(0.28, () => p.oval(INK, c.x, c.y, 6, 2));
-        // The tub: a drum of wicker, a cushion, a back curling round the outer side.
-        p.rect(wDark, c.x - 5, c.y - 8, 11, 7);
-        p.oval(wDark, c.x, c.y - 2, 5, 2);
-        for (let k = -4; k <= 4; k += 2) p.rect(wMid, c.x + k, c.y - 7, 1, 5);
-        p.oval(wMid, c.x, c.y - 8, 5, 2);
-        p.oval(light.lit(cushion, f.top), c.x - side, c.y - 9, 3, 1);
-        const bx = c.x + side * 4;
-        p.rect(wDark, bx - 2, c.y - 17, 4, 10);
-        p.rect(wMid, bx - 2 + (side > 0 ? 0 : 1), c.y - 17, 3, 9);
-        p.oval(wHi, bx, c.y - 17, 2, 1);
-        p.line(wDark, bx - side * 1, c.y - 16, c.x - side * 3, c.y - 10);
-      };
-      chair(0.12, 0.78, -1);
-      // The table: a pedestal and a round white top with tea on it.
-      const t = project(g, 0.5, 0.5, 0);
-      p.alpha(0.3, () => p.oval(INK, t.x, t.y, 7, 2));
-      const iron = light.lit("#4a4448", 0.1);
-      p.rect(iron, t.x, t.y - 12, 1, 12);
-      p.line(iron, t.x - 4, t.y, t.x, t.y - 3);
-      p.line(iron, t.x + 4, t.y, t.x, t.y - 3);
-      p.oval(light.lit(mixHex(WHITE, INK, 0.3), f.left), t.x, t.y - 12, 9, 4);
-      p.oval(light.lit(WHITE, f.top), t.x, t.y - 13, 9, 4);
-      p.line(light.lit(mixHex(WHITE, CREAM, 0.5), Math.min(1, f.top + 0.2)), t.x - 6, t.y - 15, t.x - 2, t.y - 16);
-      const tp = SPRITES.teapot;
-      const pal: Record<string, string> = {};
-      for (const [k, col] of Object.entries({ ...tp.palette, L: "#a9c98c", B: "#6f9a5a", D: "#4c6b40" })) pal[k] = k === "O" ? col : light.lit(col, f.top * 0.7);
-      p.sprite(tp.grid, pal, t.x - 6, t.y - 19);
-      p.rect(light.lit(INK, 0), t.x + 3, t.y - 15, 3, 2);
-      p.rect(light.lit("#f3ead6", f.top), t.x + 3, t.y - 15, 2, 1);
-      chair(0.78, 0.12, 1);
-    },
-  };
-}
 
 /** A fern on a tall wooden stand, fronds spilling over. */
 function fernStand(key: string, x: number, y: number): PropSpec {
@@ -532,14 +483,20 @@ function gardenFront(p: Painter, light: Light, box: FrontBox) {
 
 /** Lanterns over the brew counter, the build counter and the two tables. */
 const LANTERNS: [number, number, number][] = [
-  [1.5, 1.5, 44],
-  [4.5, 4.5, 40],
-  [6.7, 4.7, 42],
-  [7.7, 6.3, 36],
+  [4.5, 2.5, 44],
+  [6.5, 2.5, 40],
+  [2.35, 4.85, 42],
+  [3.05, 6.55, 36],
 ];
 
 export function gardenVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // Two white iron tables for two on the rug, wicker tub chairs.
+  const iron = { wood: WICKER, seat: "#7f9a7e", top: "#f2efe6", chair: "tub" as const };
+  const sit = seating(
+    cafeTable("garden-table1", 2.35, 4.85, ["-x", "-y"], iron),
+    cafeTable("garden-table2", 3.05, 6.55, ["-x", "-y"], { ...iron, seat: "#c98a6a" }),
+  );
   const sill = 16,
     top = 72;
   const glass = (wall: WallSide, at: number, width: number): WindowSpec => ({ wall, at, width, sill, top, bars: 3, transom: 14, frame: BAR });
@@ -562,15 +519,14 @@ export function gardenVenue(o: VenueOptions): Venue {
     ],
     wallItems: [sillPots("right", 0, [14, 34, 52, 160, 178, 198]), sillPots("left", 0, [80, 98, 142, 158])],
     props: [
+      ...sit.props,
       plantProp("prop:citrus", 0, rows - 1, "citrus", "#c47c5b", 0.6, 3),
       plantProp("prop:palm", cols - 1, 0, "palm", "#e8dcc4", 0.6, 5),
       fernStand("prop:fern", 0, 3.1),
       plantProp("prop:fig", 2.5, 0, "fig", "#e8dcc4", 0.6, 4),
-      bistroProp("prop:table1", 6.2, 4.2, "#7f9a7e"),
-      bistroProp("prop:table2", 6.9, 5.9, "#c98a6a"),
       ...frontWallProps("prop:front", cols, rows, { height: 14, kind: "panel", color: WHITE, line: "#bdb5a2", cap: "#f0ebde", base: ["#a8a090", 3], gapsRight: [rows - 1], post: BAR }),
     ],
-    floorItems: [matItem(cols - 0.94, rows - 0.9, 0.86, 0.8, "#8a7a5a", "#5f6f52"), matItem(5.95, 3.95, 2.0, 3.1, "#c9b48a", "#8a7a5a")],
+    floorItems: [matItem(cols - 0.94, rows - 0.9, 0.86, 0.8, "#8a7a5a", "#5f6f52"), matItem(1.6, 4.1, 2.0, 3.1, "#c9b48a", "#8a7a5a")],
     counter: { top: "#e6e0d0", front: "#e2dccd", side: "#c9c2b0", trim: "#b9a888", panel: "slats", height: 15 },
     outside: {
       ground: gardenGround(cols, rows),
@@ -588,14 +544,8 @@ export function gardenVenue(o: VenueOptions): Venue {
         { ...benchProp("out:bench", 3.0, rows + 0.75, "#e8e2d4", true), shadow: "none" as const },
       ],
     },
-    entry: [cols + 1.4, rows - 0.5],
-    queue: [
-      [cols - 0.6, 1.6],
-      [cols - 0.6, 2.6],
-      [cols - 0.6, 3.6],
-      [cols - 0.6, 4.6],
-    ],
-    pickup: [cols - 1.6, 2.4],
+    seats: sit.seats,
+    ...cornerDoorRoute(cols, rows),
     indoorSun: 0.7,
     facade: {
       wall: plaster(WHITE, "#dcd5c4"),

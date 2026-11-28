@@ -41,6 +41,8 @@ export interface Ticket {
   memoryGuest?: string | null;
   refills?: number;
   pickupAt?: number | null;
+  featured?: boolean;
+  expectedAt?: number;
 }
 export interface Receipt {
   id: number;
@@ -65,6 +67,7 @@ export interface Effect {
 }
 export interface Shift {
   version: 3;
+  skillModel?: 1;
   rankAtStart: number;
   mode: Mode;
   day: number;
@@ -106,6 +109,8 @@ export interface Shift {
   packedJobs: string[];
   weather: string;
   reserve: number;
+  hostCheckIn?: boolean;
+  lastDoseFamily?: string;
 }
 export function freshCup(recipe: string): Cup {
   return {

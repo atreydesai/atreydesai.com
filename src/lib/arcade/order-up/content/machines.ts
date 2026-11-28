@@ -633,7 +633,7 @@ export const MACHINES: readonly Machine[] = [
   },
   {
     id: "straw-dispenser",
-    name: "straw dispenser",
+    name: "lid press",
     day: 19,
     art: {
       kind: "machine",
@@ -642,7 +642,7 @@ export const MACHINES: readonly Machine[] = [
       seed: 1579,
     },
     station: "serve",
-    skills: ["straw-stab"],
+    skills: ["seal"],
     effect: "automation",
     price: 1855,
     tiers: tiers("straw-dispenser", "#94a18d", [0, 1, 2]),

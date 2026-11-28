@@ -15,6 +15,7 @@ import { noise } from "../../../../core/painter.ts";
 import { herringbone, plaster } from "../surfaces.ts";
 import type { Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, WindowSpec, WallSide, FrontBox } from "../types.ts";
+import { cafeTable, windowBar, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import { word, bigWord, bigWidth } from "../font.ts";
 import { INK } from "../props.ts";
@@ -434,13 +435,14 @@ function figProp(key: string, x: number, y: number, tall = 56): PropSpec {
 
 /** A low sofa against the wall, facing into the room. */
 function sofaProp(key: string, x: number, y: number, d: number): PropSpec {
-  // Declared one tile at its far end (padded to fit) so it sorts behind anyone walking past its front.
   return {
     key,
     x,
     y,
     w: 1,
-    d: 1,
+    d,
+    // Sorts as one tile at its near end would: behind anyone sitting on it or walking past its front.
+    depthBias: 1 - d,
     pad: 38,
     height: 22,
     draw(p, g, light) {
@@ -926,6 +928,15 @@ function penthouseFront(p: Painter, light: Light, box: FrontBox) {
 
 export function loftVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // The sofa against the left wall, stools at the front rail, a table for two on the floor.
+  const sit = seating(
+    {
+      props: [],
+      seats: [0.95, 1.75].map((v, i) => ({ id: "loft-sofa:" + i, x: 0.62, y: 2.1 + v, face: [1, 0] as [number, number], height: 12, table: "loft-sofa", dog: [1.15, 2.1 + v] as [number, number], pieces: ["prop:sofa"] })),
+    },
+    windowBar("loft-bar", "front-left", 3.0, 5.0, 2, { cols, rows, wall: 14 }, { wood: STEEL, seat: "#c2643f", top: OAK, metal: STEEL_HI }),
+    cafeTable("loft-table", 2.6, 5.6, ["-x", "-y"], { wood: STEEL, seat: OAK, top: CONCRETE, metal: STEEL_HI }),
+  );
   const wallH = 96;
   const glass = (wall: WallSide, at: number, width: number, bars: number): WindowSpec => ({ wall, at, width, sill: 4, top: 84, bars, transom: 22, frame: STEEL });
   const windows = [glass("right", 0.35, 2.5, 3), glass("right", 4.95, 2.7, 3), glass("left", 1.85, 2.5, 3), glass("left", 5.0, 2.65, 3)];
@@ -970,12 +981,13 @@ export function loftVenue(o: VenueOptions): Venue {
       sleeve("left", 4.4, 64, "#5f7a8a"),
     ],
     props: [
+      ...sit.props,
       figProp("prop:fig", 0, 0),
       sofaProp("prop:sofa", 0, 2.1, 2.5),
       recordsProp("prop:records", 2, 0),
       snakePlantProp("prop:snake", 7, 0),
       monsteraProp("prop:monstera", 0, rows - 1),
-      speakerProp("prop:speaker", cols - 1, rows - 1),
+      speakerProp("prop:speaker", 2, rows - 1),
     ],
     counter: { top: CONCRETE, front: "#8f8b84", side: "#77736d", trim: STEEL, panel: "steel", height: 16 },
     outside: {
@@ -995,18 +1007,27 @@ export function loftVenue(o: VenueOptions): Venue {
     },
     // Folding doors stand open onto the terrace; guests come up the stair and queue back along the deck.
     front: { height: 14, color: "#94503b", cap: STEEL, gapsRight: [2, 3, 4, 5] },
+    // Up the stairs, along the terrace and in through the open glass; the line runs down from the serve counter, out the way it came.
+    seats: sit.seats,
+    doorway: { wall: "front-right", from: 2, to: 6 },
     entry: [cols + 1.7, 2.3],
-    queue: [
-      [6.5, 2.45],
-      [7.2, 2.9],
-      [8.3, 3.4],
-      [8.9, 4.1],
-      [8.8, 5.0],
-      [8.7, 5.9],
-      [8.6, 6.8],
-      [8.4, 7.7],
+    way: [
+      [cols + 1.3, 5.3],
+      [cols - 0.7, 5.75],
     ],
-    pickup: [7.6, 3.6],
+    queue: [
+      [6.5, 3.4],
+      [6.5, 4.15],
+      [6.5, 4.9],
+      [6.5, 5.65],
+      [6.5, 6.4],
+      [5.8, 6.95],
+    ],
+    pickup: [7.35, 3.35],
+    out: [
+      [cols - 0.6, 5.0],
+      [cols + 0.9, 4.4],
+    ],
     indoorSun: 0.6,
     facade: { wall: oldBrick(), trim: STEEL, sign: { board: "#2a2a2e", ink: NEON }, door: STEEL, neighbours: "none", paint: penthouseFront, queueAt: 0.78 },
     overhead: bulbs([

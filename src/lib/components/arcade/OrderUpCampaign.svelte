@@ -2,6 +2,8 @@
   // Order Up opens on its saves: three shops per difficulty, each its own
   // slot, and on a development host a fourth test kitchen with cheats. The
   // first campaign's single save is retired here the first time this opens.
+  // Phones and tablets get an under-development card instead: the game is
+  // built for a desktop screen, keyboard and mouse for now.
   import { onMount, createEventDispatcher, tick } from "svelte";
   import { get } from "svelte/store";
   import { arcadeExpert } from "#lib/boba.ts";
@@ -31,6 +33,10 @@
   let lastSlot: SlotId = "1";
   let card: HTMLElement;
   const mode = get(arcadeExpert) ? "expert" : "normal";
+  /** A touch device, or a window too narrow for the shop. */
+  const MOBILE = "(hover: none) and (pointer: coarse), (max-width: 899px)";
+  let mobile = false;
+  let gateKey: HTMLButtonElement | undefined;
 
   function storage(): Storage | null {
     try {
@@ -47,6 +53,7 @@
 
   async function focusPicker() {
     await tick();
+    if (mobile) return gateKey?.focus();
     const target =
       card?.querySelector<HTMLElement>(`[data-slot="${lastSlot}"] .play`) ?? card?.querySelector<HTMLElement>(".play");
     target?.focus();
@@ -89,6 +96,10 @@
   }
 
   onMount(() => {
+    const query = window.matchMedia(MOBILE);
+    mobile = query.matches;
+    const follow = (event: MediaQueryListEvent) => (mobile = event.matches);
+    query.addEventListener("change", follow);
     const store = storage();
     if (store) retireOldSaves(store);
     testAllowed = testSlotAllowed(window.location.hostname, import.meta.env.DEV);
@@ -101,12 +112,24 @@
     refresh();
     ready = true;
     void focusPicker();
+    return () => query.removeEventListener("change", follow);
   });
 </script>
 
 <svelte:window on:keydown={onKey} />
 
-{#if slot}
+{#if mobile}
+  <div class="boba-stage is-paper" aria-hidden="true"></div>
+  <div class="boba-scrim boba-ui order-pixel-ui saves-scrim" role="dialog" aria-modal="true" aria-labelledby="mobile-title">
+    <div class="boba-card order-pixel-sheet mobile-card">
+      <h2 id="mobile-title" class="boba-title">under development</h2>
+      <p>Order Up is being built for desktop. Play it on a computer for now.</p>
+      <button type="button" class="boba-key is-primary" bind:this={gateKey} onclick={() => dispatch("close")}
+        >Back to the arcade</button
+      >
+    </div>
+  </div>
+{:else if slot}
   {#key slot}
     <ExpandedCampaign
       {slot}
@@ -180,6 +203,23 @@
 
   .saves-card {
     width: min(34rem, 100%);
+  }
+
+  .mobile-card {
+    display: grid;
+    gap: var(--space-4);
+    width: min(24rem, 100%);
+  }
+
+  .mobile-card p {
+    margin: 0;
+    line-height: 1.45;
+  }
+
+  .mobile-card .boba-key {
+    justify-self: start;
+    min-height: 44px;
+    padding-inline: var(--space-4);
   }
 
   .saves-header {

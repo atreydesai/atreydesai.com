@@ -32,12 +32,17 @@ import {
   handoff,
   usePowerup,
   finishSkill,
+  followTicket,
+  pickTicket,
+  pickCup,
+  satisfaction,
   settleShift,
   shooGull,
   feedCat,
   wakeGuest,
 } from "../src/lib/arcade/order-up/engine/shift.ts";
 import { spawnTicket } from "../src/lib/arcade/order-up/engine/tickets.ts";
+import { freshCup } from "../src/lib/arcade/order-up/engine/shift-types.ts";
 import {
   buyMachine,
   buyShop,
@@ -401,3 +406,97 @@ test("a guest who walks out hands the selection to another waiting ticket", () =
   assert.equal(s.tickets[first.slot], null);
   assert.equal(s.selected, second.slot);
 });
+
+// --- The chef walks on their own ---------------------------------------------------------
+
+/** A shift whose first ticket is a usual-biscuit order (brew, then prep), with no prepared pearls. */
+function biscuitShift(cups = 1) {
+  const c = newCampaign(),
+    s = startShift(c);
+  c.expansion.pearls = 0;
+  const t = s.tickets[s.selected];
+  t.recipe = "usual-biscuit";
+  t.usual = false;
+  t.revealed = true;
+  t.special = null;
+  t.sleeping = false;
+  t.changeTo = null;
+  t.cups = Array.from({ length: cups }, () => freshCup("usual-biscuit"));
+  t.cupIndex = 0;
+  s.chefStation = "brew";
+  s.walking = 0;
+  return { c, s, t };
+}
+/** Ends the cup's running step as if it were worked to a grade. */
+function finish(c, s, t, cup, source) {
+  if (!cup.run) {
+    assert.ok(beginWork(c, s, t.slot, t.cups.indexOf(cup), source ? { grade: 80, speed: 1, source } : undefined));
+  }
+  cup.warmup = 0;
+  cup.run.finished = true;
+  cup.run.grade = 90;
+  finishSkill(c, s, t, cup);
+}
+
+test("finishing a step walks the chef to the counter of the next one", () => {
+  const { c, s, t } = biscuitShift();
+  finish(c, s, t, t.cups[0]);
+  assert.equal(currentSkill(t.cups[0]), "pearl-pot");
+  assert.equal(s.chefStation, "prep");
+  assert.ok(s.walking > 0);
+  // Once there, the next press starts the step: no press is spent walking.
+  s.walking = 0;
+  assert.equal(beginWork(c, s), true);
+});
+
+test("a machine finishing another ticket's step never moves the chef", () => {
+  const { c, s, t } = biscuitShift();
+  spawnTicket(c, s);
+  const other = s.tickets.find((x) => x && x !== t);
+  assert.ok(other);
+  other.recipe = "usual-biscuit";
+  other.cups = [freshCup("usual-biscuit")];
+  other.cupIndex = 0;
+  other.usual = false;
+  other.changeTo = null;
+  finish(c, s, other, other.cups[0], "kettle");
+  assert.equal(s.chefStation, "brew");
+});
+
+test("picking a ticket or a cup walks the chef to where that cup goes next", () => {
+  const { c, s, t } = biscuitShift(2);
+  s.chefStation = "serve";
+  assert.equal(pickTicket(c, s, t.slot), true);
+  assert.equal(s.chefStation, "brew");
+  // The second cup is a step further on.
+  t.cups[1].step = 1;
+  assert.equal(pickCup(c, s, 1), true);
+  assert.equal(s.chefStation, "prep");
+});
+
+test("a finished cup hands the chef to the next cup in the order", () => {
+  const { c, s, t } = biscuitShift(2);
+  const [first] = t.cups;
+  first.step = RECIPES.find((r) => r.id === "usual-biscuit").steps.length - 1;
+  s.chefStation = "serve";
+  finish(c, s, t, first);
+  assert.equal(first.ready, true);
+  assert.equal(t.cupIndex, 1);
+  assert.equal(s.chefStation, "brew");
+});
+
+test("a guest who still needs an answer keeps the chef where they are", () => {
+  const { c, s, t } = biscuitShift();
+  s.chefStation = "serve";
+  t.changeTo = "usual-mochi";
+  assert.equal(followTicket(c, s), false);
+  assert.equal(s.chefStation, "serve");
+});
+
+test("satisfaction is the served cups' grades with every walked-out cup counted as nothing", () => {
+  assert.equal(satisfaction(0, 0, 0), null);
+  assert.equal(satisfaction(180, 2, 0), 90);
+  assert.equal(satisfaction(180, 2, 1), 60);
+  assert.equal(satisfaction(0, 0, 3), 0);
+});
+

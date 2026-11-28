@@ -1,9 +1,9 @@
 import type { SkillBehavior } from "./common.ts";
-/** centre is the visible result of a well-timed topping-ladle. */
+/** The order is complete when the requested scoops match. */
 export const topping_ladle: SkillBehavior = {
   id: "topping-ladle",
-  motion: "ladle",
-  good: "centre",
-  under: "rim",
-  over: "miss",
+  motion: "linear",
+  good: "right toppings",
+  under: "wrong toppings",
+  over: "wrong toppings",
 };

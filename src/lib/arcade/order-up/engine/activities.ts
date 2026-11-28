@@ -5,6 +5,9 @@ import { calendar } from "./calendar.ts";
 import { metric } from "./progression.ts";
 import { hash } from "./random.ts";
 import { TUNING } from "./tuning.ts";
+import { GARDEN_FEATURE } from "../content/service-program.ts";
+import { treeChoiceOpen } from "./opened.ts";
+import { hasNode } from "./tree-nodes.ts";
 export interface Activity {
   kind: "delivery" | "chore" | "tasteoff" | "batch" | "garden" | "lab";
   elapsed: number;
@@ -88,7 +91,13 @@ export function finishChore(c: Campaign, a: Activity) {
   c.expansion.metrics["chore-" + c.day + "-" + a.target] = 1;
   const machine = c.expansion.machines[a.target];
   if (machine) {
-    machine.condition = Math.min(100, machine.condition + 25 + a.grade * 0.45);
+    const part = c.expansion.workshop.parts["brew-coupling"] ?? 0;
+    const spare = hasNode(c, "back-spares-bin", machine.shop) && part > 0 && (machine.broken || machine.condition < 45);
+    if (spare) {
+      if (part === 1) delete c.expansion.workshop.parts["brew-coupling"];
+      else c.expansion.workshop.parts["brew-coupling"] = part - 1;
+    }
+    machine.condition = Math.min(100, machine.condition + 25 + a.grade * 0.45 + (spare ? 20 : 0));
     machine.broken = false;
   } else if (a.target === "till") c.cash += Math.round(a.grade * 0.8);
   else if (a.target === "mop") for (const person of c.expansion.staff) person.energy = Math.min(100, person.energy + 5);
@@ -142,6 +151,10 @@ export function tasteBlend(c: Campaign, ids: string[]) {
   )
     return null;
   for (const id of ids) useStock(c, id, 1);
+  return recordBlend(c, ids);
+}
+
+function recordBlend(c: Campaign, ids: string[]) {
   const grades = flavorGrades(ids);
   c.expansion.labHistory.push({ ingredients: [...ids], grades });
   c.expansion.labHistory = c.expansion.labHistory.slice(-30);
@@ -154,6 +167,20 @@ export function tasteBlend(c: Campaign, ids: string[]) {
     const print = DECOR.filter((d) => d.kind === "print")[(c.expansion.pairings.length - 1) % 30].id;
     if (!c.expansion.prints.includes(print)) c.expansion.prints.push(print);
   }
+  return grades;
+}
+
+export function developGardenBlend(c: Campaign) {
+  const state = c.expansion.gardenFeature;
+  const [, peach] = GARDEN_FEATURE.pairing;
+  if (
+    c.status !== "planning" || !treeChoiceOpen(c, "menu-garden-oolong") ||
+    state.developed || state.sampleUntil <= c.day || stock(c, peach) < 1
+  ) return null;
+  useStock(c, peach, 1);
+  state.sampleUntil = 0;
+  const grades = recordBlend(c, [...GARDEN_FEATURE.pairing]);
+  state.developed = grades.reduce((sum, grade) => sum + grade, 0) / grades.length >= 82;
   return grades;
 }
 export function plant(c: Campaign, plot: number, id: string) {
@@ -185,13 +212,19 @@ export function water(c: Campaign, plot: number) {
   metric(c, "watering");
   return true;
 }
-export function harvest(c: Campaign, plot: number) {
+export function harvest(c: Campaign, plot: number, reserveSample = false) {
   const p = c.expansion.garden[plot];
   if (!p?.ingredient || p.growth < 3 || c.status === "open") return false;
+  const feature = c.expansion.gardenFeature;
+  if (reserveSample && (
+    c.status !== "planning" || p.ingredient !== GARDEN_FEATURE.tea || !treeChoiceOpen(c, "tea-garden-oolong") ||
+    feature.sampleUntil > c.day || feature.developed
+  )) return false;
   const ingredient = INGREDIENT_BY_ID[p.ingredient],
     quantity = ingredient.season === calendar(c.day).season.id || ingredient.season === "all" ? 12 : 6;
-  const added = addStock(c, p.ingredient, quantity, 2);
-  if (!added) return false;
+  const added = addStock(c, p.ingredient, quantity - Number(reserveSample), 2);
+  if (!added && !reserveSample) return false;
+  if (reserveSample) feature.sampleUntil = c.day + GARDEN_FEATURE.sampleDays;
   c.expansion.garden[plot] = { ingredient: null, planted: 0, watered: 0, growth: 0 };
   metric(c, "harvests");
   c.xp += 30;
@@ -201,17 +234,23 @@ export function growGarden(c: Campaign) {
   for (const p of c.expansion.garden) if (p.ingredient && p.watered === c.day) p.growth = Math.min(3, p.growth + 0.5);
 }
 export function makePearlBatch(c: Campaign, grade: number) {
-  if (!useStock(c, "pearls", 4)) return false;
-  c.expansion.pearls += 8;
+  const small = hasNode(c, "prep-portion-tray");
+  const bath = hasNode(c, "prep-hold-bath");
+  if (small && c.expansion.pearls > 0) return false;
+  if (!useStock(c, "pearls", small ? 2 : 4)) return false;
+  c.expansion.pearls += small ? 5 : bath ? 14 : hasNode(c, "prep-batch-pot") ? 10 : 8;
+  if (bath) c.expansion.metrics["warm-pearls-day"] = c.day;
   c.expansion.freshness = grade / 100;
   metric(c, "batches");
   return true;
 }
 export function planRoute(c: Campaign, to: string, ingredient: string, quantity = 8) {
+  const contract = hasNode(c, "contract-neighbor-supply") && calendar(c.day).event.arrival >= 1.2;
+  const load = quantity + (contract ? 4 : 0);
   if (
     !Number.isInteger(quantity) ||
     quantity <= 0 ||
-    quantity > 100 ||
+    load > 100 ||
     !c.expansion.shops.commissary ||
     !c.expansion.shops[to] ||
     to === "commissary" ||
@@ -221,11 +260,11 @@ export function planRoute(c: Campaign, to: string, ingredient: string, quantity 
       c.expansion.routes
         .filter((r) => r.ingredient === ingredient && r.progress < 1)
         .reduce((n, r) => n + r.quantity, 0) <
-      quantity ||
+      load ||
     c.expansion.routes.filter((r) => r.progress < 1).length >= 12
   )
     return false;
-  c.expansion.routes.push({ to, ingredient, quantity, day: c.day, progress: 0 });
+  c.expansion.routes.push({ to, ingredient, quantity: load, day: c.day, progress: 0, ...(contract ? { priority: true } : {}) });
   return true;
 }
 export function deliverRoute(c: Campaign, a: Activity) {
@@ -236,7 +275,8 @@ export function deliverRoute(c: Campaign, a: Activity) {
   if (!route || !useStock(c, route.ingredient, route.quantity)) return false;
   route.progress = 1;
   // A commissary shipment is sold through its destination from the same pantry.
-  const sales = Math.round(route.quantity * (INGREDIENT_BY_ID[route.ingredient].price * 2 + 90) * (a.grade / 100));
+  const sales = Math.round(route.quantity * (INGREDIENT_BY_ID[route.ingredient].price * 2 + 90) *
+    (a.grade / 100) * (route.priority && route.day === c.day ? 1.25 : 1));
   c.cash += sales;
   a.reward = Math.max(1, sales);
   metric(c, "deliveries");

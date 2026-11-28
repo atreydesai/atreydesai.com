@@ -13,6 +13,7 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { planks, shiplap, ground as groundSurface, type Surface } from "../surfaces.ts";
 import type { Venue, PropSpec, WallItem, FrontBox } from "../types.ts";
+import { cafeTable, windowBar, seating } from "../seating.ts";
 import { displayCup } from "../front.ts";
 import type { VenueOptions } from "./index.ts";
 import { menuBoard, clock } from "../walls.ts";
@@ -913,6 +914,11 @@ function railing(cols: number, rows: number): PropSpec[] {
 
 export function boardwalkVenue(o: VenueOptions): Venue {
   const { cols, rows } = o;
+  // Stools along the front window over the deck, and a table for two.
+  const sit = seating(
+    windowBar("boardwalk-bar", "front-left", 1.0, 3.9, 3, { cols, rows, wall: 14 }, { wood: STRAW_D, seat: CORAL, top: DRIFT }),
+    cafeTable("boardwalk-table", 1.95, 3.95, ["-x", "-y"], { wood: STRAW_D, seat: TURQ, top: DRIFT }),
+  );
   const share = 0.6;
   const wallH = 80;
   return {
@@ -947,6 +953,7 @@ export function boardwalkVenue(o: VenueOptions): Venue {
       shutter("right", 5.2, 60, 2.4),
     ],
     props: [
+      ...sit.props,
       boardsProp(share),
       pottedPalmProp(share),
       iceChestProp(share),
@@ -987,17 +994,26 @@ export function boardwalkVenue(o: VenueOptions): Venue {
         signProp("out:sign", 3.7, 7.3),
       ],
     },
-    entry: [6.0, rows + 2.6],
-    // Up from the deck through the doorway to the serve counter; a long line waits out on the deck.
+    // Up from the beach past the end of the rail, in through the doorway; a long line waits out on the deck.
+    seats: sit.seats,
+    doorway: { wall: "front-left", from: 5, to: 7 },
+    entry: [8.5, rows + 4.5],
+    way: [[8.3, rows + 2.3]],
     queue: [
-      [6.5, 2.45],
-      [6.4, 3.4],
-      [6.3, 4.35],
-      [6.0, 5.3],
-      [5.8, 6.5],
-      [5.6, 7.4],
+      [5.5, 3.4],
+      [5.6, 4.15],
+      [5.7, 4.9],
+      [5.8, 5.6],
+      [5.9, rows + 0.75],
+      [6.0, rows + 1.5],
     ],
-    pickup: [5.5, 2.2],
+    pickup: [4.75, 3.5],
+    out: [
+      [4.9, 5.2],
+      [6.3, 5.5],
+      [6.5, rows + 1.0],
+      [8.3, rows + 2.3],
+    ],
     indoorSun: share,
     backHook: thatch(cols, rows, wallH),
     facade: {

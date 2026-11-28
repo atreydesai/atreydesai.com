@@ -1,0 +1,72 @@
+/* The receipt: the shop's thermal paper, torn along its foot and set in the
+   system monospace (the only monospace in the arcade, and only on paper the
+   shop prints). Used by the ledger's tucked receipts and the counter's order
+   slip; its colours are its own in either theme. */
+.bk-slip {
+  --lg-slip: #fbf8f1;
+  --lg-slip-ink: #232020;
+  --lg-slip-muted: #857c74;
+  --lg-slip-rule: #cfc7bc;
+  --lg-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --z: 6px;
+  padding: 14px 14px 20px;
+  color: var(--lg-slip-ink);
+  background: var(--lg-slip);
+  font: 400 12px/1.5 var(--lg-mono);
+  box-shadow: 0 8px 18px rgb(0 0 0 / 0.35);
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--z) * 2) var(--z) repeat-x,
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--z) + 1px) no-repeat;
+}
+
+.bk-slip h3 {
+  margin: 0;
+  font: 600 14px/1.2 var(--lg-mono);
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.bk-slip .sub {
+  margin: 2px 0 0;
+  color: var(--lg-slip-muted);
+  text-align: center;
+}
+
+.bk-slip hr {
+  margin: 9px 0;
+  border: 0;
+  border-top: 2px dashed var(--lg-slip-rule);
+}
+
+.bk-slip .h {
+  margin: 0 0 4px;
+  color: var(--lg-slip-muted);
+  font: 600 10px/1 var(--lg-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bk-slip .ln {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.bk-slip .ln i {
+  flex: 1;
+  border-bottom: 2px dotted var(--lg-slip-rule);
+  transform: translateY(-4px);
+}
+
+.bk-slip .ln b {
+  font-weight: 600;
+}
+
+.bk-slip .net {
+  font-size: 13px;
+}
+
+.bk-slip .none {
+  margin: 0;
+  color: var(--lg-slip-muted);
+}

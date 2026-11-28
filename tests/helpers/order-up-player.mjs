@@ -21,8 +21,11 @@ export function gesture(run, memory = {}, jitter = 0.012) {
   const def = SKILLS.find((s) => s.id === run.id),
     behavior = BEHAVIORS[run.id];
   if (run.finished || run.automatic !== null) return null;
+  if (run.variant === "quick") return { type: "quick" };
+  if (def.input === "pick") return run.added.length < run.wanted.length
+    ? { type: "add", id: run.wanted[run.added.length] } : { type: "done" };
   if (def.input === "knob")
-    return run.knob !== run.knobTarget ? { type: "knob", value: run.knobTarget } : { type: "press" };
+    return { type: "choose", index: run.knobTarget };
   if (def.input === "drag") {
     const guide = behavior.guide ?? [];
     const index = memory.index ?? 0;
@@ -64,6 +67,7 @@ export function playDay(c, { maxSeconds = 400, jitter = 0.009, record = false } 
     memories = new WeakMap();
   let next = 0,
     commands = 0,
+    skillPresses = 0,
     missedInput = 0;
   const trace = [];
   while (s.status !== "complete" && s.realElapsed < maxSeconds) {
@@ -131,6 +135,7 @@ export function playDay(c, { maxSeconds = 400, jitter = 0.009, record = false } 
                 if (a) {
                   const run = cup.run;
                   skillAction(c, s, a);
+                  if (a.type !== "point") skillPresses++;
                   next = s.realElapsed + (a.type === "point" ? 0.07 : 0.13);
                   commands++;
                   if (record)
@@ -150,7 +155,7 @@ export function playDay(c, { maxSeconds = 400, jitter = 0.009, record = false } 
                   next = s.realElapsed + 0.16;
                   commands++;
                 } else if (s.walking <= 0) {
-                  beginWork(c, s);
+                  if (beginWork(c, s)) skillPresses++;
                   next = s.realElapsed + 0.16;
                   commands++;
                 }
@@ -163,5 +168,5 @@ export function playDay(c, { maxSeconds = 400, jitter = 0.009, record = false } 
     tickShift(c, s, FRAME);
   }
   const report = settleShift(c, s);
-  return { shift: s, report, commands, trace };
+  return { shift: s, report, commands, trace, skillPresses };
 }

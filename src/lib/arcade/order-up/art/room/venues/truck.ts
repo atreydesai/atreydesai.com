@@ -11,8 +11,9 @@ import type { Painter } from "../../../../core/painter.ts";
 import { noise } from "../../../../core/painter.ts";
 import { checker, panels, ground as groundSurface } from "../surfaces.ts";
 import type { Venue, PropSpec } from "../types.ts";
+import { cafeTable } from "../seating.ts";
 import { menuBoard, shelf, hood, rail } from "../walls.ts";
-import { treeProp, picnicProp, aFrameProp, fridgeProp, lampPostProp, spriteProp, INK } from "../props.ts";
+import { treeProp, aFrameProp, fridgeProp, lampPostProp, spriteProp, INK } from "../props.ts";
 import { word, bigWord, bigWidth } from "../font.ts";
 import type { FrontBox } from "../types.ts";
 
@@ -285,6 +286,8 @@ function truckSide(p: Painter, light: Light, box: FrontBox) {
 }
 
 export function truckVenue(cols: number, rows: number, hour: () => number): Venue {
+  // Under the tree by the lot, a table with seats round it.
+  const sit = cafeTable("truck-picnic", -1.4, rows + 1.5, ["-x", "-y", "+x"], { wood: "#a8774f", seat: "#a8774f", top: "#b88a5c" }, { outside: true, share: 1 });
   void hour;
   return {
     id: "truck",
@@ -320,9 +323,9 @@ export function truckVenue(cols: number, rows: number, hour: () => number): Venu
       far: farPark,
       view,
       props: [
+        ...sit.props,
         cabProp(cols, rows),
         ...wheels(cols, rows),
-        picnicProp("out:picnic", -2.6, rows + 0.6, "#a8774f"),
         treeProp("out:tree1", -1.6, rows + 2.2, "#6f8f5c", 3, 66),
         treeProp("out:tree2", cols + 1.2, -2.8, "#5f8455", 7, 62),
         treeProp("out:tree3", -2.2, -0.6, "#6a8a58", 11, 60),
@@ -331,14 +334,23 @@ export function truckVenue(cols: number, rows: number, hour: () => number): Venu
       ],
     },
     front: { height: 18, color: BODY, cap: mixHex(BODY, "#ffffff", 0.2), stripe: [BAND, 4, 8], gapsLeft: [2, 3] },
-    entry: [cols + 2, rows + 3.6],
+    // Guests never board: they line up on the lot under the hatch and take their cup through it.
+    seats: sit.seats,
+    doorway: null,
+    entry: [cols + 3.5, rows + 4.3],
     queue: [
-      [2.6, rows + 0.9],
-      [3.0, rows + 1.7],
-      [3.6, rows + 2.4],
-      [4.4, rows + 2.9],
+      [3.5, rows + 0.95],
+      [3.8, rows + 1.7],
+      [4.15, rows + 2.4],
+      [4.6, rows + 3.05],
+      [5.15, rows + 3.6],
+      [5.8, rows + 4.1],
     ],
-    pickup: [3.6, rows + 0.8],
+    pickup: [2.5, rows + 0.95],
+    out: [
+      [2.6, rows + 2.3],
+      [5.0, rows + 4.6],
+    ],
     overhead: awning(cols, rows),
     facade: {
       wall: panels(BODY, BODY, BODY, BODY),

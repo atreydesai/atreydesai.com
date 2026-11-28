@@ -19,6 +19,10 @@ export interface FloorOrder {
   cup: { sealed: boolean } | null;
   /** The ticket's slot on the rail, while it is there. */
   slot: number;
+  /** The special guest it is (a crammer, a parent and child), how many cups, and how many times it has come round again. */
+  special?: string | null;
+  cups?: number;
+  refills?: number;
 }
 
 export interface FloorState {
@@ -55,6 +59,9 @@ export function createFloor() {
         status: "accepted",
         cup: { sealed: ticket.cups.every((cup) => cup.ready) },
         slot: ticket.slot,
+        special: ticket.special,
+        cups: ticket.cups.length,
+        refills: ticket.refills ?? 0,
       });
     }
     for (const [id, order] of known) {
