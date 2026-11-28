@@ -38,10 +38,10 @@ export function paintRoute(p: Pixels, time: number) {
   p.rect("#5d566c", 30, 125, 253, 2);
   p.rect("#373345", 31, 131, 251, 8);
   p.oval("#3b3547", 59, 128, 9, 2);
-  p.oval("#3b3547", 219, 128, 11, 3);
+  p.rect("#3b3547", 208, 126, 16, 1);
   paintGroundedProp(p, "vent", 56, 127, { scale: 0.73, light: rainLight });
   paintGroundedProp(p, "signal", 269, 126, { scale: 0.72, light: rainLight });
-  paintGroundedProp(p, "courier-crate", 215, 126, { scale: 0.67, light: rainLight });
+  paintGroundedProp(p, "parcel", 215, 125, { light: rainLight });
   p.rect("#322f40", 0, 137, WIDTH, 31);
   p.rect("#665e77", 0, 137, WIDTH, 2);
   p.rect("#4e445c", 0, 140, WIDTH, 4);

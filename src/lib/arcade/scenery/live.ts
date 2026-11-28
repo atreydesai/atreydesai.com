@@ -35,16 +35,22 @@ export function createBackdrop(game: GameId) {
     altitude: number;
     entry: number;
   } | undefined> = [];
-  const rate = game === "stack" ? 30 : 15;
+  // Cup stack's sky pans with the tower and drifts behind it the whole game,
+  // so its plate is redrawn every frame on a grid as fine as the screen's
+  // (up to four steps an art pixel). Moving a whole art pixel at a time,
+  // three to five screen pixels, read as a choppy frame rate.
+  const smooth = game === "stack";
+  const rate = smooth ? 60 : 15;
   let time = 0;
+  let grain = 1;
 
   function plate(altitude: number, alternate: boolean, entry = 1) {
     const index = Number(alternate);
     let frame = plates[index];
-    if (!frame) {
-      const canvas = document.createElement("canvas");
-      canvas.width = WIDTH;
-      canvas.height = HEIGHT;
+    if (!frame || frame.canvas.width !== WIDTH * grain) {
+      const canvas = frame?.canvas ?? document.createElement("canvas");
+      canvas.width = WIDTH * grain;
+      canvas.height = HEIGHT * grain;
       frame = plates[index] = { canvas, time: -1, altitude: -1, entry: -1 };
     }
     const height = alternate ? 0 : altitude;
@@ -63,7 +69,9 @@ export function createBackdrop(game: GameId) {
       rows = HEIGHT, alternate = 0, align,
     } = options;
     if (width < 1 || height < 1 || opacity <= 0) return;
-    const altitude = Math.round(clamp(options.altitude ?? 0, 0, 124) * 8) / 8;
+    if (smooth) grain = clamp(Math.round(width * Math.abs(ctx.getTransform().a) / WIDTH), 1, 4);
+    const steps = smooth ? 64 : 8;
+    const altitude = Math.round(clamp(options.altitude ?? 0, 0, 124) * steps) / steps;
     // A preference change leaves an already-painted view where it is.
     if (!options.still || options.time < time) time = Math.floor(Math.max(0, options.time) * rate) / rate;
 
@@ -82,9 +90,9 @@ export function createBackdrop(game: GameId) {
       // Fill the extra sky/floor on narrow displays with flat edge ink. A
       // detailed row would stretch any prop it happened to cross.
       if (artTop > top) ctx.drawImage(canvas, 0, 0, 1, 1, left, top, width, artTop - top);
-      ctx.drawImage(canvas, 0, 0, WIDTH, rows, left, artTop, width, artHeight);
+      ctx.drawImage(canvas, 0, 0, WIDTH * grain, rows * grain, left, artTop, width, artHeight);
       const bottom = artTop + artHeight;
-      if (bottom < top + height) ctx.drawImage(canvas, 0, rows - 1, 1, 1, left, bottom, width, top + height - bottom);
+      if (bottom < top + height) ctx.drawImage(canvas, 0, rows * grain - 1, 1, 1, left, bottom, width, top + height - bottom);
     }
 
     // Crossfade the two paintings once into a plate, before laying that
@@ -100,10 +108,10 @@ export function createBackdrop(game: GameId) {
   let transition: HTMLCanvasElement | undefined;
 
   function blend(altitude: number, amount: number) {
-    if (!transition) {
-      transition = document.createElement("canvas");
-      transition.width = WIDTH;
-      transition.height = HEIGHT;
+    transition ??= document.createElement("canvas");
+    if (transition.width !== WIDTH * grain) {
+      transition.width = WIDTH * grain;
+      transition.height = HEIGHT * grain;
     }
     const ctx = transition.getContext("2d")!;
     ctx.globalAlpha = 1;

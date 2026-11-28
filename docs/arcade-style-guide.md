@@ -812,7 +812,9 @@ A cup slides over the tower; drop it, and what overhangs is sliced off.
 - **It moves with the game.** Clouds and birds drift faster as the slide
   speeds up. A perfect drop sends out a ring of sparkle cells, in the drink's
   colour once the streak is growing the cup. When the tower falls, the sky
-  sweeps back down to the rooftop.
+  sweeps back down to the rooftop. The painting is redrawn every frame on a
+  grid as fine as the screen (up to four steps an art pixel), so the drift
+  and the climb glide; a whole art pixel at a time read as a low frame rate.
 - **Never cut more than you saw.** The tray is judged at the width it is
   drawn. The sliding cup glides on the screen's pixel grid (half CSS pixels
   on a sharp screen), and a drop is judged exactly where it was last drawn.

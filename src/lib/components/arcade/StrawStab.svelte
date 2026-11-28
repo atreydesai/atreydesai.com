@@ -1691,11 +1691,20 @@
     drawWindows(near, nearScroll, false);
     // The ferry is there early. The lantern market takes over as the
     // music rises through tiers; the lane and its beat notch stay in front.
+    const ferry = 1 - clamp((nightAt() - 0.14) / 0.49, 0, 1);
     drawBackdrop(ctx, {
       width: viewW, height: laneTop, rows: 126, time: now, still: reduceMotion,
-      alternate: 1 - clamp((nightAt() - 0.14) / 0.49, 0, 1),
-      opacity: 0.9, focus: 0.8,
+      alternate: ferry, opacity: 0.9 + 0.1 * ferry, focus: 0.8,
     });
+    // The ferry's painting ends at the water. Its quay carries on down the
+    // lane, so the city skylines behind don't show up under the water; they
+    // come back into the lane as the market takes over.
+    if (ferry > 0) {
+      drawBackdrop(ctx, {
+        top: laneTop, width: viewW, height: skyBottom - laneTop, time: now, still: reduceMotion,
+        alternate: 1, opacity: ferry, align: { row: 126, y: laneTop },
+      });
+    }
     drawRigs(now);
     // Everything behind the cups' lane is laid under one flat dark band.
     drawLane();

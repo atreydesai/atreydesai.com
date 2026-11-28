@@ -78,16 +78,24 @@ function glassRoofs(p: Pixels, time: number) {
   p.image(gardenSky, 0, 0);
   skyline(p, 115, -time * 2, 0);
   skyline(p, 131, -time * 5, 1);
+  // The far blocks' street, so no sky shows under the skyline.
+  p.rect("#5f4f5b", 0, 131, WIDTH, 6);
   for (let i = 0; i < 5; i++) {
     const x = wrap(i * 101 + 22 - time * 14, 505) - 76;
     const y = 86 + (i % 2) * 7;
+    // Each greenhouse stands on its own building, down to the street, so
+    // none hangs in the sky over the skyline.
+    p.rect("#6a5a62", x + 3, y + 36, 69, 137 - y - 36);
+    p.rect("#5b4e58", x + 3, y + 41, 2, 137 - y - 41);
+    for (let row = y + 46; row < 133; row += 7) {
+      for (let col = 9; col < 66; col += 9) {
+        p.rect(hash(i * 31 + col + row) > 0.55 ? "#d0a47e" : "#584b55", x + col, row, 4, 3);
+      }
+    }
     paintProp(p, "greenhouse", x + 5, y, { scale: 0.85, light: glassLight });
     p.rect("#765f5f", x + 1, y + 32, 73, 5);
     p.rect("#b3947c", x + 1, y + 32, 73, 2);
-    if (i % 2) {
-      p.oval("#7d6961", x + 65, y + 34, 8, 2);
-      paintGroundedProp(p, "planter", x + 65, y + 33, { scale: 0.58, turn: i * 15, light: glassLight });
-    }
+    if (i % 2) paintGroundedProp(p, "planter-box", x + 65, y + 32, { light: glassLight });
     p.rect("#62565c", x + 1, y + 37, 73, 4);
     p.rect("#856b62", x + 2, y + 37, 72);
   }

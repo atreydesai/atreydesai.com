@@ -341,6 +341,23 @@ export const props: Record<string, Prop> = {
     p.rect("#5b5855", 5, 37, 64, 3);
   }),
 
+  // Side-on stand-ins for the sprite stacks in sugar rush's side-on scenes.
+  // A stack is seen from above at a slant, so on a ledge seen edge-on it
+  // hangs off the front; the guide keeps stacks for things that turn.
+  "planter-box": stamp("rooftop tomato planter", 15, 13, (p) => {
+    p.rect("#567551", 2, 2, 11, 6); p.rect("#779a59", 3, 1, 4, 4); p.rect("#779a59", 8, 0, 4, 5);
+    p.rect("#aac478", 4, 1, 2); p.rect("#aac478", 9, 0, 2);
+    p.rect("#be665e", 3, 5, 2, 2); p.rect("#e49375", 10, 4, 2, 2); p.rect("#be665e", 7, 6, 2, 2);
+    p.rect(ink, 0, 7, 15, 6); p.rect("#ad6d50", 1, 8, 13, 4); p.rect("#d59b71", 1, 8, 13);
+    p.rect("#7e5642", 1, 11, 13);
+  }),
+
+  parcel: stamp("courier parcel", 14, 11, (p) => {
+    p.rect(ink, 0, 1, 14, 10); p.rect("#b4825d", 1, 2, 12, 8); p.rect("#d3a377", 1, 2, 12, 2);
+    p.rect(ink, 1, 0, 12, 1); p.rect("#8c6249", 6, 1, 2, 9);
+    p.rect(paper, 9, 5, 3, 3); p.rect(red, 9, 5, 3);
+  }),
+
   mast: stamp("folding solar mast", 36, 35, (p) => {
     p.rect(ink, 14, 29, 11, 5); p.rect(steel, 17, 10, 4, 20);
     p.line(steel, 8, 26, 25, 25); p.rect(ink, 1, 4, 32, 11);
@@ -398,7 +415,6 @@ export const props: Record<string, Prop> = {
   "ice-chest": stacked("open ice chest", iceChest, 22.5, 0.58),
   stamp: stacked("coral order stamp", inkStamp, 30),
   basket: stacked("wicker carry basket", models.catch, 30),
-  "courier-crate": stacked("courier crate", models.runner, 22.5, 0.48),
   "lunar-beacon": stacked("parked survey lander", models.lander, 15, 0.48),
   "pearl-satellite": stacked("pearl satellite", models.stack, 30),
   "straw-caddy": stacked("straw caddy", models.stab, 22.5, 0.52),
