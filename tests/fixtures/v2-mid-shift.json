@@ -1,0 +1,535 @@
+{
+  "campaign": {
+    "version": 2,
+    "mode": "normal",
+    "day": 12,
+    "cash": 18740,
+    "xp": 1200,
+    "reputation": 50,
+    "highestReputation": 50,
+    "bestShiftScore": 743,
+    "status": "open",
+    "inventory": [
+      {
+        "id": 1,
+        "ingredient": "black",
+        "quantity": 16,
+        "expiresOn": 18
+      },
+      {
+        "id": 2,
+        "ingredient": "jasmine",
+        "quantity": 16,
+        "expiresOn": 18
+      },
+      {
+        "id": 3,
+        "ingredient": "taro",
+        "quantity": 14,
+        "expiresOn": 18
+      },
+      {
+        "id": 4,
+        "ingredient": "milk",
+        "quantity": 19,
+        "expiresOn": 18
+      },
+      {
+        "id": 5,
+        "ingredient": "oat",
+        "quantity": 14,
+        "expiresOn": 18
+      },
+      {
+        "id": 6,
+        "ingredient": "pearls",
+        "quantity": 14,
+        "expiresOn": 18
+      },
+      {
+        "id": 7,
+        "ingredient": "popping",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 8,
+        "ingredient": "pudding",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 9,
+        "ingredient": "strawberry",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 10,
+        "ingredient": "banana",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 11,
+        "ingredient": "brown-sugar",
+        "quantity": 16,
+        "expiresOn": 18
+      },
+      {
+        "id": 12,
+        "ingredient": "honey",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 13,
+        "ingredient": "vanilla",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 14,
+        "ingredient": "bun",
+        "quantity": 11,
+        "expiresOn": 18
+      },
+      {
+        "id": 15,
+        "ingredient": "mango",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 16,
+        "ingredient": "grass-jelly",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 17,
+        "ingredient": "waffle",
+        "quantity": 10,
+        "expiresOn": 18
+      },
+      {
+        "id": 18,
+        "ingredient": "banana-scoop",
+        "quantity": 9,
+        "expiresOn": 18
+      },
+      {
+        "id": 19,
+        "ingredient": "vanilla-scoop",
+        "quantity": 9,
+        "expiresOn": 18
+      },
+      {
+        "id": 20,
+        "ingredient": "sesame-syrup",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 21,
+        "ingredient": "yuzu",
+        "quantity": 11,
+        "expiresOn": 18
+      },
+      {
+        "id": 22,
+        "ingredient": "seltzer",
+        "quantity": 12,
+        "expiresOn": 18
+      }
+    ],
+    "deliveries": [],
+    "upgrades": [
+      "auto-tea",
+      "warm-shelf"
+    ],
+    "powerups": {
+      "rush": 0,
+      "patience": 0,
+      "quality": 0,
+      "assist": 0,
+      "supplies": 0,
+      "special": 0,
+      "quiet": 0
+    },
+    "activePowerups": [],
+    "legacyUnlimitedStock": false,
+    "crew": [
+      "host",
+      "prep",
+      "runner",
+      "manager"
+    ],
+    "crewShifts": {
+      "host": 2,
+      "prep": 2,
+      "runner": 2,
+      "manager": 2
+    },
+    "certifiedCrew": [
+      "host"
+    ],
+    "activeCrew": [
+      "host"
+    ],
+    "branches": [
+      "corner",
+      "campus"
+    ],
+    "branchFittings": [],
+    "activeBranch": "corner",
+    "managedBranch": null,
+    "managerBranch": null,
+    "locationManagers": {
+      "campus": {
+        "scheduled": true,
+        "shifts": 2,
+        "certified": true
+      }
+    },
+    "managerMenus": {},
+    "publicity": null,
+    "commission": null,
+    "standingOrders": {},
+    "paint": "clay",
+    "paintUnlocked": [
+      "clay"
+    ],
+    "recipeRecords": {},
+    "cupPrint": "house",
+    "currentEvent": "neighborhood",
+    "lastDay": null,
+    "regularVisits": {
+      "mochi": 4,
+      "biscuit": 3
+    },
+    "rentPaid": 0,
+    "rentBook": {
+      "current": null,
+      "history": []
+    },
+    "nextId": 23
+  },
+  "shift": {
+    "day": 12,
+    "expert": false,
+    "effects": {
+      "arrivalMultiplier": 0.95,
+      "patienceMultiplier": 1.3687999999999998,
+      "tipMultiplier": 1.15,
+      "fruitBonus": 0,
+      "prepMultiplier": 1,
+      "prepHoldBonus": 15,
+      "floatHoldBonus": 0,
+      "ticketSlots": 3,
+      "autoSeal": false,
+      "serveBonus": 0,
+      "qualityBonus": 0,
+      "autoTea": true,
+      "autoMilk": false,
+      "autoToppings": false,
+      "autoExtras": false,
+      "carafe": false,
+      "batchPickup": false,
+      "sideBonus": 0,
+      "icedBonus": 0,
+      "sparklingBonus": 0
+    },
+    "status": "open",
+    "elapsed": 2.6,
+    "duration": 100,
+    "orders": [
+      {
+        "id": "12-1",
+        "customerId": "yuzu",
+        "customerName": "Yuzu",
+        "tag": "Sneaks in between calls",
+        "arrivesAt": 0,
+        "patience": 40.266712,
+        "maxPatience": 42.578711999999996,
+        "status": "brewing",
+        "recipe": {
+          "name": "Honey Jasmine Boba",
+          "tea": "jasmine",
+          "milk": null,
+          "toppings": [
+            "popping",
+            "popping"
+          ],
+          "mixins": [
+            "strawberry"
+          ],
+          "syrup": "honey",
+          "sugar": 2,
+          "ice": 3,
+          "bun": false
+        },
+        "cup": {
+          "tea": "jasmine",
+          "milk": null,
+          "brew": {
+            "elapsed": 0.6000000000000001,
+            "target": 3.5,
+            "quality": null,
+            "done": false
+          },
+          "ingredients": {},
+          "ice": 0,
+          "shaken": false,
+          "sealed": false,
+          "qualityBonus": 0,
+          "prepQuality": {}
+        }
+      },
+      {
+        "id": "12-2",
+        "customerId": "dumpling",
+        "customerName": "Dumpling",
+        "tag": "Here for taro and a bun",
+        "arrivesAt": 11.1,
+        "patience": 51.653856,
+        "maxPatience": 51.653856,
+        "status": "waiting",
+        "recipe": {
+          "name": "Taro Pearl Milk Tea & Bun",
+          "tea": "taro",
+          "milk": "milk",
+          "toppings": [
+            "pearls"
+          ],
+          "mixins": [],
+          "syrup": "vanilla",
+          "sugar": 1,
+          "ice": 1,
+          "bun": true
+        },
+        "cup": null
+      },
+      {
+        "id": "12-3",
+        "customerId": "pudding",
+        "customerName": "Pudding",
+        "tag": "Orders their namesake",
+        "arrivesAt": 16.8,
+        "patience": 47.383199999999995,
+        "maxPatience": 47.383199999999995,
+        "status": "waiting",
+        "recipe": {
+          "name": "Taro Pudding Milk Tea",
+          "tea": "taro",
+          "milk": "milk",
+          "toppings": [
+            "pudding"
+          ],
+          "mixins": [],
+          "syrup": "vanilla",
+          "sugar": 2,
+          "ice": 1,
+          "bun": false
+        },
+        "cup": null
+      },
+      {
+        "id": "12-4",
+        "customerId": "sprout",
+        "customerName": "Sprout",
+        "tag": "Can barely reach the counter",
+        "arrivesAt": 33.2,
+        "patience": 53.255352,
+        "maxPatience": 53.255352,
+        "status": "waiting",
+        "recipe": {
+          "name": "Strawberry Shortcake Tea",
+          "tea": "jasmine",
+          "milk": "oat",
+          "toppings": [
+            "pudding"
+          ],
+          "mixins": [
+            "strawberry"
+          ],
+          "syrup": "vanilla",
+          "sugar": 2,
+          "ice": 2,
+          "bun": true
+        },
+        "cup": null
+      },
+      {
+        "id": "12-5",
+        "customerId": "figgy",
+        "customerName": "Figgy",
+        "tag": "Usually buys a drink for a friend, too",
+        "arrivesAt": 44.2,
+        "patience": 49.518527999999996,
+        "maxPatience": 49.518527999999996,
+        "status": "waiting",
+        "recipe": {
+          "name": "Banana Pudding Tea",
+          "tea": "black",
+          "milk": "milk",
+          "toppings": [
+            "pudding"
+          ],
+          "mixins": [
+            "banana"
+          ],
+          "syrup": "vanilla",
+          "sugar": 1,
+          "ice": 1,
+          "bun": false
+        },
+        "cup": null
+      },
+      {
+        "id": "12-6",
+        "customerId": "miso",
+        "customerName": "Miso",
+        "tag": "Likes every drink extra cold",
+        "arrivesAt": 50,
+        "patience": 45.247871999999994,
+        "maxPatience": 45.247871999999994,
+        "status": "waiting",
+        "recipe": {
+          "name": "Reading Room Tea & Bun",
+          "tea": "black",
+          "milk": "milk",
+          "toppings": [
+            "pearls"
+          ],
+          "mixins": [],
+          "syrup": "vanilla",
+          "sugar": 1,
+          "ice": 0,
+          "bun": true
+        },
+        "cup": null,
+        "seasonalSpecial": "book-club"
+      },
+      {
+        "id": "12-7",
+        "customerId": "basil",
+        "customerName": "Basil",
+        "tag": "Always asks if it's unsweetened",
+        "arrivesAt": 66.3,
+        "patience": 50.586192,
+        "maxPatience": 50.586192,
+        "status": "waiting",
+        "recipe": {
+          "name": "Jasmine Oat & Bun",
+          "tea": "jasmine",
+          "milk": "oat",
+          "toppings": [],
+          "mixins": [],
+          "syrup": "honey",
+          "sugar": 0,
+          "ice": 0,
+          "bun": true
+        },
+        "cup": null
+      },
+      {
+        "id": "12-8",
+        "customerId": "maple",
+        "customerName": "Maple",
+        "tag": "Calls everyone chef",
+        "arrivesAt": 77.4,
+        "patience": 49.518527999999996,
+        "maxPatience": 49.518527999999996,
+        "status": "waiting",
+        "recipe": {
+          "name": "Mango Brown Sugar Taro",
+          "tea": "taro",
+          "milk": "oat",
+          "toppings": [
+            "pearls",
+            "pearls"
+          ],
+          "mixins": [
+            "mango"
+          ],
+          "syrup": "brown-sugar",
+          "sugar": 3,
+          "ice": 1,
+          "bun": false
+        },
+        "cup": null
+      },
+      {
+        "id": "12-9",
+        "customerId": "kiwi",
+        "customerName": "Kiwi",
+        "tag": "Gets a pudding scoop every time",
+        "arrivesAt": 83.1,
+        "patience": 47.383199999999995,
+        "maxPatience": 47.383199999999995,
+        "status": "waiting",
+        "recipe": {
+          "name": "Strawberry Mango Pudding Tea",
+          "tea": "taro",
+          "milk": "milk",
+          "toppings": [
+            "pudding"
+          ],
+          "mixins": [
+            "strawberry",
+            "mango"
+          ],
+          "syrup": "vanilla",
+          "sugar": 1,
+          "ice": 2,
+          "bun": false
+        },
+        "cup": null
+      }
+    ],
+    "pearls": {
+      "cooking": false,
+      "elapsed": 0,
+      "target": 7,
+      "ready": 0,
+      "quality": 0,
+      "cookedAt": null
+    },
+    "buns": {
+      "cooking": false,
+      "elapsed": 0,
+      "target": 5,
+      "ready": 0,
+      "quality": 0,
+      "cookedAt": null
+    },
+    "waffles": {
+      "cooking": false,
+      "elapsed": 0,
+      "target": 3.25,
+      "ready": 0,
+      "quality": 0,
+      "cookedAt": null
+    },
+    "receipts": [],
+    "usage": {
+      "jasmine": 1
+    },
+    "powerups": {
+      "rush": 0,
+      "patience": 0,
+      "quality": 0,
+      "assist": 0,
+      "supplies": 0,
+      "special": 0,
+      "quiet": 0
+    },
+    "streak": 0,
+    "houseRoundReady": false,
+    "notice": "The tea is brewing."
+  },
+  "bookedDay": null,
+  "cateringDay": null,
+  "houseBlend": null
+}

@@ -1,0 +1,191 @@
+/* The shop's painted places share one frame: the picture contained in the
+   view at its own 8:5 proportion (432 by 270 for the places, 240 by 150 for
+   the window and street), controls laid over the things they act on, and
+   one row of pixel keys under it that never changes height. */
+.ou-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ou-stage {
+  position: relative;
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+  background: #2c2629;
+  container-type: size;
+}
+
+.ou-frame {
+  position: relative;
+  width: min(100cqw, 160cqh);
+  aspect-ratio: 240 / 150;
+  /* One scene pixel, for laying things over the art at its own scale. */
+  container-type: inline-size;
+  --px: calc(100cqw / 432);
+}
+
+.ou-spot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.ou-keys {
+  display: flex;
+  flex: none;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: safe center;
+  gap: 6px;
+  padding: 8px var(--space-3);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ou-keys .boba-key {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+/* Keys laid over the art scale with it, down to a phone's frame. */
+.ou-spot .boba-key {
+  min-height: clamp(30px, calc(var(--px) * 26), 44px);
+  padding-inline: clamp(6px, calc(var(--px) * 7), 12px);
+  font-size: clamp(0.6875rem, calc(var(--px) * 8.5), 0.875rem);
+  white-space: nowrap;
+}
+
+.ou-note {
+  margin: 0;
+  color: #e7c9a8;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.ou-select select {
+  min-height: 44px;
+  max-width: 14rem;
+  padding: 0 10px;
+  border: 0;
+  background: #2a2224;
+  color: #fff0d6;
+  font: inherit;
+  font-size: 0.8125rem;
+  box-shadow: inset 0 0 0 2px #6b5048;
+  clip-path: var(--notch);
+}
+
+.ou-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: #2a2224;
+  color: #fff0d6;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  clip-path: var(--notch);
+}
+
+.ou-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* A box over the art in scene pixels: left/top/width/height set inline in %. */
+.ou-box {
+  position: absolute;
+}
+
+/* A thing in the picture that is a button: invisible until hovered or focused. */
+.ou-hot {
+  position: absolute;
+  display: grid;
+  place-items: end center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.ou-hot:focus-visible,
+.ou-hot.is-picked {
+  outline: 2px dashed #ffe0a8;
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .ou-hot:not(:disabled):hover {
+    outline: 2px dashed #ffe0a8;
+    outline-offset: 2px;
+  }
+}
+
+.ou-hot:disabled {
+  cursor: default;
+}
+
+/* A short caption plate on something in the picture. */
+.ou-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: -2px;
+  padding: 2px 6px;
+  background: rgb(42 34 36 / 0.88);
+  color: #fff0d6;
+  font-size: clamp(0.625rem, calc(var(--px) * 8), 0.75rem);
+  line-height: 1.25;
+  white-space: nowrap;
+  clip-path: var(--notch);
+}
+
+/* An ingredient icon sized in scene pixels (set --size, in pixels of the art). */
+.ou-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: calc(var(--px) * var(--size, 12));
+  height: calc(var(--px) * var(--size, 12));
+}
+
+.ou-icon > svg,
+.ou-icon > span {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Text that changes keeps its width, so the keys beside it stay put. */
+.ou-fixed {
+  display: inline-block;
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ou-keys .ou-note {
+  flex: none;
+  text-align: left;
+}
+
+/* A phone stacks the panels and lets them take their own height. */
+@media (max-width: 760px) {
+  .ou-stage {
+    container-type: inline-size;
+  }
+
+  .ou-frame {
+    width: 100%;
+  }
+}

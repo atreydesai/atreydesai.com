@@ -41,7 +41,7 @@ Three rules hold everywhere:
 | cup stack  | Drop cups onto a tower          | Tap, click, Space                                    | Everywhere   |
 | spill      | Draw straws to steer the pour   | Drag to draw; arrows and Space as a pen              | Everywhere   |
 | straw stab | Stab each cup on the beat       | Tap, click, Space                                    | Everywhere   |
-| order up   | Brew, build, serve, run a shop | Tap, click, or keyboard                              | Everywhere   |
+| order up   | Brew, build, serve, run a shop  | Tap, click, or keyboard                              | Everywhere   |
 
 The menu lists them in this order, and their shortcut keys are `1` to `7` in
 the same order.
@@ -571,154 +571,131 @@ A conveyor belt carries cups past a straw; stab each on the beat.
 
 ### Order up
 
-The arcade entry opens the milk tea shop ledger. During a shift, up to five
-stations run at once. Brew handles tea and milk. Prep cooks tapioca pearls,
-steamed buns, and from day 13, sesame waffles. The waffle press cooks quickly,
-so time it close to handoff for crisp edges. Build layers the ticket's fruit,
-syrup, toppings, and ice. Serve shakes, seals, and hands over the drink for an
-itemized grade and tip. Returning guests remember their earlier visits and have
-favorite recipes, including blends of strawberries and banana.
+Order up opens on its saves: three shops per difficulty, each in its own
+slot (`order-up/engine/slots.ts`), listed with its day, shop and till, to
+play, start new or delete; the shop played last is the primary key. On a
+development host a fourth slot, the test kitchen, adds a test tab to the
+shop book with cheats (the till, jumping to any day with its rank, every
+shop, a stocked pantry, the whole collection, finishing cups, patience and
+the clock, and going straight to any place), so every part of the game can
+be reached; it never shows on the live site, and the menu's best never
+counts it. The first campaign's single save is retired the first time the
+saves open. The shop book's Saves key comes back here.
 
-- Both modes stock from immediate and scheduled suppliers, use the oldest
-  ingredients first, and settle rent after every seven-day shop month. Normal
-  has more starting stock and cash, longer shelf life, and lower rent. Expert
-  adds tighter timing and more pressure from the queue. An unpaid rent bill
-  closes the shop. A missed ticket costs a sale and reputation.
-- New days bring a shuffled event, recipe and regular unlocks, and chances to
-  spend earnings on equipment or single-shift boosts. Equipment can catch a
-  brew at its target or portion recipe ingredients from the ticket. The Tea
-  Carafe can hold the extra portion of a double brew for the next guest who
-  orders that tea. Milk still goes in at the pitcher. The Warm Shelf gives
-  all three prep batches another fifteen seconds before they cool.
-  The Cold Tray keeps ice-cream finishes cold a little longer. A Wide Ticket
-  Rack gives you room to prepare four orders at once. The Automatic Sealer
-  handles a matching drink after its last finishing step.
-  The chalkboard pays extra for fresh pastries on rainy days and correct
-  extra-ice recipes on campus breaks.
-  The opening menu grows through day 31. Toasted sesame gets a dark syrup pump
-  on day 18, and yuzu gets a citrus bowl on day 23. Some recipes use two
-  kettles at once from day 21. Both choices print on the ticket, and either
-  pick order is valid. Both tea colors show in the stacked cup. Sparkling
-  orders arrive on day 27. Charge a shaken tea at the seltzer tap and show
-  the bubbles in the cup. Starting on day 5, repeat customers
-  can request a variation. Keep their words and the exact measured recipe
-  on the ticket, and show the bonus on the handoff receipt when it is earned.
-- The ledger and any active tickets, timers, pantry, and equipment are saved
-  together on the device. Normal and Expert keep separate shops. Practice
-  a ticket from the opening notice to work through an upcoming recipe
-  without a shift clock or pantry costs. Practice preserves any open shift.
-  The Opening Key gives a short prep window with real stock and a closed
-  door. The guest clock starts when the doors open.
-- The Supplier Ledger allows four standing orders. Mark a supplier on a
-  shelf. At closing, that supplier sends a crate when the new day's stock
-  falls below four and no shipment is due. The ledger sets aside payroll
-  and approaching rent first. Street Market and Fruit Special days mark
-  down fruit from the named supplier. The Wall Calendar forecasts the next
-  three events, expected deliveries, and rent. The receipt shows any
-  restocking spend.
-- Brew, Build, Serve, Prep, and Stockroom are physical counters in one three-quarter
-  kitchen. Choose a counter in the room or press `1` through `5` to move the
-  chef. The Prep counter gives pearls and buns their own timed equipment and
-  freshness meters. Ingredient pictures and small portion marks print on the
-  recipe slip. Open the slip for the full ingredient names at any counter.
-- The counter camera (`V`) puts the eye-level station artwork first and keeps
-  the room in reach. Space presses the current station's primary key when
-  focus rests on the counter. Arrow keys follow the positions of the physical
-  counters. The chef carries the cup from Brew to Build or Build to Serve.
-  A streak of three well-made drinks earns a
-  tasting tray for the people currently waiting.
-- The Stockroom opens on day 3. Ring the market bell for a small express
-  crate during the shift, watch the courier, and use the ingredients when
-  the crate arrives. Ingredient controls can lead there when their bin is empty.
-  On the public side, the entrance leads to the order line and the separate
-  pickup mark. The original Order Up cast walks in, reacts to the wait, and
-  takes a sip before carrying out a boba cup. Reuse the original guest faces and
-  emotes so a guest's reaction matches their receipt. Tap a guest to take their ticket
-  or work on their order. At Serve, a guest with a sealed cup can be served
-  directly. The ticket rail repeats the guest's name, patience, and pickup
-  status for a quick scan. Market awnings, campus pennants, and festival
-  lanterns belong outside the glass and stay behind the kitchen tools.
-- The close-up worktop accepts taps on illustrated kettles, pumps, jars and
-  the serving tray, with labelled keys for each action within reach. A gold
-  square marks the equipment or portion called for on the ticket. Build
-  highlights the selected recipe's bins and lets the player open the full
-  ingredient rack. The cup uses sprite stacking. A sealed cup brings its
-  guest into view at the pickup window, where you can tap to hand it over
-  and see them take a sip. The Pickup Counter can hand out two or more sealed
-  cups together. Exterior windows share the shift's daylight, rain, or night
-  across the kitchen, worktop, and pickup view. Match steam to the running kettles.
-  The chef, customers, cup, and scene animations stay still with Reduce Motion.
-- Purchased boosts are kept together beside the kitchen. Counter Help
-  finishes the selected brewed drink if its ingredients and prep are ready.
-  Emergency Run replenishes short stock through closing. Tip Special applies
-  to the next three handoffs and shows how many are left.
-  The Window Chime holds the line's patience for a few seconds while
-  brewing, prep, and the shift clock keep moving.
-- The shop office hires a host, prep cook, and runner. Schedule them for a
-  shift, pay their wages at close, and show their posts in the kitchen.
-  Two shifts with sales qualify a worker for a certificate. Show the one-time
-  cost and new wage on the roster. Their badge and benefit are active on duty.
-  Purchased branches add rent and change the active shift's traffic and
-  sales. Branch and event recipes rotate onto the opening chalkboard. The
-  notice offers two shift contracts and, from day 5, an optional group
-  reservation. Booked guests sit together and can be served with one
-  handoff at their table when their drinks are sealed. A runner can carry a
-  complete tray to the table on your behalf.
-  The Takeout Rack unlocks three-cup courier jobs from day 12. Pack sealed
-  cups into the kraft carrier at Serve. Green tickets share a fixed pickup
-  time, and the rail shows how many cups are packed. You can book a table or
-  a takeout job for a shift. Both bonuses print on the till receipt when earned.
-  From day 4, the neighborhood board offers a commission
-  that carries over between shifts. Complete it before rent day to collect
-  the payout. The first completed commission of each kind unlocks a paint
-  color for the shop and apron. Choose it at the office.
-  Reputation milestones earn permanent neighborhood awards for longer guest
-  patience, bigger tips, and lower location prices. An enamel pin joins the
-  office cabinet and the same cabinet hangs behind the pass after the first award.
-- Book one optional promotion in the shop office to trade cash for different
-  traffic, wait times, tips, or fruit sales. A purchased Menu Easel opens a
-  tasting counter. Make a house blend with the ingredient pictures and check
-  it in the layered cup before putting it on the chalkboard.
-  At level five, the recipe tin keeps up to three drafts. With two or more,
-  the player can rotate one onto each new day's board.
-  The recipe album keeps serving stamps and best grades for the regular
-  menu. Signature recipes unlock printed cup seals, rendered on the cup
-  itself. Select a recipe in the album to practice it.
-- The runner can staff an owned side stand instead of working the live pass.
-  It shares the pantry and rings its sales under a separate line on the till
-  receipt. Hire a manager at each additional shop from the Locations map.
-  Schedule managers before opening. Each scheduled manager earns their own
-  wage and serves their shop's tea from the shared pantry. The original
-  Branch Manager can move between locations. A certified manager can choose
-  a fruit or dessert menu. The office and Stockroom forecasts account for
-  the runner and other managers drawing from the same stock.
-  A branch renovation changes both the scene and the service at that address.
-  The Skyline Tea Loft is a level-ten shop. Its drifting clouds cross the
-  window from beyond its edges, behind the rooftop fixtures.
-  Each location has a different
-  street view that appears through its windows. Inspect a shop on the office
-  map to open there, send staff, or check the price.
-- Select later recipes add a milk-foam cap at the Serve pitcher after
-  shaking. The day 16 freezer adds banana and vanilla scoops for floats.
-  Scoop just before the handoff. The receipt keeps the customer's short
-  tasting note.
-- Three good handoffs to a regular fill their guestbook card. Completed
-  cards earn keepsakes, with the postcard, plant, charm, and cup trophy
-  displayed in the kitchen as the collection grows.
-- The shop runs on dark pixel chips and arcade keys. The active recipe and
-  handoff receipt print on warm slips against that counter. The opening
-  notice leads with the day's event and menu. If the pantry falls short for
-  the first tickets, ingredient marks on the notice link right to those
-  shelves. The closing receipt leads
-  with the shift's takings and leaves next-day setup to the opening notice.
-  Pantry, Workshop, and Regulars open from illustrated tools on the notice.
-  Use spacing and type to group information on these sheets. Painted signs
-  and readouts use drawn letters. Longer labels and recipes use Neue Haas
-  Grotesk.
+A shop opens on the shop book, kept like a ledger over the shop: the day in
+pixel letters, the day's event as its headline with its rule under it, the
+till on the right, and the chapters down the margin as index tabs (Today,
+Pantry, Workshop, Crew, Shops, Album; Testing in the test kitchen). Each
+chapter is a ledger: rows on a grid with their column headings written once,
+a mark only where something is out of the ordinary (out of stock, in season,
+low upkeep), and the picked row written up in a panel beside the list with
+its actions. Choices are pixel keys (suppliers, kinds, price levels, the
+counter a crew member works), never a dropdown. Today leads with the last
+shift's receipt, then what's new, the week as seven columns, money, and the
+promotion; contracts are chits clipped down the right, taken ones stamped.
+The Shops chapter shows every shop by its own room, baked small. One primary
+key sits at the foot (Open the shop, or Back to the shift), with Saves,
+Export and Import as quiet links beside it. The same ingredients, guests,
+machines and places arrive in Normal and Expert; the numbers change, not the
+content. The rules live in `src/lib/arcade/order-up/` (typed content, a
+DOM-free engine and one module per skill); the components in
+`src/lib/components/arcade/order-up/` draw and listen.
 
-Each drink served or packed at the player's counter adds its quality out
-of 100 to the shift score. The closing receipt shows the total. The Arcade
-menu shows the best completed shift for the current difficulty and shop save.
+- **Five places on screen, fixed.** The header is the arcade's shop header:
+  the sign, Day, Time, Till and Points in pixel letters, and the HUD buttons
+  (difficulty keys and Arcade between shifts, pause and sound during one).
+  The clock's slot and the buttons' room are kept whether or not a shift is
+  on, so opening the shop moves nothing. Under it the ticket rail has a peg
+  for every ticket the shop can hold. The room fills the left, the counter
+  the right, and the tool belt runs along the foot. Every place keeps one
+  control row of the same height under its picture, so switching places or
+  picking options never rescales the picture or moves a key.
+- **One place strip.** Over the picture a strip of pixel signs (room,
+  counter, order window, street, stockroom and the rest as they open) picks
+  the place; `V` steps through them. There is no other place picker.
+- **The rooms** are isometric pixel scenes baked per venue and per light
+  (`art/room/`): each of the twelve shops is its own build (a brick corner
+  shop, a campus kiosk, a glass conservatory, a market stall, a station
+  concourse, a pier tea house, a high-rise loft, a step van, a beach shack, a
+  log lodge, a warehouse kitchen, a lunar habitat), with its own walls,
+  floor, windows onto its own outside, lamps, wall things, props and the
+  world around it, set out as data in `art/room/venues/`. Counters stand at
+  the shop's own layout with their tools at fixed spots on their tops, at a
+  size a hand could lift, sorted back to front. Light is a palette, not an
+  overlay (`core/light.ts`): the hour of the shift, the season and the
+  weather colour every material, the sun throws patches through the windows
+  and shadows on the ground outside from where it stands, and the lamps
+  pool light after dark. The chef walks between counters and guests come in,
+  queue, wait at pickup and leave (`art/room/actors.ts`); counters are real
+  buttons over the art, and a guest can be clicked to pick their ticket.
+  Arranging turns the floor's tiles into buttons.
+- **Drawn once, blitted after.** A room is baked into a background, an
+  atlas of everything that stands (one image, `core/atlas.ts`) and an
+  overhead layer, in a Web Worker (`art/room/bake.worker.ts`), the next
+  light step baked ahead while this one shows and faded in when it arrives.
+  Each frame is a few image blits sorted by depth; people come from an atlas
+  filled as they first appear (`core/dynamic-atlas.ts`). Scenes draw at full
+  rate only while someone walks, a dozen frames a second otherwise, once a
+  second under the book or a pause, and not at all off screen or in a hidden
+  tab. The decor catalogue, badges and machine tiers are made from their
+  patterns rather than written out.
+- **The counter** is a dark chip: the station's painted close-up from
+  `OrderStationArt` with the drink on its mat, what the ticket asks for
+  (ingredient pictures, sugar and ice in words, the steps with their grades),
+  the skill being worked, and one primary key (Space) that does the next
+  thing. Meters are pixel art on the chip; nothing on the counter is a glyph.
+- **The drink** is the first campaign's stacked cup made general
+  (`cupSprite` in `art/sprites.ts`): a lathe per cup family (tall, short,
+  dome, slush, mug, bottle, bowl), the recipe's own tea, milk, fruit,
+  toppings and finish, and a fill that rises with the pouring steps. A
+  finished cup turns on the counter.
+- **Skills.** Steep, kettle heat, pour, milk ratio, pearl pot, egg waffle,
+  fruit board, cheese foam, tiger stripes, topping ladle, blender, shake,
+  seal and straw stab, then the torch, layered pour, color change, rosette
+  and packing. Each is a press, hold, beat, sequence, knob or drawn line. A
+  skill's first use on a device stops the shift with its line in the
+  arcade's callout over the counter's picture, brackets round the band to
+  hit; Continue (Enter, or Space once it has been read) brings play back and
+  never makes the move.
+- **Places.** The place strip opens the shop's other places. The order
+  window and the street are baked like the rooms (`art/room/front.ts`): the
+  window looks out over the pass at the guests with the venue's own outside
+  behind them, and the street shows the venue's own front between its
+  neighbours, its window display drink in the glass and people walking past.
+  The rest (the stockroom, office, city map, delivery run, garden, tasting
+  bench, closing chores and taste-off tent) are 432×270 scenes in
+  `art/places/`, the room's pixel density, painted with `core/painter.ts`
+  under the same light as the room, so the hour, season and weather reach
+  them too. Their controls sit on the things they act on, and choices are
+  ‹ › steppers (`views/Picker.svelte`), never a dropdown. A still scene paints
+  once per change; only what moves repaints (the garden's plants and
+  wildlife at a dozen frames a second, a chore while it is scrubbed). A
+  place's first visit names what it is for.
+- **The delivery run** is a street from above at a slant, scrolling under a
+  courier on a cargo bike with four sealed cups in its front box. The bike,
+  cars, trees, lamps and planters are sprite stacks (`art/models.ts`); the
+  balance leans the rider and the box by shearing the stack, and tea slops
+  over the side past what the cups can take. A spirit level in the scene
+  reads the balance and a route strip the distance. Rain, night and snow
+  change the street. The street is baked once per light into a strip that
+  repeats as it scrolls, so a frame copies it in and paints only the bike,
+  the weather and the gauges.
+- **Icons.** Ingredients, tools and skills use the first campaign's kitchen
+  icons where it drew the thing (`OrderKitchenItem`) and the expansion's own
+  drawings of the same kind otherwise (`art/icons.ts`), in the same ink and
+  paper.
+- **Sound** is the arcade's: the shared songs follow the shift's opening,
+  steady and rush, and each skill answers with a shop effect. The HUD's mute
+  silences it.
+- **Saves.** Normal and Expert keep separate shops on the device, with
+  export and import in the book. A first-campaign save opens in the
+  expansion; a first-campaign shift that was open finishes in the preserved
+  first-campaign counter (`OrderUpLegacy.svelte`) and the next day opens the
+  expansion. An unreadable save is kept aside, never overwritten.
+
+Each drink served or packed at the player's counter adds its grade out of
+100 to the shift's points. The book's receipt shows the total, and the
+Arcade menu shows the best completed shift for the current difficulty.
 
 #### Original Score Attack archive
 

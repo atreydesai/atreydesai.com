@@ -1,0 +1,1321 @@
+{
+  "version": 3,
+  "campaign": {
+    "version": 3,
+    "expansion": {
+      "schema": 1,
+      "shipments": [],
+      "shelves": {},
+      "activeShop": "corner",
+      "shops": {
+        "corner": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              5
+            ],
+            "build": [
+              4,
+              3
+            ],
+            "serve": [
+              6,
+              1
+            ],
+            "stock": [
+              4,
+              0
+            ]
+          },
+          "decor": [
+            {
+              "id": "fern-window-plant",
+              "x": 2,
+              "y": 5,
+              "rotation": 0
+            },
+            {
+              "id": "fern-wall-print",
+              "x": 3,
+              "y": 5,
+              "rotation": 0
+            },
+            {
+              "id": "fern-low-stool",
+              "x": 4,
+              "y": 5,
+              "rotation": 0
+            }
+          ],
+          "paint": "clay",
+          "manager": null
+        },
+        "campus": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              4
+            ],
+            "build": [
+              3,
+              3
+            ],
+            "serve": [
+              5,
+              1
+            ],
+            "stock": [
+              3,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "garden": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              6
+            ],
+            "build": [
+              4,
+              4
+            ],
+            "serve": [
+              7,
+              1
+            ],
+            "stock": [
+              4,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "night": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              3
+            ],
+            "build": [
+              3,
+              2
+            ],
+            "serve": [
+              4,
+              1
+            ],
+            "stock": [
+              3,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "station": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              4
+            ],
+            "build": [
+              5,
+              3
+            ],
+            "serve": [
+              8,
+              1
+            ],
+            "stock": [
+              5,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "harbor": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              5
+            ],
+            "build": [
+              4,
+              3
+            ],
+            "serve": [
+              7,
+              1
+            ],
+            "stock": [
+              4,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "loft": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              6
+            ],
+            "build": [
+              4,
+              4
+            ],
+            "serve": [
+              6,
+              1
+            ],
+            "stock": [
+              4,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "truck": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              2
+            ],
+            "build": [
+              3,
+              2
+            ],
+            "serve": [
+              4,
+              2
+            ],
+            "stock": [
+              3,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "boardwalk": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              4
+            ],
+            "build": [
+              4,
+              3
+            ],
+            "serve": [
+              6,
+              1
+            ],
+            "stock": [
+              4,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "lodge": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              2,
+              2
+            ],
+            "prep": [
+              1,
+              5
+            ],
+            "build": [
+              5,
+              4
+            ],
+            "serve": [
+              7,
+              2
+            ],
+            "stock": [
+              5,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "commissary": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              1,
+              1
+            ],
+            "prep": [
+              1,
+              6
+            ],
+            "build": [
+              5,
+              4
+            ],
+            "serve": [
+              9,
+              1
+            ],
+            "stock": [
+              5,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        },
+        "moon": {
+          "expansion": 2,
+          "stars": 4,
+          "receipts": 0,
+          "quality": 0,
+          "layout": {
+            "brew": [
+              2,
+              1
+            ],
+            "prep": [
+              1,
+              4
+            ],
+            "build": [
+              4,
+              4
+            ],
+            "serve": [
+              6,
+              2
+            ],
+            "stock": [
+              4,
+              0
+            ]
+          },
+          "decor": [],
+          "paint": "clay",
+          "manager": null
+        }
+      },
+      "extraInventory": [
+        {
+          "id": 10000,
+          "ingredient": "oolong",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10001,
+          "ingredient": "green",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10002,
+          "ingredient": "matcha",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10003,
+          "ingredient": "hojicha",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10004,
+          "ingredient": "genmaicha",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10005,
+          "ingredient": "earl-grey",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10006,
+          "ingredient": "thai-tea",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10007,
+          "ingredient": "rose-tea",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10008,
+          "ingredient": "osmanthus-tea",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10009,
+          "ingredient": "chrysanthemum",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10010,
+          "ingredient": "butterfly-pea",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10011,
+          "ingredient": "winter-melon",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10012,
+          "ingredient": "barley",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10013,
+          "ingredient": "coffee",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10014,
+          "ingredient": "soy",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10015,
+          "ingredient": "coconut-milk",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10016,
+          "ingredient": "almond",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10017,
+          "ingredient": "condensed",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10018,
+          "ingredient": "cream",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10019,
+          "ingredient": "foam-base",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10020,
+          "ingredient": "sea-salt-cream",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10021,
+          "ingredient": "yogurt",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10022,
+          "ingredient": "passion-fruit",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10023,
+          "ingredient": "lychee-fruit",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10024,
+          "ingredient": "peach",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10025,
+          "ingredient": "watermelon",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10026,
+          "ingredient": "grape",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10027,
+          "ingredient": "pineapple",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10028,
+          "ingredient": "lemon",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10029,
+          "ingredient": "lime",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10030,
+          "ingredient": "grapefruit",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10031,
+          "ingredient": "kumquat",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10032,
+          "ingredient": "dragon-fruit",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10033,
+          "ingredient": "avocado",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10034,
+          "ingredient": "coconut-fruit",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10035,
+          "ingredient": "persimmon",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10036,
+          "ingredient": "plum",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10037,
+          "ingredient": "pomelo",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10038,
+          "ingredient": "crystal-boba",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10039,
+          "ingredient": "coconut-jelly",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10040,
+          "ingredient": "aloe",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10041,
+          "ingredient": "red-bean",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10042,
+          "ingredient": "taro-balls",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10043,
+          "ingredient": "mochi-bits",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10044,
+          "ingredient": "lychee-jelly",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10045,
+          "ingredient": "sago",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10046,
+          "ingredient": "chia",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10047,
+          "ingredient": "rainbow-jelly",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10048,
+          "ingredient": "cookie-crumble",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10049,
+          "ingredient": "brulee-crust",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10050,
+          "ingredient": "fructose",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10051,
+          "ingredient": "osmanthus-syrup",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10052,
+          "ingredient": "rose-syrup",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10053,
+          "ingredient": "caramel",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10054,
+          "ingredient": "ube",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10055,
+          "ingredient": "pandan",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10056,
+          "ingredient": "black-sesame",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10057,
+          "ingredient": "egg-waffle",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10058,
+          "ingredient": "mochi-donut",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10059,
+          "ingredient": "taiyaki",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10060,
+          "ingredient": "scallion-pancake",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10061,
+          "ingredient": "mooncake",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10062,
+          "ingredient": "tangyuan",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10063,
+          "ingredient": "zongzi",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        },
+        {
+          "id": 10064,
+          "ingredient": "ginger",
+          "quantity": 4,
+          "expiresOn": 150,
+          "shelf": 0
+        }
+      ],
+      "machines": {
+        "auto-tea": {
+          "tier": 2,
+          "condition": 82,
+          "shop": "corner",
+          "slot": 0,
+          "rotation": 0,
+          "automatic": true,
+          "broken": false
+        },
+        "pearl-cooker": {
+          "tier": 2,
+          "condition": 82,
+          "shop": "corner",
+          "slot": 1,
+          "rotation": 0,
+          "automatic": true,
+          "broken": false
+        },
+        "auto-milk": {
+          "tier": 2,
+          "condition": 82,
+          "shop": "corner",
+          "slot": 2,
+          "rotation": 0,
+          "automatic": true,
+          "broken": false
+        }
+      },
+      "staff": [
+        {
+          "id": "staff-40",
+          "name": "Anise",
+          "portrait": "anise",
+          "role": "barista",
+          "traits": [
+            "quick",
+            "steady"
+          ],
+          "skills": {
+            "brew": 1,
+            "prep": 1,
+            "build": 1,
+            "serve": 1,
+            "stock": 1
+          },
+          "progress": {
+            "brew": 0,
+            "prep": 0,
+            "build": 0,
+            "serve": 0,
+            "stock": 0
+          },
+          "energy": 100,
+          "station": "brew",
+          "shop": "corner",
+          "rota": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "shifts": 0,
+          "paidDays": []
+        },
+        {
+          "id": "staff-41",
+          "name": "Birch",
+          "portrait": "birch",
+          "role": "prep",
+          "traits": [
+            "careful",
+            "early-bird"
+          ],
+          "skills": {
+            "brew": 1,
+            "prep": 1,
+            "build": 1,
+            "serve": 1,
+            "stock": 1
+          },
+          "progress": {
+            "brew": 0,
+            "prep": 0,
+            "build": 0,
+            "serve": 0,
+            "stock": 0
+          },
+          "energy": 100,
+          "station": "prep",
+          "shop": "corner",
+          "rota": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "shifts": 0,
+          "paidDays": []
+        },
+        {
+          "id": "staff-42",
+          "name": "Cedar",
+          "portrait": "cedar",
+          "role": "runner",
+          "traits": [
+            "chatty",
+            "night-owl"
+          ],
+          "skills": {
+            "brew": 1,
+            "prep": 1,
+            "build": 1,
+            "serve": 1,
+            "stock": 1
+          },
+          "progress": {
+            "brew": 0,
+            "prep": 0,
+            "build": 0,
+            "serve": 0,
+            "stock": 0
+          },
+          "energy": 100,
+          "station": "serve",
+          "shop": "corner",
+          "rota": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "shifts": 0,
+          "paidDays": []
+        }
+      ],
+      "loadout": [
+        "golden-ladle",
+        "steady-hands",
+        "slow-pour",
+        "second-hands",
+        "ice-avalanche",
+        "fresh-batch"
+      ],
+      "powerups": {
+        "rush": 3,
+        "patience": 3,
+        "quality": 3,
+        "assist": 3,
+        "supplies": 3,
+        "special": 3,
+        "quiet": 3,
+        "golden-ladle": 3,
+        "steady-hands": 3,
+        "slow-pour": 3,
+        "second-hands": 3,
+        "ice-avalanche": 3,
+        "fresh-batch": 3,
+        "jukebox-coin": 3,
+        "happy-hour": 3,
+        "fortune-cookie": 3,
+        "rush-bell": 3,
+        "cat-nap": 3,
+        "hot-stamp": 3,
+        "pearl-express": 3,
+        "remake-pass": 3,
+        "vip-lane": 3,
+        "rain-check": 3,
+        "flow-keeper": 3
+      },
+      "visits": {
+        "mochi": 5,
+        "biscuit": 5,
+        "juniper": 5,
+        "bean": 5,
+        "tofu": 5,
+        "pip": 5,
+        "nori": 5,
+        "clementine": 5,
+        "bao": 5,
+        "oats": 5
+      },
+      "recipes": {},
+      "metrics": {},
+      "badges": [],
+      "decor": [
+        "fern-window-plant",
+        "fern-wall-print",
+        "fern-low-stool",
+        "fern-tea-shelf",
+        "fern-table-runner",
+        "fern-small-vase",
+        "fern-cushion",
+        "fern-menu-frame"
+      ],
+      "keepsakes": [],
+      "prints": [
+        "house"
+      ],
+      "paint": "clay",
+      "apron": "house",
+      "cupPrint": "house",
+      "cat": true,
+      "catAccessory": "",
+      "garden": [
+        {
+          "ingredient": "peach",
+          "planted": 118,
+          "watered": 119,
+          "growth": 2.5
+        },
+        {
+          "ingredient": "oolong",
+          "planted": 118,
+          "watered": 119,
+          "growth": 3
+        },
+        {
+          "ingredient": null,
+          "planted": 0,
+          "watered": 0,
+          "growth": 0
+        },
+        {
+          "ingredient": null,
+          "planted": 0,
+          "watered": 0,
+          "growth": 0
+        }
+      ],
+      "pairings": [],
+      "labHistory": [],
+      "houseBlend": [],
+      "routes": [],
+      "truckStop": "park",
+      "prices": {},
+      "loan": 0,
+      "loanInterest": 0,
+      "marketing": null,
+      "windowDisplay": "milk-tea",
+      "dailyBests": {},
+      "selectedGoals": [
+        "shift-served"
+      ],
+      "goalProgress": {},
+      "claimedGoals": [],
+      "rivalWins": 0,
+      "tournamentRound": 0,
+      "tasteoffDay": 0,
+      "giftedDays": [],
+      "seenDays": [],
+      "nextId": 10065,
+      "ice": 100,
+      "pearls": 0,
+      "freshness": 1,
+      "missedRent": 0,
+      "lastReport": null,
+      "lessons": [],
+      "totalPlaySeconds": 0,
+      "recoveries": 0,
+      "notice": ""
+    },
+    "mode": "expert",
+    "day": 120,
+    "cash": 187500,
+    "xp": 100000,
+    "reputation": 50,
+    "highestReputation": 50,
+    "bestShiftScore": 0,
+    "status": "planning",
+    "inventory": [
+      {
+        "id": 23,
+        "ingredient": "black",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 24,
+        "ingredient": "jasmine",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 25,
+        "ingredient": "taro",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 26,
+        "ingredient": "milk",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 27,
+        "ingredient": "oat",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 28,
+        "ingredient": "pearls",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 29,
+        "ingredient": "popping",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 30,
+        "ingredient": "pudding",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 31,
+        "ingredient": "strawberry",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 32,
+        "ingredient": "banana",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 33,
+        "ingredient": "brown-sugar",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 34,
+        "ingredient": "honey",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 35,
+        "ingredient": "vanilla",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 36,
+        "ingredient": "bun",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 37,
+        "ingredient": "mango",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 38,
+        "ingredient": "grass-jelly",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 39,
+        "ingredient": "waffle",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 40,
+        "ingredient": "banana-scoop",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 41,
+        "ingredient": "vanilla-scoop",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 42,
+        "ingredient": "sesame-syrup",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 43,
+        "ingredient": "yuzu",
+        "quantity": 4,
+        "expiresOn": 150
+      },
+      {
+        "id": 44,
+        "ingredient": "seltzer",
+        "quantity": 4,
+        "expiresOn": 150
+      }
+    ],
+    "deliveries": [],
+    "upgrades": [],
+    "powerups": {
+      "rush": 0,
+      "patience": 0,
+      "quality": 0,
+      "assist": 0,
+      "supplies": 0,
+      "special": 0,
+      "quiet": 0
+    },
+    "activePowerups": [],
+    "legacyUnlimitedStock": false,
+    "crew": [],
+    "crewShifts": {},
+    "certifiedCrew": [],
+    "activeCrew": [],
+    "branches": [
+      "corner"
+    ],
+    "branchFittings": [],
+    "activeBranch": "corner",
+    "managedBranch": null,
+    "managerBranch": null,
+    "locationManagers": {},
+    "managerMenus": {},
+    "publicity": null,
+    "commission": null,
+    "standingOrders": {},
+    "paint": "clay",
+    "paintUnlocked": [
+      "clay"
+    ],
+    "recipeRecords": {},
+    "cupPrint": "house",
+    "currentEvent": "neighborhood",
+    "lastDay": null,
+    "regularVisits": {},
+    "rentPaid": 0,
+    "rentBook": {
+      "current": null,
+      "history": []
+    },
+    "nextId": 45
+  },
+  "shift": null,
+  "expandedShift": null,
+  "savedAt": "2026-11-26T23:28:03.671Z"
+}

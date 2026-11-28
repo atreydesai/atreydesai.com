@@ -28,6 +28,11 @@ export interface StackOptions {
   spacing?: number;
   /** A palette character drawn once around the finished stack ("" for none). */
   outline?: string;
+  /**
+   * Columns each slice shifts sideways from the one under it: a stack that
+   * leans (a rider swaying, a tray tipping) rather than turns. 0 stands upright.
+   */
+  shear?: number;
 }
 
 export interface Stacked {
@@ -49,7 +54,10 @@ export function quantizeTurn(turn: number) {
  * Stacks `slices` (each the same width and height, ground first) into one
  * grid seen from above at a slant and turned by `turn`.
  */
-export function stackGrid(slices: readonly Grid[], { turn = 0, squash = 0.75, spacing = 1, outline = "" }: StackOptions = {}): Stacked {
+export function stackGrid(
+  slices: readonly Grid[],
+  { turn = 0, squash = 0.75, spacing = 1, outline = "", shear = 0 }: StackOptions = {},
+): Stacked {
   const count = slices.length;
   const h = count ? slices[0].length : 0;
   const w = h ? slices[0][0].length : 0;
@@ -64,13 +72,16 @@ export function stackGrid(slices: readonly Grid[], { turn = 0, squash = 0.75, sp
   const sh = Math.max(1, Math.round(th * squash));
   const lift = Math.round((count - 1) * spacing);
   const pad = outline ? 1 : 0;
-  const W = tw + pad * 2;
+  const lean = Math.ceil(Math.abs(shear) * (count - 1) - 1e-9);
+  const base = shear < 0 ? lean : 0;
+  const W = tw + lean + pad * 2;
   const H = sh + lift + pad * 2;
   const cells: string[][] = Array.from({ length: H }, () => Array(W).fill(EMPTY));
 
   for (let z = 0; z < count; z++) {
     const slice = slices[z];
     const up = Math.round(z * spacing);
+    const side = base + Math.round(z * shear);
     for (let oy = 0; oy < sh; oy++) {
       // Undo the squash, then the turn, to find the slice cell under this one.
       const ry = ((oy + 0.5) / sh) * th - th / 2;
@@ -88,7 +99,7 @@ export function stackGrid(slices: readonly Grid[], { turn = 0, squash = 0.75, sp
         if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
         const ch = slice[sy][sx];
         if (ch === EMPTY || ch === " ") continue;
-        cells[pad + lift - up + oy][pad + ox] = ch;
+        cells[pad + lift - up + oy][pad + side + ox] = ch;
       }
     }
   }
@@ -105,7 +116,7 @@ export function stackGrid(slices: readonly Grid[], { turn = 0, squash = 0.75, sp
     }
   }
 
-  return { grid: cells.map((row) => row.join("")), anchorX: pad + tw / 2, anchorY: pad + lift + sh / 2 };
+  return { grid: cells.map((row) => row.join("")), anchorX: pad + base + tw / 2, anchorY: pad + lift + sh / 2 };
 }
 
 export interface LatheLayer {

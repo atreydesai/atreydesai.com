@@ -1,0 +1,219 @@
+{
+  "campaign": {
+    "version": 2,
+    "mode": "normal",
+    "day": 12,
+    "cash": 18740,
+    "xp": 1200,
+    "reputation": 50,
+    "highestReputation": 50,
+    "bestShiftScore": 743,
+    "status": "planning",
+    "inventory": [
+      {
+        "id": 1,
+        "ingredient": "black",
+        "quantity": 16,
+        "expiresOn": 18
+      },
+      {
+        "id": 2,
+        "ingredient": "jasmine",
+        "quantity": 16,
+        "expiresOn": 18
+      },
+      {
+        "id": 3,
+        "ingredient": "taro",
+        "quantity": 14,
+        "expiresOn": 18
+      },
+      {
+        "id": 4,
+        "ingredient": "milk",
+        "quantity": 19,
+        "expiresOn": 18
+      },
+      {
+        "id": 5,
+        "ingredient": "oat",
+        "quantity": 14,
+        "expiresOn": 18
+      },
+      {
+        "id": 6,
+        "ingredient": "pearls",
+        "quantity": 14,
+        "expiresOn": 18
+      },
+      {
+        "id": 7,
+        "ingredient": "popping",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 8,
+        "ingredient": "pudding",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 9,
+        "ingredient": "strawberry",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 10,
+        "ingredient": "banana",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 11,
+        "ingredient": "brown-sugar",
+        "quantity": 16,
+        "expiresOn": 18
+      },
+      {
+        "id": 12,
+        "ingredient": "honey",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 13,
+        "ingredient": "vanilla",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 14,
+        "ingredient": "bun",
+        "quantity": 11,
+        "expiresOn": 18
+      },
+      {
+        "id": 15,
+        "ingredient": "mango",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 16,
+        "ingredient": "grass-jelly",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 17,
+        "ingredient": "waffle",
+        "quantity": 10,
+        "expiresOn": 18
+      },
+      {
+        "id": 18,
+        "ingredient": "banana-scoop",
+        "quantity": 9,
+        "expiresOn": 18
+      },
+      {
+        "id": 19,
+        "ingredient": "vanilla-scoop",
+        "quantity": 9,
+        "expiresOn": 18
+      },
+      {
+        "id": 20,
+        "ingredient": "sesame-syrup",
+        "quantity": 12,
+        "expiresOn": 18
+      },
+      {
+        "id": 21,
+        "ingredient": "yuzu",
+        "quantity": 11,
+        "expiresOn": 18
+      },
+      {
+        "id": 22,
+        "ingredient": "seltzer",
+        "quantity": 12,
+        "expiresOn": 18
+      }
+    ],
+    "deliveries": [],
+    "upgrades": [
+      "auto-tea",
+      "warm-shelf"
+    ],
+    "powerups": {
+      "rush": 0,
+      "patience": 0,
+      "quality": 0,
+      "assist": 0,
+      "supplies": 0,
+      "special": 0,
+      "quiet": 0
+    },
+    "activePowerups": [],
+    "legacyUnlimitedStock": false,
+    "crew": [
+      "host",
+      "prep",
+      "runner",
+      "manager"
+    ],
+    "crewShifts": {
+      "host": 2,
+      "prep": 2,
+      "runner": 2,
+      "manager": 2
+    },
+    "certifiedCrew": [
+      "host"
+    ],
+    "activeCrew": [
+      "host"
+    ],
+    "branches": [
+      "corner",
+      "campus"
+    ],
+    "branchFittings": [],
+    "activeBranch": "corner",
+    "managedBranch": null,
+    "managerBranch": null,
+    "locationManagers": {
+      "campus": {
+        "scheduled": true,
+        "shifts": 2,
+        "certified": true
+      }
+    },
+    "managerMenus": {},
+    "publicity": null,
+    "commission": null,
+    "standingOrders": {},
+    "paint": "clay",
+    "paintUnlocked": [
+      "clay"
+    ],
+    "recipeRecords": {},
+    "cupPrint": "house",
+    "currentEvent": "neighborhood",
+    "lastDay": null,
+    "regularVisits": {
+      "mochi": 4,
+      "biscuit": 3
+    },
+    "rentPaid": 0,
+    "rentBook": {
+      "current": null,
+      "history": []
+    },
+    "nextId": 23
+  },
+  "shift": null
+}
